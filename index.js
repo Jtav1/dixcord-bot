@@ -25,11 +25,11 @@ const processMessageForResponse = (msg) => {
             if(useURLsForTakeALookAtThis) file = new Discord.MessageAttachment('./take_a_look_at_this/' + fileName) ;
             else file = new Discord.MessageAttachment(fileName) ;
     
-            const exampleEmbed = {
-                image: {
-                    url: fileName,
-                },
-            };
+            // const exampleEmbed = {
+            //     image: {
+            //         url: fileName,
+            //     },
+            // };
             
             msg.channel.send({ files: [file] });
         }
@@ -40,9 +40,9 @@ const getTakeALookAtThisFilename = () => {
     // let fileArray = [];
     let urlArray = [];
 
-    // fs.readdirSync(getTakeALookAtThisPath).forEach(file => {
-    //     fileArray.push(file);
-    // });
+    fs.readdirSync(getTakeALookAtThisPath).forEach(file => {
+        fileArray.push(file);
+    });
     
     try {  
         var data = fs.readFileSync((process.env.TAKE_A_LOOK_AT_THIS_LINKS_FILE), 'utf8');
