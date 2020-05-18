@@ -8,33 +8,139 @@ const fs = require('fs');
 const getTakeALookAtThisPath = path.join(__dirname, 'take_a_look_at_this');
 const useURLsForTakeALookAtThis = true;
 
+//Log bot into server
 client.on('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
 });
    
+//When a message is sent on the server, process the message
 client.on('message', msg => {
     processMessageForResponse(msg);
 });
 
+//Finally, log in
+client.login(process.env.BOT_SECRET_TOKEN)
+
+//Parse message for keywords
 const processMessageForResponse = (msg) => {
-    //"Take a look at this" meme
-    if (msg.content.toLowerCase().includes('take a look at this')) {
-            const fileName = getTakeALookAtThisFilename();
 
-            let file;
-            if(useURLsForTakeALookAtThis) file = new Discord.MessageAttachment(fileName) ;
-            else file = new Discord.MessageAttachment('./take_a_look_at_this/' + fileName) ;
-    
-            const exampleEmbed = {
-                image: {
-                    url: fileName,
-                },
-            };
-            console.log(file);
-            msg.channel.send({ files: [file] });
+    console.log(msg.content.toLowerCase());
+    console.log(msg.author);
+
+    if(msg.author.username !== "dixcord-bot"){
+        //"Take a look at this" meme
+        if (msg.content.toLowerCase().includes('take a look at this')) {
+            takeALookAtThisResponder(msg);
         }
-    };
 
+        if (msg.content.toLowerCase().startsWith('good shit')) {
+            goodShitResponder(msg);
+        };
+
+        if (msg.content.toLowerCase().includes('ustin makes me feel good')) {
+            bustinResponder(msg);
+        };
+
+        if (msg.content.toLowerCase().startsWith('do they ask questions?')) {
+            questionsResponder(msg);
+        };
+
+        if (msg.content.toLowerCase().includes('dippin dots')) {
+            dippinDotsResponder(msg);
+        };
+
+        if (msg.content.toLowerCase().includes('big enough')) {
+            bigEnoughResponder(msg);
+        };
+    }
+};
+
+/*
+* Resposne handlers
+*    Functions that handle text based responses to input message triggers
+*/
+
+//Response for TakeALookAtThis meme - return one of a set of urls or images
+const takeALookAtThisResponder = (msg) => {
+    console.log("Take a look at this detected, replying");
+
+    const fileName = getTakeALookAtThisFilename();
+
+    let file;
+    if(useURLsForTakeALookAtThis) file = new Discord.MessageAttachment(fileName) ;
+    else file = new Discord.MessageAttachment('./take_a_look_at_this/' + fileName) ;
+
+    const exampleEmbed = {
+        image: {
+            url: fileName,
+        },
+    };
+    if(useURLsForTakeALookAtThis) msg.channel.send({ files: [file] });
+    else msg.channel.send({ files: [file], embed: exampleEmbed });
+};
+
+//Response for Good Shit meme - return one of two strings
+const goodShitResponder = (msg) => {
+    console.log("Good shit detected, replying");
+
+    let responseArray = [":ok_hand::eyes::ok_hand::eyes::ok_hand::eyes::ok_hand::eyes::ok_hand::eyes: good shit go౦ԁ sHit:ok_hand: thats :heavy_check_mark: some good:ok_hand::ok_hand:shit right:ok_hand::ok_hand:there:ok_hand::ok_hand::ok_hand: right:heavy_check_mark:there…ʳᶦᵍʰᵗ ᵗʰᵉʳᵉ) mMMMMᎷМ:100: :ok_hand::ok_hand: :ok_hand:НO0ОଠOOOOOОଠଠOoooᵒᵒᵒᵒᵒᵒᵒᵒᵒ:ok_hand: :ok_hand::ok_hand: :ok_hand: :100: :ok_hand: :eyes: :eyes: :eyes: :ok_hand::ok_hand:Good shit",
+    //    ":pg::eyes::pg::eyes::pg::eyes::pg::eyes::pg::eyes: good shit go౦ԁ sHit:pg: thats :heavy_check_mark: some good:pg::pg:shit right:pg::pg:there:pg::pg::pg: right:heavy_check_mark:there…ʳᶦᵍʰᵗ ᵗʰᵉʳᵉ) mMMMMᎷМ:100: :pg::pg: :pg:НO0ОଠOOOOOОଠଠOoooᵒᵒᵒᵒᵒᵒᵒᵒᵒ:pg: :pg::pg: :pg: :100: :pg: :eyes: :eyes: :eyes: :pg::pg:Good shit"
+    ]
+    msg.channel.send(responseArray[Math.floor(Math.random() * responseArray.length)]);   
+}
+
+//Response for Bustin meme - return a single youtube link response
+const bustinResponder = (msg) => {
+    console.log("Bustin detected, replying");
+
+    msg.channel.send("https://www.youtube.com/watch?v=0tdyU_gW6WE");   
+}
+
+//Response for Questions meme - return a single image response
+const questionsResponder = (msg) => {
+    console.log("Questions detected, replying");
+
+    msg.channel.send("https://i.imgur.com/jl2UeKT.png");   
+}
+
+//Response for Questions meme - return one of an array of responses
+const dippinDotsResponder = (msg) => {
+    console.log("dippin dots detected, replying");
+
+    let responseArray = [
+        "https://twitter.com/seanspicer/status/11794196641",
+        "https://twitter.com/seanspicer/status/132499281847402496",
+        "https://twitter.com/seanspicer/status/116970977878999040",
+        "https://twitter.com/seanspicer/status/640955839390576640",
+        "https://twitter.com/seanspicer/status/302491904707272704"
+    ];
+
+
+    msg.channel.send(responseArray[Math.floor(Math.random() * responseArray.length)]);   
+}
+
+//Response for Questions meme - return one of an array of responses
+const bigEnoughResponder = (msg) => {
+    console.log("big enough detected, replying");
+
+    let responseArray = [
+       "https://www.youtube.com/watch?v=SywExJR4lrI",
+       "https://www.youtube.com/watch?v=_k833juQcic",
+       "https://www.youtube.com/watch?v=vAe3x86c7Xk",
+       "https://www.youtube.com/watch?v=KYTT4orVixE",
+       "https://www.youtube.com/watch?v=nAjh3fJuI6k",
+       "https://www.youtube.com/watch?v=ypHZ_iKBcoo",
+       "https://www.youtube.com/watch?v=2yCRnT5xegI"
+    ];
+
+
+    msg.channel.send(responseArray[Math.floor(Math.random() * responseArray.length)]);   
+}
+
+/*
+* Support functions
+*    Functions that support other functions
+*/
 const getTakeALookAtThisFilename = () => {
 
     let fileArray = [];
@@ -58,5 +164,3 @@ const getTakeALookAtThisFilename = () => {
     }
       
 };
-
-client.login(process.env.BOT_SECRET_TOKEN)
