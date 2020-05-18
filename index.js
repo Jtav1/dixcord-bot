@@ -18,7 +18,7 @@ client.on('message', msg => {
 
 const processMessageForResponse = (msg) => {
     //"Take a look at this" meme
-    if (msg.content.toLowerCase().includes('a')) {
+    if (msg.content.toLowerCase().includes('take a look at this')) {
             const fileName = getTakeALookAtThisFilename();
 
             let file;
