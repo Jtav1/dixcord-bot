@@ -22,37 +22,41 @@ const processMessageForResponse = (msg) => {
             const fileName = getTakeALookAtThisFilename();
 
             let file;
-            if(useURLsForTakeALookAtThis) file = new Discord.MessageAttachment('./take_a_look_at_this/' + fileName) ;
-            else file = new Discord.MessageAttachment(fileName) ;
+            if(useURLsForTakeALookAtThis) file = new Discord.MessageAttachment(fileName) ;
+            else file = new Discord.MessageAttachment('./take_a_look_at_this/' + fileName) ;
     
-            // const exampleEmbed = {
-            //     image: {
-            //         url: fileName,
-            //     },
-            // };
-            
+            const exampleEmbed = {
+                image: {
+                    url: fileName,
+                },
+            };
+            console.log(file);
             msg.channel.send({ files: [file] });
         }
-};
+    };
 
 const getTakeALookAtThisFilename = () => {
 
-    // let fileArray = [];
+    let fileArray = [];
     let urlArray = [];
 
-    fs.readdirSync(getTakeALookAtThisPath).forEach(file => {
-        fileArray.push(file);
-    });
-    
-    try {  
-        var data = fs.readFileSync((process.env.TAKE_A_LOOK_AT_THIS_LINKS_FILE), 'utf8');
-        urlArray.push(data.split("\r\n"));    
-    } catch(e) {
-        console.log('Error:', e.stack);
-    }
+    if(useURLsForTakeALookAtThis){
+        try {  
+            var data = fs.readFileSync((process.env.TAKE_A_LOOK_AT_THIS_LINKS_FILE), 'utf8');
+            urlArray = data.split("\r\n");    
+        } catch(e) {
+            console.log('Error:', e.stack);
+        }
+        return urlArray[Math.floor(Math.random() * urlArray.length)];
+        
+    } else {
+        fs.readdirSync(getTakeALookAtThisPath).forEach(file => {
+            fileArray.push(file);
+        });
 
-    if(useURLsForTakeALookAtThis) return urlArray[Math.floor(Math.random() * urlArray.length)];
-    // else return fileArray[Math.floor(Math.random() * fileArray.length)];    
+        return fileArray[Math.floor(Math.random() * fileArray.length)];
+    }
+      
 };
 
 client.login(process.env.BOT_SECRET_TOKEN)
