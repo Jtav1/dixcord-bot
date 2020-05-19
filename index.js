@@ -27,9 +27,8 @@ client.login(process.env.BOT_SECRET_TOKEN)
 //Parse message for keywords
 const processMessageForResponse = (msg) => {
 
-    console.log(msg.content.toLowerCase());
-    console.log(msg.author);
 
+    
     if(msg.author.username !== "dixbot"){
         //"Take a look at this" meme
         if (msg.content.toLowerCase().includes('take a look at this')) {
