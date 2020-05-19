@@ -11,7 +11,10 @@ const useURLsForTakeALookAtThis = true;
 //Log bot into server
 client.on('ready', () => {
     console.log(`Logged in as ${client.user.tag}!`);
+    client.user.setUsername('dixbot');
+
 });
+
    
 //When a message is sent on the server, process the message
 client.on('message', msg => {
@@ -27,7 +30,7 @@ const processMessageForResponse = (msg) => {
     console.log(msg.content.toLowerCase());
     console.log(msg.author);
 
-    if(msg.author.username !== "dixcord-bot"){
+    if(msg.author.username !== "dixbot"){
         //"Take a look at this" meme
         if (msg.content.toLowerCase().includes('take a look at this')) {
             takeALookAtThisResponder(msg);
@@ -41,9 +44,9 @@ const processMessageForResponse = (msg) => {
             bustinResponder(msg);
         };
 
-        if (msg.content.toLowerCase().startsWith('do they ask questions?')) {
-            questionsResponder(msg);
-        };
+        // if (msg.content.toLowerCase().startsWith('do they ask questions?')) {
+        //     questionsResponder(msg);
+        // };
 
         if (msg.content.toLowerCase().includes('dippin dots')) {
             dippinDotsResponder(msg);
@@ -51,6 +54,14 @@ const processMessageForResponse = (msg) => {
 
         if (msg.content.toLowerCase().includes('big enough')) {
             bigEnoughResponder(msg);
+        };
+
+        if (msg.content.toLowerCase().startsWith('!dixbot list')) {
+            listResponder(msg);
+        };
+
+        if (msg.content.toLowerCase().startsWith('!dixbot poll')) {
+            pollResponder(msg);
         };
     }
 };
@@ -135,6 +146,51 @@ const bigEnoughResponder = (msg) => {
 
 
     msg.channel.send(responseArray[Math.floor(Math.random() * responseArray.length)]);   
+}
+
+//Response for !list function - return a static response
+const listResponder = (msg) => {
+    console.log("!list command detected, replying");
+
+    let responseStr = "`DIXBOT AVAILABLE COMMANDS:\n"
+                           + "Responds to:\n"
+                           + "\t'take a look at this'\n"
+                           + "\t'good shit'\n"
+                           + "\t'ustin makes me feel good'\n"
+                           + "\t'dippin dots'\n"
+                           + "\t'big enough'\n"
+                           + "Create a Poll:\n"
+                           + "\t!dixbot poll \"Poll Question\" \"Response A\" \"Response B\" etc`";
+
+    msg.channel.send(responseStr);   
+}
+
+const pollResponder = (msg) => {
+
+    let messageArray = msg.content.substring(12, msg.content.lengt).split("\" \"");;
+    let newMessageArray = [];
+    messageArray.map((fragment) => {
+        newMessageArray.push(fragment.replace("\"", ""));
+    });
+    
+    
+    msg.channel.send('`' + newMessageArray.shift() + ":`");
+
+    if(newMessageArray.length > 9) msg.channel.send("Too many options! Keep it to like, 9, please");
+
+    else {
+        newMessageArray.forEach((fragment) => {
+            if(newMessageArray.indexOf(fragment) === 0) msg.channel.send('`1️⃣' + fragment.trim()+ "`").then((outgoing) => outgoing.react('1️⃣'));   
+            if(newMessageArray.indexOf(fragment) === 1) msg.channel.send('`2️⃣' + fragment.trim()+ "`").then((outgoing) => outgoing.react('2️⃣')); 
+            if(newMessageArray.indexOf(fragment) === 2) msg.channel.send('`3️⃣' + fragment.trim()+ "`").then((outgoing) => outgoing.react('3️⃣'));
+            if(newMessageArray.indexOf(fragment) === 3) msg.channel.send('`4️⃣' + fragment.trim()+ "`").then((outgoing) => outgoing.react('4️⃣'));
+            if(newMessageArray.indexOf(fragment) === 4) msg.channel.send('`5️⃣' + fragment.trim()+ "`").then((outgoing) => outgoing.react('5️⃣'));
+            if(newMessageArray.indexOf(fragment) === 5) msg.channel.send('`6️⃣' + fragment.trim()+ "`").then((outgoing) => outgoing.react('6️⃣'));
+            if(newMessageArray.indexOf(fragment) === 6) msg.channel.send('`7️⃣' + fragment.trim()+ "`").then((outgoing) => outgoing.react('7️⃣'));
+            if(newMessageArray.indexOf(fragment) === 7) msg.channel.send('`8️⃣' + fragment.trim()+ "`").then((outgoing) => outgoing.react('8️⃣'));
+            if(newMessageArray.indexOf(fragment) === 8) msg.channel.send('`9️⃣' + fragment.trim()+ "`").then((outgoing) => outgoing.react('9️⃣'));
+        });
+    }
 }
 
 /*
