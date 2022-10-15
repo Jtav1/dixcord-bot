@@ -1,4 +1,4 @@
-const Discord = require('discord.js');
+const { REST, Routes } = require('discord.js');
 const dotenv = require('dotenv').config();
 const client = new Discord.Client();
 
@@ -7,6 +7,11 @@ const fs = require('fs');
 
 const getTakeALookAtThisPath = path.join(__dirname, process.env.TAKE_A_LOOK_AT_THIS_FOLDER);
 const useURLsForTakeALookAtThis = true;
+
+
+
+
+
 
 //Log bot into server
 client.on('ready', () => {

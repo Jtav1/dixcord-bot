@@ -10,7 +10,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "discord.js": "^12.2.0",
-    "dotenv": "^8.2.0"
+    "@discordjs/voice": "^0.13.0",
+    "bufferutil": "^4.0.6",
+    "discord.js": "^14.6.0",
+    "dotenv": "^8.2.0",
+    "erlpack": "github:discord/erlpack",
+    "utf-8-validate": "^5.0.9",
+    "zlib-sync": "^0.1.7"
   }
 }
