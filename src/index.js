@@ -5,7 +5,7 @@ const client = new Discord.Client();
 const path = require('path');
 const fs = require('fs');
 
-const getTakeALookAtThisPath = path.join(__dirname, 'take_a_look_at_this');
+const getTakeALookAtThisPath = path.join(__dirname, process.env.TAKE_A_LOOK_AT_THIS_FOLDER);
 const useURLsForTakeALookAtThis = true;
 
 //Log bot into server
@@ -26,8 +26,6 @@ client.login(process.env.BOT_SECRET_TOKEN)
 
 //Parse message for keywords
 const processMessageForResponse = (msg) => {
-
-
     
     if(msg.author.username !== "dixbot"){
         //"Take a look at this" meme
@@ -35,33 +33,33 @@ const processMessageForResponse = (msg) => {
             takeALookAtThisResponder(msg);
         }
 
-        if (msg.content.toLowerCase().startsWith('good shit')) {
-            goodShitResponder(msg);
-        };
+        // if (msg.content.toLowerCase().startsWith('good shit')) {
+        //     goodShitResponder(msg);
+        // };
 
-        if (msg.content.toLowerCase().includes('ustin makes me feel good')) {
-            bustinResponder(msg);
-        };
+        // if (msg.content.toLowerCase().includes('ustin makes me feel good')) {
+        //     bustinResponder(msg);
+        // };
 
         // if (msg.content.toLowerCase().startsWith('do they ask questions?')) {
         //     questionsResponder(msg);
         // };
 
-        if (msg.content.toLowerCase().includes('dippin dots')) {
-            dippinDotsResponder(msg);
-        };
+        // if (msg.content.toLowerCase().includes('dippin dots')) {
+        //     dippinDotsResponder(msg);
+        // };
 
-        if (msg.content.toLowerCase().includes('big enough')) {
-            bigEnoughResponder(msg);
-        };
+        // if (msg.content.toLowerCase().includes('big enough')) {
+        //     bigEnoughResponder(msg);
+        // };
 
-        if (msg.content.toLowerCase().startsWith('!dixbot list')) {
-            listResponder(msg);
-        };
+        // if (msg.content.toLowerCase().startsWith('!dixbot list')) {
+        //     listResponder(msg);
+        // };
 
-        if (msg.content.toLowerCase().startsWith('!dixbot poll')) {
-            pollResponder(msg);
-        };
+        // if (msg.content.toLowerCase().startsWith('!dixbot poll')) {
+        //     pollResponder(msg);
+        // };
     }
 };
 
@@ -78,7 +76,7 @@ const takeALookAtThisResponder = (msg) => {
 
     let file;
     if(useURLsForTakeALookAtThis) file = new Discord.MessageAttachment(fileName) ;
-    else file = new Discord.MessageAttachment('./take_a_look_at_this/' + fileName) ;
+    else file = new Discord.MessageAttachment('../assets/take_a_look_at_this/' + fileName) ;
 
     const exampleEmbed = {
         image: {
