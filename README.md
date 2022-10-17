@@ -1,4 +1,4 @@
-# discord-bot
+# dixcord-bot
  Discord Bot for Justin's Discord
  
  Extremely rudimentary, getting the hang of the new version of this library
