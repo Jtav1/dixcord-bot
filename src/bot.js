@@ -42,8 +42,7 @@ for (const file of eventFiles) {
 	}
 }
 
-
-// When the client is ready, run this code (only once) - handled by event 
+// When the client is ready, run this code (only once) - moved to handled by event 
 // client.once('ready', () => {
 
 // });
