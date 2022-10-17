@@ -7,6 +7,7 @@ RUN npm ci
 COPY ./src .
 COPY ./assets .
 
-EXPOSE 3000
+# EXPOSE 3000
 
-CMD [ "node", "index.js" ]
+# ENTRYPOINT [ "node", "./src/bot.js" ]
+CMD ["node", "bot.js"]
