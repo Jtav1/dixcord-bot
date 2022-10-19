@@ -3,8 +3,10 @@ WORKDIR /usr/src/app
 
 COPY ./commands ./commands
 COPY ./events ./events
-COPY ./*.js ./
 COPY ./package*.json ./
+
+COPY ./configVars.js ./
+COPY ./bot.js ./
 
 RUN npm ci
 
