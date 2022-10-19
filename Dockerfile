@@ -1,13 +1,10 @@
 FROM node:alpine3.16
 WORKDIR /usr/src/app
 
-COPY package*.json ./
+COPY ./commands ./commands
+COPY ./events ./events
+COPY ./*.js* ./
+
 RUN npm ci
 
-COPY ./src .
-COPY ./assets .
-
-# EXPOSE 3000
-
-# ENTRYPOINT [ "node", "./src/bot.js" ]
-CMD ["node", "bot.js"]
+CMD ["node", "./bot.js"]
