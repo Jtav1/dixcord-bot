@@ -1,4 +1,4 @@
-const { images } = require('../assets/take_a_look_at_this.js');
+const images = {};
 
 module.exports = {
 	name: 'messageCreate',
