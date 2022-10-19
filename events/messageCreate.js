@@ -1,4 +1,4 @@
-const images = {};
+const { clientId, takeALookAry, takeALookSources, uncommonScale, rareScale, ultraScale } = require('../configVars.js');
 
 module.exports = {
 	name: 'messageCreate',
@@ -17,40 +17,37 @@ module.exports = {
 		}
 
 
-
 		//******* Response Functions *******//
 			
 		//TAKE A LOOK AT THIS
 		const takeALook = () => {
+			let totalArySize = takeALookAry.length;
 
-			// eventually cache this lol
-			// maybe write to redis if doesn't exist or exists and timestamp < x days old?
-			let imgTbl = [];
+			let imgLink = takeALookAry[Math.floor(Math.random() * totalArySize)]
+			let imgWeight = takeALookSources.find(item => item.link === imgLink).weight;
 
-			images.forEach((img) => {
-				for(j=0; j<img.weight; j++){
-					imgTbl.push(img);
-				}
-			});
-				
-			let imgObj = imgTbl[Math.floor(Math.random() * imgTbl.length)]
-
-			let odds = (imgObj.weight / imgTbl.length) * 100;
-			message.reply(imgObj.link);
+			let pct = (imgWeight / totalArySize).toFixed(3);
 		
-			if(odds < 5){
-				console.log(odds);
-				let fraction = reduce(imgObj.weight, imgTbl.length);
-				message.channel.send("ULTRA rare, odds: **" + fraction[0] + "** in **" + fraction[1] + "**");
+			if(imgWeight <= uncommonScale && imgWeight > rareScale){
+				let fraction = reduce(imgWeight, totalArySize);
+				//message.channel.send("Rare, odds: **" + fraction[0] + "** in **" + fraction[1] + "** or " + pct + "%");
+				console.log("Uncommon, odds: **" + fraction[0] + "** in **" + fraction[1] + "** or " + pct + "%");
+			} 
+			else if(imgWeight <= rareScale && imgWeight > ultraScale){
+				let fraction = reduce(imgWeight, totalArySize);
+				//message.channel.send("ULTRA GIGA rare, odds: **" + fraction[0] + "** in **" + fraction[1] + "** or " + pct + "%!");
+				console.log("Rare, odds: **" + fraction[0] + "** in **" + fraction[1] + "** or " + pct + "%!");
+			} 
+			else if(imgWeight <= ultraScale) {
+				let fraction = reduce(imgWeight, totalArySize);
+				//message.channel.send("ULTRA GIGA rare, odds: **" + fraction[0] + "** in **" + fraction[1] + "** or " + pct + "%!!!");
+				console.log("ULTRA RARE, odds: **" + fraction[0] + "** in **" + fraction[1] + "** or " + pct + "%!!!");
 			}
 		}
-
-
 
 		//******* Response Determination *******//
 
 		if(!message.author.bot && !(message.author.id === clientId)){
-
 			//List of all responses
 			let commandDict = {
 				'takealookatthis': takeALook,
