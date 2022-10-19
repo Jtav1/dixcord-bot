@@ -28,9 +28,10 @@ if(!fs.existsSync('/data')){
 fs.writeFile(take_a_look_list_file_loc, '', { flag: 'wx' }, function (err) {
   if(err) {
     console.log(take_a_look_list_file_loc + " exists, skipping creation");
-  } 
+  } else {
+    console.log("Created /data/take_a_look_at_this.txt")
+  }
   
-  console.log("Created /data/take_a_look_at_this.txt")
   console.log("Make sure you have a list of imgur links in /data/take_a_look_at_this.txt - one link per line.");
   console.log("And also put a * at the beginning of the default Riker picture e.g. *https://...");
 });
@@ -76,7 +77,7 @@ const processTakeImageLinks = () => {
   const file = fs.readFileSync(take_a_look_list_file_loc, 'utf8');
   let lines = file.split(/\r?\n/);
 
-  for (const line of lines) {
+  lines.forEach((line) => {
     const weightScale = () => {
       let scaleSelect = Math.floor(Math.random() * 3) + 1;
 
@@ -101,8 +102,11 @@ const processTakeImageLinks = () => {
       addLine = line.replace(/[*]/g, "");
     }
 
-    takeALookSources.push({ link: addLine, weight: weight })
-  }
+    addLine = addLine.trim();
+    if(addLine.length > 0) takeALookSources.push({ link: addLine, weight: weight });
+
+  })
+
   cacheSources();
 }
 
