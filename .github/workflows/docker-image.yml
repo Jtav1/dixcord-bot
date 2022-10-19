@@ -23,4 +23,4 @@ jobs:
     - name: Build the Docker image
       run: docker build . --file Dockerfile --tag jtav1/my-image-name:$(date +%s)
     - name: Docker Push
-      run: docker push {{secrets.DOCKER_USER}}/jtav1/dixbot
+      run: docker push {{secrets.DOCKER_USER}}/dixbot
