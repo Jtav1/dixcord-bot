@@ -67,10 +67,7 @@ if(uncommonScale == null || rareScale == null ||  ultraScale == null ||  default
 
 
 
-/*********** CONFIRM ENVIRONMENT VARIABLES ARE SET **********/
-//INCL: token - DISCORD BOT AUTH TOKEN
-//      clientId - DISCORD BOT CLIENT ID
-//      [weight scale values] - FOR BUILDING RANDOM IMG LINK ARRAY
+/*********** PROCESSING FUNCTIONS **********/
 
 // processTakeImageLinks()
 //  Build takeALookSources array of all image links and weights
