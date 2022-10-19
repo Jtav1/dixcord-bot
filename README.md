@@ -1,6 +1,10 @@
-# discord-bot
+# dixcord-bot
  Discord Bot for Justin's Discord
  
- Extremely rudimentary, proof of concept for a working discord bot. Will need significant upgrades before we can switch off Slack and rely on this bot. 
+ Extremely rudimentary, getting the hang of the new version of this library
  
- Also consider hosting. Lambdas? Heroku server? Something that won't go offline when Justin's power goes out. 
+## COMMANDS:
+
+#### Message responses: If the key is detected in a message, a response will be sent
+
+- key: "take a look at this" now works
