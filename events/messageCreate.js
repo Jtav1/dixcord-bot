@@ -1,4 +1,3 @@
-const { clientId } = require('../config.json');
 const { images } = require('../assets/take_a_look_at_this.js');
 
 module.exports = {

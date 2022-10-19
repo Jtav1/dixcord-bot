@@ -1,6 +1,5 @@
 // Require the necessary discord.js classes
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
-const { token, clientId, guildId } = require('./config.json');
 
 const fs = require('node:fs');
 const path = require('node:path');
