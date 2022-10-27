@@ -1,51 +1,31 @@
-const { clientId, takeALookAry, takeALookSources, uncommonScale, rareScale, ultraScale } = require('../configVars.js');
+const { clientId, defaultArray, rareArray, rareFrequency } = require('../configVars.js');
+
 
 module.exports = {
 	name: 'messageCreate',
 	execute(message) {
 
-		/*********** SUPPORT UTILITY FUNCTIONS **********/
-
-		// reduce(num int, den int)
-		//	reduces a fraction of num / dem if possible
-		const reduce = (num, den) => {
-			//too tired to figure this out so i stole it https://stackoverflow.com/questions/4652468/is-there-a-javascript-function-that-reduces-a-fraction dont ever say im not honest
-			let gcd = (a, b) => {
-				return b ? gcd(b, a%b) : a;
-			}
-
-			gcd = gcd(num, den);
-			return [num/gcd, den/gcd];
-		}
-
-		
 		//******* RESPONSE FUNCTIONS *******//
 			
 		// takeALook()
 		//	selects an image and sends a reply containing the link
 		//	if the image has a sufficient rarity, also says that
 		const takeALook = () => {
-			let totalArySize = takeALookAry.length;
+			let imgLink = "";
 
-			let imgLink = takeALookAry[Math.floor(Math.random() * totalArySize)]
-			let imgWeight = takeALookSources.find(item => item.link === imgLink).weight;
+			//New calculation
+			let diceRoll = Math.random();
 
-			let pct = (imgWeight / totalArySize).toFixed(3);
-
-			message.reply(imgLink);
-		
-			if(imgWeight <= uncommonScale && imgWeight > rareScale){
-				let fraction = reduce(imgWeight, totalArySize);
-				message.channel.send("Rare, odds: **" + fraction[0] + "** in **" + fraction[1] + "** or " + pct + "%");
-			} 
-			else if(imgWeight <= rareScale && imgWeight > ultraScale){
-				let fraction = reduce(imgWeight, totalArySize);
-				message.channel.send("ULTRA GIGA rare, odds: **" + fraction[0] + "** in **" + fraction[1] + "** or " + pct + "%!");
-			} 
-			else if(imgWeight <= ultraScale) {
-				let fraction = reduce(imgWeight, totalArySize);
-				message.channel.send("ULTRA GIGA rare, odds: **" + fraction[0] + "** in **" + fraction[1] + "** or " + pct + "%!!!");
+			if(diceRoll <= rareFrequency){
+				console.log("diceRoll of " + diceRoll + " is within rare frequency of " + rareFrequency + " - returning rare link.")
+				imgLink = rareArray[rareArray.length * Math.random() | 0]
+			} else {
+				console.log("diceRoll of " + diceRoll + " is outside rare frequency of " + rareFrequency + " - returning default link.")
+				imgLink = defaultArray[defaultArray.length * Math.random() | 0]
 			}
+
+			console.log("Sending message: " + imgLink);
+			message.reply(imgLink);
 		}
 
 
