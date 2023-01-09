@@ -1,7 +1,9 @@
 const { clientId, defaultArray, rareArray, rareFrequency } = require('../configVars.js');
 
+let limit = 0;
+let ms = 10000;
 
-module.exports = {
+module.exports =  {
 	name: 'messageCreate',
 	execute(message) {
 
@@ -11,6 +13,15 @@ module.exports = {
 		//	selects an image and sends a reply containing the link
 		//	if the image has a sufficient rarity, also says that
 		const takeALook = () => {
+			if(limit < 3){
+				limit++
+			} else {
+				message.reply("aaa");
+				sleep = ms => new Promise(r => setTimeout(r, ms));
+				return;
+			}
+
+
 			let imgLink = "";
 
 			//New calculation
@@ -27,7 +38,6 @@ module.exports = {
 			console.log("Sending message: " + imgLink);
 			message.reply(imgLink);
 		}
-
 
 		//******* INCOMING MESSAGE PROCESSING *******//
 			
