@@ -5,6 +5,10 @@ name: Docker
 # separate terms of service, privacy policy, and support
 # documentation.
 
+permissions:
+  contents: read
+  packages: write
+
 on:
   push:
     branches: [ "master" ]
