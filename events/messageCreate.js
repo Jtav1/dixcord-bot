@@ -1,7 +1,8 @@
 const { clientId, defaultArray, rareArray, rareFrequency } = require('../configVars.js');
 
 let limit = 0;
-let ms = 10000;
+let ms = 25000;
+let thirdReplyTimestamp = null;
 
 module.exports =  {
 	name: 'messageCreate',
@@ -13,14 +14,29 @@ module.exports =  {
 		//	selects an image and sends a reply containing the link
 		//	if the image has a sufficient rarity, also says that
 		const takeALook = () => {
-			if(limit < 3){
-				limit++
-			} else {
-				message.reply("aaa");
-				sleep = ms => new Promise(r => setTimeout(r, ms));
-				return;
+
+			let nowTime = Date.now();
+			if(thirdReplyTimestamp && (Math.floor((nowTime - thirdReplyTimestamp)) >= ms)) {
+				
+				// If a third reply has occured previously to set a timestamp, and that timestamp is over 10 seconds ago
+				console.log("difference: " + Math.floor((nowTime - thirdReplyTimestamp)));
+				
+				//its time to continue
+				thirdReplyTimestamp = null;
+				limit = 0;
 			}
 
+
+			if(limit < 2){
+				limit++
+			} else {
+				if(!thirdReplyTimestamp)	{
+					message.reply("https://i.imgur.com/kAClxb0.png"); // https://i.imgur.com/kAClxb0.png = spam picture url lol
+					thirdReplyTimestamp = Date.now();
+				}
+				
+				return;
+			}
 
 			let imgLink = "";
 
@@ -39,23 +55,29 @@ module.exports =  {
 			message.reply(imgLink);
 		}
 
+		const fortuneTeller = () => {
+			console.log("Sending fortune: " + "fortune here lol");
+			message.reply("oop you found me!");
+		}
+
 		//******* INCOMING MESSAGE PROCESSING *******//
 			
 		if(!message.author.bot && !(message.author.id === clientId)){
 			
 			// List of all response functions
-			let commandDict = {
-				'takealookatthis': takeALook,
-			}
+			//let commandDict = {
+			//	'takealookatthis': ,
+			//	'dixbotfortune': fortuneTeller,
+			//}
 
-			// Strip incoming message for comparison
+			// Strip incoming message for comparison		
 			let contentStripped = message.content.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
 			
 			// If the incoming message contains a response trigger phrase
-			for(var key in commandDict){
-				if(contentStripped.includes(key)){
-					commandDict[key]();
-				}
+			if(contentStripped.includes("takealookatthis")){
+				takeALook();
+			} else if(contentStripped.startsWith(clientId) && message.content.endsWith("?")){
+				//fortuneTeller();
 			}
 		}
 	},
