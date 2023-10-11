@@ -1,8 +1,11 @@
-const { clientId, defaultArray, rareArray, rareFrequency } = require('../configVars.js');
+const { clientId, defaultArray, rareArray, rareFrequency, positiveArray, negativeArray, neutralArray } = require('../configVars.js');
+
+// var Sentiment = require('sentiment');
+// var sentiment = new Sentiment();
 
 let limit = 0;
-let ms = 25000;
-let thirdReplyTimestamp = null;
+let lastReplyTimestamp = null;
+let ms = (Math.random() * 60000) + 30000; // ANTI EXPLOIT TECHNOLOGY
 
 module.exports =  {
 	name: 'messageCreate',
@@ -15,29 +18,30 @@ module.exports =  {
 		//	if the image has a sufficient rarity, also says that
 		const takeALook = () => {
 
-			let nowTime = Date.now();
-			if(thirdReplyTimestamp && (Math.floor((nowTime - thirdReplyTimestamp)) >= ms)) {
-				
-				// If a third reply has occured previously to set a timestamp, and that timestamp is over 10 seconds ago
-				console.log("difference: " + Math.floor((nowTime - thirdReplyTimestamp)));
-				
-				//its time to continue
-				thirdReplyTimestamp = null;
-				limit = 0;
-			}
-
-
-			if(limit < 2){
+			console.log("Limit: " + limit);
+			if(limit < 3){
 				limit++
-			} else {
-				if(!thirdReplyTimestamp)	{
-					message.reply("https://i.imgur.com/kAClxb0.png"); // https://i.imgur.com/kAClxb0.png = spam picture url lol
-					thirdReplyTimestamp = Date.now();
+			} else if(limit >= 3){
+
+				let nowTime = Date.now();
+
+				console.log("elapsed ms: " + Math.floor((nowTime - lastReplyTimestamp)));
+
+				if(Math.floor((nowTime - lastReplyTimestamp)) >= ms) {
+					// If a third reply has occured previously to set a timestamp, and that timestamp is over ms time ago
+					//its time to continue
+					limit = 0;
+
+				} else {
+					limit++;
+					(limit == 4) ? message.reply("No spam!") : null; // https://i.imgur.com/kAClxb0.png = spam picture url lol
+					return;
 				}
-				
+			} else {
 				return;
 			}
 
+			lastReplyTimestamp = Date.now();
 			let imgLink = "";
 
 			//New calculation
@@ -55,9 +59,18 @@ module.exports =  {
 			message.reply(imgLink);
 		}
 
-		const fortuneTeller = () => {
-			console.log("Sending fortune: " + "fortune here lol");
-			message.reply("oop you found me!");
+
+		// fortuneTeller()
+		//	Randomly sends a fortune
+		const fortuneTeller = (rawMessage) => {
+			console.log("Fortune teller: ")
+			const processedMessage = rawMessage.replace("<@" + clientId + ">", "")
+			console.log(rawMessage + " => " + processedMessage);
+			//var result = sentiment.analyze(processedMessage);
+
+			const combinedResponses = positiveArray.concat(negativeArray, neutralArray);
+			console.log(combinedResponses.length);
+			message.reply(combinedResponses[Math.floor(Math.random() * combinedResponses.length)]);
 		}
 
 		//******* INCOMING MESSAGE PROCESSING *******//
@@ -71,13 +84,13 @@ module.exports =  {
 			//}
 
 			// Strip incoming message for comparison		
-			let contentStripped = message.content.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+			const contentStripped = message.content.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
 			
 			// If the incoming message contains a response trigger phrase
 			if(contentStripped.includes("takealookatthis")){
 				takeALook();
 			} else if(contentStripped.startsWith(clientId) && message.content.endsWith("?")){
-				//fortuneTeller();
+				fortuneTeller(message.content.toLowerCase());
 			}
 		}
 	},

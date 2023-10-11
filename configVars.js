@@ -4,9 +4,17 @@ require('dotenv').config();
 // file location for list of URLs
 let take_a_look_list_file_loc = '/data/take_a_look_list.txt';
 
+let positive_file_loc = '/data/positive.txt';
+let negative_file_loc = '/data/negative.txt';
+let neutral_file_loc = '/data/neutral.txt';
+
 // initialise values that will be exported later
 let defaultArray = [];
 let rareArray = [];
+
+let positiveArray = [];
+let negativeArray = [];
+let neutralArray = [];
 
 // Utility function for killing program if missing setup
 const writeError = (err) => {
@@ -14,18 +22,29 @@ const writeError = (err) => {
   process.exit();
 }
 
-
-
 /*********** CONFIRM ENVIRONMENT IS SET UP **********/
 //INCL: MOUNT DIRECTORY - /data
+//    TAKE A LOOKI AT THIS:
 //      INITIALIZE FILE - /data/take_a_look_list.txt
+
+//    FORTUNE TELLER:
+//      INITIALIZE FILE - /data/positive.txt
+//      INITIALIZE FILE - /data/negative.txt
+//      INITIALIZE FILE - /data/neutral.txt
 
 // Check if data directory mounted
 if(!fs.existsSync('/data')){
   console.log("Data directory not mounted. Assuming you are testing locally, using dev env vars");
-  take_a_look_list_file_loc = process.env.DEV_TAKE_A_LOOK_AT_THIS_LINKS_FILE;
 
-  if(take_a_look_list_file_loc.length < 1) writeError("Data directory not mounted, and no DEV_TAKE_A_LOOK_AT_THIS_LINKS_FILE in .env")
+  take_a_look_list_file_loc = process.env.DEV_TAKE_A_LOOK_AT_THIS_LINKS_FILE;
+  positive_file_loc = process.env.DEV_POSITIVE_FILE;
+  negative_file_loc = process.env.DEV_NEGATIVE_FILE;
+  neutral_file_loc = process.env.DEV_NEUTRAL_FILE;
+
+  if(take_a_look_list_file_loc.length < 1) writeError("Data directory not mounted, and no DEV_TAKE_A_LOOK_AT_THIS_LINKS_FILE in .env");
+  if(positive_file_loc.length < 1) writeError("Data directory not mounted, and no DEV_POSITIVE_FILE in .env");
+  if(negative_file_loc.length < 1) writeError("Data directory not mounted, and no DEV_NEGATIVE_FILE in .env");
+  if(neutral_file_loc.length < 1) writeError("Data directory not mounted, and no DEV_NEUTRAL_FILE in .env");
 }
 
 // Put files in the data directory for population if one isn't already there
@@ -40,6 +59,29 @@ fs.writeFile(take_a_look_list_file_loc, '', { flag: 'wx' }, function (err) {
   console.log("And also put a * at the beginning of the default Riker picture e.g. *https://...");
 });
 
+fs.writeFile(positive_file_loc, '', { flag: 'wx' }, function (err) {
+  if(err) {
+    console.log(positive_file_loc + " exists, skipping creation");
+  } else {
+    console.log("Created " + positive_file_loc)
+  }
+});
+
+fs.writeFile(negative_file_loc, '', { flag: 'wx' }, function (err) {
+  if(err) {
+    console.log(negative_file_loc + " exists, skipping creation");
+  } else {
+    console.log("Created " + negative_file_loc)
+  }
+});
+
+fs.writeFile(neutral_file_loc, '', { flag: 'wx' }, function (err) {
+  if(err) {
+    console.log(neutral_file_loc + " exists, skipping creation");
+  } else {
+    console.log("Created " + neutral_file_loc)
+  }
+});
 
 
 /*********** CONFIRM ENVIRONMENT VARIABLES ARE SET **********/
@@ -98,13 +140,39 @@ const processTakeImageLinks = () => {
 
 }
 
+const processFortuneArrays = () => {
+  const posFile = fs.readFileSync(positive_file_loc, 'utf8').split(/\r?\n/);
+  const negFile = fs.readFileSync(negative_file_loc, 'utf8').split(/\r?\n/);
+  const neuFile = fs.readFileSync(neutral_file_loc, 'utf8').split(/\r?\n/);
+
+  posFile.forEach((line) => {
+    positiveArray.push(line.trim());
+  })
+
+  negFile.forEach((line) => {
+    negativeArray.push(line.trim());
+  })
+
+  neuFile.forEach((line) => {
+    neutralArray.push(line.trim());
+  })
+
+  console.log("Positive Array contains " + positiveArray.length + " responses");
+  console.log("Negative Array contains " + negativeArray.length + " responses");
+  console.log("Neutral Array contains " + neutralArray.length + " responses");
+}
+
 //Kick off image array building process
 processTakeImageLinks();
+processFortuneArrays();
 
 module.exports = {
   token,
   clientId,
   defaultArray,
   rareArray,
-  rareFrequency
+  rareFrequency,
+  positiveArray,
+  negativeArray,
+  neutralArray
 };
