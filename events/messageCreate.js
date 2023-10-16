@@ -5,7 +5,9 @@ const { clientId, defaultArray, rareArray, rareFrequency, positiveArray, negativ
 
 let limit = 0;
 let lastReplyTimestamp = null;
-let ms = (Math.random() * 60000) + 30000; // ANTI EXPLOIT TECHNOLOGY
+let ms = (Math.random() * 60000) + 60000; // CUTTING EDGE AI ANTI EXPLOIT TECHNOLOGY
+// let ms = 10000;
+let configuredLimit = 2;
 
 module.exports =  {
 	name: 'messageCreate',
@@ -17,45 +19,44 @@ module.exports =  {
 		//	selects an image and sends a reply containing the link
 		//	if the image has a sufficient rarity, also says that
 		const takeALook = () => {
+			
+			let nowTime = Date.now();
 
-			console.log("Limit: " + limit);
-			if(limit < 3){
-				limit++
-			} else if(limit >= 3){
+			if(lastReplyTimestamp == null || Math.floor((nowTime - lastReplyTimestamp)) >= ms){
+				timestamp = null
+				limit = 0;
+			}
 
-				let nowTime = Date.now();
+			if(limit < configuredLimit){
+				//continue to response
+			} else if(limit == (configuredLimit)) {
 
-				console.log("elapsed ms: " + Math.floor((nowTime - lastReplyTimestamp)));
+				lastReplyTimestamp = Date.now();
+				limit++;
+				
+				message.reply("No spam!"); // https://i.imgur.com/kAClxb0.png = spam picture url lol
 
-				if(Math.floor((nowTime - lastReplyTimestamp)) >= ms) {
-					// If a third reply has occured previously to set a timestamp, and that timestamp is over ms time ago
-					//its time to continue
-					limit = 0;
+				return;
 
-				} else {
-					limit++;
-					(limit == 4) ? message.reply("No spam!") : null; // https://i.imgur.com/kAClxb0.png = spam picture url lol
-					return;
-				}
 			} else {
+				//do nothing
 				return;
 			}
 
-			lastReplyTimestamp = Date.now();
 			let imgLink = "";
 
 			//New calculation
 			let diceRoll = Math.random();
 
 			if(diceRoll <= rareFrequency){
-				console.log("diceRoll of " + diceRoll + " is within rare frequency of " + rareFrequency + " - returning rare link.")
 				imgLink = rareArray[rareArray.length * Math.random() | 0]
 			} else {
-				console.log("diceRoll of " + diceRoll + " is outside rare frequency of " + rareFrequency + " - returning default link.")
 				imgLink = defaultArray[defaultArray.length * Math.random() | 0]
 			}
+			
+			limit++;
+			lastReplyTimestamp = Date.now();
 
-			console.log("Sending message: " + imgLink);
 			message.reply(imgLink);
 		}
 
