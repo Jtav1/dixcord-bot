@@ -9,6 +9,8 @@ module.exports = {
     const phoneNumRegex = /^(\([0-9]{3}\) |[0-9]{3}-)[0-9]{3}-[0-9]{4}$/
     const emailRegex = /[a-zA-Z0-9]+@[a-zA-Z0-9]+.[a-zA-Z0-9]+/
     const spaceRegex = /\s+/g;
+    //todo remove attachments and URLs
+
 
     let logMsg = message.content
       .replace(userIdRegex, '')
@@ -17,13 +19,15 @@ module.exports = {
       .replace(emailRegex, '');
 
     filterWordArray.forEach((keyword) => {
+
+      //todo split, compare ignore case, rejoin without
       logMsg = logMsg.replace(keyword, '');
     })
 
     logMsg = logMsg.replace(spaceRegex, ' ').trim();
 
     console.log("LOGGING: " + logMsg);
-    // log here
+    //todo log here
 
   }
 
