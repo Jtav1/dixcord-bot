@@ -11,6 +11,8 @@ module.exports = {
     const spaceRegex = /\s+/g;
     //todo remove attachments and URLs
 
+    //todo add logfile encryption
+
 
     let logMsg = message.content
       .replace(userIdRegex, '')
