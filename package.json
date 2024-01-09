@@ -16,6 +16,7 @@
     "dotenv": "^8.6.0",
     "redis": "^4.6.12",
     "sentiment": "^5.0.2",
-    "utf-8-validate": "^5.0.10"
+    "utf-8-validate": "^5.0.10",
+    "zlib-sync": "^0.1.9"
   }
 }
