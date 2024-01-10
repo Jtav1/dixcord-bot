@@ -8,6 +8,7 @@ COPY ./package*.json ./
 COPY ./configVars.js ./
 COPY ./bot.js ./
 
+RUN npm update -g npm
 RUN npm ci
 
 CMD ["node", "./bot.js"]
