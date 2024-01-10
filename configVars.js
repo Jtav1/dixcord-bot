@@ -184,7 +184,7 @@ const processLogFilterList = () => {
   const file = fs.readFileSync(log_filter_list_loc, 'utf8');
   let lines = file.split(/\r?\n/);
 
-  lines.forEach((line) => { filterWordArray.push(line.trim()) })
+  lines.forEach((line) => { filterWordArray.push(line.toLowerCase().trim()) })
 
   console.log("-- Filter Word Array contains " + filterWordArray.length + " keywords");
 }
