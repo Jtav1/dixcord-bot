@@ -27,7 +27,7 @@ module.exports = {
     filterWordArray.push(keyword);
 
     //add it to the list for next time
-    fs.appendFile(log_filter_list_loc, "\n"+keyword, async function(err) {
+    fs.appendFile(log_filter_list_loc, keyword+"\n", async function(err) {
       if(err) await interaction.reply("ERROR adding keyword: " + keyword + " to the filter list. Tell Justin to add it manually.");
       else await interaction.reply('"' + keyword + '" added to the filter list.');
     })

@@ -33,7 +33,7 @@ module.exports = {
     let cleanMsg = msgAry.join(' ').replace(spaceRegex, ' ').trim();
 
     if(cleanMsg.length > 0){
-      fs.appendFile(logFile, "\n"+cleanMsg, (err) => { 
+      fs.appendFile(logFile, cleanMsg+"\n", (err) => { 
         if (err) { 
           console.log("Error writing to chatlog file " + logFile + ": " + err); 
         } 
