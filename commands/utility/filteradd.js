@@ -15,7 +15,7 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageWebhooks)
     .setDMPermission(false),
 	async execute(interaction) {
-    const keyword = interaction.options.getString('keyword');
+    const keyword = interaction.options.getString('keyword').toLowerCase();
 		
 
     if(filterWordArray.includes(keyword)) {
