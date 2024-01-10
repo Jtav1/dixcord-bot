@@ -3,6 +3,7 @@ WORKDIR /usr/src/app
 
 COPY ./commands ./commands
 COPY ./events ./events
+COPY ./Logging ./Logging
 COPY ./package*.json ./
 
 COPY ./configVars.js ./
