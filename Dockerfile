@@ -1,4 +1,4 @@
-FROM node:alpine3.16
+FROM node:alpine3.19
 WORKDIR /usr/src/app
 
 COPY ./commands ./commands
