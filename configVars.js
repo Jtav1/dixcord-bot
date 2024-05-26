@@ -36,7 +36,7 @@ const writeError = (err) => {
 //      INITIALIZE FILE - /data/negative.txt
 //      INITIALIZE FILE - /data/neutral.txt
 
-// Check if data directory mounted
+// Check if data directory mounted - these run regardless of dev/prod state
 if(!fs.existsSync('/data')){
   console.log("-- Data directory not mounted. Assuming you are testing locally, using dev env vars");
 
@@ -105,55 +105,76 @@ fs.writeFile(log_filter_list_loc, '', { flag: 'wx' }, function (err) {
 //INCL: token - DISCORD BOT AUTH TOKEN
 //      clientId - DISCORD BOT CLIENT ID
 //      guildId - DISCORD GUILD ID FOR SINGLE-SERVER USE
-//      rareFrequency - HOW OFTEN DO RARE "TAKE A LOOK AT THIS" LINKS GET RETURNED 0-1
+//      rareFreqStr/rareFrequency - HOW OFTEN DO RARE "TAKE A LOOK AT THIS" LINKS GET RETURNED 0-1
+//      logFile - where to store (sanitized) chat logs
 
-let token = process.env.DISCORD_TOKEN;
-if(token == null){
-  console.log("-- No token provided. Assuming you are testing locally, using dev env vars");
+// These are the required variables - can be passed into the container as env vars or in a .env file in root directory
+//  usually i pass them into the container in prod and put them in .env for dev.
+//  note the env var names are different for dev/prod
+// To run in production mode, add an env var (in docker or in .env file) called DEV_FLAG and set it to 0
+
+let isDev = true;
+if(process.env.DEV_FLAG == false) {
+  console.log("RUNNING IN PRODUCTION");
+  isDev = false;
+} else {
+  console.log("RUNNING IN DEVELOPMENT");
+}
+
+let token = "";
+let clientId = "";
+let guildId = "";
+let rareFreqStr = "";
+let logFile = "";
+
+let mysqlHost = "";
+let mysqlPort = "";
+let mysqlUser = "";
+let mysqlPw = "";
+let mysqlDb = "";
+
+
+if(isDev){
+  //load dev vars from local .env file (prefaced with DEV_)
   token = process.env.DEV_DISCORD_TOKEN;
-
-  if(token.length < 1) writeError("Discord auth token not found, and no DEV_DISCORD_TOKEN in .env") 
-}
-
-let clientId = process.env.DISCORD_CLIENT_ID;
-if(clientId == null){
-  console.log("-- No clientId provided. Assuming you are testing locally, using dev env vars");
   clientId = process.env.DEV_CLIENT_ID;
-
-  if(clientId.length < 1) writeError("Discord clientId not found, and no DEV_CLIENT_ID in .env") 
-}
-
-let guildId = process.env.DISCORD_GUILD_ID;
-if(guildId == null){
-  console.log("-- No guildId provided. Assuming you are testing locally, using dev env vars");
   guildId = process.env.DEV_GUILD_ID;
-
-  if(guildId.length < 1) writeError("Discord guildId not found, and no DISCORD_GUILD_ID in .env") 
-}
-
-let rareFreqStr = process.env.RARITY_FREQ
-let rareFrequency = parseFloat(rareFreqStr);
-
-if(isNaN(rareFrequency) || rareFrequency > 1.0 || rareFrequency < 0.0){
-  console.log("-- No valid rareFreq provided. Assuming you are testing locally, using dev env vars");
-  rareFrequency = process.env.DEV_RARE_FREQ;
-
-  console.log("-- rareFrequency set to: " + rareFrequency);
-
-  if(isNaN(rareFrequency) || rareFrequency > 1.0 || rareFrequency < 0.0) writeError("Did not provide valid DEV_RARE_FREQ between 0 and 1, defaulting to normal value - 0.10 or 10% chance of rare link.") 
-}
-
-let logFile = process.env.DISCORD_LOG_FILE;
-if(logFile == null){
-  console.log("-- No logfile provided. Assuming you are testing locally, using dev env vars");
+  rareFreqStr = process.env.DEV_RARITY_FREQ;
   logFile = process.env.DEV_DISCORD_LOG_FILE;
 
-  if(!logFile || logFile.length < 1) {
-    writeError("-- logFile not found, and no DEV_DISCORD_LOG_FILE in .env, no chat logging will occur.") 
-  } else {
-    console.log("-- sanitized chatlogs will be saved in " + logFile);
-  }
+  mysqlHost = process.env.DEV_MYSQL_HOST;
+  mysqlPort = process.env.DEV_MYSQL_PORT;
+  mysqlUser = process.env.DEV_MYSQL_USER;
+  mysqlPw = process.env.DEV_MYSQL_PW;
+  mysqlDb = process.env.DEV_MYSQL_DB;
+
+} else if (!isDev){
+  //load production vars 
+  token = process.env.DISCORD_TOKEN;
+  clientId = process.env.DISCORD_CLIENT_ID;
+  guildId = process.env.DISCORD_GUILD_ID;
+  rareFreqStr = process.env.RARITY_FREQ
+  logFile = process.env.DISCORD_LOG_FILE;
+
+  mysqlHost = process.env.MYSQL_HOST;
+  mysqlPort = process.env.MYSQL_PORT;
+  mysqlUser = process.env.MYSQL_USER;
+  mysqlPw = process.env.MYSQL_PW;
+  mysqlDb = process.env.MYSQL_DB;
 }
+
+
+let rareFrequency = parseFloat(rareFreqStr);
+if(isNaN(rareFrequency) || rareFrequency > 1.0 || rareFrequency < 0.0) {
+  rareFrequency = 0.1;
+  writeError("Did not provide valid DEV_RARE_FREQ between 0 and 1, defaulting to normal value - 0.10 or 10% chance of rare link.") 
+} 
+
+console.log("-- sanitized chatlogs will be saved in " + logFile);
+
+if(!mysqlHost || mysqlHost.length < 1) console.log("-- no db config provided");
+  
+
 
 /*********** PROCESSING FUNCTIONS **********/
 
@@ -230,5 +251,10 @@ module.exports = {
   neutralArray,
   logFile,
   log_filter_list_loc,
-  filterWordArray
+  filterWordArray,
+  mysqlHost,
+  mysqlPort,
+  mysqlUser,
+  mysqlPw,
+  mysqlDb,
 };
