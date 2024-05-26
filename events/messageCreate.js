@@ -1,6 +1,6 @@
 const { clientId, defaultArray, rareArray, rareFrequency, positiveArray, negativeArray, neutralArray } = require('../configVars.js');
 
-var dataLog = require('../Logging/dataLog.js');
+const dataLog = require('../Logging/dataLog.js');
 
 // var Sentiment = require('sentiment');
 // var sentiment = new Sentiment();
@@ -88,6 +88,8 @@ module.exports = {
 			
 		if(!message.author.bot && !(message.author.id === clientId)){
 
+			console.log(message.content);
+
 			// List of all response functions
 			//let commandDict = {
 			//	'takealookatthis': ,
@@ -104,7 +106,7 @@ module.exports = {
 			// })
 
 			if(response.length > 0){
-				console.log("@" + message.name);
+				//console.log("@" + message.name);
 				message.reply(response);
 				return;
 			}
@@ -120,10 +122,12 @@ module.exports = {
 			}
 
 			if(response.length > 0){
-				console.log("<@" + message.author.username + '>: ' + message.cleanContent);
+				// console.log("<@" + message.author.username + '>: ' + message.cleanContent);
 				message.reply(response);
 				return;
 			}
+
+
 
 			// If it wasnt a dixbot keyword, log the message for later bot training purposes
 			// dataLog.cleanLog pulls out all mentions of userID and a preset list of names

@@ -1,9 +1,11 @@
 // Require the necessary discord.js classes
 const { REST, Routes, Client, Collection, Events, GatewayIntentBits } = require('discord.js');
-const { token, clientId } = require('./configVars.js');
+const { token, clientId, guildId } = require('./configVars.js');
 
 const fs = require('node:fs');
 const path = require('node:path');
+
+const dataLog = require('./Logging/dataLog.js');
 
 // Create a new client instance
 const client = new Client({ intents: [
@@ -79,7 +81,29 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 client.once(Events.ClientReady, readyClient => {
+
+	console.log("Initializing emoji set");
+
+	const guild = client.guilds.cache.get(guildId);
+	let emojiCollection = guild.emojis.cache;
+
+	//console.log(emojiCollection);
+
+	let emojiList = [];
+
+	for(e in emojiCollection) {
+		emojiList.push(
+			{
+				emoji: e.name,
+				id: e.id
+			}
+		)
+	}
+	
+	dataLog.initializeEmojisList(emojiList);
+
 	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+
 });
 
 // Login to Discord with your client's token

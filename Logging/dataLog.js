@@ -1,5 +1,29 @@
-const { logFile, log_filter_list_loc, filterWordArray } = require('../configVars.js');
+const { logFile, log_filter_list_loc, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, } = require('../configVars.js');
 const fs = require('node:fs');
+
+const mysql = require('mysql2');
+
+// runs on initialization
+const connection = mysql.createConnection(
+  'mysql://' + mysqlUser + ':' + mysqlPw + '@' + mysqlHost + ':' + mysqlPort + '/' + mysqlDb
+);
+
+connection.addListener('error', (err) => {
+  console.log(err);
+});
+
+const emoji_table_name = 'emoji_frequency'; // table for tracking emoji usage frequency
+
+connection.query(`CREATE TABLE IF NOT EXISTS ${emoji_table_name} (id INT NOT NULL AUTO_INCREMENT, emoji VARCHAR(255) NOT NULL, frequency INT NOT NULL, emoid VARCHAR(255) NOT NULL, PRIMARY KEY (id))`);
+
+
+function emojiInit() {
+  connection.query(`DELETE FROM ${emoji_table_name} WHERE frequency=0`);
+  // insert where doesnt exist, all emojis
+
+
+}
+
 
 module.exports = {
 	cleanLog: function(message) {
@@ -39,6 +63,12 @@ module.exports = {
         } 
       });
     } 
+  },
+  countEmoji: function(emoji){
+    // increment the frequency column for the given emoji if it exists in the database
+  },
+  initializeEmojisList: function(emojis){
+    emojiInit(emojis);
   }
 
 }
