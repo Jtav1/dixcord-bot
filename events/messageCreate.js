@@ -97,13 +97,13 @@ module.exports = {
 			//}
 			const sentence = message.content.split(' ');
 
-			// sentence.forEach(async word => {
-			// 	if(word.startsWith('https://twitter.com/')){
-			// 		response = twitterFixer(word, false);
-			// 	} else if(word.startsWith('https://x.com/')){
-			// 		response = twitterFixer(word, true);
-			// 	}
-			// })
+			sentence.forEach(async word => {
+				if(word.startsWith('https://twitter.com/')){
+					response = twitterFixer(word, false);
+				} else if(word.startsWith('https://x.com/')){
+					response = twitterFixer(word, true);
+				}
+			})
 
 			if(response.length > 0){
 				//console.log("@" + message.name);
