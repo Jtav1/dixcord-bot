@@ -37,7 +37,7 @@ const writeError = (err) => {
 //      INITIALIZE FILE - /data/neutral.txt
 
 // Check if data directory mounted - these run regardless of dev/prod state
-if(!fs.existsSync('/data')){
+if(!fs.existsSync('./data')){
   console.log("-- Data directory not mounted. Assuming you are testing locally, using dev env vars");
 
   take_a_look_list_file_loc = process.env.DEV_TAKE_A_LOOK_AT_THIS_LINKS_FILE;
