@@ -1,4 +1,4 @@
-const { logFile, log_filter_list_loc, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, } = require('../configVars.js');
+const { logFile, log_filter_list_loc, guildId, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, } = require('../configVars.js');
 const fs = require('node:fs');
 
 const mysql = require('mysql2');
@@ -17,9 +17,17 @@ const emoji_table_name = 'emoji_frequency'; // table for tracking emoji usage fr
 connection.query(`CREATE TABLE IF NOT EXISTS ${emoji_table_name} (id INT NOT NULL AUTO_INCREMENT, emoji VARCHAR(255) NOT NULL, frequency INT NOT NULL, emoid VARCHAR(255) NOT NULL, PRIMARY KEY (id))`);
 
 
-function emojiInit() {
+function emojiInit(emojiObjectList) {
   connection.query(`DELETE FROM ${emoji_table_name} WHERE frequency=0`);
   // insert where doesnt exist, all emojis
+
+  //Emoji array comes in as mysql-insertable double array e.g.
+  // [ [ name1, id1 ], [ name2, id2 ] ]
+
+  // convert ohjects into double array for insertion into db
+  // but first delete from db if name/id no longer in list regardless of frequency
+
+  console.log(emojiAryForInsert);
 
 
 }
@@ -67,8 +75,8 @@ module.exports = {
   countEmoji: function(emoji){
     // increment the frequency column for the given emoji if it exists in the database
   },
-  initializeEmojisList: function(emojis){
-    emojiInit(emojis);
+  initializeEmojisList: function(emojiObjectList){
+    emojiInit(emojiObjectList);
   }
 
 }

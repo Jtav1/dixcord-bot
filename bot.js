@@ -84,24 +84,29 @@ client.once(Events.ClientReady, readyClient => {
 
 	console.log("Initializing emoji set");
 
-	const guild = client.guilds.cache.get(guildId);
-	let emojiCollection = guild.emojis.cache;
+	client.guilds.fetch(guildId)
+		.then(guild => {
+			guild.emojis.fetch()
+				.then((result) => {
+					let emojiDoubleArray = [];
 
-	//console.log(emojiCollection);
+					//JUSTIN TODO: change this to be an array of objects
+					// so that you can easily use them to clear out deleted emojis from the database
+					// that may be gone but have a non-zero number of uses
 
-	let emojiList = [];
+					console.log(result);
 
-	for(e in emojiCollection) {
-		emojiList.push(
-			{
-				emoji: e.name,
-				id: e.id
-			}
-		)
-	}
+					result.forEach((e) => {
+						emojiDoubleArray.push([e.name, e.id]);
+					})
+
+					console.log(emojiDoubleArray);
+					dataLog.initializeEmojisList(emojiDoubleArray);
+				})
+				.catch(console.error)
+		})
+		.catch(console.error)
 	
-	dataLog.initializeEmojisList(emojiList);
-
 	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 
 });
