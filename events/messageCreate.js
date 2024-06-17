@@ -1,4 +1,4 @@
-const { clientId, defaultArray, rareArray, rareFrequency, positiveArray, negativeArray, neutralArray } = require('../configVars.js');
+const { clientId, defaultArray, rareArray, rareFrequency, positiveArray, negativeArray, neutralArray, twitterFixEnabled } = require('../configVars.js');
 
 const dataLog = require('../Logging/dataLog.js');
 
@@ -60,7 +60,6 @@ module.exports = {
 		//	Randomly sends a fortune
 		const fortuneTeller = (rawMessage) => {
 			const processedMessage = rawMessage.replace("<@" + clientId + ">", "")
-			//console.log(rawMessage + " => " + processedMessage);
 
 			//var result = sentiment.analyze(processedMessage);
 
@@ -94,14 +93,17 @@ module.exports = {
 			//let commandDict = {
 			//	'takealookatthis': ,
 			//	'dixbotfortune': fortuneTeller,
+			//	'twitterFixer': fixes twitter links
 			//}
 			const sentence = message.content.split(' ');
 
 			sentence.forEach(async word => {
-				if(word.startsWith('https://twitter.com/')){
-					response = twitterFixer(word, false);
-				} else if(word.startsWith('https://x.com/')){
-					response = twitterFixer(word, true);
+				if(twitterFixEnabled){
+					if(word.startsWith('https://twitter.com/') && twitterFixEnabled){
+						response = twitterFixer(word, false);
+					} else if(word.startsWith('https://x.com/') && twitterFixEnabled){
+						response = twitterFixer(word, true);
+					}
 				}
 			})
 
@@ -126,8 +128,6 @@ module.exports = {
 				message.reply(response);
 				return;
 			}
-
-
 
 			// If it wasnt a dixbot keyword, log the message for later bot training purposes
 			// dataLog.cleanLog pulls out all mentions of userID and a preset list of names
