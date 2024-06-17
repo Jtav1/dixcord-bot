@@ -87,7 +87,19 @@ module.exports = {
 			
 		if(!message.author.bot && !(message.author.id === clientId)){
 
-			console.log(message.content);
+			//console.log(message.content);
+
+			const EMOJIREGEX = /((?<!\\)<:[^:]+:(\d+)>)|\p{Emoji_Presentation}|\p{Extended_Pictographic}/gmu;
+			const emojiDetector = (str) => str.match(EMOJIREGEX);
+
+			let emoAry = emojiDetector(message.content) || [];
+
+			emoAry.forEach(emo => {
+				if(emo.length > 0) dataLog.countEmoji(emo);
+			});
+
+			emoAry = [];
+
 
 			// List of all response functions
 			//let commandDict = {

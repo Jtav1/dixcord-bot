@@ -42,7 +42,17 @@ function emojiInit(emojiObjectList) {
 }
 
 function emojiIncrement(emoji){
-  console.log(emoji);
+  let emoCleaned = emoji.replace("<", "").replace(">", "").split(":").slice(1);
+  
+  if(emoCleaned.length == 2){
+    const emoIncrementQry = mysql.format(
+      "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
+      [emoCleaned[0], emoCleaned[1]]
+    );
+
+    connection.query(emoIncrementQry);
+  }
+
 }
 
 
