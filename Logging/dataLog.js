@@ -12,24 +12,37 @@ connection.addListener('error', (err) => {
   console.log(err);
 });
 
-const emoji_table_name = 'emoji_frequency'; // table for tracking emoji usage frequency
+const tblCreateQuery = mysql.format(
+  "CREATE TABLE IF NOT EXISTS emoji_frequency " + 
+    "(emoid VARCHAR(255) NOT NULL, " + 
+    "emoji VARCHAR(255) NOT NULL, " +
+    "frequency INT NOT NULL, " +
+    "animated BOOLEAN, " +
+    "type VARCHAR(50) NOT NULL, " +
+    "PRIMARY KEY (emoid))");
 
-connection.query(`CREATE TABLE IF NOT EXISTS ${emoji_table_name} (id INT NOT NULL AUTO_INCREMENT, emoji VARCHAR(255) NOT NULL, frequency INT NOT NULL, emoid VARCHAR(255) NOT NULL, PRIMARY KEY (id))`);
-
+connection.query(tblCreateQuery);
+console.log('-- Emoji table tracking created');
 
 function emojiInit(emojiObjectList) {
-  connection.query(`DELETE FROM ${emoji_table_name} WHERE frequency=0`);
-  // insert where doesnt exist, all emojis
+  connection.query("DELETE FROM emoji_frequency WHERE frequency = 0 and type = 'emoji'");
 
-  //Emoji array comes in as mysql-insertable double array e.g.
-  // [ [ name1, id1 ], [ name2, id2 ] ]
+  let emojiArray = [];
 
-  // convert ohjects into double array for insertion into db
-  // but first delete from db if name/id no longer in list regardless of frequency
+  emojiObjectList.forEach((e) => {
+    emojiArray.push(([`${e.id}`, `${e.name}` , 0, e.animated, `${e.type}`]));
+  });
 
-  console.log(emojiAryForInsert);
+  const emoInsertQry = mysql.format(
+    "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES ? ON DUPLICATE KEY UPDATE emoid=emoid",
+    [emojiArray]
+  );
 
+  connection.query(emoInsertQry);
+}
 
+function emojiIncrement(emoji){
+  console.log(emoji);
 }
 
 
@@ -73,7 +86,7 @@ module.exports = {
     } 
   },
   countEmoji: function(emoji){
-    // increment the frequency column for the given emoji if it exists in the database
+    emojiIncrement(emoji);
   },
   initializeEmojisList: function(emojiObjectList){
     emojiInit(emojiObjectList);

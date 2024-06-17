@@ -88,20 +88,14 @@ client.once(Events.ClientReady, readyClient => {
 		.then(guild => {
 			guild.emojis.fetch()
 				.then((result) => {
-					let emojiDoubleArray = [];
-
-					//JUSTIN TODO: change this to be an array of objects
-					// so that you can easily use them to clear out deleted emojis from the database
-					// that may be gone but have a non-zero number of uses
-
-					console.log(result);
-
-					result.forEach((e) => {
-						emojiDoubleArray.push([e.name, e.id]);
-					})
-
-					console.log(emojiDoubleArray);
-					dataLog.initializeEmojisList(emojiDoubleArray);
+					dataLog.initializeEmojisList(result.map((r) => 
+						({
+							id: r.id,
+							name: r.name,
+							animated: r.animated,
+							type: "emoji"
+						})
+					));
 				})
 				.catch(console.error)
 		})
