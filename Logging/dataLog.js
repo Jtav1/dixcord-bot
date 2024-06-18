@@ -55,6 +55,19 @@ function emojiIncrement(emoji){
 
 }
 
+function emoLeaderQry(number) {
+
+  try {
+    const [results] = connection.query(
+      `SELECT emoji, frequency FROM emoji_frequency ORDER BY frequency DESC limit ${number}`
+    );
+  
+    return results;
+  } catch (err) {
+    console.log(err);
+  }
+
+}
 
 module.exports = {
 	cleanLog: function(message) {
@@ -100,6 +113,9 @@ module.exports = {
   },
   initializeEmojisList: function(emojiObjectList){
     emojiInit(emojiObjectList);
+  },
+  getTopEmoji(number){
+    return emoLeaderQry(number);
   }
 
 }
