@@ -1,5 +1,5 @@
 // Require the necessary discord.js classes
-const { REST, Routes, Client, Collection, Events, GatewayIntentBits } = require('discord.js');
+const { REST, Routes, Client, Collection, Events, GatewayIntentBits, Partials } = require('discord.js');
 const { token, clientId, guildId } = require('./configVars.js');
 
 const fs = require('node:fs');
@@ -8,11 +8,18 @@ const path = require('node:path');
 const dataLog = require('./Logging/dataLog.js');
 
 // Create a new client instance
-const client = new Client({ intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-] });
+const client = new Client({ 
+	intents: [
+		GatewayIntentBits.Guilds,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.MessageContent,
+		GatewayIntentBits.GuildMessageReactions,
+	], 
+	partials: [
+		Partials.Message, 
+		Partials.Channel, 
+		Partials.Reaction
+	],});
 
 //Set up slash commands
 //Docs: https://discordjs.guide/creating-your-bot/command-handling.html
@@ -105,5 +112,14 @@ client.once(Events.ClientReady, readyClient => {
 
 });
 
+// https://stackoverflow.com/questions/66793543/reaction-event-discord-js
+client.on('messageReactionAdd', async (reaction, user) => {
+	
+	let reactStr = "<:" + reaction._emoji.name + ":" + reaction._emoji.id + ">";
+	dataLog.countEmoji(reactStr);
+
+});
+
 // Login to Discord with your client's token
 client.login(token);
+
