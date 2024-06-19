@@ -1,4 +1,4 @@
-const { logFile, log_filter_list_loc, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, } = require('../configVars.js');
+const { logFile, log_filter_list_loc, guildId, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, } = require('../configVars.js');
 const fs = require('node:fs');
 
 const mysql = require('mysql2');
@@ -12,18 +12,62 @@ connection.addListener('error', (err) => {
   console.log(err);
 });
 
-const emoji_table_name = 'emoji_frequency'; // table for tracking emoji usage frequency
+const tblCreateQuery = mysql.format(
+  "CREATE TABLE IF NOT EXISTS emoji_frequency " + 
+    "(emoid VARCHAR(255) NOT NULL, " + 
+    "emoji VARCHAR(255) NOT NULL, " +
+    "frequency INT NOT NULL, " +
+    "animated BOOLEAN, " +
+    "type VARCHAR(50) NOT NULL, " +
+    "PRIMARY KEY (emoid))");
 
-connection.query(`CREATE TABLE IF NOT EXISTS ${emoji_table_name} (id INT NOT NULL AUTO_INCREMENT, emoji VARCHAR(255) NOT NULL, frequency INT NOT NULL, emoid VARCHAR(255) NOT NULL, PRIMARY KEY (id))`);
+connection.query(tblCreateQuery);
+console.log('-- Emoji table tracking created');
 
+function emojiInit(emojiObjectList) {
+  connection.query("DELETE FROM emoji_frequency WHERE frequency = 0 and type = 'emoji'");
 
-function emojiInit() {
-  connection.query(`DELETE FROM ${emoji_table_name} WHERE frequency=0`);
-  // insert where doesnt exist, all emojis
+  let emojiArray = [];
 
+  emojiObjectList.forEach((e) => {
+    emojiArray.push(([`${e.id}`, `${e.name}` , 0, e.animated, `${e.type}`]));
+  });
+
+  const emoInsertQry = mysql.format(
+    "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES ? ON DUPLICATE KEY UPDATE emoid=emoid",
+    [emojiArray]
+  );
+
+  connection.query(emoInsertQry);
+}
+
+function emojiIncrement(emoji){
+  let emoCleaned = emoji.replace("<", "").replace(">", "").split(":").slice(1);
+  
+  if(emoCleaned.length == 2){
+    const emoIncrementQry = mysql.format(
+      "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
+      [emoCleaned[0], emoCleaned[1]]
+    );
+
+    connection.query(emoIncrementQry);
+  }
 
 }
 
+function emoLeaderQry(number) {
+
+  try {
+    const [results] = connection.query(
+      `SELECT emoji, frequency FROM emoji_frequency ORDER BY frequency DESC limit ${number}`
+    );
+  
+    return results;
+  } catch (err) {
+    console.log(err);
+  }
+
+}
 
 module.exports = {
 	cleanLog: function(message) {
@@ -65,10 +109,13 @@ module.exports = {
     } 
   },
   countEmoji: function(emoji){
-    // increment the frequency column for the given emoji if it exists in the database
+    emojiIncrement(emoji);
   },
-  initializeEmojisList: function(emojis){
-    emojiInit(emojis);
+  initializeEmojisList: function(emojiObjectList){
+    emojiInit(emojiObjectList);
+  },
+  getTopEmoji(number){
+    return emoLeaderQry(number);
   }
 
 }
