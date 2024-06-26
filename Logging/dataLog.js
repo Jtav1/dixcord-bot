@@ -1,4 +1,4 @@
-const { logFile, log_filter_list_loc, guildId, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, } = require('../configVars.js');
+const { logFile, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, isDev} = require('../configVars.js');
 const fs = require('node:fs');
 
 const mysql = require('mysql2');
@@ -12,9 +12,11 @@ connection.addListener('error', (err) => {
   console.log(err);
 });
 
+const emojiTblName = (isDev ? "dev_emoji_frequency" : "emoji_frequency");
+
 const tblCreateQuery = mysql.format(
-  "CREATE TABLE IF NOT EXISTS emoji_frequency " + 
-    "(emoid VARCHAR(255) NOT NULL, " + 
+  "CREATE TABLE IF NOT EXISTS " + emojiTblName +
+    " (emoid VARCHAR(255) NOT NULL, " + 
     "emoji VARCHAR(255) NOT NULL, " +
     "frequency INT NOT NULL, " +
     "animated BOOLEAN, " +
@@ -25,16 +27,16 @@ connection.query(tblCreateQuery);
 console.log('-- Emoji table tracking created');
 
 function emojiInit(emojiObjectList) {
-  connection.query("DELETE FROM emoji_frequency WHERE frequency = 0 and type = 'emoji'");
-
   let emojiArray = [];
 
   emojiObjectList.forEach((e) => {
     emojiArray.push(([`${e.id}`, `${e.name}` , 0, e.animated, `${e.type}`]));
   });
 
+  connection.query("DELETE FROM " + emojiTblName + " WHERE frequency = 0 and type = 'emoji'");
+
   const emoInsertQry = mysql.format(
-    "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES ? ON DUPLICATE KEY UPDATE emoid=emoid",
+    "INSERT INTO " + emojiTblName + " (emoid, emoji, frequency, animated, type) VALUES ? ON DUPLICATE KEY UPDATE emoid=emoid",
     [emojiArray]
   );
 
@@ -46,7 +48,7 @@ function emojiIncrement(emoji){
   
   if(emoCleaned.length == 2){
     const emoIncrementQry = mysql.format(
-      "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
+      "UPDATE " + emojiTblName + " SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
       [emoCleaned[0], emoCleaned[1]]
     );
 
@@ -57,15 +59,7 @@ function emojiIncrement(emoji){
 
 function emoLeaderQry(number) {
 
-  try {
-    const [results] = connection.query(
-      `SELECT emoji, frequency FROM emoji_frequency ORDER BY frequency DESC limit ${number}`
-    );
-  
-    return results;
-  } catch (err) {
-    console.log(err);
-  }
+ // this does not exist
 
 }
 

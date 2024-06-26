@@ -264,4 +264,5 @@ module.exports = {
   mysqlPw,
   mysqlDb,
   twitterFixEnabled,
+  isDev
 };
