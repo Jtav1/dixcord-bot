@@ -70,15 +70,10 @@ module.exports = {
 			return(combinedResponses[Math.floor(Math.random() * combinedResponses.length)]);
 		}
 
-		// twitterFixer(str, bool)
+		// twitterFixer(str)
 		//  reply with a vx twitter link if a non-vx twitter link is posted
-		//	urlType = true for x.com false for twitter.com
-		const twitterFixer =  (url, urlType) => {
-			if(urlType){
-				return "fixed it: " + url.replace('https://x.com/', 'https://vxtwitter.com/');
-			} else {
-				return "fixed it: " + url.replace('https://twitter.com/', 'https://vxtwitter.com/');
-			}
+		const twitterFixer = (url) => {
+			return "fixed it: " + url.replace('https://x.com/', 'https://vxtwitter.com/');
 		}
 
 		//******* INCOMING MESSAGE PROCESSING *******//
@@ -111,14 +106,21 @@ module.exports = {
 
 			sentence.forEach(async word => {
 				if(twitterFixEnabled){
-					if(word.startsWith('https://twitter.com/') && twitterFixEnabled){
-						response = twitterFixer(word, false);
-					} else if(word.startsWith('https://x.com/') && twitterFixEnabled){
-						response = twitterFixer(word, true);
+					if(word.startsWith('https://x.com/') 
+						&& twitterFixEnabled
+						&& (sentence.includes('dd') 
+							|| sentence.includes('dixbot') 
+							|| sentence.includes('fix')))
+					{
+						console.log("ok fixing");
+						response = twitterFixer(word);
 					}
 				}
 			})
 
+
+
+			
 			if(response.length > 0){
 				//console.log("@" + message.name);
 				message.reply(response);
