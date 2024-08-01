@@ -1,5 +1,89 @@
-const { logFile, log_filter_list_loc, filterWordArray } = require('../configVars.js');
+const { logFile, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, isDev} = require('../configVars.js');
 const fs = require('node:fs');
+
+const mysql = require('mysql2');
+
+// runs on initialization
+// const connection = mysql.createConnection(
+//   'mysql://' + mysqlUser + ':' + mysqlPw + '@' + mysqlHost + ':' + mysqlPort + '/' + mysqlDb
+// );
+
+var con = mysql.createPool(
+  {
+    host: mysqlHost,
+    port: mysqlPort,
+    user: mysqlUser,
+    password: mysqlPw,
+    database: mysqlDb
+  }
+);
+
+con.on('connection', function (connection) {
+  console.log('DB Connection established');
+
+  connection.on('error', function (err) {
+    console.error(new Date(), 'MySQL error', err.code);
+  });
+  connection.on('close', function (err) {
+    console.error(new Date(), 'MySQL close', err);
+  });
+});
+
+
+con.addListener('error', (err) => {
+  console.log(err);
+});
+
+const emojiTblName = (isDev ? "dev_emoji_frequency" : "emoji_frequency");
+
+const tblCreateQuery = mysql.format(
+  "CREATE TABLE IF NOT EXISTS " + emojiTblName +
+    " (emoid VARCHAR(255) NOT NULL, " + 
+    "emoji VARCHAR(255) NOT NULL, " +
+    "frequency INT NOT NULL, " +
+    "animated BOOLEAN, " +
+    "type VARCHAR(50) NOT NULL, " +
+    "PRIMARY KEY (emoid))");
+
+    con.query(tblCreateQuery);
+console.log('-- Emoji table tracking created');
+
+function emojiInit(emojiObjectList) {
+  let emojiArray = [];
+
+  emojiObjectList.forEach((e) => {
+    emojiArray.push(([`${e.id}`, `${e.name}` , 0, e.animated, `${e.type}`]));
+  });
+
+  con.query("DELETE FROM " + emojiTblName + " WHERE frequency = 0 and type = 'emoji'");
+
+  const emoInsertQry = mysql.format(
+    "INSERT INTO " + emojiTblName + " (emoid, emoji, frequency, animated, type) VALUES ? ON DUPLICATE KEY UPDATE emoid=emoid",
+    [emojiArray]
+  );
+
+  con.query(emoInsertQry);
+}
+
+function emojiIncrement(emoji){
+  let emoCleaned = emoji.replace("<", "").replace(">", "").split(":").slice(1);
+  
+  if(emoCleaned.length == 2){
+    const emoIncrementQry = mysql.format(
+      "UPDATE " + emojiTblName + " SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
+      [emoCleaned[0], emoCleaned[1]]
+    );
+
+    con.query(emoIncrementQry);
+  }
+
+}
+
+function emoLeaderQry(number) {
+
+ // this does not exist
+
+}
 
 module.exports = {
 	cleanLog: function(message) {
@@ -39,6 +123,15 @@ module.exports = {
         } 
       });
     } 
+  },
+  countEmoji: function(emoji){
+    emojiIncrement(emoji);
+  },
+  initializeEmojisList: function(emojiObjectList){
+    emojiInit(emojiObjectList);
+  },
+  getTopEmoji(number){
+    return emoLeaderQry(number);
   }
 
 }

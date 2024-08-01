@@ -1,6 +1,6 @@
-const { clientId, defaultArray, rareArray, rareFrequency, positiveArray, negativeArray, neutralArray } = require('../configVars.js');
+const { clientId, defaultArray, rareArray, rareFrequency, positiveArray, negativeArray, neutralArray, twitterFixEnabled } = require('../configVars.js');
 
-var dataLog = require('../Logging/dataLog.js');
+const dataLog = require('../Logging/dataLog.js');
 
 // var Sentiment = require('sentiment');
 // var sentiment = new Sentiment();
@@ -60,7 +60,6 @@ module.exports = {
 		//	Randomly sends a fortune
 		const fortuneTeller = (rawMessage) => {
 			const processedMessage = rawMessage.replace("<@" + clientId + ">", "")
-			//console.log(rawMessage + " => " + processedMessage);
 
 			//var result = sentiment.analyze(processedMessage);
 
@@ -88,23 +87,40 @@ module.exports = {
 			
 		if(!message.author.bot && !(message.author.id === clientId)){
 
+			//console.log(message.content);
+
+			const EMOJIREGEX = /((?<!\\)<:[^:]+:(\d+)>)|\p{Emoji_Presentation}|\p{Extended_Pictographic}/gmu;
+			const emojiDetector = (str) => str.match(EMOJIREGEX);
+
+			let emoAry = emojiDetector(message.content) || [];
+
+			emoAry.forEach(emo => {
+				if(emo.length > 0) dataLog.countEmoji(emo);
+			});
+
+			emoAry = [];
+
+
 			// List of all response functions
 			//let commandDict = {
 			//	'takealookatthis': ,
 			//	'dixbotfortune': fortuneTeller,
+			//	'twitterFixer': fixes twitter links
 			//}
 			const sentence = message.content.split(' ');
 
-			// sentence.forEach(async word => {
-			// 	if(word.startsWith('https://twitter.com/')){
-			// 		response = twitterFixer(word, false);
-			// 	} else if(word.startsWith('https://x.com/')){
-			// 		response = twitterFixer(word, true);
-			// 	}
-			// })
+			sentence.forEach(async word => {
+				if(twitterFixEnabled){
+					if(word.startsWith('https://twitter.com/') && twitterFixEnabled){
+						response = twitterFixer(word, false);
+					} else if(word.startsWith('https://x.com/') && twitterFixEnabled){
+						response = twitterFixer(word, true);
+					}
+				}
+			})
 
 			if(response.length > 0){
-				console.log("@" + message.name);
+				//console.log("@" + message.name);
 				message.reply(response);
 				return;
 			}
@@ -120,7 +136,7 @@ module.exports = {
 			}
 
 			if(response.length > 0){
-				console.log("<@" + message.author.username + '>: ' + message.cleanContent);
+				// console.log("<@" + message.author.username + '>: ' + message.cleanContent);
 				message.reply(response);
 				return;
 			}

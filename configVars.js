@@ -127,6 +127,8 @@ let guildId = "";
 let rareFreqStr = "";
 let logFile = "";
 
+let twitterFixEnabled = false;
+
 let mysqlHost = "";
 let mysqlPort = "";
 let mysqlUser = "";
@@ -142,6 +144,8 @@ if(isDev){
   rareFreqStr = process.env.DEV_RARITY_FREQ;
   logFile = process.env.DEV_DISCORD_LOG_FILE;
 
+  twitterFixEnabled = (process.env.DEV_ENABLE_TWITTER_FIXER === 'true');
+
   mysqlHost = process.env.DEV_MYSQL_HOST;
   mysqlPort = process.env.DEV_MYSQL_PORT;
   mysqlUser = process.env.DEV_MYSQL_USER;
@@ -155,6 +159,8 @@ if(isDev){
   guildId = process.env.DISCORD_GUILD_ID;
   rareFreqStr = process.env.RARITY_FREQ
   logFile = process.env.DISCORD_LOG_FILE;
+
+  twitterFixEnabled = process.env.ENABLE_TWITTER_FIXER === 'true';
 
   mysqlHost = process.env.MYSQL_HOST;
   mysqlPort = process.env.MYSQL_PORT;
@@ -257,4 +263,6 @@ module.exports = {
   mysqlUser,
   mysqlPw,
   mysqlDb,
+  twitterFixEnabled,
+  isDev
 };
