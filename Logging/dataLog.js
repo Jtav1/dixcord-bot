@@ -4,11 +4,33 @@ const fs = require('node:fs');
 const mysql = require('mysql2');
 
 // runs on initialization
-const connection = mysql.createConnection(
-  'mysql://' + mysqlUser + ':' + mysqlPw + '@' + mysqlHost + ':' + mysqlPort + '/' + mysqlDb
+// const connection = mysql.createConnection(
+//   'mysql://' + mysqlUser + ':' + mysqlPw + '@' + mysqlHost + ':' + mysqlPort + '/' + mysqlDb
+// );
+
+var con = mysql.createPool(
+  {
+    host: mysqlHost,
+    port: mysqlPort,
+    user: mysqlUser,
+    password: mysqlPw,
+    database: mysqlDb
+  }
 );
 
-connection.addListener('error', (err) => {
+con.on('connection', function (connection) {
+  console.log('DB Connection established');
+
+  connection.on('error', function (err) {
+    console.error(new Date(), 'MySQL error', err.code);
+  });
+  connection.on('close', function (err) {
+    console.error(new Date(), 'MySQL close', err);
+  });
+});
+
+
+con.addListener('error', (err) => {
   console.log(err);
 });
 
@@ -23,7 +45,7 @@ const tblCreateQuery = mysql.format(
     "type VARCHAR(50) NOT NULL, " +
     "PRIMARY KEY (emoid))");
 
-connection.query(tblCreateQuery);
+    con.query(tblCreateQuery);
 console.log('-- Emoji table tracking created');
 
 function emojiInit(emojiObjectList) {
@@ -33,14 +55,14 @@ function emojiInit(emojiObjectList) {
     emojiArray.push(([`${e.id}`, `${e.name}` , 0, e.animated, `${e.type}`]));
   });
 
-  connection.query("DELETE FROM " + emojiTblName + " WHERE frequency = 0 and type = 'emoji'");
+  con.query("DELETE FROM " + emojiTblName + " WHERE frequency = 0 and type = 'emoji'");
 
   const emoInsertQry = mysql.format(
     "INSERT INTO " + emojiTblName + " (emoid, emoji, frequency, animated, type) VALUES ? ON DUPLICATE KEY UPDATE emoid=emoid",
     [emojiArray]
   );
 
-  connection.query(emoInsertQry);
+  con.query(emoInsertQry);
 }
 
 function emojiIncrement(emoji){
@@ -52,7 +74,7 @@ function emojiIncrement(emoji){
       [emoCleaned[0], emoCleaned[1]]
     );
 
-    connection.query(emoIncrementQry);
+    con.query(emoIncrementQry);
   }
 
 }
