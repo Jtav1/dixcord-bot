@@ -1,9 +1,10 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { log_filter_list_loc, filterWordArray } = require('../../configVars.js');
-const fs = require('node:fs');
+import fs from "node:fs";
+import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
+import { log_filter_list_loc, filterWordArray } from "../../configVars.js";
 
-module.exports = {
-	data: new SlashCommandBuilder()
+export const test = "======filteradd command test";
+
+export let data = new SlashCommandBuilder()
 		.setName('filteradd')
 		.setDescription('Add a word to the chat log filter')
     .addStringOption(option => 
@@ -13,10 +14,10 @@ module.exports = {
         .setRequired(true)
         )
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageWebhooks)
-    .setDMPermission(false),
-	async execute(interaction) {
+    .setDMPermission(false);
+
+export const execute = async (interaction) => {
     const keyword = interaction.options.getString('keyword').toLowerCase();
-		
 
     if(filterWordArray.includes(keyword)) {
       await interaction.reply('"' + keyword + '" is already on the filter list.');
@@ -31,5 +32,4 @@ module.exports = {
       if(err) await interaction.reply("ERROR adding keyword: " + keyword + " to the filter list. Tell Justin to add it manually.");
       else await interaction.reply('"' + keyword + '" added to the filter list.');
     })
-	},
-};
+	};

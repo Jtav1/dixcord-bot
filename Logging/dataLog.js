@@ -1,7 +1,7 @@
-const { logFile, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, isDev} = require('../configVars.js');
-const fs = require('node:fs');
+import fs from 'node:fs';
+import mysql from 'mysql2/promise';
 
-const mysql = require('mysql2');
+import {logFile, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, isDev} from '../configVars.js'; 
 
 // runs on initialization
 // const connection = mysql.createConnection(
@@ -48,7 +48,18 @@ const tblCreateQuery = mysql.format(
     con.query(tblCreateQuery);
 console.log('-- Emoji table tracking created');
 
-function emojiInit(emojiObjectList) {
+
+export const initializeEmojisList = async (emojiObjectList) => {
+  const connection = await mysql.createConnection({
+    host: mysqlHost,
+    port: mysqlPort,
+    user: mysqlUser,
+    password: mysqlPw,
+    database: mysqlDb,
+  });
+
+  connection.query(tblCreateQuery);
+
   let emojiArray = [];
 
   emojiObjectList.forEach((e) => {
@@ -65,7 +76,42 @@ function emojiInit(emojiObjectList) {
   con.query(emoInsertQry);
 }
 
-function emojiIncrement(emoji){
+
+    con.query(emoIncrementQry);
+  }
+
+  const spaceRegex = /\s+/g;
+
+  //todo add logfile encryption
+
+  let logMsg = message.content
+    .replace(userIdRegex, '')
+    .replace(groupIdRegex, '')
+    .replace(phoneNumRegex, '')
+    .replace(emailRegex, '')
+    .replace(urlRegex, '')
+    .replace(addressRegex, '');
+
+
+  let tmpAry = logMsg.split(' ');
+
+
+  let msgAry = tmpAry.filter((word) =>{
+    return !filterWordArray.includes(word);
+  })
+
+  let cleanMsg = msgAry.join(' ').replace(spaceRegex, ' ').trim();
+
+  if(cleanMsg.length > 0){
+    fs.appendFile(logFile, cleanMsg+"\n", (err) => { 
+      if (err) { 
+        console.log("Error writing to chatlog file " + logFile + ": " + err); 
+      } 
+    });
+  } 
+}
+
+export const countEmoji = (emoji) => {
   let emoCleaned = emoji.replace("<", "").replace(">", "").split(":").slice(1);
   
   if(emoCleaned.length == 2){
@@ -74,64 +120,19 @@ function emojiIncrement(emoji){
       [emoCleaned[0], emoCleaned[1]]
     );
 
-    con.query(emoIncrementQry);
+    connection.query(emoIncrementQry);
   }
-
 }
 
-function emoLeaderQry(number) {
-
- // this does not exist
-
-}
-
-module.exports = {
-	cleanLog: function(message) {
-    const userIdRegex = /<@\d+>/g;
-    const groupIdRegex = /<@&\d+>/g;
-    const addressRegex = /\d{1,5}\s{1}\w+\s{1}\w+\s\w+/g;
-    const phoneNumRegex = /(\([0-9]{3}\)|[0-9]{3})( |-)[0-9]{3}-[0-9]{4}/g;
-    const emailRegex = /[a-zA-Z0-9]+@[a-zA-Z0-9]+.[a-zA-Z0-9]+/g;
-    const urlRegex = /(http:\/\/|https:\/\/)[^\s]+/g;
-
-    const spaceRegex = /\s+/g;
-
-    //todo add logfile encryption
-
-    let logMsg = message.content
-      .replace(userIdRegex, '')
-      .replace(groupIdRegex, '')
-      .replace(phoneNumRegex, '')
-      .replace(emailRegex, '')
-      .replace(urlRegex, '')
-      .replace(addressRegex, '');
-
-
-    let tmpAry = logMsg.split(' ');
-
-
-    let msgAry = tmpAry.filter((word) =>{
-      return !filterWordArray.includes(word);
-    })
-
-    let cleanMsg = msgAry.join(' ').replace(spaceRegex, ' ').trim();
-
-    if(cleanMsg.length > 0){
-      fs.appendFile(logFile, cleanMsg+"\n", (err) => { 
-        if (err) { 
-          console.log("Error writing to chatlog file " + logFile + ": " + err); 
-        } 
-      });
-    } 
-  },
-  countEmoji: function(emoji){
-    emojiIncrement(emoji);
-  },
-  initializeEmojisList: function(emojiObjectList){
-    emojiInit(emojiObjectList);
-  },
-  getTopEmoji(number){
-    return emoLeaderQry(number);
+export const getTopEmoji = async (number) => {
+  try {
+    const [results, fields] = await connection.query(
+      'SELECT * FROM `table` WHERE `name` = "Page" AND `age` > 45'
+    );
+  
+    console.log(results); // results contains rows returned by server
+    console.log(fields); // fields contains extra meta data about results, if available
+  } catch (err) {
+    console.log(err);
   }
-
 }

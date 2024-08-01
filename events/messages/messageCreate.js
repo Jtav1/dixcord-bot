@@ -1,6 +1,8 @@
-const { clientId, defaultArray, rareArray, rareFrequency, positiveArray, negativeArray, neutralArray, twitterFixEnabled } = require('../configVars.js');
+const { clientId, defaultArray, rareArray, rareFrequency, positiveArray, negativeArray, neutralArray, twitterFixEnabled } = require('../../configVars.js');
 
-const dataLog = require('../Logging/dataLog.js');
+const dataLog = require('../../Logging/dataLog.js');
+
+export const test = "Message create test";
 
 // var Sentiment = require('sentiment');
 // var sentiment = new Sentiment();
