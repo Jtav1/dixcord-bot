@@ -1,12 +1,7 @@
+import { logFile, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, isDev} from '../configVars.js';
 import fs from 'node:fs';
-import mysql from 'mysql2/promise';
 
-import {logFile, filterWordArray, mysqlHost, mysqlPort, mysqlUser, mysqlPw, mysqlDb, isDev} from '../configVars.js'; 
-
-// runs on initialization
-// const connection = mysql.createConnection(
-//   'mysql://' + mysqlUser + ':' + mysqlPw + '@' + mysqlHost + ':' + mysqlPort + '/' + mysqlDb
-// );
+import mysql from 'mysql2';
 
 var con = mysql.createPool(
   {
@@ -49,17 +44,7 @@ const tblCreateQuery = mysql.format(
 console.log('-- Emoji table tracking created');
 
 
-export const initializeEmojisList = async (emojiObjectList) => {
-  const connection = await mysql.createConnection({
-    host: mysqlHost,
-    port: mysqlPort,
-    user: mysqlUser,
-    password: mysqlPw,
-    database: mysqlDb,
-  });
-
-  connection.query(tblCreateQuery);
-
+const initializeEmojisList = (emojiObjectList) => {
   let emojiArray = [];
 
   emojiObjectList.forEach((e) => {
@@ -77,8 +62,33 @@ export const initializeEmojisList = async (emojiObjectList) => {
 }
 
 
+const countEmoji = (emoji) => {
+  let emoCleaned = emoji.replace("<", "").replace(">", "").split(":").slice(1);
+  
+  if(emoCleaned.length == 2){
+    const emoIncrementQry = mysql.format(
+      "UPDATE " + emojiTblName + " SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
+      [emoCleaned[0], emoCleaned[1]]
+    );
+
     con.query(emoIncrementQry);
   }
+
+}
+
+const getTopEmoji = (number) => {
+
+ // this does not exist
+
+}
+
+const cleanLog = (message) => {
+  const userIdRegex = /<@\d+>/g;
+  const groupIdRegex = /<@&\d+>/g;
+  const addressRegex = /\d{1,5}\s{1}\w+\s{1}\w+\s\w+/g;
+  const phoneNumRegex = /(\([0-9]{3}\)|[0-9]{3})( |-)[0-9]{3}-[0-9]{4}/g;
+  const emailRegex = /[a-zA-Z0-9]+@[a-zA-Z0-9]+.[a-zA-Z0-9]+/g;
+  const urlRegex = /(http:\/\/|https:\/\/)[^\s]+/g;
 
   const spaceRegex = /\s+/g;
 
@@ -111,28 +121,4 @@ export const initializeEmojisList = async (emojiObjectList) => {
   } 
 }
 
-export const countEmoji = (emoji) => {
-  let emoCleaned = emoji.replace("<", "").replace(">", "").split(":").slice(1);
-  
-  if(emoCleaned.length == 2){
-    const emoIncrementQry = mysql.format(
-      "UPDATE " + emojiTblName + " SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
-      [emoCleaned[0], emoCleaned[1]]
-    );
-
-    connection.query(emoIncrementQry);
-  }
-}
-
-export const getTopEmoji = async (number) => {
-  try {
-    const [results, fields] = await connection.query(
-      'SELECT * FROM `table` WHERE `name` = "Page" AND `age` > 45'
-    );
-  
-    console.log(results); // results contains rows returned by server
-    console.log(fields); // fields contains extra meta data about results, if available
-  } catch (err) {
-    console.log(err);
-  }
-}
+export default { cleanLog, countEmoji, initializeEmojisList, getTopEmoji};
