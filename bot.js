@@ -8,18 +8,19 @@ import path from 'node:path';
 import dataLog from './logging/dataLog.js';
 
 // Create a new client instance
-const client = new Client({ 
+const client = new Client({
 	intents: [
 		GatewayIntentBits.Guilds,
 		GatewayIntentBits.GuildMessages,
 		GatewayIntentBits.MessageContent,
 		GatewayIntentBits.GuildMessageReactions,
-	], 
+	],
 	partials: [
-		Partials.Message, 
-		Partials.Channel, 
+		Partials.Message,
+		Partials.Channel,
 		Partials.Reaction
-	],});
+	],
+});
 
 //Set up slash commands
 //Docs: https://discordjs.guide/creating-your-bot/command-handling.html
@@ -33,10 +34,10 @@ const commandCategories = fs.readdirSync(commandsPath);
 //for each folder (category) under commands, get all js files
 for (const category of commandCategories) {
 	const categoryPath = path.join(commandsPath, category);
-	for (const file of fs.readdirSync(categoryPath).filter(file => file.endsWith('.js'))){
+	for (const file of fs.readdirSync(categoryPath).filter(file => file.endsWith('.js'))) {
 
 		const { command } = await import(path.join(categoryPath, file));
-		
+
 		// Set a new item in the Collection with the key as the command name and the value as the exported module
 		if ('data' in command && 'execute' in command) {
 			client.commands.set(command.data.name, command);
@@ -56,7 +57,7 @@ const eventCategories = fs.readdirSync(eventsPath);
 for (const category of eventCategories) {
 	const categoryPath = path.join(eventsPath, category);
 
-	for (const file of fs.readdirSync(categoryPath).filter(file => file.endsWith('.js'))){
+	for (const file of fs.readdirSync(categoryPath).filter(file => file.endsWith('.js'))) {
 
 		const { event } = await import(path.join(categoryPath, file));
 
@@ -99,26 +100,26 @@ client.once(Events.ClientReady, readyClient => {
 		.then(guild => {
 			guild.emojis.fetch()
 				.then((result) => {
-					dataLog.initializeEmojisList(result.map((r) => 
-						({
-							id: r.id,
-							name: r.name,
-							animated: r.animated,
-							type: "emoji"
-						})
+					dataLog.initializeEmojisList(result.map((r) =>
+					({
+						id: r.id,
+						name: r.name,
+						animated: r.animated,
+						type: "emoji"
+					})
 					));
 				})
 				.catch(console.error)
 		})
 		.catch(console.error)
-	
+
 	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 
 });
 
 // https://stackoverflow.com/questions/66793543/reaction-event-discord-js
 client.on('messageReactionAdd', async (reaction, user) => {
-	
+
 	let reactStr = "<:" + reaction._emoji.name + ":" + reaction._emoji.id + ">";
 	dataLog.countEmoji(reactStr);
 
