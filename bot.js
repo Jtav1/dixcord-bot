@@ -1,11 +1,11 @@
 // Require the necessary discord.js classes
-const { REST, Routes, Client, Collection, Events, GatewayIntentBits, Partials } = require('discord.js');
-const { token, clientId, guildId } = require('./configVars.js');
+import { REST, Routes, Client, Collection, Events, GatewayIntentBits, Partials } from 'discord.js';
+import { token, clientId, guildId } from './configVars.js';
 
-const fs = require('node:fs');
-const path = require('node:path');
+import fs from 'node:fs';
+import path from 'node:path';
 
-const dataLog = require('./Logging/dataLog.js');
+import dataLog from './Logging/dataLog.js';
 
 // Create a new client instance
 const client = new Client({ 
@@ -26,21 +26,19 @@ const client = new Client({
 
 client.commands = new Collection();
 
-const foldersPath = path.join(__dirname, 'commands');
-const commandFolders = fs.readdirSync(foldersPath); // grab all folders
+const foldersPath = path.join(import.meta.dirname, 'commands');
+const commandFolders = fs.readdirSync(foldersPath);
 
-// grab all commands in all folders
-for (const folder of commandFolders) {
-
-	const commandsPath = path.join(foldersPath, folder);
-	const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-
-	for (const file of commandFiles) {
-		const filePath = path.join(commandsPath, file);
-		const command = require(filePath);
+for(const folder of commandFolders) {
+	const folderFullPath = path.join(foldersPath, folder);
+	for (const file of fs.readdirSync(folderFullPath).filter(file => file.endsWith('.js'))){
+		console.log("importing from " + folderFullPath + "/" + file);
+		const { command } = await import(path.join(folderFullPath, file));
+		
 
 		// Set a new item in the Collection with the key as the command name and the value as the exported module
 		if ('data' in command && 'execute' in command) {
+			console.log("adding command: " + command.test)
 			client.commands.set(command.data.name, command);
 		} else {
 			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
@@ -50,7 +48,7 @@ for (const folder of commandFolders) {
 
 //Set up events
 //https://discord.js.org/#/docs/main/main/class/Client List of Events to handle
-const eventsPath = path.join(__dirname, 'events');
+const eventsPath = path.join(import.meta.dirname, 'events');
 const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
 for (const file of eventFiles) {

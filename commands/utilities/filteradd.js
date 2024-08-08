@@ -2,9 +2,7 @@ import fs from "node:fs";
 import { SlashCommandBuilder, PermissionFlagsBits } from "discord.js";
 import { log_filter_list_loc, filterWordArray } from "../../configVars.js";
 
-export const test = "======filteradd command test";
-
-export let data = new SlashCommandBuilder()
+const data = new SlashCommandBuilder()
 		.setName('filteradd')
 		.setDescription('Add a word to the chat log filter')
     .addStringOption(option => 
@@ -16,7 +14,7 @@ export let data = new SlashCommandBuilder()
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageWebhooks)
     .setDMPermission(false);
 
-export const execute = async (interaction) => {
+const execute = async (interaction) => {
     const keyword = interaction.options.getString('keyword').toLowerCase();
 
     if(filterWordArray.includes(keyword)) {
@@ -33,3 +31,8 @@ export const execute = async (interaction) => {
       else await interaction.reply('"' + keyword + '" added to the filter list.');
     })
 	};
+
+export const command = {
+  data: data,
+  execute: execute
+}
