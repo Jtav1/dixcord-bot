@@ -5,7 +5,7 @@ import { token, clientId, guildId } from './configVars.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import dataLog from './Logging/dataLog.js';
+import dataLog from './logging/dataLog.js';
 
 // Create a new client instance
 const client = new Client({ 
@@ -57,6 +57,7 @@ for (const category of eventCategories) {
 	const categoryPath = path.join(eventsPath, category);
 
 	for (const file of fs.readdirSync(categoryPath).filter(file => file.endsWith('.js'))){
+
 		const { event } = await import(path.join(categoryPath, file));
 
 		if (event.once) {
