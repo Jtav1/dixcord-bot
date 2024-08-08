@@ -26,19 +26,19 @@ const client = new Client({
 
 client.commands = new Collection();
 
-const foldersPath = path.join(import.meta.dirname, 'commands');
-const commandFolders = fs.readdirSync(foldersPath);
+//set commands direcotry and get folders inside
+const commandsPath = path.join(import.meta.dirname, 'commands');
+const commandCategories = fs.readdirSync(commandsPath);
 
-for(const folder of commandFolders) {
-	const folderFullPath = path.join(foldersPath, folder);
-	for (const file of fs.readdirSync(folderFullPath).filter(file => file.endsWith('.js'))){
-		console.log("importing from " + folderFullPath + "/" + file);
-		const { command } = await import(path.join(folderFullPath, file));
+//for each folder (category) under commands, get all js files
+for (const category of commandCategories) {
+	const categoryPath = path.join(commandsPath, category);
+	for (const file of fs.readdirSync(categoryPath).filter(file => file.endsWith('.js'))){
+
+		const { command } = await import(path.join(categoryPath, file));
 		
-
 		// Set a new item in the Collection with the key as the command name and the value as the exported module
 		if ('data' in command && 'execute' in command) {
-			console.log("adding command: " + command.test)
 			client.commands.set(command.data.name, command);
 		} else {
 			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
@@ -48,17 +48,22 @@ for(const folder of commandFolders) {
 
 //Set up events
 //https://discord.js.org/#/docs/main/main/class/Client List of Events to handle
+
 const eventsPath = path.join(import.meta.dirname, 'events');
-const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+const eventCategories = fs.readdirSync(eventsPath);
 
-for (const file of eventFiles) {
-	const filePath = path.join(eventsPath, file);
-	const event = require(filePath);
+//for each folder (category) under commands, get all js files
+for (const category of eventCategories) {
+	const categoryPath = path.join(eventsPath, category);
 
-	if (event.once) {
-		client.once(event.name, (...args) => event.execute(...args));
-	} else {
-		client.on(event.name, (...args) => event.execute(...args));
+	for (const file of fs.readdirSync(categoryPath).filter(file => file.endsWith('.js'))){
+		const { event } = await import(path.join(categoryPath, file));
+
+		if (event.once) {
+			client.once(event.name, (...args) => event.execute(...args));
+		} else {
+			client.on(event.name, (...args) => event.execute(...args));
+		}
 	}
 }
 
