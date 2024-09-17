@@ -72,16 +72,29 @@ const fortuneTeller = (rawMessage) => {
 
 // twitterFixer(str)
 //  reply with a vx twitter link if a non-vx twitter link is posted
+//	note: will use the last link in the message
 //  return: response (string)
 const twitterFixer = (messageContents) => {
-	messageContents.forEach(word => {
-		if (word.startsWith('https://x.com/')
-			&& (messageContents.includes('dd')
-				|| messageContents.includes('dixbot')
-				|| messageContents.includes('fix'))) {
-			return "fixed it: " + url.replace('https://x.com/', 'https://vxtwitter.com/');
+	
+	const msgAry = messageContents.split(' ');
+	let reply = '';
+
+	msgAry.forEach(word => {
+
+		let cleanWord = word.replace(/[<>]/g, '');
+
+		if(cleanWord.startsWith('https://x.com')){
+			if(messageContents.includes('dd') ||
+				messageContents.includes('dixbot') ||
+				messageContents.includes('fix')){
+
+				reply = ("fixed link: " + cleanWord.replace('https://x.com/', 'https://vxtwitter.com/'));
+			}
 		}
-	})
+
+	});
+
+	return reply;
 }
 
 // emojiDetector 
@@ -115,12 +128,11 @@ const execute = (message) => {
 		// Strip incoming message for comparison		
 		const contentStripped = message.content.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
 
-
 		// If there's a twitter link to fix, do that
 		if (twitterFixEnabled) {
-			const twitFixReply = twitterFixer(message.content);
-			if (twitFixReply.length > 1) {
-				response = twitterFixer(word);
+			let twitFixReply = twitterFixer(message.content);
+			if (twitFixReply.length > 0) {
+				response = twitFixReply;
 			}
 			//if not, check if there's a take a look at this to reply to
 		} else if (contentStripped.includes("takealookatthis")) {
