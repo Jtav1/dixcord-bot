@@ -12,7 +12,6 @@ const data = new SlashCommandBuilder()
         .setRequired(true)
         )
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageWebhooks)
-    .setDMPermission(false);
 
 const execute = async (interaction) => {
     const keyword = interaction.options.getString('keyword').toLowerCase();

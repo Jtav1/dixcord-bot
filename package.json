@@ -15,7 +15,7 @@
     "bufferutil": "^4.0.8",
     "discord.js": "^14.16.2",
     "dotenv": "^8.6.0",
-    "mysql2": "^3.11.0",
+    "mysql2": "^3.11.3",
     "redis": "^4.6.12",
     "sentiment": "^5.0.2",
     "utf-8-validate": "^5.0.10"
