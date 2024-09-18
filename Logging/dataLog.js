@@ -77,8 +77,22 @@ const countEmoji = (emoji) => {
 }
 
 const getTopEmoji = (number) => {
+  !number ? number = 5 : null;
 
-  // this does not exist
+
+  try {
+    // For pool initialization, see above
+    con.query('SELECT emoji, frequency FROM ' + emojiTblName + ' ORDER BY frequency DESC LIMIT ?', [number], (error, results) => {
+      if (error) {
+        console.log(error);
+        return;
+      }
+      console.log(results); // Use results instead of qry.rows
+    });
+
+  } catch (err) {
+    console.log(err);
+  }
 
 }
 
