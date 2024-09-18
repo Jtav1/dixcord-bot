@@ -1,7 +1,7 @@
 # dixcord-bot
  Discord Bot for the Dixon Cox Butte Preservation Society discord
 
- This isn't super complex or really even that good, it's just a pet project to make our group chat more interesting and fun.
+ This isn't super complex or really even that good, it's just a side project to make our group chat more interesting and fun.
  
 ## COMMANDS:
 
