@@ -12,9 +12,9 @@ import {
 import dataLog from '../../logging/dataLog.js';
 
 //******* RESPONSE FUNCTIONS *******//
-import twitterFixer from './utilities/twitterFixer.js';
-import takeALook from './utilities/takeALook.js';
-import fortuneTeller from './utilities/fortuneTeller.js';
+import twitterFixer from './responses/twitterFixer.js';
+import takeALook from './responses/takeALook.js';
+import fortuneTeller from './responses/fortuneTeller.js';
 
 const name = 'messageCreate';
 
