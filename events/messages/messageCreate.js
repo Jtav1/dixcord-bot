@@ -1,30 +1,22 @@
-import { clientId, defaultArray, rareArray, rareFrequency, positiveArray, negativeArray, neutralArray, twitterFixEnabled } from '../../configVars.js';
+import { 
+	clientId, 
+	defaultArray, 
+	rareArray, 
+	rareFrequency, 
+	positiveArray, 
+	negativeArray,
+	neutralArray, 
+	twitterFixEnabled 
+} from '../../configVars.js';
+
 import dataLog from '../../logging/dataLog.js';
 
 //******* RESPONSE FUNCTIONS *******//
 import twitterFixer from './utilities/twitterFixer.js';
 import takeALook from './utilities/takeALook.js';
-
-// var Sentiment = require('sentiment');
-// var sentiment = new Sentiment();
+import fortuneTeller from './utilities/fortuneTeller.js';
 
 const name = 'messageCreate';
-
-
-// fortuneTeller()
-//	Randomly sends a fortune
-//  return: response (string)
-const fortuneTeller = (rawMessage) => {
-	const processedMessage = rawMessage.replace("<@" + clientId + ">", "")
-
-	//var result = sentiment.analyze(processedMessage);
-
-	const combinedResponses = positiveArray.concat(negativeArray, neutralArray);
-
-
-	console.log(combinedResponses.length);
-	return (combinedResponses[Math.floor(Math.random() * combinedResponses.length)]);
-}
 
 
 // emojiDetector 
@@ -55,23 +47,27 @@ const execute = (message) => {
 		// Strip incoming message for comparison		
 		const contentStripped = message.content.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
 
-		console.log(contentStripped);
-
 		// If there's a twitter link to fix, do that
 		if (twitterFixEnabled) {
 			let twitFixReply = twitterFixer(message.content);
 			if (twitFixReply.length > 0) {
 				response = twitFixReply;
 			}
-			//if not, check if there's a take a look at this to reply to
 		} 
 		
+		// Then, if there's a Take A Look OR fortune teller prompt, handle that
 		if (contentStripped.includes("takealookatthis")) {
 			response = takeALook(rareFrequency, defaultArray, rareArray);
 
 			//if not, check if there is a fortune teller request to reply to
 		} else if (contentStripped.startsWith(clientId) && message.content.endsWith("?")) {
-			response = fortuneTeller(message.content.toLowerCase());
+			response = fortuneTeller(
+				message.content.toLowerCase(), 
+				clientId, 
+				positiveArray, 
+				negativeArray, 
+				neutralArray
+			);
 		}
 
 		// if a reply was generated, send it
