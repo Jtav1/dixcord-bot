@@ -16,22 +16,12 @@ import twitterFixer from './responses/twitterFixer.js';
 import takeALook from './responses/takeALook.js';
 import fortuneTeller from './responses/fortuneTeller.js';
 
+//******* UTILITIES FUNCTIONS ********//;
+import emojiDetector from './utilities/emojiDetector.js'
+
+
+
 const name = 'messageCreate';
-
-
-// emojiDetector 
-//  logs instances of each emojis in the message
-//  return: none/void
-const emojiDetector = (rawMessage) => {
-	const EMOJIREGEX = /((?<!\\)<:[^:]+:(\d+)>)|\p{Emoji_Presentation}|\p{Extended_Pictographic}/gmu;
-	const emojiDetector = (str) => str.match(EMOJIREGEX);
-
-	let emoAry = emojiDetector(rawMessage.content) || [];
-
-	emoAry.forEach(emo => {
-		if (emo.length > 0) dataLog.countEmoji(emo);
-	});
-}
 
 const execute = (message) => {
 
@@ -46,6 +36,12 @@ const execute = (message) => {
 
 		// Strip incoming message for comparison		
 		const contentStripped = message.content.toLowerCase().replace(/[^a-zA-Z0-9]/g, "");
+
+		// if(contentStripped.includes("emojis")){
+		// 	console.log("okay getting top emojis");
+		// 	console.log(dataLog.getTopEmoji());
+
+		// }
 
 		// If there's a twitter link to fix, do that
 		if (twitterFixEnabled) {
@@ -78,6 +74,7 @@ const execute = (message) => {
 
 		// If it wasnt a dixbot keyword, log the message for later bot training purposes
 		// dataLog.cleanLog pulls out all mentions of userID and a preset list of names
+		
 		dataLog.cleanLog(message);
 
 	}
