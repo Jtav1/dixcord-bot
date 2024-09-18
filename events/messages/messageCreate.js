@@ -1,69 +1,15 @@
 import { clientId, defaultArray, rareArray, rareFrequency, positiveArray, negativeArray, neutralArray, twitterFixEnabled } from '../../configVars.js';
 import dataLog from '../../logging/dataLog.js';
 
+//******* RESPONSE FUNCTIONS *******//
 import twitterFixer from './utilities/twitterFixer.js';
+import takeALook from './utilities/takeALook.js';
 
 // var Sentiment = require('sentiment');
 // var sentiment = new Sentiment();
 
 const name = 'messageCreate';
 
-let limit = 0;
-let lastReplyTimestamp = null;
-let ms = (Math.random() * 60000) + 60000; // CUTTING EDGE AI ANTI EXPLOIT TECHNOLOGY
-
-let configuredLimit = 2;
-
-//******* RESPONSE FUNCTIONS *******//
-
-// takeALook()
-//	selects an image and sends a reply containing the link
-//	return: response (string)
-
-const takeALook = () => {
-	let nowTime = Date.now();
-
-	let response = '';
-
-	// If there has not been a last reply or it has been long enough since the last reply, reset counter
-	if (lastReplyTimestamp == null || Math.floor((nowTime - lastReplyTimestamp)) >= ms) {
-		lastReplyTimestamp = null;
-		limit = 0;
-	}
-
-	//if the spam counter hasnt hit the limit
-	if (limit < configuredLimit) {
-		//continue to response
-
-	//else if the counter is at the limit
-	} else if (limit == (configuredLimit)) {
-
-		//store the time of the last response and count it
-		lastReplyTimestamp = Date.now();
-		limit++;
-
-		response = 'No spam!'; // https://i.imgur.com/kAClxb0.png = spam picture url lol
-	}
-
-
-	let imgLink = '';
-
-	//New calculation
-	let diceRoll = Math.random();
-
-	if (diceRoll <= rareFrequency) {
-		imgLink = rareArray[rareArray.length * Math.random() | 0]
-	} else {
-		imgLink = defaultArray[defaultArray.length * Math.random() | 0]
-	}
-
-	response.length < 1 ? response = imgLink : null;
-
-	limit++;
-	lastReplyTimestamp = Date.now();
-
-	return response;
-}
 
 // fortuneTeller()
 //	Randomly sends a fortune
@@ -121,8 +67,7 @@ const execute = (message) => {
 		} 
 		
 		if (contentStripped.includes("takealookatthis")) {
-			console.log("taking a look")
-			response = takeALook();
+			response = takeALook(rareFrequency, defaultArray, rareArray);
 
 			//if not, check if there is a fortune teller request to reply to
 		} else if (contentStripped.startsWith(clientId) && message.content.endsWith("?")) {
