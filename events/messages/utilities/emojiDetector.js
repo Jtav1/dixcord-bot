@@ -4,7 +4,7 @@ import dataLog from '../../../logging/dataLog.js';
 //  logs instances of each emojis in the message
 //  return: none/void
 const emojiDetector = (rawMessage) => {
-	const EMOJIREGEX = /((?<!\\)<:[^:]+:(\d+)>)|\p{Emoji_Presentation}|\p{Extended_Pictographic}/gmu;
+	const EMOJIREGEX = /((<|<a):?:\w+:?\d+>)|\p{Emoji_Presentation}|\p{Extended_Pictographic}/gmu;
 	const emojiDetector = (str) => str.match(EMOJIREGEX);
 
 	let emoAry = emojiDetector(rawMessage.content) || [];
