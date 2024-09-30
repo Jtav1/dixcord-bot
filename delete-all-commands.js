@@ -1,11 +1,14 @@
-const { REST, Routes } = require('discord.js');
-const { clientId, guildId, token } = require('./configVars.js');
+import { REST, Routes } from 'discord.js';
+import { clientId, guildId, token } from './configVars.js';
 
 const rest = new REST().setToken(token);
 
-// ...
-
-// for guild-based commands
-rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: [] })
-	.then(() => console.log('Successfully deleted all guild commands.'))
-	.catch(console.error);
+(async () => {
+	try {
+		// for guild-based commands
+		await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: [] });
+		console.log('Successfully deleted all guild commands.');
+	} catch (error) {
+		console.error(error);
+	}
+})();
