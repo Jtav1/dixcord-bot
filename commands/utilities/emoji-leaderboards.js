@@ -1,19 +1,38 @@
 import { SlashCommandBuilder } from "discord.js";
-//import { getTopEmoji } from "../../Logging/dataLog.js";
+import dataLog from "../../logging/dataLog.js";
+
+import { EmbedBuilder } from "discord.js";
+
+const cmdName = "top-emojis";
 
 const data = new SlashCommandBuilder()
 		.setName('top-emojis')
 		.setDescription('Top 5 Most Used Emojis in Dixcord');
 
 const execute = async (interaction) => {
-        // let topAry = getTopEmoji(5);
+    console.log("in emoji leaderboard execute");
 
-        // console.log(topAry);
+    let top5 = await dataLog.getTopEmoji(5);
 
-        await interaction.reply('bing bong');
+    console.log("top5 complete");
+    console.log(top5);
+
+    let emoStr = 'Top 5 most used emojis:\n\n';
+    top5.forEach((em, idx) => {
+        let num = idx+1
+        emoStr += '\n\t' + num + ' - ' + em.emoji + ', ' + em.frequency + (em.animated ? ' <a:' : ' <:') + em.emoji + ':' + em.emoid + '>';
+    });
+
+    console.log(emoStr)
+
+    const emojiEmbed = new EmbedBuilder()
+        .setColor(0x0099FF)
+        .setTitle('Top 5 Emojis')
+        .setDescription(emoStr)
+        .setThumbnail('https://i.imgur.com/KMroCAv.png');
+
+    await interaction.reply({ embeds: [emojiEmbed] });
+
     };
 
-export const command = {
-    data: data,
-    execute: execute
-}
+export { cmdName, data, execute };
