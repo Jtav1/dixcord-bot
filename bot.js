@@ -24,27 +24,6 @@ const client = new Client({
 
 const commands = [];
 
-//Set up slash commands
-//Docs: https://discordjs.guide/creating-your-bot/command-handling.html
-
-// const commands = [];
-// const foldersPath = path.join(process.cwd(), 'commands');
-// const commandFolders = fs.readdirSync(foldersPath);
-
-// for (const folder of commandFolders) {
-// 	const commandsPath = path.join(foldersPath, folder);
-// 	const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-// 	for (const file of commandFiles) {
-// 		const filePath = path.join(commandsPath, file);
-// 		const command = await import(filePath);
-// 		if ('data' in command && 'execute' in command) {
-// 			commands.push(command.data.toJSON());
-// 		} else {
-// 			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
-// 		}
-// 	}
-// }
-
 //Set up events
 //https://discord.js.org/#/docs/main/main/class/Client List of Events to handle
 
