@@ -22,30 +22,28 @@ const client = new Client({
 	],
 });
 
+const commands = [];
+
 //Set up slash commands
 //Docs: https://discordjs.guide/creating-your-bot/command-handling.html
 
-client.commands = new Collection();
+// const commands = [];
+// const foldersPath = path.join(process.cwd(), 'commands');
+// const commandFolders = fs.readdirSync(foldersPath);
 
-//set commands direcotry and get folders inside
-const commandsPath = path.join(import.meta.dirname, 'commands');
-const commandCategories = fs.readdirSync(commandsPath);
-
-//for each folder (category) under commands, get all js files
-for (const category of commandCategories) {
-	const categoryPath = path.join(commandsPath, category);
-	for (const file of fs.readdirSync(categoryPath).filter(file => file.endsWith('.js'))) {
-
-		const { command } = await import(path.join(categoryPath, file));
-
-		// Set a new item in the Collection with the key as the command name and the value as the exported module
-		if ('data' in command && 'execute' in command) {
-			client.commands.set(command.data.name, command);
-		} else {
-			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
-		}
-	}
-}
+// for (const folder of commandFolders) {
+// 	const commandsPath = path.join(foldersPath, folder);
+// 	const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+// 	for (const file of commandFiles) {
+// 		const filePath = path.join(commandsPath, file);
+// 		const command = await import(filePath);
+// 		if ('data' in command && 'execute' in command) {
+// 			commands.push(command.data.toJSON());
+// 		} else {
+// 			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+// 		}
+// 	}
+// }
 
 //Set up events
 //https://discord.js.org/#/docs/main/main/class/Client List of Events to handle
@@ -53,13 +51,13 @@ for (const category of commandCategories) {
 const eventsPath = path.join(import.meta.dirname, 'events');
 const eventCategories = fs.readdirSync(eventsPath);
 
-//for each folder (category) under commands, get all js files
+//for each folder (category) under events, get all js files
 for (const category of eventCategories) {
-	const categoryPath = path.join(eventsPath, category);
+	const eventCategoryPath = path.join(eventsPath, category);
 
-	for (const file of fs.readdirSync(categoryPath).filter(file => file.endsWith('.js'))) {
+	for (const file of fs.readdirSync(eventCategoryPath).filter(file => file.endsWith('.js'))) {
 
-		const { event } = await import(path.join(categoryPath, file));
+		const { event } = await import(path.join(eventCategoryPath, file));
 
 		if (event.once) {
 			client.once(event.name, (...args) => event.execute(...args));
@@ -69,28 +67,40 @@ for (const category of eventCategories) {
 	}
 }
 
-// Register commands
-client.on(Events.InteractionCreate, async interaction => {
-	if (!interaction.isChatInputCommand()) return;
 
-	const command = interaction.client.commands.get(interaction.commandName);
+//Set up commands
+const commandsPath = path.join(import.meta.dirname, 'commands');
+const commandsCategories = fs.readdirSync(commandsPath);
 
-	if (!command) {
-		console.error(`No command matching ${interaction.commandName} was found.`);
-		return;
-	}
+//for each folder (category) under events, get all js files
+for (const category of commandsCategories) {
+	const commandCategoryPath = path.join(commandsPath, category);
 
-	try {
-		await command.execute(interaction);
-	} catch (error) {
-		console.error(error);
-		if (interaction.replied || interaction.deferred) {
-			await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+	for (const file of fs.readdirSync(commandCategoryPath).filter(file => file.endsWith('.js'))) {
+
+		const command = await import(path.join(commandCategoryPath, file));
+
+		if ('cmdName' in command && 'data' in command && 'execute' in command) {
+			commands.push(command);
 		} else {
-			await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+			console.log(`[WARNING] The command at ${filePath} is missing a required "cmdName" or "data" or "execute" property.`);
 		}
 	}
+}
+
+// Respond to commands
+client.on(Events.InteractionCreate, async (interaction) => {
+	if (!interaction.isCommand()) return;
+
+	let runCommand = commands.find((cmd) => cmd.cmdName === interaction.commandName);
+	try {
+		await(runCommand.execute(interaction));
+	} catch (e) {
+		console.log("command execution error");
+	}
+	
 });
+
 
 client.once(Events.ClientReady, readyClient => {
 
