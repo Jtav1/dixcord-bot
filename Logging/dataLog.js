@@ -63,7 +63,9 @@ const initializeEmojisList = (emojiObjectList) => {
 
 
 const countEmoji = (emoji) => {
-  let emoCleaned = emoji.replace("<", "").replace(">", "").split(":").slice(1);
+  console.log(emoji);
+  let emoCleaned = emoji.replace("<a", "").replace("<", "").replace(">", "").split(":").slice(1);
+  console.log(emoCleaned);
 
   if (emoCleaned.length == 2) {
     const emoIncrementQry = mysql.format(
@@ -76,25 +78,29 @@ const countEmoji = (emoji) => {
 
 }
 
-const getTopEmoji = (number) => {
-  !number ? number = 5 : null;
+const getTopEmoji = async (number) => {
 
+  let res = [];
 
-  try {
-    // For pool initialization, see above
-    con.query('SELECT emoji, frequency FROM ' + emojiTblName + ' ORDER BY frequency DESC LIMIT ?', [number], (error, results) => {
-      if (error) {
-        console.log(error);
-        return;
-      }
-      console.log(results); // Use results instead of qry.rows
-    });
+  var query = con.format('SELECT emoji, frequency, emoid, animated FROM ' + emojiTblName + ' ORDER BY frequency DESC LIMIT ?', [number]);
 
-  } catch (err) {
-    console.log(err);
+  async function getResults(qry) {
+      const [rows] = await con.promise().query(qry);
+      return rows;  // Return the result
   }
 
+  try {
+    const results = await getResults(query);
+    console.log(results);
+    res = results;
+
+  } catch (e) {
+    console.err(e);
+  }
+  return res;
+
 }
+
 
 const cleanLog = (message) => {
   const userIdRegex = /<@\d+>/g;
