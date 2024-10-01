@@ -31,7 +31,7 @@ con.addListener('error', (err) => {
 
 const emojiTblName = (isDev ? "dev_emoji_frequency" : "emoji_frequency");
 
-const tblCreateQuery = mysql.format(
+const emojiTblCreateQuery = mysql.format(
   "CREATE TABLE IF NOT EXISTS " + emojiTblName +
   " (emoid VARCHAR(255) NOT NULL, " +
   "emoji VARCHAR(255) NOT NULL, " +
@@ -40,9 +40,30 @@ const tblCreateQuery = mysql.format(
   "type VARCHAR(50) NOT NULL, " +
   "PRIMARY KEY (emoid))");
 
-con.query(tblCreateQuery);
+con.query(emojiTblCreateQuery);
 console.log('-- Emoji table tracking created');
 
+const pinTblName = (isDev ? "dev_pin_history" : "pin_history");
+
+const pinTblCreateQuery = mysql.format(
+  "CREATE TABLE IF NOT EXISTS " + pinTblName +
+  "  (msgid VARCHAR(255) PRIMARY KEY," +
+  "  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)");
+
+con.query(pinTblCreateQuery);
+console.log('-- Pinned message tracking table created');
+
+//async wrapper for running select queries
+async function getResults(qry) {
+
+  try {
+    const [rows] = await con.promise().query(qry);
+  } catch (e){
+    console.err(e);
+  }
+
+  return rows;  // Return the result
+}
 
 const initializeEmojisList = (emojiObjectList) => {
   let emojiArray = [];
@@ -63,9 +84,7 @@ const initializeEmojisList = (emojiObjectList) => {
 
 
 const countEmoji = (emoji) => {
-  console.log(emoji);
   let emoCleaned = emoji.replace("<a", "").replace("<", "").replace(">", "").split(":").slice(1);
-  console.log(emoCleaned);
 
   if (emoCleaned.length == 2) {
     const emoIncrementQry = mysql.format(
@@ -75,19 +94,38 @@ const countEmoji = (emoji) => {
 
     con.query(emoIncrementQry);
   }
+}
+
+const logPinnedMessage = (msgid) => {
+
+  if(msgid) {
+    const pinLogQry = mysql.format("INSERT INTO " + pinTblName + "(msgid) VALUES ?", [msgid]);
+    con.query(pinLogQry);
+  }
+}
+
+
+///TODO finish this
+const getPinnedMsgIfExists = async (msgid) => {
+
+  let res = [];
+  var query = con.format('SELECT EXISTS (SELECT 1 FROM ' + pinTblName + ' WHERE msgid = \'?\') AS found;');
+
+  const results = await getResults(query);
+  console.log(results);
+  res = results;
+
+  //TODO return true or false based on value of found
+  return res;
 
 }
 
+// TODO test that this works with the getResults query moved out
 const getTopEmoji = async (number) => {
 
   let res = [];
 
   var query = con.format('SELECT emoji, frequency, emoid, animated FROM ' + emojiTblName + ' ORDER BY frequency DESC LIMIT ?', [number]);
-
-  async function getResults(qry) {
-      const [rows] = await con.promise().query(qry);
-      return rows;  // Return the result
-  }
 
   try {
     const results = await getResults(query);
