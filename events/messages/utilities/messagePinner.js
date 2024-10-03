@@ -3,7 +3,7 @@ import { EmbedBuilder } from "discord.js";
 
 import { isDev } from '../../../configVars.js';
 
-const pinChannelId = '915462110761349201'; //TODO move this to config table in db
+const pinChannelId = isDev ? '710671234471559228' : '915462110761349201'; //TODO move this to config table in db
 
 // messagePinner 
 // pins message if sufficent pin emoji reactions are added to it
@@ -26,6 +26,7 @@ const messagePinner = async (message, pinReaction, user, client) => {
         const pinEmbed = new EmbedBuilder()
             .setColor(0xBC0302)
             .setAuthor({ name: (message.author.displayName + ' (' + message.author.username + ')'), iconURL: message.author.displayAvatarURL(), url: message.url })
+            .setThumbnail()
             .setTitle('📌 Major Pin Alert')
             .setURL(message.url)
             .setDescription(message.content)
