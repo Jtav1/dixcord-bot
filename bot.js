@@ -1,11 +1,12 @@
 // Require the necessary discord.js classes
 import { REST, Routes, Client, Collection, Events, GatewayIntentBits, Partials } from 'discord.js';
-import { token, clientId, guildId } from './configVars.js';
+import { token, clientId, guildId, isDev } from './configVars.js';
 
 import fs from 'node:fs';
 import path from 'node:path';
 
 import dataLog from './logging/dataLog.js';
+import messagePinner from './events/messages/utilities/messagePinner.js';
 
 // Create a new client instance
 const client = new Client({
@@ -23,10 +24,11 @@ const client = new Client({
 });
 
 //TODO PUT THESE INTO CONFIG TABLE
-const pinThreshold = 1; // emoji pin voting threshold, put into db instead as configuration
-const pinEmoji = '\ud83d\udccc'; // pin emoji unicode maybe
+const pinThreshold = 3; // TODO emoji pin voting threshold, put into db instead as configuration
+const pinEmoji = '\ud83d\udccc'; // TODO pin emoji unicode maybe move into db
 
 const commands = [];
+const announceChannelId = '710671234471559228'; //TODO move this to config table in db
 
 //Set up events
 //https://discord.js.org/#/docs/main/main/class/Client List of Events to handle
@@ -118,25 +120,33 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
 	const allReactions = message.reactions.valueOf();
 	const pinReact = allReactions.get(pinEmoji);
+
 	if(pinReact){
 		if(pinReact.count === pinThreshold){
-			console.log("PIN THAT MESSAGE");
+			//dataLog.logPinnedMessage(message.id);
+			await messagePinner(message, pinReact, user, client); // returns success bool
 		}
-		
 	}
 
 	let reactStr = "<:" + reaction._emoji.name + ":" + reaction._emoji.id + ">";
-	console.log(reaction._emoji.name);
 
-	if(reaction._emoji.name === pinEmoji) console.log("HIT");
+	// This shouldnt be necessary because countEmoji only counts server emoji BUT if we ever use a custom one, or add that in as another option...
+	if(reaction._emoji.name === pinEmoji){
+		//console.log("HIT");
+	} else {
+		dataLog.countEmoji(reactStr);
+	}
 
 	//this is how to split unicode emojis into their composite unicode string sorry i forgot to save the S.O. link
 	//emoji.split("").map((unit) => "\\u" + unit.charCodeAt(0).toString(16).padStart(4, "0")).join("");
 
-	dataLog.countEmoji(reactStr);
-
 });
 
 // Login to Discord with your client's token
-client.login(token);
+await client.login(token);
+
+if(announceChannelId.length > 0 && !isDev){
+	const announceChannel = await client.channels.fetch(announceChannelId);
+	await announceChannel.send("Dixbot v1.5 online");
+}
 
