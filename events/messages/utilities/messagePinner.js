@@ -8,16 +8,6 @@ const pinChannelId = '915462110761349201'; //TODO move this to config table in d
 // pins message if sufficent pin emoji reactions are added to it
 // return: none/void
 const messagePinner = async (message, pinReaction, user, client) => {
-
-    // console.log('======= message id');
-    // console.log(message)
-
-    // console.log('======= pinReaction');
-    // console.log(pinReaction)
-
-    // console.log('======= user');
-    // console.log(user)
-
     //check to see if the message is pinned already
     const isPinnedAlready = await dataLog.isMessageAlreadyPinned(message.id);
 
@@ -27,7 +17,6 @@ const messagePinner = async (message, pinReaction, user, client) => {
 
         const users = await pinReaction.users.fetch();
         const userArray = [];
-
 
         users.each((user) => {
             userArray.push('<@' + user.id + '>');
@@ -47,7 +36,7 @@ const messagePinner = async (message, pinReaction, user, client) => {
 
         //send embed message to the configured channel
         const channel = await client.channels.fetch(pinChannelId);
-        // await channel.send({ embeds: [pinEmbed] });
+        await channel.send({ embeds: [pinEmbed] });
 
         return true;
     }

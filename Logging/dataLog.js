@@ -103,7 +103,6 @@ const countEmoji = (emoji) => {
 }
 
 const logPinnedMessage = (msgid) => {
-
   if(msgid) {
     const boolPreviouslyPinned = isMessageAlreadyPinned(msgid) > 0 ? true : false; // shouldnt 0 be falsy idk how js works im dumb
 
