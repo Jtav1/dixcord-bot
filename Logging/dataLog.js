@@ -56,13 +56,19 @@ console.log('-- Pinned message tracking table created');
 //async wrapper for running select queries
 async function getResults(qry) {
 
+  console.log(qry);
+
   try {
     const [rows] = await con.promise().query(qry);
+    return rows;  // Return the result
+
   } catch (e){
+
     console.err(e);
+    return [];
   }
 
-  return rows;  // Return the result
+  
 }
 
 const initializeEmojisList = (emojiObjectList) => {
@@ -89,35 +95,38 @@ const countEmoji = (emoji) => {
   if (emoCleaned.length == 2) {
     const emoIncrementQry = mysql.format(
       "UPDATE " + emojiTblName + " SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
-      [emoCleaned[0], emoCleaned[1]]
+      [emoCleaned[0], emoCleaned[1]] 
     );
 
-    con.query(emoIncrementQry);
+    con.query(emoIncrementQry)
   }
 }
 
 const logPinnedMessage = (msgid) => {
 
   if(msgid) {
-    const pinLogQry = mysql.format("INSERT INTO " + pinTblName + "(msgid) VALUES ?", [msgid]);
-    con.query(pinLogQry);
+    const boolPreviouslyPinned = isMessageAlreadyPinned(msgid) > 0 ? true : false; // shouldnt 0 be falsy idk how js works im dumb
+
+    if(!boolPreviouslyPinned){
+      const pinLogQry = mysql.format("INSERT INTO " + pinTblName + "(msgid) VALUES (?)", [msgid])
+      con.query(pinLogQry)
+      console.log("MESSAGE ID SHOULD HAVE BEEN ADDED TO DB WITH: ")
+      console.log(pinLogQry);
+
+    } else {
+      console.log("DO NOT PIN ITS IN THERE ALREADY");
+    }
+
   }
 }
 
+const isMessageAlreadyPinned = async (msgid) => {
+  var query = con.format('SELECT * FROM ' + pinTblName + ' WHERE msgid LIKE CONCAT(\'%\' ? \'%\')', msgid)
+  const results = await getResults(query)
 
-///TODO finish this
-const getPinnedMsgIfExists = async (msgid) => {
+  console.log("results length " + results.length)
 
-  let res = [];
-  var query = con.format('SELECT EXISTS (SELECT 1 FROM ' + pinTblName + ' WHERE msgid = \'?\') AS found;');
-
-  const results = await getResults(query);
-  console.log(results);
-  res = results;
-
-  //TODO return true or false based on value of found
-  return res;
-
+  return results.length > 0;
 }
 
 // TODO test that this works with the getResults query moved out
@@ -125,17 +134,17 @@ const getTopEmoji = async (number) => {
 
   let res = [];
 
-  var query = con.format('SELECT emoji, frequency, emoid, animated FROM ' + emojiTblName + ' ORDER BY frequency DESC LIMIT ?', [number]);
+  var query = con.format('SELECT emoji, frequency, emoid, animated FROM ' + emojiTblName + ' ORDER BY frequency DESC LIMIT ?', [number])
 
   try {
-    const results = await getResults(query);
-    console.log(results);
-    res = results;
+    const results = await getResults(query)
+    console.log(results)
+    res = results
 
   } catch (e) {
-    console.err(e);
+    console.err(e)
   }
-  return res;
+  return res
 
 }
 
@@ -179,4 +188,4 @@ const cleanLog = (message) => {
   }
 }
 
-export default { cleanLog, countEmoji, initializeEmojisList, getTopEmoji };
+export default { cleanLog, countEmoji, initializeEmojisList, getTopEmoji, logPinnedMessage, isMessageAlreadyPinned };
