@@ -2,7 +2,7 @@ import dataLog from '../../../logging/dataLog.js';
 import { EmbedBuilder } from "discord.js";
 
 
-const pinChannelId = '710671234471559228'; //TODO move this to config table in db
+const pinChannelId = '915462110761349201'; //TODO move this to config table in db
 
 // messagePinner 
 // pins message if sufficent pin emoji reactions are added to it
