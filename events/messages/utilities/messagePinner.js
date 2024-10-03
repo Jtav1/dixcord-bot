@@ -26,7 +26,6 @@ const messagePinner = async (message, pinReaction, user, client) => {
         const pinEmbed = new EmbedBuilder()
             .setColor(0xBC0302)
             .setAuthor({ name: (message.author.displayName + ' (' + message.author.username + ')'), iconURL: message.author.displayAvatarURL(), url: message.url })
-            .setThumbnail()
             .setTitle('📌 Major Pin Alert')
             .setURL(message.url)
             .setDescription(message.content)

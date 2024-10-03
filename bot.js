@@ -27,7 +27,7 @@ const client = new Client({
 });
 
 //TODO PUT THESE INTO CONFIG TABLE
-const pinThreshold = 3; // TODO emoji pin voting threshold, put into db instead as configuration
+const pinThreshold = isDev ? 1 : 3; // TODO emoji pin voting threshold, put into db instead as configuration
 const pinEmoji = '\ud83d\udccc'; // TODO pin emoji unicode maybe move into db
 
 const commands = [];
