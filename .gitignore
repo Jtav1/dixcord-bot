@@ -106,3 +106,4 @@ dist
 config.ignore
 /data
 .DS_Store
+.vscode

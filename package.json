@@ -1,8 +1,9 @@
 {
   "name": "dixcord-bot",
-  "version": "1.2",
+  "version": "1.5",
   "description": "",
   "main": "bot.js",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "run": "node bot.js"
@@ -12,9 +13,9 @@
   "dependencies": {
     "@discordjs/voice": "^0.13.0",
     "bufferutil": "^4.0.8",
-    "discord.js": "^14.15.3",
+    "discord.js": "^14.16.2",
     "dotenv": "^8.6.0",
-    "mysql2": "^3.9.7",
+    "mysql2": "^3.11.3",
     "redis": "^4.6.12",
     "sentiment": "^5.0.2",
     "utf-8-validate": "^5.0.10"

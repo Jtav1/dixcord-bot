@@ -1,5 +1,5 @@
-const fs = require('node:fs');
-require('dotenv').config();
+import 'dotenv/config';
+import fs from "node:fs";
 
 // file location for list of URLs
 let take_a_look_list_file_loc = '/data/take_a_look_list.txt';
@@ -245,7 +245,7 @@ processTakeImageLinks();
 processFortuneArrays();
 processLogFilterList();
 
-module.exports = {
+export {
   token,
   clientId,
   guildId,
