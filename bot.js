@@ -5,6 +5,9 @@ import { token, clientId, guildId, isDev } from './configVars.js';
 import fs from 'node:fs';
 import path from 'node:path';
 
+// import { version } from './package.json'; //doesnt work lol figure it out later
+const version = '1.5';
+
 import dataLog from './logging/dataLog.js';
 import messagePinner from './events/messages/utilities/messagePinner.js';
 
@@ -147,6 +150,6 @@ await client.login(token);
 
 if(announceChannelId.length > 0 && !isDev){
 	const announceChannel = await client.channels.fetch(announceChannelId);
-	await announceChannel.send("Dixbot v1.5 online");
+	await announceChannel.send(`Dixbot ${version}-prod online`);
 }
 
