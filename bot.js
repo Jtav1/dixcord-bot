@@ -148,6 +148,9 @@ client.on('messageReactionAdd', async (reaction, user) => {
 // Login to Discord with your client's token
 await client.login(token);
 
+client.on("error", (err) => console.log(err));
+
+
 if(announceChannelId.length > 0 && !isDev){
 	const announceChannel = await client.channels.fetch(announceChannelId);
 	await announceChannel.send(`Dixbot ${version}-prod online`);
