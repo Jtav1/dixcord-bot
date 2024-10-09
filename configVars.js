@@ -51,10 +51,10 @@ if (!fs.existsSync("/data")) {
 
   log_filter_list_loc = process.env.DEV_LOG_FILTER_LIST_FILE;
 
-  if (take_a_look_list_file_loc.length < 1)
-    writeError(
-      "-- Data directory not mounted, and no DEV_TAKE_A_LOOK_AT_THIS_LINKS_FILE in .env"
-    );
+  // if (take_a_look_list_file_loc.length < 1)
+  //   writeError(
+  //     "-- Data directory not mounted, and no DEV_TAKE_A_LOOK_AT_THIS_LINKS_FILE in .env"
+  //   );
   if (positive_file_loc.length < 1)
     writeError(
       "-- Data directory not mounted, and no DEV_POSITIVE_FILE in .env"
@@ -73,25 +73,25 @@ if (!fs.existsSync("/data")) {
     );
 }
 
-// Put files in the data directory for population if one isn't already there
-fs.writeFile(take_a_look_list_file_loc, "", { flag: "wx" }, function (err) {
-  if (err) {
-    console.log(
-      "-- " + take_a_look_list_file_loc + " exists, skipping creation"
-    );
-  } else {
-    console.log("---- Created " + take_a_look_list_file_loc);
-  }
+// // Put files in the data directory for population if one isn't already there
+// fs.writeFile(take_a_look_list_file_loc, "", { flag: "wx" }, function (err) {
+//   if (err) {
+//     console.log(
+//       "-- " + take_a_look_list_file_loc + " exists, skipping creation"
+//     );
+//   } else {
+//     console.log("---- Created " + take_a_look_list_file_loc);
+//   }
 
-  console.log(
-    "---- Make sure you have a list of imgur links in " +
-      take_a_look_list_file_loc +
-      " - one link per line."
-  );
-  console.log(
-    "---- And also put a * at the beginning of the default Riker picture e.g. *https://..."
-  );
-});
+//   console.log(
+//     "---- Make sure you have a list of imgur links in " +
+//       take_a_look_list_file_loc +
+//       " - one link per line."
+//   );
+//   console.log(
+//     "---- And also put a * at the beginning of the default Riker picture e.g. *https://..."
+//   );
+// });
 
 fs.writeFile(positive_file_loc, "", { flag: "wx" }, function (err) {
   if (err) {
@@ -217,21 +217,21 @@ if (!mysqlHost || mysqlHost.length < 1) console.log("-- no db config provided");
 // processTakeImageLinks()
 //  Build takeALookSources array of all image links and weights
 //  rarity categories are randomly assigned to links other than the default
-const processTakeImageLinks = () => {
-  const file = fs.readFileSync(take_a_look_list_file_loc, "utf8");
-  let lines = file.split(/\r?\n/);
+// const processTakeImageLinks = () => {
+//   const file = fs.readFileSync(take_a_look_list_file_loc, "utf8");
+//   let lines = file.split(/\r?\n/);
 
-  lines.forEach((line) => {
-    if (line.startsWith("*")) {
-      defaultArray.push(line.replace(/[*]/g, "").trim());
-    } else {
-      rareArray.push(line.trim());
-    }
-  });
+//   lines.forEach((line) => {
+//     if (line.startsWith("*")) {
+//       defaultArray.push(line.replace(/[*]/g, "").trim());
+//     } else {
+//       rareArray.push(line.trim());
+//     }
+//   });
 
-  console.log("-- Default Array contains " + defaultArray.length + " links");
-  console.log("-- Rare Array contains " + rareArray.length + " links");
-};
+//   console.log("-- Default Array contains " + defaultArray.length + " links");
+//   console.log("-- Rare Array contains " + rareArray.length + " links");
+// };
 
 // processLogFilterList()
 //  Build logFilterWords array of all words to be filtered when logging
@@ -277,7 +277,7 @@ const processFortuneArrays = () => {
 };
 
 //Kick off image array building process
-processTakeImageLinks();
+//processTakeImageLinks();
 processFortuneArrays();
 processLogFilterList();
 
@@ -302,4 +302,8 @@ export {
   twitterFixEnabled,
   isDev,
   version,
+  take_a_look_list_file_loc,
+  positive_file_loc,
+  negative_file_loc,
+  neutral_file_loc,
 };

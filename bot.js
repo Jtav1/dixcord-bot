@@ -9,6 +9,12 @@ import {
   Partials,
 } from "discord.js";
 import { token, clientId, guildId, isDev, version } from "./configVars.js";
+import { initializeDatabase } from "./database/initialize.js";
+import {
+  importEmojiList,
+  importTakeALookList,
+  importConfigs,
+} from "./database/import.js";
 
 import fs from "node:fs";
 import path from "node:path";
@@ -33,6 +39,16 @@ const pinEmoji = "\ud83d\udccc"; // TODO pin emoji unicode maybe move into db
 
 const commands = [];
 const announceChannelId = "710671234471559228"; //TODO move this to config table in db
+
+const emojiList = [];
+
+await initializeDatabase();
+
+console.log("waiting 2 seconds for db creation...");
+setTimeout(function () {}, 2000); // this is fucking stupid sorry
+
+await importConfigs();
+await importTakeALookList();
 
 //Set up events
 //https://discord.js.org/#/docs/main/main/class/Client List of Events to handle
@@ -96,14 +112,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.once(Events.ClientReady, (readyClient) => {
   console.log("Initializing emoji set");
-
   client.guilds
     .fetch(guildId)
     .then((guild) => {
       guild.emojis
         .fetch()
         .then((result) => {
-          dataLog.initializeEmojisList(
+          importEmojiList(
             result.map((r) => ({
               id: r.id,
               name: r.name,
