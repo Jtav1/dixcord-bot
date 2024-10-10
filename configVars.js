@@ -93,30 +93,6 @@ if (!fs.existsSync("/data")) {
 //   );
 // });
 
-fs.writeFile(positive_file_loc, "", { flag: "wx" }, function (err) {
-  if (err) {
-    console.log("-- " + positive_file_loc + " exists, skipping creation");
-  } else {
-    console.log("---- Created " + positive_file_loc);
-  }
-});
-
-fs.writeFile(negative_file_loc, "", { flag: "wx" }, function (err) {
-  if (err) {
-    console.log("-- " + negative_file_loc + " exists, skipping creation");
-  } else {
-    console.log("---- Created " + negative_file_loc);
-  }
-});
-
-fs.writeFile(neutral_file_loc, "", { flag: "wx" }, function (err) {
-  if (err) {
-    console.log("-- " + neutral_file_loc + " exists, skipping creation");
-  } else {
-    console.log("---- Created " + neutral_file_loc);
-  }
-});
-
 fs.writeFile(log_filter_list_loc, "", { flag: "wx" }, function (err) {
   if (err) {
     console.log("-- " + log_filter_list_loc + " exists, skipping creation");
