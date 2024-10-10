@@ -1,27 +1,31 @@
+import {
+  getAllFortunes,
+  incrementFortune,
+} from "../../../middleware/responses.js";
+
+const allFortunes = await getAllFortunes();
+// const positiveFortunes = allFortunes.filter((fortune) => {
+//   return fortune.sentiment === "positive";
+// });
+// const negativeFortunes = allFortunes.filter((fortune) => {
+//   return fortune.sentiment === "negative";
+// });
+// const neutralFortunes = allFortunes.filter((fortune) => {
+//   return fortune.sentiment === "neutral";
+// });
 
 // fortuneTeller()
 //	Randomly sends a fortune
 //  return: response (string)
-const fortuneTeller = (
-    rawMessage, 
-    clientId, 
-    positiveArray, 
-    negativeArray, 
-    neutralArray
-) => {
-	const processedMessage = rawMessage.replace("<@" + clientId + ">", "")
+const fortuneTeller = (rawMessage, clientId) => {
+  const processedMessage = rawMessage.replace("<@" + clientId + ">", "");
 
-    // var Sentiment = require('sentiment');
-    // var sentiment = new Sentiment();
+  // var Sentiment = require('sentiment');
+  // var sentiment = new Sentiment();
 
-
-	//var result = sentiment.analyze(processedMessage);
-
-	const combinedResponses = positiveArray.concat(negativeArray, neutralArray);
-
-
-	console.log(combinedResponses.length);
-	return (combinedResponses[Math.floor(Math.random() * combinedResponses.length)]);
-}
+  //var result = sentiment.analyze(processedMessage);
+  return allFortunes[Math.floor(Math.random() * allFortunes.length)]
+    .response_string;
+};
 
 export default fortuneTeller;

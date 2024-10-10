@@ -33,10 +33,7 @@ const getCommonArray = async () => {
 };
 
 const getAllTakeALookLinks = async () => {
-  const tmpArray = [];
-
-  var getAllQry = mysql.format("SELECT * FROM take_a_look_responses");
-
+  var query = mysql.format("SELECT * FROM take_a_look_responses");
   return await execQuery(query);
 };
 
@@ -50,12 +47,35 @@ const insertTakeALookLink = async (link, isdefault) => {
 };
 
 const incrementTakeALookLink = async (link) => {
-  const linkInsertQry = mysql.format(
+  const incrementQuery = mysql.format(
     "UPDATE take_a_look_responses SET frequency = frequency + 1 WHERE link = ?",
     [link]
   );
 
-  return await execQuery(linkInsertQry);
+  return await execQuery(incrementQuery);
+};
+
+const getAllFortunes = async () => {
+  var query = mysql.format("SELECT * FROM eight_ball_responses");
+  return await execQuery(query);
+};
+
+const insertFortune = async (text, sentiment) => {
+  const fortuneInsertQry = mysql.format(
+    "INSERT IGNORE INTO eight_ball_responses (resoponse_string, sentiment) VALUES (?, ?)",
+    [text, sentiment]
+  );
+
+  return await execQuery(fortuneInsertQry);
+};
+
+const incrementFortune = async (text, sentiment) => {
+  const incrementQuery = mysql.format(
+    "UPDATE eight_ball_responses SET frequency = frequency + 1 WHERE resoponse_string = ? AND sentiment = ?",
+    [text, sentiment]
+  );
+
+  return await execQuery(incrementQuery);
 };
 
 export {
@@ -64,4 +84,7 @@ export {
   getAllTakeALookLinks,
   insertTakeALookLink,
   incrementTakeALookLink,
+  getAllFortunes,
+  insertFortune,
+  incrementFortune,
 };
