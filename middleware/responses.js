@@ -10,9 +10,6 @@ const getRareArray = async () => {
   );
   const results = await execQuery(query);
 
-  console.log("------ rare array ------");
-  console.log(results);
-
   //map this to an array of strings
   const tempArray = results.map((row) => {
     return row.link;
@@ -26,9 +23,6 @@ const getCommonArray = async () => {
     "SELECT link FROM take_a_look_responses WHERE isdefault = 1"
   );
   const results = await execQuery(query);
-
-  console.log("------ common array ------");
-  console.log(results);
 
   //map this to an array of strings
   const tempArray = results.map((row) => {
