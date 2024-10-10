@@ -31,20 +31,15 @@ con.addListener("error", (err) => {
 });
 
 export const execQuery = async (query) => {
-  let res = [];
-  con
-    .promise()
-    .query(query)
-    .then((result) => {
-      if (isDev) {
-        console.log("db: query successful: " + query.substring(0, 50) + "...");
-      }
-      [res] = result;
-    })
-    .catch((err) => {
-      console.log("db: table create query error", err);
-      console.log(query);
-    });
-
-  return res;
+  try {
+    const [rows] = await con.promise().query(query);
+    if (isDev) {
+      console.log("db: query successful: " + query.substring(0, 50) + "...");
+    }
+    return rows;
+  } catch (err) {
+    console.log("db: table create query error", err);
+    console.log(query);
+    return [];
+  }
 };
