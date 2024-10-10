@@ -8,6 +8,19 @@ import {
 
 import mysql from "mysql2";
 
+const execQuery = (con, query) => {
+  con
+    .promise()
+    .query(query)
+    .then((result) => {
+      console.log("db: query successful: " + query.substring(0, 50) + "...");
+    })
+    .catch((err) => {
+      console.log("db: table create query error", err);
+      console.log(query);
+    });
+};
+
 //Initialize DB by setting up all required tables, etc
 export const initializeDatabase = async () => {
   var con = mysql.createPool({
@@ -19,8 +32,6 @@ export const initializeDatabase = async () => {
   });
 
   con.on("connection", function (connection) {
-    console.log("db: Connection established");
-
     connection.on("error", function (err) {
       console.error(new Date(), "db: MySQL error", err.code);
     });
@@ -41,8 +52,7 @@ export const initializeDatabase = async () => {
       " (config VARCHAR(255) PRIMARY KEY," +
       " value VARCHAR(255))"
   );
-  con.query(configTblCreateQuery);
-  console.log("db: Configuration table created");
+  execQuery(con, configTblCreateQuery);
 
   //Emoji Tracking Table
   const emojiTblName = "emoji_frequency"; //Also found in: import.js
@@ -56,8 +66,7 @@ export const initializeDatabase = async () => {
       " type VARCHAR(50) NOT NULL," +
       " PRIMARY KEY (emoid))"
   );
-  con.query(emojiTblCreateQuery);
-  console.log("db: Emoji table tracking created");
+  execQuery(con, emojiTblCreateQuery);
 
   //Pinned Message Table
   const pinTblName = "pin_history";
@@ -67,12 +76,11 @@ export const initializeDatabase = async () => {
       "  (msgid VARCHAR(255) PRIMARY KEY," +
       "  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
   );
-  con.query(pinTblCreateQuery);
-  console.log("db: Pinned message tracking table created");
+  execQuery(con, pinTblCreateQuery);
 
   //TakeALook Responses Table
   const takeALookTableName = "take_a_look_responses"; //Also found in: import.js
-  const taleALookTableCreateQuery = mysql.format(
+  const takeALookTableCreateQuery = mysql.format(
     "CREATE TABLE IF NOT EXISTS " +
       takeALookTableName +
       " (id int PRIMARY KEY AUTO_INCREMENT," +
@@ -80,7 +88,17 @@ export const initializeDatabase = async () => {
       " isdefault smallint DEFAULT 0," +
       " frequency int DEFAULT 0)"
   );
+  execQuery(con, takeALookTableCreateQuery);
 
-  con.query(taleALookTableCreateQuery);
-  console.log("db: Take a look at this response table created");
+  //TakeALook Responses Table
+  const eightBallTableName = "eight_ball_responses"; //Also found in: import.js
+  const eightBallTableCreateQuery = mysql.format(
+    "CREATE TABLE IF NOT EXISTS " +
+      eightBallTableName +
+      " (id int PRIMARY KEY AUTO_INCREMENT," +
+      " response_string VARCHAR(500) NOT NULL," +
+      " sentiment ENUM('positive', 'negative', 'neutral')," +
+      " frequency int DEFAULT 0)"
+  );
+  execQuery(con, eightBallTableCreateQuery);
 };
