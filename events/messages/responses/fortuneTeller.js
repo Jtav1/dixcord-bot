@@ -24,8 +24,11 @@ const fortuneTeller = (rawMessage, clientId) => {
   // var sentiment = new Sentiment();
 
   //var result = sentiment.analyze(processedMessage);
-  return allFortunes[Math.floor(Math.random() * allFortunes.length)]
-    .response_string;
+  let fortuneReply =
+    allFortunes[Math.floor(Math.random() * allFortunes.length)];
+  incrementFortune(fortuneReply);
+
+  return fortuneReply.response_string;
 };
 
 export default fortuneTeller;

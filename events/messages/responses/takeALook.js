@@ -1,13 +1,13 @@
 import { rareFrequency } from "../../../configVars.js";
 
 import {
-  getRareArray,
-  getCommonArray,
   incrementTakeALookLink,
+  getAllTakeALookLinks,
 } from "../../../middleware/responses.js";
 
-const commonArray = await getCommonArray();
-const rareArray = await getRareArray();
+const takeAlookArray = await getAllTakeALookLinks();
+const commonArray = takeAlookArray.filter((x) => x.isdefault == 1);
+const rareArray = takeAlookArray.filter((x) => x.isdefault == 0);
 
 let limit = 0;
 let lastReplyTimestamp = null;
@@ -54,11 +54,9 @@ const takeALook = () => {
     imgLink = commonArray[(commonArray.length * Math.random()) | 0];
   }
 
-  response.length < 1 ? (response = imgLink) : null;
+  response.length < 1 ? (response = imgLink.link) : null;
 
-  if (response == imgLink) {
-    incrementTakeALookLink(imgLink);
-  }
+  incrementTakeALookLink(imgLink);
 
   return response;
 };
