@@ -14,6 +14,7 @@ import {
   importEmojiList,
   importTakeALookList,
   importConfigs,
+  importFortunes,
 } from "./database/import.js";
 
 import fs from "node:fs";
@@ -43,12 +44,9 @@ const announceChannelId = "710671234471559228"; //TODO move this to config table
 const emojiList = [];
 
 await initializeDatabase();
-
-console.log("waiting 2 seconds for db creation...");
-setTimeout(function () {}, 2000); // this is fucking stupid sorry
-
 await importConfigs();
 await importTakeALookList();
+await importFortunes();
 
 //Set up events
 //https://discord.js.org/#/docs/main/main/class/Client List of Events to handle
@@ -111,7 +109,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.once(Events.ClientReady, (readyClient) => {
-  console.log("Initializing emoji set");
+  // Once connected: import emojis
   client.guilds
     .fetch(guildId)
     .then((guild) => {
