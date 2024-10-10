@@ -56,8 +56,9 @@ export const initializeDatabase = async () => {
       eightBallTableName +
       " (id int PRIMARY KEY AUTO_INCREMENT," +
       " response_string VARCHAR(500) NOT NULL," +
-      " sentiment ENUM('positive', 'negative', 'neutral')," +
-      " frequency int DEFAULT 0)"
+      " sentiment ENUM('positive', 'negative', 'neutral') NOT NULL," +
+      " frequency int DEFAULT 0," +
+      " UNIQUE KEY `unique_response` (`response_string`, `sentiment`))"
   );
   await execQuery(eightBallTableCreateQuery);
 };

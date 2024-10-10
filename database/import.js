@@ -39,6 +39,7 @@ export const importEmojiList = async (emojiObjectList) => {
   );
 
   await execQuery(emoInsertQry);
+  console.log("db: emoji import complete");
 };
 
 //Import all of the "take a look at this" responses
@@ -64,6 +65,7 @@ export const importTakeALookList = async () => {
   );
 
   await execQuery(linkInsertQry);
+  console.log("db: take a look import complete");
 };
 
 //Import all of the "fortune" responses
@@ -75,20 +77,21 @@ export const importFortunes = async () => {
     rows.push([line.trim(), "positive"]);
   });
 
-  const negativeFile = fs.readFileSync(positive_file_loc, "utf8");
+  const negativeFile = fs.readFileSync(negative_file_loc, "utf8");
   negativeFile.split(/\r?\n/).forEach((line) => {
     rows.push([line.trim(), "negative"]);
   });
 
-  const neutralFile = fs.readFileSync(positive_file_loc, "utf8");
+  const neutralFile = fs.readFileSync(neutral_file_loc, "utf8");
   neutralFile.split(/\r?\n/).forEach((line) => {
     rows.push([line.trim(), "neutral"]);
   });
 
   const linkInsertQry = mysql.format(
-    "INSERT IGNORE INTO take_a_look_responses (link, isdefault) VALUES ?",
-    [linkArray]
+    "INSERT IGNORE INTO eight_ball_responses (response_string, sentiment) VALUES ?",
+    [rows]
   );
 
   await execQuery(linkInsertQry);
+  console.log("db: fortune import complete");
 };
