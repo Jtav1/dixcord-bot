@@ -300,7 +300,7 @@ export {
   mysqlPw,
   mysqlDb,
   twitterFixEnabled,
-  isDev,
+  isDev, // used
   version,
   take_a_look_list_file_loc, // used
   positive_file_loc, // used
