@@ -1,10 +1,4 @@
-import {
-  clientId,
-  positiveArray,
-  negativeArray,
-  neutralArray,
-  twitterFixEnabled,
-} from "../../configVars.js";
+import { clientId, twitterFixEnabled } from "../../configVars.js";
 
 import dataLog from "../../logging/dataLog.js";
 
@@ -55,13 +49,7 @@ const execute = (message) => {
       contentStripped.startsWith(clientId) &&
       message.content.endsWith("?")
     ) {
-      response = fortuneTeller(
-        message.content.toLowerCase(),
-        clientId,
-        positiveArray,
-        negativeArray,
-        neutralArray
-      );
+      response = fortuneTeller(message.content.toLowerCase(), clientId);
     }
 
     // if a reply was generated, send it
