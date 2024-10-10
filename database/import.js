@@ -1,20 +1,11 @@
 import {
-  mysqlHost,
-  mysqlPort,
-  mysqlUser,
-  mysqlPw,
-  mysqlDb,
-  // defaultArray,
-  // rareArray,
-  // rareFrequency,
-  // positiveArray,
-  // negativeArray,
-  // neutralArray,
-  // logFile,
-  // log_filter_list_loc,
-  // filterWordArray,
   take_a_look_list_file_loc,
+  positive_file_loc,
+  negative_file_loc,
+  neutral_file_loc,
 } from "../configVars.js";
+
+import { execQuery } from "./queryRunner.js";
 
 import mysql from "mysql2";
 import fs from "node:fs";
@@ -24,29 +15,6 @@ import fs from "node:fs";
 // let negative_file_loc = "/data/negative.txt";
 // let neutral_file_loc = "/data/neutral.txt";
 // let log_filter_list_loc = "/data/logfilterlist.txt";
-
-var con = mysql.createPool({
-  host: mysqlHost,
-  port: mysqlPort,
-  user: mysqlUser,
-  password: mysqlPw,
-  database: mysqlDb,
-});
-
-con.on("connection", function (connection) {
-  console.log("db: Import, connection established");
-
-  connection.on("error", function (err) {
-    console.error(new Date(), "db: Import MySQL error", err.code);
-  });
-  connection.on("close", function (err) {
-    console.error(new Date(), "db: Import MySQL close", err);
-  });
-});
-
-con.addListener("error", (err) => {
-  console.error(new Date(), "db: Import MySQL listener error", err);
-});
 
 //Import all configurations from flat files into the config table
 //This should only matter the first time you run the bot after upgrading to ^1.6
@@ -61,7 +29,7 @@ export const importEmojiList = async (emojiObjectList) => {
     emojiArray.push([`${e.id}`, `${e.name}`, 0, e.animated, `${e.type}`]);
   });
 
-  con.query(
+  await execQuery(
     "DELETE FROM emoji_frequency WHERE frequency = 0 and type = 'emoji'"
   );
 
@@ -70,7 +38,7 @@ export const importEmojiList = async (emojiObjectList) => {
     [emojiArray]
   );
 
-  con.query(emoInsertQry);
+  await execQuery(emoInsertQry);
 };
 
 //Import all of the "take a look at this" responses
@@ -95,24 +63,26 @@ export const importTakeALookList = async () => {
     [linkArray]
   );
 
-  con.query(linkInsertQry);
+  await execQuery(linkInsertQry);
 };
 
 //Import all of the "fortune" responses
 export const importFortunes = async () => {
-  // if take a look at this file exists, parse it into an array, insert into db
+  let rows = [];
 
-  const file = fs.readFileSync(take_a_look_list_file_loc, "utf8");
-  let lines = file.split(/\r?\n/);
+  const positiveFile = fs.readFileSync(positive_file_loc, "utf8");
+  positiveFile.split(/\r?\n/).forEach((line) => {
+    rows.push([line.trim(), "positive"]);
+  });
 
-  let linkArray = [];
+  const negativeFile = fs.readFileSync(positive_file_loc, "utf8");
+  negativeFile.split(/\r?\n/).forEach((line) => {
+    rows.push([line.trim(), "negative"]);
+  });
 
-  lines.forEach((line) => {
-    if (line.startsWith("*")) {
-      linkArray.push([line.replace(/[*]/g, "").trim(), 1]);
-    } else {
-      linkArray.push([line.trim(), 0]);
-    }
+  const neutralFile = fs.readFileSync(positive_file_loc, "utf8");
+  neutralFile.split(/\r?\n/).forEach((line) => {
+    rows.push([line.trim(), "neutral"]);
   });
 
   const linkInsertQry = mysql.format(
@@ -120,5 +90,5 @@ export const importFortunes = async () => {
     [linkArray]
   );
 
-  con.query(linkInsertQry);
+  await execQuery(linkInsertQry);
 };

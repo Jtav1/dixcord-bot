@@ -1,49 +1,8 @@
-import {
-  mysqlHost,
-  mysqlPort,
-  mysqlUser,
-  mysqlPw,
-  mysqlDb,
-} from "../configVars.js";
-
 import mysql from "mysql2";
-
-const execQuery = (con, query) => {
-  con
-    .promise()
-    .query(query)
-    .then((result) => {
-      console.log("db: query successful: " + query.substring(0, 50) + "...");
-    })
-    .catch((err) => {
-      console.log("db: table create query error", err);
-      console.log(query);
-    });
-};
+import { execQuery } from "./queryRunner.js";
 
 //Initialize DB by setting up all required tables, etc
 export const initializeDatabase = async () => {
-  var con = mysql.createPool({
-    host: mysqlHost,
-    port: mysqlPort,
-    user: mysqlUser,
-    password: mysqlPw,
-    database: mysqlDb,
-  });
-
-  con.on("connection", function (connection) {
-    connection.on("error", function (err) {
-      console.error(new Date(), "db: MySQL error", err.code);
-    });
-    connection.on("close", function (err) {
-      console.error(new Date(), "db: MySQL close", err);
-    });
-  });
-
-  con.addListener("error", (err) => {
-    console.error(new Date(), "db: MySQL listener error", err);
-  });
-
   //Configuration table
   const configTblName = "configurations";
   const configTblCreateQuery = mysql.format(
@@ -52,7 +11,7 @@ export const initializeDatabase = async () => {
       " (config VARCHAR(255) PRIMARY KEY," +
       " value VARCHAR(255))"
   );
-  execQuery(con, configTblCreateQuery);
+  await execQuery(configTblCreateQuery);
 
   //Emoji Tracking Table
   const emojiTblName = "emoji_frequency"; //Also found in: import.js
@@ -66,7 +25,7 @@ export const initializeDatabase = async () => {
       " type VARCHAR(50) NOT NULL," +
       " PRIMARY KEY (emoid))"
   );
-  execQuery(con, emojiTblCreateQuery);
+  await execQuery(emojiTblCreateQuery);
 
   //Pinned Message Table
   const pinTblName = "pin_history";
@@ -76,7 +35,7 @@ export const initializeDatabase = async () => {
       "  (msgid VARCHAR(255) PRIMARY KEY," +
       "  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)"
   );
-  execQuery(con, pinTblCreateQuery);
+  await execQuery(pinTblCreateQuery);
 
   //TakeALook Responses Table
   const takeALookTableName = "take_a_look_responses"; //Also found in: import.js
@@ -88,7 +47,7 @@ export const initializeDatabase = async () => {
       " isdefault smallint DEFAULT 0," +
       " frequency int DEFAULT 0)"
   );
-  execQuery(con, takeALookTableCreateQuery);
+  await execQuery(takeALookTableCreateQuery);
 
   //TakeALook Responses Table
   const eightBallTableName = "eight_ball_responses"; //Also found in: import.js
@@ -100,5 +59,5 @@ export const initializeDatabase = async () => {
       " sentiment ENUM('positive', 'negative', 'neutral')," +
       " frequency int DEFAULT 0)"
   );
-  execQuery(con, eightBallTableCreateQuery);
+  await execQuery(eightBallTableCreateQuery);
 };
