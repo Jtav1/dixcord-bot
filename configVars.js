@@ -302,8 +302,8 @@ export {
   twitterFixEnabled,
   isDev,
   version,
-  take_a_look_list_file_loc,
-  positive_file_loc,
-  negative_file_loc,
-  neutral_file_loc,
+  take_a_look_list_file_loc, // used
+  positive_file_loc, // used
+  negative_file_loc, // used
+  neutral_file_loc, // used
 };
