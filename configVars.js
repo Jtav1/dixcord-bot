@@ -248,37 +248,8 @@ const processLogFilterList = () => {
   );
 };
 
-const processFortuneArrays = () => {
-  const posFile = fs.readFileSync(positive_file_loc, "utf8").split(/\r?\n/);
-  const negFile = fs.readFileSync(negative_file_loc, "utf8").split(/\r?\n/);
-  const neuFile = fs.readFileSync(neutral_file_loc, "utf8").split(/\r?\n/);
-
-  posFile.forEach((line) => {
-    positiveArray.push(line.trim());
-  });
-
-  negFile.forEach((line) => {
-    negativeArray.push(line.trim());
-  });
-
-  neuFile.forEach((line) => {
-    neutralArray.push(line.trim());
-  });
-
-  console.log(
-    "-- Positive Array contains " + positiveArray.length + " responses"
-  );
-  console.log(
-    "-- Negative Array contains " + negativeArray.length + " responses"
-  );
-  console.log(
-    "-- Neutral Array contains " + neutralArray.length + " responses"
-  );
-};
-
 //Kick off image array building process
 //processTakeImageLinks();
-processFortuneArrays();
 processLogFilterList();
 
 export {
@@ -288,9 +259,6 @@ export {
   defaultArray,
   rareArray,
   rareFrequency,
-  positiveArray,
-  negativeArray,
-  neutralArray,
   logFile,
   log_filter_list_loc,
   filterWordArray,
