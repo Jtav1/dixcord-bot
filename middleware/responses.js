@@ -48,8 +48,8 @@ const insertTakeALookLink = async (link, isdefault) => {
 
 const incrementTakeALookLink = async (link) => {
   const incrementQuery = mysql.format(
-    "UPDATE take_a_look_responses SET frequency = frequency + 1 WHERE link = ?",
-    [link]
+    "UPDATE take_a_look_responses SET frequency = frequency + 1 WHERE id = ?",
+    [link.id]
   );
 
   return await execQuery(incrementQuery);
@@ -69,10 +69,10 @@ const insertFortune = async (text, sentiment) => {
   return await execQuery(fortuneInsertQry);
 };
 
-const incrementFortune = async (text, sentiment) => {
+const incrementFortune = async (fortune) => {
   const incrementQuery = mysql.format(
-    "UPDATE eight_ball_responses SET frequency = frequency + 1 WHERE resoponse_string = ? AND sentiment = ?",
-    [text, sentiment]
+    "UPDATE eight_ball_responses SET frequency = frequency + 1 WHERE id = ?",
+    [fortune.id]
   );
 
   return await execQuery(incrementQuery);
