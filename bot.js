@@ -10,12 +10,9 @@ import {
 } from "discord.js";
 import { token, clientId, guildId, isDev, version } from "./configVars.js";
 import { initializeDatabase } from "./database/initialize.js";
-import {
-  importEmojiList,
-  importTakeALookList,
-  importConfigs,
-  importFortunes,
-} from "./database/import.js";
+import { importAll } from "./database/import.js";
+
+import { importEmojiList } from "./middleware/emojis.js";
 
 import fs from "node:fs";
 import path from "node:path";
@@ -41,12 +38,8 @@ const pinEmoji = "\ud83d\udccc"; // TODO pin emoji unicode maybe move into db
 const commands = [];
 const announceChannelId = "710671234471559228"; //TODO move this to config table in db
 
-const emojiList = [];
-
 await initializeDatabase();
-await importConfigs();
-await importTakeALookList();
-await importFortunes();
+await importAll();
 
 //Set up events
 //https://discord.js.org/#/docs/main/main/class/Client List of Events to handle
@@ -54,7 +47,7 @@ await importFortunes();
 const eventsPath = path.join(import.meta.dirname, "events");
 const eventCategories = fs.readdirSync(eventsPath);
 
-//for each folder (category) under events, get all js files
+// for each folder (category) under events, get all js files
 for (const category of eventCategories) {
   const eventCategoryPath = path.join(eventsPath, category);
 
@@ -108,26 +101,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.once(Events.ClientReady, (readyClient) => {
+client.once(Events.ClientReady, async (readyClient) => {
   // Once connected: import emojis
-  client.guilds
-    .fetch(guildId)
-    .then((guild) => {
-      guild.emojis
-        .fetch()
-        .then((result) => {
-          importEmojiList(
-            result.map((r) => ({
-              id: r.id,
-              name: r.name,
-              animated: r.animated,
-              type: "emoji",
-            }))
-          );
-        })
-        .catch(console.error);
-    })
-    .catch(console.error);
+
+  //https://discord.js.org/docs/packages/discord.js/14.16.2/GuildEmojiManager:Class
+
+  const oauthGuild = await client.guilds.fetch(guildId);
+  const guild = await oauthGuild.fetch();
+  const emojis = await guild.emojis.fetch();
+
+  await importEmojiList(emojis);
 
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });
