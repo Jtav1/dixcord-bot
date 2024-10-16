@@ -1,3 +1,4 @@
+import { parseEmoji } from "discord.js";
 import { execQuery } from "../database/queryRunner.js";
 
 import mysql from "mysql2";
@@ -27,21 +28,14 @@ export const importEmojiList = async (emojiObjectList) => {
 };
 
 export const countEmoji = (emoji) => {
-  let emoCleaned = emoji
-    .replace("<a", "")
-    .replace("<", "")
-    .replace(">", "")
-    .split(":")
-    .slice(1);
+  const emoCleaned = parseEmoji(emoji);
 
-  if (emoCleaned.length == 2) {
+  if (emoCleaned) {
     const emoIncrementQry = mysql.format(
       "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
-      [emoCleaned[0], emoCleaned[1]]
+      [emoCleaned.name, emoCleaned.id]
     );
 
-    console.log(emoIncrementQry);
-    console.log(emoCleaned);
-    //execQuery(emoIncrementQry);
+    execQuery(emoIncrementQry);
   }
 };
