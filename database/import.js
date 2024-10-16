@@ -82,7 +82,6 @@ export const importFortunes = async () => {
 export const importLogFilterKeywords = async () => {
   // if take a look at this file exists, parse it into an array, insert into db
 
-  console.log(log_filter_list_loc);
   const file = fs.readFileSync(log_filter_list_loc, "utf8");
   let lines = file.split(/\r?\n/);
 
