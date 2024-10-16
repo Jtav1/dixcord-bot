@@ -43,7 +43,6 @@ await importAll();
 
 //Set up events
 //https://discord.js.org/#/docs/main/main/class/Client List of Events to handle
-
 const eventsPath = path.join(import.meta.dirname, "events");
 const eventCategories = fs.readdirSync(eventsPath);
 
@@ -103,9 +102,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
 client.once(Events.ClientReady, async (readyClient) => {
   // Once connected: import emojis
-
-  //https://discord.js.org/docs/packages/discord.js/14.16.2/GuildEmojiManager:Class
-
   const oauthGuild = await client.guilds.fetch(guildId);
   const guild = await oauthGuild.fetch();
   const emojis = await guild.emojis.fetch();
