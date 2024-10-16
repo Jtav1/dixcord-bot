@@ -61,4 +61,14 @@ export const initializeDatabase = async () => {
       " UNIQUE KEY `unique_response` (`response_string`, `sentiment`))"
   );
   await execQuery(eightBallTableCreateQuery);
+
+  //Log filter keywords table
+  const logFilterTableName = "log_filter_keywords";
+  const logFilterTableCreateQuery = mysql.format(
+    "CREATE TABLE IF NOT EXISTS " +
+      logFilterTableName +
+      " (id int PRIMARY KEY AUTO_INCREMENT," +
+      " keyword VARCHAR(255) UNIQUE)"
+  );
+  await execQuery(logFilterTableCreateQuery);
 };

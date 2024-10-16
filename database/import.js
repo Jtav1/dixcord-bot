@@ -3,6 +3,7 @@ import {
   positive_file_loc,
   negative_file_loc,
   neutral_file_loc,
+  log_filter_list_loc,
 } from "../configVars.js";
 
 import { execQuery } from "./queryRunner.js";
@@ -17,30 +18,7 @@ import fs from "node:fs";
 // let log_filter_list_loc = "/data/logfilterlist.txt";
 
 //Import all configurations from flat files into the config table
-//This should only matter the first time you run the bot after upgrading to ^1.6
 export const importConfigs = async () => {};
-
-//Import emojis into database by checking what the server has, clearing out all un-incremented emoji entries
-//and then inserting all
-export const importEmojiList = async (emojiObjectList) => {
-  let emojiArray = [];
-
-  emojiObjectList.forEach((e) => {
-    emojiArray.push([`${e.id}`, `${e.name}`, 0, e.animated, `${e.type}`]);
-  });
-
-  await execQuery(
-    "DELETE FROM emoji_frequency WHERE frequency = 0 and type = 'emoji'"
-  );
-
-  const emoInsertQry = mysql.format(
-    "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES ? ON DUPLICATE KEY UPDATE emoid=emoid",
-    [emojiArray]
-  );
-
-  await execQuery(emoInsertQry);
-  console.log("db: emoji import complete");
-};
 
 //Import all of the "take a look at this" responses
 export const importTakeALookList = async () => {
@@ -58,6 +36,8 @@ export const importTakeALookList = async () => {
       linkArray.push([line.trim(), 0]);
     }
   });
+
+  if (linkArray.length < 2) linkArray = [linkArray];
 
   const linkInsertQry = mysql.format(
     "INSERT IGNORE INTO take_a_look_responses (link, isdefault) VALUES ?",
@@ -87,6 +67,8 @@ export const importFortunes = async () => {
     rows.push([line.trim(), "neutral"]);
   });
 
+  if (rows.length < 2) rows = [rows];
+
   const linkInsertQry = mysql.format(
     "INSERT IGNORE INTO eight_ball_responses (response_string, sentiment) VALUES ?",
     [rows]
@@ -94,4 +76,36 @@ export const importFortunes = async () => {
 
   await execQuery(linkInsertQry);
   console.log("db: fortune import complete");
+};
+
+//Import all of the "take a look at this" responses
+export const importLogFilterKeywords = async () => {
+  // if take a look at this file exists, parse it into an array, insert into db
+
+  console.log(log_filter_list_loc);
+  const file = fs.readFileSync(log_filter_list_loc, "utf8");
+  let lines = file.split(/\r?\n/);
+
+  let keywordArray = [];
+
+  lines.forEach((line) => {
+    keywordArray.push(line.toLowerCase().trim());
+  });
+
+  if (keywordArray.length < 2) keywordArray = [keywordArray];
+
+  const keywordInsertQry = mysql.format(
+    "INSERT IGNORE INTO log_filter_keywords (keyword) VALUES ?",
+    [keywordArray]
+  );
+
+  await execQuery(keywordInsertQry);
+  console.log("db: log filter keyword import complete");
+};
+
+export const importAll = async () => {
+  await importConfigs();
+  await importTakeALookList();
+  await importFortunes();
+  await importLogFilterKeywords();
 };
