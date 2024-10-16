@@ -1,6 +1,6 @@
 import { clientId, twitterFixEnabled } from "../../configVars.js";
 
-import dataLog from "../../logging/dataLog.js";
+import { cleanLog } from "../../logging/dataLog.js";
 
 //******* RESPONSE FUNCTIONS *******//
 import twitterFixer from "./responses/twitterFixer.js";
@@ -25,12 +25,6 @@ const execute = (message) => {
     const contentStripped = message.content
       .toLowerCase()
       .replace(/[^a-zA-Z0-9]/g, "");
-
-    // if(contentStripped.includes("emojis")){
-    // 	console.log("okay getting top emojis");
-    // 	console.log(dataLog.getTopEmoji());
-
-    // }
 
     // If there's a twitter link to fix, do that
     if (twitterFixEnabled) {
@@ -59,9 +53,9 @@ const execute = (message) => {
     }
 
     // If it wasnt a dixbot keyword, log the message for later bot training purposes
-    // dataLog.cleanLog pulls out all mentions of userID and a preset list of names
+    // dataLog cleanLog pulls out all mentions of userID and a preset list of names
 
-    dataLog.cleanLog(message);
+    cleanLog(message);
   }
 };
 
