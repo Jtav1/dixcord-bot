@@ -39,3 +39,21 @@ export const countEmoji = (emoji) => {
     execQuery(emoIncrementQry);
   }
 };
+
+export const getTopEmoji = async (number) => {
+  let res = [];
+
+  var query = mysql.format(
+    "SELECT emoji, frequency, emoid, animated FROM emoji_frequency ORDER BY frequency DESC LIMIT ?",
+    [number]
+  );
+
+  try {
+    const results = await execQuery(query);
+    console.log(results);
+    res = results;
+  } catch (e) {
+    console.err(e);
+  }
+  return res;
+};
