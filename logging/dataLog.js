@@ -1,6 +1,5 @@
 import {
   logFile,
-  filterWordArray,
   mysqlHost,
   mysqlPort,
   mysqlUser,
@@ -8,45 +7,13 @@ import {
   mysqlDb,
   isDev,
 } from "../configVars.js";
-import fs from "node:fs";
+import { execQuery } from "../database/queryRunner.js";
+import { getAllLogFilterKeywords } from "../middleware/responses.js";
 
+import fs from "node:fs";
 import mysql from "mysql2";
 
-var con = mysql.createPool({
-  host: mysqlHost,
-  port: mysqlPort,
-  user: mysqlUser,
-  password: mysqlPw,
-  database: mysqlDb,
-});
-
-con.on("connection", function (connection) {
-  console.log("DB Connection established");
-
-  connection.on("error", function (err) {
-    console.error(new Date(), "MySQL error", err.code);
-  });
-  connection.on("close", function (err) {
-    console.error(new Date(), "MySQL close", err);
-  });
-});
-
-con.addListener("error", (err) => {
-  console.log(err);
-});
-
-//async wrapper for running select queries
-async function getResults(qry) {
-  console.log(qry);
-
-  try {
-    const [rows] = await con.promise().query(qry);
-    return rows; // Return the result
-  } catch (e) {
-    console.err(e);
-    return [];
-  }
-}
+let filterWordArray = await getAllLogFilterKeywords();
 
 const countEmoji = (emoji) => {
   let emoCleaned = emoji
@@ -64,7 +31,7 @@ const countEmoji = (emoji) => {
       [emoCleaned[0], emoCleaned[1]]
     );
 
-    con.query(emoIncrementQry);
+    execQuery(emoIncrementQry);
   }
 };
 
@@ -78,7 +45,7 @@ const logPinnedMessage = (msgid) => {
         "INSERT INTO " + pinTblName + "(msgid) VALUES (?)",
         [msgid]
       );
-      con.query(pinLogQry);
+      execQuery(pinLogQry);
       console.log("MESSAGE ID SHOULD HAVE BEEN ADDED TO DB WITH: ");
       console.log(pinLogQry);
     } else {
@@ -88,11 +55,11 @@ const logPinnedMessage = (msgid) => {
 };
 
 const isMessageAlreadyPinned = async (msgid) => {
-  var query = con.format(
+  var query = mysql.format(
     "SELECT * FROM " + pinTblName + " WHERE msgid LIKE CONCAT('%' ? '%')",
     msgid
   );
-  const results = await getResults(query);
+  const results = await execQuery(query);
 
   console.log("results length " + results.length);
 
@@ -103,7 +70,7 @@ const isMessageAlreadyPinned = async (msgid) => {
 const getTopEmoji = async (number) => {
   let res = [];
 
-  var query = con.format(
+  var query = mysql.format(
     "SELECT emoji, frequency, emoid, animated FROM " +
       emojiTblName +
       " ORDER BY frequency DESC LIMIT ?",
@@ -111,7 +78,7 @@ const getTopEmoji = async (number) => {
   );
 
   try {
-    const results = await getResults(query);
+    const results = await execQuery(query);
     console.log(results);
     res = results;
   } catch (e) {

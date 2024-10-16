@@ -34,7 +34,7 @@ export const execQuery = async (query) => {
   try {
     const [rows] = await con.promise().query(query);
     if (isDev) {
-      console.log("db: query successful: " + query.substring(0, 50) + "...");
+      //console.log("db: query successful: " + query.substring(0, 50) + "...");
     }
     return rows;
   } catch (err) {
