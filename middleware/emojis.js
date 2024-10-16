@@ -25,3 +25,23 @@ export const importEmojiList = async (emojiObjectList) => {
   await execQuery(emoInsertQry);
   console.log("db: emoji import complete");
 };
+
+export const countEmoji = (emoji) => {
+  let emoCleaned = emoji
+    .replace("<a", "")
+    .replace("<", "")
+    .replace(">", "")
+    .split(":")
+    .slice(1);
+
+  if (emoCleaned.length == 2) {
+    const emoIncrementQry = mysql.format(
+      "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
+      [emoCleaned[0], emoCleaned[1]]
+    );
+
+    console.log(emoIncrementQry);
+    console.log(emoCleaned);
+    //execQuery(emoIncrementQry);
+  }
+};

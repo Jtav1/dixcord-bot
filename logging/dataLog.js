@@ -1,39 +1,11 @@
-import {
-  logFile,
-  mysqlHost,
-  mysqlPort,
-  mysqlUser,
-  mysqlPw,
-  mysqlDb,
-  isDev,
-} from "../configVars.js";
+import { logFile, isDev } from "../configVars.js";
 import { execQuery } from "../database/queryRunner.js";
-import { getAllLogFilterKeywords } from "../middleware/responses.js";
+import { getAllLogFilterKeywords } from "../middleware/filters.js";
 
 import fs from "node:fs";
 import mysql from "mysql2";
 
 let filterWordArray = await getAllLogFilterKeywords();
-
-const countEmoji = (emoji) => {
-  let emoCleaned = emoji
-    .replace("<a", "")
-    .replace("<", "")
-    .replace(">", "")
-    .split(":")
-    .slice(1);
-
-  if (emoCleaned.length == 2) {
-    const emoIncrementQry = mysql.format(
-      "UPDATE " +
-        emojiTblName +
-        " SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
-      [emoCleaned[0], emoCleaned[1]]
-    );
-
-    execQuery(emoIncrementQry);
-  }
-};
 
 const logPinnedMessage = (msgid) => {
   if (msgid) {
@@ -115,7 +87,7 @@ const cleanLog = (message) => {
 
   let cleanMsg = msgAry.join(" ").replace(spaceRegex, " ").trim();
 
-  if (cleanMsg.length > 0) {
+  if (cleanMsg.length > 0 && !isDev) {
     fs.appendFile(logFile, cleanMsg + "\n", (err) => {
       if (err) {
         console.log("Error writing to chatlog file " + logFile + ": " + err);
@@ -126,7 +98,6 @@ const cleanLog = (message) => {
 
 export default {
   cleanLog,
-  countEmoji,
   getTopEmoji,
   logPinnedMessage,
   isMessageAlreadyPinned,
