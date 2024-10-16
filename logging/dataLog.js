@@ -7,7 +7,7 @@ import mysql from "mysql2";
 
 let filterWordArray = await getAllLogFilterKeywords();
 
-const logPinnedMessage = (msgid) => {
+export const logPinnedMessage = (msgid) => {
   if (msgid) {
     const boolPreviouslyPinned =
       isMessageAlreadyPinned(msgid) > 0 ? true : false; // shouldnt 0 be falsy idk how js works im dumb
@@ -26,7 +26,7 @@ const logPinnedMessage = (msgid) => {
   }
 };
 
-const isMessageAlreadyPinned = async (msgid) => {
+export const isMessageAlreadyPinned = async (msgid) => {
   var query = mysql.format(
     "SELECT * FROM " + pinTblName + " WHERE msgid LIKE CONCAT('%' ? '%')",
     msgid
@@ -38,28 +38,7 @@ const isMessageAlreadyPinned = async (msgid) => {
   return results.length > 0;
 };
 
-// TODO test that this works with the getResults query moved out
-const getTopEmoji = async (number) => {
-  let res = [];
-
-  var query = mysql.format(
-    "SELECT emoji, frequency, emoid, animated FROM " +
-      emojiTblName +
-      " ORDER BY frequency DESC LIMIT ?",
-    [number]
-  );
-
-  try {
-    const results = await execQuery(query);
-    console.log(results);
-    res = results;
-  } catch (e) {
-    console.err(e);
-  }
-  return res;
-};
-
-const cleanLog = (message) => {
+export const cleanLog = (message) => {
   const userIdRegex = /<@\d+>/g;
   const groupIdRegex = /<@&\d+>/g;
   const addressRegex = /\d{1,5}\s{1}\w+\s{1}\w+\s\w+/g;
@@ -87,18 +66,15 @@ const cleanLog = (message) => {
 
   let cleanMsg = msgAry.join(" ").replace(spaceRegex, " ").trim();
 
-  if (cleanMsg.length > 0 && !isDev) {
-    fs.appendFile(logFile, cleanMsg + "\n", (err) => {
-      if (err) {
-        console.log("Error writing to chatlog file " + logFile + ": " + err);
-      }
-    });
+  if (cleanMsg.length > 0) {
+    if (isDev) {
+      console.log("DEV Chatlog entry: " + cleanMsg);
+    } else {
+      fs.appendFile(logFile, cleanMsg + "\n", (err) => {
+        if (err) {
+          console.log("Error writing to chatlog file " + logFile + ": " + err);
+        }
+      });
+    }
   }
-};
-
-export default {
-  cleanLog,
-  getTopEmoji,
-  logPinnedMessage,
-  isMessageAlreadyPinned,
 };

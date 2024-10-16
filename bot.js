@@ -17,7 +17,7 @@ import { importEmojiList } from "./middleware/emojis.js";
 import fs from "node:fs";
 import path from "node:path";
 
-import dataLog from "./logging/dataLog.js";
+import { countEmoji } from "./middleware/emojis.js";
 import messagePinner from "./events/messages/utilities/messagePinner.js";
 
 // Create a new client instance
@@ -123,7 +123,6 @@ client.on("messageReactionAdd", async (reaction, user) => {
 
   if (pinReact) {
     if (pinReact.count === pinThreshold) {
-      //dataLog.logPinnedMessage(message.id);
       await messagePinner(message, pinReact, user, client); // returns success bool
     }
   }
@@ -134,7 +133,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
   if (reaction._emoji.name === pinEmoji) {
     //console.log("HIT");
   } else {
-    dataLog.countEmoji(reactStr);
+    countEmoji(reactStr);
   }
 
   //this is how to split unicode emojis into their composite unicode string sorry i forgot to save the S.O. link
@@ -148,7 +147,7 @@ if (announceChannelId.length > 0) {
   const announceChannel = await client.channels.fetch(announceChannelId);
 
   if (isDev) {
-    console.log(version);
+    console.log(`Dixbot ${version}-dev online`);
     //await announceChannel.send(`Dixbot ${version}-dev online`);
   } else {
     await announceChannel.send(`Dixbot ${version}-prod online`);
