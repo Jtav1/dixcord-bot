@@ -47,7 +47,7 @@ if (process.env.DEV_FLAG == false) {
   console.log("RUNNING IN DEVELOPMENT");
 }
 
-if (isDev) {
+if (!isDev) {
   take_a_look_list_file_loc = "/data/take_a_look_list.txt";
   positive_file_loc = "/data/positive.txt";
   negative_file_loc = "/data/negative.txt";
