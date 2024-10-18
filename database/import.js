@@ -82,10 +82,10 @@ export const importLogFilterKeywords = async () => {
   let keywordArray = [];
 
   lines.forEach((line) => {
-    keywordArray.push(line.toLowerCase().trim());
+    keywordArray.push([line.toLowerCase().trim()]);
   });
 
-  if (keywordArray.length < 2) keywordArray = [keywordArray];
+  //if (keywordArray.length < 2) keywordArray = [keywordArray];
 
   const keywordInsertQry = mysql.format(
     "INSERT IGNORE INTO log_filter_keywords (keyword) VALUES ?",
