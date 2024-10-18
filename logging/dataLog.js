@@ -6,6 +6,9 @@ import fs from "node:fs";
 import mysql from "mysql2";
 
 let filterWordArray = await getAllLogFilterKeywords();
+filterWordArray = filterWordArray.map((w) => {
+  return w.keyword;
+});
 
 export const logPinnedMessage = (msgid) => {
   if (msgid) {
@@ -18,10 +21,7 @@ export const logPinnedMessage = (msgid) => {
         [msgid]
       );
       execQuery(pinLogQry);
-      console.log("MESSAGE ID SHOULD HAVE BEEN ADDED TO DB WITH: ");
-      console.log(pinLogQry);
     } else {
-      console.log("DO NOT PIN ITS IN THERE ALREADY");
     }
   }
 };
@@ -32,8 +32,6 @@ export const isMessageAlreadyPinned = async (msgid) => {
     msgid
   );
   const results = await execQuery(query);
-
-  console.log("results length " + results.length);
 
   return results.length > 0;
 };
@@ -59,6 +57,8 @@ export const cleanLog = (message) => {
     .replace(addressRegex, "");
 
   let tmpAry = logMsg.split(" ");
+
+  console.log(filterWordArray);
 
   let msgAry = tmpAry.filter((word) => {
     return !filterWordArray.includes(word);
