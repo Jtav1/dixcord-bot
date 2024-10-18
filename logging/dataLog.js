@@ -17,7 +17,7 @@ export const logPinnedMessage = (msgid) => {
 
     if (!boolPreviouslyPinned) {
       const pinLogQry = mysql.format(
-        "INSERT INTO " + pinTblName + "(msgid) VALUES (?)",
+        "INSERT INTO pin_history (msgid) VALUES (?)",
         [msgid]
       );
       execQuery(pinLogQry);
@@ -28,7 +28,7 @@ export const logPinnedMessage = (msgid) => {
 
 export const isMessageAlreadyPinned = async (msgid) => {
   var query = mysql.format(
-    "SELECT * FROM " + pinTblName + " WHERE msgid LIKE CONCAT('%' ? '%')",
+    "SELECT * FROM pin_history WHERE msgid LIKE CONCAT('%' ? '%')",
     msgid
   );
   const results = await execQuery(query);
@@ -58,8 +58,6 @@ export const cleanLog = (message) => {
 
   let tmpAry = logMsg.split(" ");
 
-  console.log(filterWordArray);
-
   let msgAry = tmpAry.filter((word) => {
     return !filterWordArray.includes(word);
   });
@@ -68,7 +66,7 @@ export const cleanLog = (message) => {
 
   if (cleanMsg.length > 0) {
     if (isDev) {
-      console.log("DEV Chatlog entry: " + cleanMsg);
+      // console.log("DEV Chatlog entry: " + cleanMsg);
     } else {
       fs.appendFile(logFile, cleanMsg + "\n", (err) => {
         if (err) {
