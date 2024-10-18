@@ -47,6 +47,14 @@ if (process.env.DEV_FLAG == false) {
   console.log("RUNNING IN DEVELOPMENT");
 }
 
+if (isDev) {
+  take_a_look_list_file_loc = "/data/take_a_look_list.txt";
+  positive_file_loc = "/data/positive.txt";
+  negative_file_loc = "/data/negative.txt";
+  neutral_file_loc = "/data/neutral.txt";
+  log_filter_list_loc = "/data/logfilterlist.txt";
+}
+
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
 const guildId = process.env.DISCORD_GUILD_ID;
