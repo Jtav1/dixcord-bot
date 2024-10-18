@@ -11,12 +11,6 @@ import { execQuery } from "./queryRunner.js";
 import mysql from "mysql2";
 import fs from "node:fs";
 
-//let take_a_look_list_file_loc = "../data/take_a_look_list.txt";
-// let positive_file_loc = "/data/positive.txt";
-// let negative_file_loc = "/data/negative.txt";
-// let neutral_file_loc = "/data/neutral.txt";
-// let log_filter_list_loc = "/data/logfilterlist.txt";
-
 //Import all configurations from flat files into the config table
 export const importConfigs = async () => {};
 
