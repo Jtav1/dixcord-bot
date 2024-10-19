@@ -4,8 +4,6 @@ import {
   negative_file_loc,
   neutral_file_loc,
   log_filter_list_loc,
-  rareFrequency,
-  twitterFixEnabled,
 } from "../configVars.js";
 
 import { execQuery } from "./queryRunner.js";
@@ -13,11 +11,12 @@ import { execQuery } from "./queryRunner.js";
 import mysql from "mysql2";
 import fs from "node:fs";
 
-//Import all configurations from flat files into the config table
+//Import all configurations
 export const importConfigs = async () => {
+  //hardcoding these for default imported values
   const configArray = [
-    ["rare_frequency", rareFrequency],
-    ["twitter_fix_enabled", twitterFixEnabled],
+    ["rare_frequency", 0.1],
+    ["twitter_fix_enabled", "true"],
   ];
 
   const configInsertQry = mysql.format(

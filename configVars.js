@@ -71,17 +71,6 @@ let negative_file_loc = `${dataDirectory}/negative.txt`;
 let neutral_file_loc = `${dataDirectory}/neutral.txt`;
 let log_filter_list_loc = `${dataDirectory}/logfilterlist.txt`;
 
-// =========== BREAK THESE OUT ============= //
-
-const rareFreqStr = process.env.RARITY_FREQ;
-const twitterFixEnabled = process.env.ENABLE_TWITTER_FIXER === "true";
-
-let rareFrequency = parseFloat(rareFreqStr);
-if (isNaN(rareFrequency) || rareFrequency > 1.0 || rareFrequency < 0.0) {
-  rareFrequency = 0.1;
-  writeError("config: no RARITY_FREQ env var. Defaulting to 0.1");
-}
-
 // =========== END CONFIG VARS ============= //
 
 console.log("log: sanitized chatlogs will be saved in " + logFile);
@@ -90,9 +79,7 @@ export {
   token, //----
   clientId, //----
   guildId, //----
-  rareFrequency, //----
   logFile, //----
-  twitterFixEnabled, //----
   mysqlHost, //used
   mysqlPort, //used
   mysqlUser, //used

@@ -1,28 +1,39 @@
+import { getAllConfigurations } from "../../../middleware/configurations.js";
+
 // twitterFixer(str)
 //  reply with a vx twitter link if a non-vx twitter link is posted
 //	note: will use the last link in the message
 //  return: response (string)
-const twitterFixer = (messageContents) => {
-	
-	const msgAry = messageContents.split(' ');
-	let reply = '';
+export const twitterFixer = async (messageContents) => {
+  // pull this at response time to get a fresh object
 
-	msgAry.forEach(word => {
+  const configurations = await getAllConfigurations();
+  const twitterFixEnabled =
+    configurations.filter(
+      (config_entry) => config_entry.config === "twitter_fix_enabled"
+    )[0].value === "true";
 
-		let cleanWord = word.replace(/[<>]/g, '');
+  let reply = "";
 
-		if(cleanWord.startsWith('https://x.com')){
-			if(messageContents.includes('dd') ||
-				messageContents.includes('dixbot') ||
-				messageContents.includes('fix')){
+  if (twitterFixEnabled) {
+    const msgAry = messageContents.split(" ");
 
-				reply = ("fixed link: " + cleanWord.replace('https://x.com/', 'https://vxtwitter.com/'));
-			}
-		}
+    msgAry.forEach((word) => {
+      let cleanWord = word.replace(/[<>]/g, "");
 
-	});
+      if (cleanWord.startsWith("https://x.com")) {
+        if (
+          messageContents.includes("dd") ||
+          messageContents.includes("dixbot") ||
+          messageContents.includes("fix")
+        ) {
+          reply =
+            "fixed link: " +
+            cleanWord.replace("https://x.com/", "https://fixvx.com/");
+        }
+      }
+    });
+  }
 
-	return reply;
-}
-
-export default twitterFixer;
+  return reply;
+};
