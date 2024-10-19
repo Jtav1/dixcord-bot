@@ -50,7 +50,6 @@ export const getTopEmoji = async (number) => {
 
   try {
     const results = await execQuery(query);
-    console.log(results);
     res = results;
   } catch (e) {
     console.err(e);
