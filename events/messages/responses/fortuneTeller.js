@@ -4,6 +4,8 @@ import {
 } from "../../../middleware/responses.js";
 
 const allFortunes = await getAllFortunes();
+// https://naturalnode.github.io/natural/sentiment_analysis.html
+
 // const positiveFortunes = allFortunes.filter((fortune) => {
 //   return fortune.sentiment === "positive";
 // });
