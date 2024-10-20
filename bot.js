@@ -140,7 +140,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
   const repostReact = allReactions.get(repostEmojiId);
 
   if (repostReact) {
-    countRepost(user.id, message.id);
+    countRepost(message.author.id, message.id);
   }
 
   //this is how to split unicode emojis into their composite unicode string sorry i forgot to save the S.O. link
