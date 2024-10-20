@@ -88,4 +88,16 @@ export const initializeDatabase = async () => {
       " CONSTRAINT unique_user_emoji UNIQUE (userid, emoid))"
   );
   await execQuery(userEmojiTableCreateQuery);
+
+  const repostTable = "user_repost_tracking"; //Also found in: import.js
+  const repostTableCreateQuery = mysql.format(
+    "CREATE TABLE IF NOT EXISTS " +
+      repostTable +
+      " (id int PRIMARY KEY AUTO_INCREMENT," +
+      " userid VARCHAR(500) NOT NULL," +
+      " msgid VARCHAR(500) NOT NULL)"
+  );
+  await execQuery(repostTableCreateQuery);
+
+  console.log("db: table initialization complete");
 };
