@@ -8,16 +8,18 @@ import {
   GatewayIntentBits,
   Partials,
 } from "discord.js";
-import { token, clientId, guildId, isDev, version } from "./configVars.js";
-import { initializeDatabase } from "./database/initialize.js";
-import { importAll } from "./database/import.js";
-
-import { importEmojiList } from "./middleware/emojis.js";
 
 import fs from "node:fs";
 import path from "node:path";
 
-import { countEmoji } from "./middleware/emojis.js";
+import { token, clientId, guildId, isDev, version } from "./configVars.js";
+import { initializeDatabase } from "./database/initialize.js";
+import { importAll } from "./database/import.js";
+import {
+  importEmojiList,
+  countRepost,
+  countEmoji,
+} from "./middleware/emojis.js";
 import messagePinner from "./events/messages/utilities/messagePinner.js";
 
 // Create a new client instance
@@ -34,6 +36,7 @@ const client = new Client({
 //TODO PUT THESE INTO CONFIG TABLE
 const pinThreshold = isDev ? 1 : 3; // TODO emoji pin voting threshold, put into db instead as configuration
 const pinEmoji = "\ud83d\udccc"; // TODO pin emoji unicode maybe move into db
+const repostEmojiId = "1072368151922233404";
 
 const commands = [];
 const announceChannelId = "710671234471559228"; //TODO move this to config table in db
@@ -126,14 +129,18 @@ client.on("messageReactionAdd", async (reaction, user) => {
       await messagePinner(message, pinReact, user, client); // returns success bool
     }
   }
-
   let reactStr = "<:" + reaction._emoji.name + ":" + reaction._emoji.id + ">";
 
   // This shouldnt be necessary because countEmoji only counts server emoji BUT if we ever use a custom one, or add that in as another option...
   if (reaction._emoji.name === pinEmoji) {
-    //console.log("HIT");
   } else {
     countEmoji(reactStr, user.id);
+  }
+
+  const repostReact = allReactions.get(repostEmojiId);
+
+  if (repostReact) {
+    countRepost(user.id, message.id);
   }
 
   //this is how to split unicode emojis into their composite unicode string sorry i forgot to save the S.O. link
