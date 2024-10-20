@@ -23,9 +23,9 @@ export const twitterFixer = async (messageContents) => {
 
       if (cleanWord.startsWith("https://x.com")) {
         if (
-          messageContents.includes("dd") ||
-          messageContents.includes("dixbot") ||
-          messageContents.includes("fix")
+          messageContents.includes(" dd") ||
+          messageContents.includes(" dixbot") ||
+          messageContents.includes(" fix")
         ) {
           reply =
             "fixed link: " +
