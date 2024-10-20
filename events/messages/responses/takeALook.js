@@ -27,8 +27,6 @@ export const takeALook = async () => {
     )[0].value
   );
 
-  console.log(rareFrequency);
-
   let nowTime = Date.now();
   let response = "";
 

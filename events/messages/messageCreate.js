@@ -52,7 +52,6 @@ const execute = async (message) => {
 
     // if a reply was generated, send it
     if (response.length > 0) {
-      // console.log("<@" + message.author.username + '>: ' + message.cleanContent);
       message.reply(response);
     }
 
