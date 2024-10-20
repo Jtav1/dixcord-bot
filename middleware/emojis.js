@@ -27,7 +27,7 @@ export const importEmojiList = async (emojiObjectList) => {
   console.log("db: emoji import complete");
 };
 
-export const countEmoji = (emoji) => {
+export const countEmoji = async (emoji, userid = null) => {
   const emoCleaned = parseEmoji(emoji);
 
   if (emoCleaned) {
@@ -37,6 +37,25 @@ export const countEmoji = (emoji) => {
     );
 
     execQuery(emoIncrementQry);
+  }
+
+  if (emoCleaned.id && userid) {
+    const userEmoQuery = mysql.format(
+      "INSERT INTO user_emoji_tracking (userid, emoid) VALUES (?, ?) ON DUPLICATE KEY UPDATE frequency = frequency + 1",
+      [userid, emoCleaned.id]
+    );
+
+    const emoExistsQuery = mysql.format(
+      "SELECT 1 FROM emoji_frequency WHERE emoji_frequency.emoid = ?",
+      [emoCleaned.id]
+    );
+
+    const count = await execQuery(emoExistsQuery);
+
+    if (count.length > 0) {
+      console.log("counting");
+      execQuery(userEmoQuery);
+    }
   }
 };
 

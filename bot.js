@@ -133,7 +133,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
   if (reaction._emoji.name === pinEmoji) {
     //console.log("HIT");
   } else {
-    countEmoji(reactStr);
+    countEmoji(reactStr, user.id);
   }
 
   //this is how to split unicode emojis into their composite unicode string sorry i forgot to save the S.O. link
