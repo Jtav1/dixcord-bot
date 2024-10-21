@@ -7,8 +7,7 @@ const writeError = (err) => {
   process.exit();
 };
 
-// (node:2236) ExperimentalWarning: Importing JSON modules is an experimental feature and might change at any time
-import packageJson from "./package.json" assert { type: "json" };
+import packageJson from "./package.json" with { type: "json" };
 const version = packageJson.version;
 
 // =========== REQUIRED ============= //
