@@ -7,6 +7,8 @@ COPY ./events ./events
 COPY ./logging ./logging
 COPY ./middleware ./middleware
 COPY ./package*.json ./
+COPY ./delete-all-commands.js ./
+COPY ./deploy-commands.js ./
 
 COPY ./configVars.js ./
 COPY ./bot.js ./
