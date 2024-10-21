@@ -19,7 +19,7 @@ const allFortunes = await getAllFortunes();
 // fortuneTeller()
 //	Randomly sends a fortune
 //  return: response (string)
-const fortuneTeller = (rawMessage, clientId) => {
+export const fortuneTeller = (rawMessage, clientId) => {
   const processedMessage = rawMessage.replace("<@" + clientId + ">", "");
 
   // var Sentiment = require('sentiment');
@@ -32,5 +32,3 @@ const fortuneTeller = (rawMessage, clientId) => {
 
   return fortuneReply.response_string;
 };
-
-export default fortuneTeller;

@@ -10,7 +10,7 @@ const pinChannelId = isDev ? "710671234471559228" : "915462110761349201"; //TODO
 // messagePinner
 // pins message if sufficent pin emoji reactions are added to it
 // return: none/void
-const messagePinner = async (message, pinReaction, user, client) => {
+export const messagePinner = async (message, pinReaction, user, client) => {
   //check to see if the message is pinned already
   const isPinnedAlready = await isMessageAlreadyPinned(message.id);
 
@@ -55,5 +55,3 @@ const messagePinner = async (message, pinReaction, user, client) => {
 
   return false;
 };
-
-export default messagePinner;

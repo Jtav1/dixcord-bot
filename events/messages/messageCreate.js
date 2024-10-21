@@ -5,10 +5,10 @@ import { getAllConfigurations } from "../../middleware/configurations.js";
 //******* RESPONSE FUNCTIONS *******//
 import { twitterFixer } from "./responses/twitterFixer.js";
 import { takeALook } from "./responses/takeALook.js";
-import fortuneTeller from "./responses/fortuneTeller.js";
+import { fortuneTeller } from "./responses/fortuneTeller.js";
 
 //******* UTILITIES FUNCTIONS ********//;
-import emojiDetector from "./utilities/emojiDetector.js";
+import { emojiDetector } from "./utilities/emojiDetector.js";
 
 const name = "messageCreate";
 

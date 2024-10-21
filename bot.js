@@ -20,7 +20,7 @@ import {
   countRepost,
   countEmoji,
 } from "./middleware/emojis.js";
-import messagePinner from "./events/messages/utilities/messagePinner.js";
+import { messagePinner } from "./events/messages/utilities/messagePinner.js";
 
 // Create a new client instance
 const client = new Client({
