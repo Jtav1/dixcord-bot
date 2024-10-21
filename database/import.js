@@ -1,11 +1,11 @@
-import {
-  take_a_look_list_file_loc,
-  positive_file_loc,
-  negative_file_loc,
-  neutral_file_loc,
-  log_filter_list_loc,
-  isDev,
-} from "../configVars.js";
+import { dataDirectory, isDev } from "../configVars.js";
+
+// These were imported in 1.6, and are legacy. left here just in case.
+let take_a_look_list_file_loc = `${dataDirectory}/take_a_look_list.txt`;
+let positive_file_loc = `${dataDirectory}/positive.txt`;
+let negative_file_loc = `${dataDirectory}/negative.txt`;
+let neutral_file_loc = `${dataDirectory}/neutral.txt`;
+let log_filter_list_loc = `${dataDirectory}/logfilterlist.txt`;
 
 import { execQuery } from "./queryRunner.js";
 
