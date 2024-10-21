@@ -101,3 +101,20 @@ export const getTopReposters = async (number) => {
   }
   return res;
 };
+
+export const getRepostsForUser = async (userid) => {
+  let res = [];
+
+  var query = mysql.format(
+    "SELECT count(userid) as 'count', userid FROM user_repost_tracking WHERE userid = ?",
+    [userid]
+  );
+
+  try {
+    const results = await execQuery(query);
+    res = results[0].count;
+  } catch (e) {
+    console.err(e);
+  }
+  return res;
+};
