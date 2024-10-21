@@ -1,13 +1,5 @@
 // Require the necessary discord.js classes
-import {
-  REST,
-  Routes,
-  Client,
-  Collection,
-  Events,
-  GatewayIntentBits,
-  Partials,
-} from "discord.js";
+import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 
 import fs from "node:fs";
 import path from "node:path";
@@ -21,6 +13,7 @@ import {
   countEmoji,
 } from "./middleware/emojis.js";
 import { messagePinner } from "./events/messages/utilities/messagePinner.js";
+import { getAllConfigurations } from "./middleware/configurations.js";
 
 // Create a new client instance
 const client = new Client({
@@ -33,13 +26,23 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
-//TODO PUT THESE INTO CONFIG TABLE
-const pinThreshold = isDev ? 1 : 3; // TODO emoji pin voting threshold, put into db instead as configuration
-const pinEmoji = "\ud83d\udccc"; // TODO pin emoji unicode maybe move into db
-const repostEmojiId = "1072368151922233404";
+const configs = await getAllConfigurations();
+
+const pinThreshold = parseInt(
+  configs.filter((config_entry) => config_entry.config === "pin_threshold")[0]
+    .value
+);
+const pinEmoji = configs.filter(
+  (config_entry) => config_entry.config === "pin_emoji"
+)[0].value;
+const repostEmojiId = configs.filter(
+  (config_entry) => config_entry.config === "repost_emoji"
+)[0].value;
+const announceChannelId = configs.filter(
+  (config_entry) => config_entry.config === "announce_channel_id"
+)[0].value;
 
 const commands = [];
-const announceChannelId = "710671234471559228"; //TODO move this to config table in db
 
 await initializeDatabase();
 await importAll();

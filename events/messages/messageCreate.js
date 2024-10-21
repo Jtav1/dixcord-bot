@@ -1,6 +1,5 @@
 import { clientId } from "../../configVars.js";
 import { cleanLog } from "../../logging/dataLog.js";
-import { getAllConfigurations } from "../../middleware/configurations.js";
 
 //******* RESPONSE FUNCTIONS *******//
 import { twitterFixer } from "./responses/twitterFixer.js";
@@ -58,7 +57,7 @@ const execute = async (message) => {
     // If it wasnt a dixbot keyword, log the message for later bot training purposes
     // dataLog cleanLog pulls out all mentions of userID and a preset list of names
 
-    cleanLog(message);
+    await cleanLog(message);
   }
 };
 
