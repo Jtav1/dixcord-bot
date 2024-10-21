@@ -1,4 +1,4 @@
-import { logFile, isDev } from "../configVars.js";
+import { dataDirectory, isDev } from "../configVars.js";
 import { execQuery } from "../database/queryRunner.js";
 import { getAllLogFilterKeywords } from "../middleware/filters.js";
 
@@ -50,7 +50,8 @@ export const cleanLog = async (message) => {
   //todo add logfile encryption
   //todo multiple files one for each channel id
 
-  const channelLogfile = "./data/" + message.channelId + "_cleanlog.txt";
+  const channelLogfile =
+    dataDirectory + "/" + message.channelId + "_cleanlog.txt";
 
   const logMsg = message.content
     .replace(userIdRegex, "")
@@ -69,7 +70,7 @@ export const cleanLog = async (message) => {
   const cleanMsg = msgAry.join(" ").replace(spaceRegex, " ").trim();
 
   if (cleanMsg.length > 0) {
-    if (!isDev) {
+    if (isDev) {
       // console.log("DEV Chatlog entry: " + cleanMsg);
     } else {
       fs.appendFile(channelLogfile, cleanMsg + "\n", "utf8", (err) => {

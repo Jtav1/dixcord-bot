@@ -78,7 +78,7 @@ export {
   token, //----
   clientId, //----
   guildId, //----
-  logFile, //----
+  dataDirectory, //----
   mysqlHost, //used
   mysqlPort, //used
   mysqlUser, //used
