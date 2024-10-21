@@ -1,9 +1,8 @@
-import { rareFrequency } from "../../../configVars.js";
-
 import {
   incrementTakeALookLink,
   getAllTakeALookLinks,
 } from "../../../middleware/responses.js";
+import { getAllConfigurations } from "../../../middleware/configurations.js";
 
 const takeAlookArray = await getAllTakeALookLinks();
 const commonArray = takeAlookArray.filter((x) => x.isdefault == 1);
@@ -19,7 +18,15 @@ let configuredLimit = 2;
 //	selects an image and sends a reply containing the link
 //	return: response (string)
 
-const takeALook = () => {
+export const takeALook = async () => {
+  // pull this at response time to get a fresh object
+  const configurations = await getAllConfigurations();
+  const rareFrequency = parseFloat(
+    configurations.filter(
+      (config_entry) => config_entry.config === "rare_frequency"
+    )[0].value
+  );
+
   let nowTime = Date.now();
   let response = "";
 
@@ -60,5 +67,3 @@ const takeALook = () => {
 
   return response;
 };
-
-export default takeALook;

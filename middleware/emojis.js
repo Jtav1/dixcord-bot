@@ -27,7 +27,7 @@ export const importEmojiList = async (emojiObjectList) => {
   console.log("db: emoji import complete");
 };
 
-export const countEmoji = (emoji) => {
+export const countEmoji = async (emoji, userid = null) => {
   const emoCleaned = parseEmoji(emoji);
 
   if (emoCleaned) {
@@ -37,6 +37,24 @@ export const countEmoji = (emoji) => {
     );
 
     execQuery(emoIncrementQry);
+  }
+
+  if (emoCleaned.id && userid) {
+    const userEmoQuery = mysql.format(
+      "INSERT INTO user_emoji_tracking (userid, emoid) VALUES (?, ?) ON DUPLICATE KEY UPDATE frequency = frequency + 1",
+      [userid, emoCleaned.id]
+    );
+
+    const emoExistsQuery = mysql.format(
+      "SELECT 1 FROM emoji_frequency WHERE emoji_frequency.emoid = ?",
+      [emoCleaned.id]
+    );
+
+    const count = await execQuery(emoExistsQuery);
+
+    if (count.length > 0) {
+      execQuery(userEmoQuery);
+    }
   }
 };
 
@@ -50,7 +68,33 @@ export const getTopEmoji = async (number) => {
 
   try {
     const results = await execQuery(query);
-    console.log(results);
+    res = results;
+  } catch (e) {
+    console.err(e);
+  }
+  return res;
+};
+
+export const countRepost = async (userid, msgid) => {
+  if (msgid && userid) {
+    const userRepostQuery = mysql.format(
+      "INSERT INTO user_repost_tracking (userid, msgid) VALUES (?, ?) ON DUPLICATE KEY UPDATE userid=userid",
+      [userid, msgid]
+    );
+    execQuery(userRepostQuery);
+  }
+};
+
+export const getTopReposters = async (number) => {
+  let res = [];
+
+  var query = mysql.format(
+    "SELECT count(userid) as 'count', userid FROM user_repost_tracking GROUP BY userid ORDER BY count(userid) DESC LIMIT ?",
+    [number]
+  );
+
+  try {
+    const results = await execQuery(query);
     res = results;
   } catch (e) {
     console.err(e);

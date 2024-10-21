@@ -1,10 +1,10 @@
-import { clientId, twitterFixEnabled } from "../../configVars.js";
-
+import { clientId } from "../../configVars.js";
 import { cleanLog } from "../../logging/dataLog.js";
+import { getAllConfigurations } from "../../middleware/configurations.js";
 
 //******* RESPONSE FUNCTIONS *******//
-import twitterFixer from "./responses/twitterFixer.js";
-import takeALook from "./responses/takeALook.js";
+import { twitterFixer } from "./responses/twitterFixer.js";
+import { takeALook } from "./responses/takeALook.js";
 import fortuneTeller from "./responses/fortuneTeller.js";
 
 //******* UTILITIES FUNCTIONS ********//;
@@ -12,7 +12,7 @@ import emojiDetector from "./utilities/emojiDetector.js";
 
 const name = "messageCreate";
 
-const execute = (message) => {
+const execute = async (message) => {
   //******* INCOMING MESSAGE PROCESSING *******//
 
   let response = "";
@@ -27,8 +27,12 @@ const execute = (message) => {
       .replace(/[^a-zA-Z0-9]/g, "");
 
     // If there's a twitter link to fix, do that
-    if (twitterFixEnabled) {
-      let twitFixReply = twitterFixer(message.content);
+    const twitCheck = message.content.split(" ").filter((word) => {
+      return word.replace(/[<>]/g, "").includes("https://x.com/");
+    });
+
+    if (twitCheck.length > 0) {
+      const twitFixReply = await twitterFixer(message.content);
       if (twitFixReply.length > 0) {
         response = twitFixReply;
       }
@@ -36,7 +40,7 @@ const execute = (message) => {
 
     // Then, if there's a Take A Look OR fortune teller prompt, handle that
     if (contentStripped.includes("takealookatthis")) {
-      response = takeALook();
+      response = await takeALook();
 
       //if not, check if there is a fortune teller request to reply to
     } else if (
@@ -48,7 +52,6 @@ const execute = (message) => {
 
     // if a reply was generated, send it
     if (response.length > 0) {
-      // console.log("<@" + message.author.username + '>: ' + message.cleanContent);
       message.reply(response);
     }
 

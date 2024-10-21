@@ -11,8 +11,22 @@ import { execQuery } from "./queryRunner.js";
 import mysql from "mysql2";
 import fs from "node:fs";
 
-//Import all configurations from flat files into the config table
-export const importConfigs = async () => {};
+//Import all configurations
+export const importConfigs = async () => {
+  //hardcoding these for default imported values
+  const configArray = [
+    ["rare_frequency", 0.1],
+    ["twitter_fix_enabled", "true"],
+  ];
+
+  const configInsertQry = mysql.format(
+    "INSERT IGNORE INTO configurations (config, value) VALUES ?",
+    [configArray]
+  );
+
+  await execQuery(configInsertQry);
+  console.log("db: configuration import complete");
+};
 
 //Import all of the "take a look at this" responses
 export const importTakeALookList = async () => {

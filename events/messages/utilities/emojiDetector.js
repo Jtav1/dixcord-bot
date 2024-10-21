@@ -10,7 +10,7 @@ const emojiDetector = (rawMessage) => {
   let emoAry = emojiDetector(rawMessage.content) || [];
 
   emoAry.forEach((emo) => {
-    if (emo.length > 0) countEmoji(emo);
+    if (emo.length > 0) countEmoji(emo, rawMessage.author.id);
   });
 };
 

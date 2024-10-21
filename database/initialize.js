@@ -49,7 +49,7 @@ export const initializeDatabase = async () => {
   );
   await execQuery(takeALookTableCreateQuery);
 
-  //TakeALook Responses Table
+  //Fortune responses table
   const eightBallTableName = "eight_ball_responses"; //Also found in: import.js
   const eightBallTableCreateQuery = mysql.format(
     "CREATE TABLE IF NOT EXISTS " +
@@ -71,4 +71,33 @@ export const initializeDatabase = async () => {
       " keyword VARCHAR(255) UNIQUE)"
   );
   await execQuery(logFilterTableCreateQuery);
+
+  //Tracking user usage of emojis table
+  //  note: not going to alter the emoji frequency table to cascade delete because it should only
+  //  delete unused emojis and an unused emoji should not be referenced by this table
+  const userEmojiTableName = "user_emoji_tracking"; //Also found in: import.js
+  const userEmojiTableCreateQuery = mysql.format(
+    "CREATE TABLE IF NOT EXISTS " +
+      userEmojiTableName +
+      " (id int PRIMARY KEY AUTO_INCREMENT," +
+      " userid VARCHAR(500) NOT NULL," +
+      " emoid VARCHAR(255) NOT NULL REFERENCES " +
+      emojiTblName +
+      " (emoid)," +
+      " frequency int DEFAULT 1," +
+      " CONSTRAINT unique_user_emoji UNIQUE (userid, emoid))"
+  );
+  await execQuery(userEmojiTableCreateQuery);
+
+  const repostTable = "user_repost_tracking"; //Also found in: import.js
+  const repostTableCreateQuery = mysql.format(
+    "CREATE TABLE IF NOT EXISTS " +
+      repostTable +
+      " (id int PRIMARY KEY AUTO_INCREMENT," +
+      " userid VARCHAR(500) NOT NULL," +
+      " msgid VARCHAR(500) NOT NULL)"
+  );
+  await execQuery(repostTableCreateQuery);
+
+  console.log("db: table initialization complete");
 };
