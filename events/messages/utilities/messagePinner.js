@@ -1,16 +1,19 @@
 import { EmbedBuilder } from "discord.js";
-import { isDev } from "../../../configVars.js";
 import {
   logPinnedMessage,
   isMessageAlreadyPinned,
 } from "../../../logging/dataLog.js";
+import { getAllConfigurations } from "../../../middleware/configurations.js";
 
-const pinChannelId = isDev ? "710671234471559228" : "915462110761349201"; //TODO move this to config table in db
+const configs = await getAllConfigurations();
+const pinChannelId = configs.filter(
+  (config_entry) => config_entry.config === "pin_channel_id"
+)[0].value;
 
 // messagePinner
 // pins message if sufficent pin emoji reactions are added to it
 // return: none/void
-const messagePinner = async (message, pinReaction, user, client) => {
+export const messagePinner = async (message, pinReaction, user, client) => {
   //check to see if the message is pinned already
   const isPinnedAlready = await isMessageAlreadyPinned(message.id);
 
@@ -55,5 +58,3 @@ const messagePinner = async (message, pinReaction, user, client) => {
 
   return false;
 };
-
-export default messagePinner;

@@ -1,8 +1,8 @@
-import { logFile, isDev } from "../configVars.js";
+import { dataDirectory, isDev } from "../configVars.js";
 import { execQuery } from "../database/queryRunner.js";
 import { getAllLogFilterKeywords } from "../middleware/filters.js";
 
-import fs from "node:fs";
+import fs from "fs";
 import mysql from "mysql2";
 
 let filterWordArray = await getAllLogFilterKeywords();
@@ -36,7 +36,7 @@ export const isMessageAlreadyPinned = async (msgid) => {
   return results.length > 0;
 };
 
-export const cleanLog = (message) => {
+export const cleanLog = async (message) => {
   const userIdRegex = /<@\d+>/g;
   const groupIdRegex = /<@&\d+>/g;
   const addressRegex = /\d{1,5}\s{1}\w+\s{1}\w+\s\w+/g;
@@ -46,9 +46,14 @@ export const cleanLog = (message) => {
 
   const spaceRegex = /\s+/g;
 
+  //message.channelId
   //todo add logfile encryption
+  //todo multiple files one for each channel id
 
-  let logMsg = message.content
+  const channelLogfile =
+    dataDirectory + "/" + message.channelId + "_cleanlog.txt";
+
+  const logMsg = message.content
     .replace(userIdRegex, "")
     .replace(groupIdRegex, "")
     .replace(phoneNumRegex, "")
@@ -62,15 +67,19 @@ export const cleanLog = (message) => {
     return !filterWordArray.includes(word);
   });
 
-  let cleanMsg = msgAry.join(" ").replace(spaceRegex, " ").trim();
+  const cleanMsg = msgAry.join(" ").replace(spaceRegex, " ").trim();
 
   if (cleanMsg.length > 0) {
     if (isDev) {
       // console.log("DEV Chatlog entry: " + cleanMsg);
     } else {
-      fs.appendFile(logFile, cleanMsg + "\n", (err) => {
+      fs.appendFile(channelLogfile, cleanMsg + "\n", "utf8", (err) => {
         if (err) {
-          console.log("Error writing to chatlog file " + logFile + ": " + err);
+          console.log(
+            "log: error writing to chatlog file " + channelLogfile + ": " + err
+          );
+        } else {
+          console.log("log: wrote to log file " + channelLogfile);
         }
       });
     }
