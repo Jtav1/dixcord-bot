@@ -36,24 +36,24 @@ export const countEmoji = async (emoji, userid = null) => {
       [emoCleaned.name, emoCleaned.id]
     );
 
-    execQuery(emoIncrementQry);
-  }
+    await execQuery(emoIncrementQry);
 
-  if (emoCleaned.id && userid) {
-    const userEmoQuery = mysql.format(
-      "INSERT INTO user_emoji_tracking (userid, emoid) VALUES (?, ?) ON DUPLICATE KEY UPDATE frequency = frequency + 1",
-      [userid, emoCleaned.id]
-    );
+    if (emoCleaned.id && userid) {
+      const userEmoQuery = mysql.format(
+        "INSERT INTO user_emoji_tracking (userid, emoid) VALUES (?, ?) ON DUPLICATE KEY UPDATE frequency = frequency + 1",
+        [userid, emoCleaned.id]
+      );
 
-    const emoExistsQuery = mysql.format(
-      "SELECT 1 FROM emoji_frequency WHERE emoji_frequency.emoid = ?",
-      [emoCleaned.id]
-    );
+      const emoExistsQuery = mysql.format(
+        "SELECT 1 FROM emoji_frequency WHERE emoji_frequency.emoid = ?",
+        [emoCleaned.id]
+      );
 
-    const count = await execQuery(emoExistsQuery);
+      const count = await execQuery(emoExistsQuery);
 
-    if (count.length > 0) {
-      execQuery(userEmoQuery);
+      if (count.length > 0) {
+        execQuery(userEmoQuery);
+      }
     }
   }
 };
