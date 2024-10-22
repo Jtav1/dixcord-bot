@@ -14,6 +14,7 @@ import {
 } from "./middleware/emojis.js";
 import { messagePinner } from "./events/messages/utilities/messagePinner.js";
 import { getAllConfigurations } from "./middleware/configurations.js";
+import { error } from "node:console";
 
 // Create a new client instance
 const client = new Client({
@@ -148,6 +149,10 @@ client.on("messageReactionAdd", async (reaction, user) => {
 
   //this is how to split unicode emojis into their composite unicode string sorry i forgot to save the S.O. link
   //emoji.split("").map((unit) => "\\u" + unit.charCodeAt(0).toString(16).padStart(4, "0")).join("");
+});
+
+client.on(Events.Error, async (error) => {
+  console.error("Discord Client Error: ", error);
 });
 
 // Login to Discord with your client's token
