@@ -79,7 +79,7 @@ export const cleanLog = async (message) => {
             "log: error writing to chatlog file " + channelLogfile + ": " + err
           );
         } else {
-          console.log("log: wrote to log file " + channelLogfile);
+          //console.log("log: wrote to log file " + channelLogfile);
         }
       });
     }
