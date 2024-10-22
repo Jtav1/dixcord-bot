@@ -5,7 +5,11 @@ import { getTopReposters } from "../../middleware/emojis.js";
 import { getAllConfigurations } from "../../middleware/configurations.js";
 
 const cmdName = "top-reposters";
-const repostEmojiId = "1072368151922233404"; // use db for this somehow
+
+const configs = await getAllConfigurations();
+const repostEmojiId = configs.filter(
+  (config_entry) => config_entry.config === "repost_emoji"
+)[0].value;
 
 const data = new SlashCommandBuilder()
   .setName("top-reposters")
