@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 import { getRepostsForUser } from "../../middleware/emojis.js";
 
 const cmdName = "reposts-by-user";
-const repostEmojiId = "1072368151922233404";
+const repostEmojiId = "1072368151922233404"; // use db for this somehow
 
 const data = new SlashCommandBuilder()
   .setName("reposts-by-user")
