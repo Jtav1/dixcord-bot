@@ -4,11 +4,18 @@ import {
   isMessageAlreadyPinned,
 } from "../../../logging/dataLog.js";
 import { getAllConfigurations } from "../../../middleware/configurations.js";
+import { isDev } from "../../../configVars.js";
 
 const configs = await getAllConfigurations();
-const pinChannelId = configs.filter(
+const filteredConfigs = configs.filter(
   (config_entry) => config_entry.config === "pin_channel_id"
-)[0].value;
+);
+const pinChannelId =
+  filteredConfigs.length > 0
+    ? filteredConfigs[0].value
+    : isDev
+    ? "710671234471559228"
+    : "915462110761349201";
 
 // messagePinner
 // pins message if sufficent pin emoji reactions are added to it

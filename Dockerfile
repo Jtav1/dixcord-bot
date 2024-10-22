@@ -15,7 +15,6 @@ COPY ./bot.js ./
 
 RUN npm update -g npm
 RUN npm ci
-RUN node ./bot.js
 
-# CMD ["node", "./bot.js"]
-CMD ["sh", "-c", "node ./delete-all-commands.js && node ./deploy-commands.js && node ./bot.js"]
+CMD ["node", "./bot.js"]
+# CMD ["sh", "-c", "node ./delete-all-commands.js && node ./deploy-commands.js && node ./bot.js"]

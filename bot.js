@@ -3,6 +3,7 @@ import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 
 import fs from "node:fs";
 import path from "node:path";
+import { exec } from "child_process";
 
 import { token, clientId, guildId, isDev, version } from "./configVars.js";
 import { initializeDatabase } from "./database/initialize.js";
@@ -14,7 +15,6 @@ import {
 } from "./middleware/emojis.js";
 import { messagePinner } from "./events/messages/utilities/messagePinner.js";
 import { getAllConfigurations } from "./middleware/configurations.js";
-import { error } from "node:console";
 
 // Create a new client instance
 const client = new Client({
@@ -26,6 +26,9 @@ const client = new Client({
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
+
+await initializeDatabase();
+await importAll();
 
 const configs = await getAllConfigurations();
 
@@ -44,9 +47,6 @@ const announceChannelId = configs.filter(
 )[0].value;
 
 const commands = [];
-
-await initializeDatabase();
-await importAll();
 
 //Set up events
 //https://discord.js.org/#/docs/main/main/class/Client List of Events to handle
