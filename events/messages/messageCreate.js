@@ -1,14 +1,13 @@
 import { clientId } from "../../configVars.js";
 import { cleanLog } from "../../logging/dataLog.js";
-import { getAllConfigurations } from "../../middleware/configurations.js";
 
 //******* RESPONSE FUNCTIONS *******//
 import { twitterFixer } from "./responses/twitterFixer.js";
 import { takeALook } from "./responses/takeALook.js";
-import fortuneTeller from "./responses/fortuneTeller.js";
+import { fortuneTeller } from "./responses/fortuneTeller.js";
 
 //******* UTILITIES FUNCTIONS ********//;
-import emojiDetector from "./utilities/emojiDetector.js";
+import { emojiDetector } from "./utilities/emojiDetector.js";
 
 const name = "messageCreate";
 
@@ -58,7 +57,7 @@ const execute = async (message) => {
     // If it wasnt a dixbot keyword, log the message for later bot training purposes
     // dataLog cleanLog pulls out all mentions of userID and a preset list of names
 
-    cleanLog(message);
+    await cleanLog(message);
   }
 };
 

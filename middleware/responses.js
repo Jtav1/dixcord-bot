@@ -2,7 +2,7 @@ import { execQuery } from "../database/queryRunner.js";
 
 import mysql from "mysql2";
 
-const getRareArray = async () => {
+export const getRareArray = async () => {
   var query = mysql.format(
     "SELECT link FROM take_a_look_responses WHERE isdefault = 0"
   );
@@ -16,7 +16,7 @@ const getRareArray = async () => {
   return tempArray;
 };
 
-const getCommonArray = async () => {
+export const getCommonArray = async () => {
   var query = mysql.format(
     "SELECT link FROM take_a_look_responses WHERE isdefault = 1"
   );
@@ -30,12 +30,12 @@ const getCommonArray = async () => {
   return tempArray;
 };
 
-const getAllTakeALookLinks = async () => {
+export const getAllTakeALookLinks = async () => {
   var query = mysql.format("SELECT * FROM take_a_look_responses");
   return await execQuery(query);
 };
 
-const insertTakeALookLink = async (link, isdefault) => {
+export const insertTakeALookLink = async (link, isdefault) => {
   const linkInsertQry = mysql.format(
     "INSERT IGNORE INTO take_a_look_responses (link, isdefault) VALUES (?, ?)",
     [link, isdefault]
@@ -44,7 +44,7 @@ const insertTakeALookLink = async (link, isdefault) => {
   return await execQuery(linkInsertQry);
 };
 
-const incrementTakeALookLink = async (link) => {
+export const incrementTakeALookLink = async (link) => {
   const incrementQuery = mysql.format(
     "UPDATE take_a_look_responses SET frequency = frequency + 1 WHERE id = ?",
     [link.id]
@@ -53,12 +53,12 @@ const incrementTakeALookLink = async (link) => {
   return await execQuery(incrementQuery);
 };
 
-const getAllFortunes = async () => {
+export const getAllFortunes = async () => {
   var query = mysql.format("SELECT * FROM eight_ball_responses");
   return await execQuery(query);
 };
 
-const insertFortune = async (text, sentiment) => {
+export const insertFortune = async (text, sentiment) => {
   const fortuneInsertQry = mysql.format(
     "INSERT IGNORE INTO eight_ball_responses (resoponse_string, sentiment) VALUES (?, ?)",
     [text, sentiment]
@@ -67,22 +67,11 @@ const insertFortune = async (text, sentiment) => {
   return await execQuery(fortuneInsertQry);
 };
 
-const incrementFortune = async (fortune) => {
+export const incrementFortune = async (fortune) => {
   const incrementQuery = mysql.format(
     "UPDATE eight_ball_responses SET frequency = frequency + 1 WHERE id = ?",
     [fortune.id]
   );
 
   return await execQuery(incrementQuery);
-};
-
-export {
-  getRareArray,
-  getCommonArray,
-  getAllTakeALookLinks,
-  insertTakeALookLink,
-  incrementTakeALookLink,
-  getAllFortunes,
-  insertFortune,
-  incrementFortune,
 };

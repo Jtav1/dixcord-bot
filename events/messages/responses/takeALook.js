@@ -10,9 +10,19 @@ const rareArray = takeAlookArray.filter((x) => x.isdefault == 0);
 
 let limit = 0;
 let lastReplyTimestamp = null;
-let ms = Math.random() * 60000 + 60000; // CUTTING EDGE AI ANTI EXPLOIT TECHNOLOGY
 
-let configuredLimit = 2;
+const configs = await getAllConfigurations();
+
+const repostTrackerTimeframe_ms = parseInt(
+  configs.filter(
+    (config_entry) => config_entry.config === "take_a_look_delay"
+  )[0].value
+);
+const configuredLimit = parseInt(
+  configs.filter(
+    (config_entry) => config_entry.config === "take_a_look_repost_limit"
+  )[0].value
+);
 
 // takeALook()
 //	selects an image and sends a reply containing the link
@@ -32,7 +42,8 @@ export const takeALook = async () => {
 
   // If there has not been a last reply or it has been long enough since the last reply, reset counter
   if (
-    (lastReplyTimestamp && Math.floor(nowTime - lastReplyTimestamp) >= ms) ||
+    (lastReplyTimestamp &&
+      Math.floor(nowTime - lastReplyTimestamp) >= repostTrackerTimeframe_ms) ||
     lastReplyTimestamp == null
   ) {
     lastReplyTimestamp = null;

@@ -56,39 +56,16 @@ if (!mysqlPw || mysqlPw.length < 1)
 if (!mysqlDb || mysqlDb.length < 1)
   writeError("config: missing MYSQL_DB env var");
 
-const logFile = process.env.DISCORD_LOG_FILE; //This is required for now
-
-if (!logFile || logFile.length < 1)
-  writeError("config: missing DISCORD_LOG_FILE env var");
-
-// =========== OPTIONAL ============= //
-
-// file location for list of URLs
-let take_a_look_list_file_loc = `${dataDirectory}/take_a_look_list.txt`;
-let positive_file_loc = `${dataDirectory}/positive.txt`;
-let negative_file_loc = `${dataDirectory}/negative.txt`;
-let neutral_file_loc = `${dataDirectory}/neutral.txt`;
-let log_filter_list_loc = `${dataDirectory}/logfilterlist.txt`;
-
-// =========== END CONFIG VARS ============= //
-
-console.log("log: sanitized chatlogs will be saved in " + logFile);
-
 export {
-  token, //----
-  clientId, //----
-  guildId, //----
-  logFile, //----
-  mysqlHost, //used
-  mysqlPort, //used
-  mysqlUser, //used
-  mysqlPw, //used
-  mysqlDb, //uzed
-  isDev, // used
-  version, // used
-  log_filter_list_loc, // used for initial database creation & import
-  take_a_look_list_file_loc, // used for initial database creation & import
-  positive_file_loc, // used for initial database creation & import
-  negative_file_loc, // used for initial database creation & import
-  neutral_file_loc, // used for initial database creation & import
+  token,
+  clientId,
+  guildId,
+  dataDirectory,
+  mysqlHost,
+  mysqlPort,
+  mysqlUser,
+  mysqlPw,
+  mysqlDb,
+  isDev,
+  version,
 };
