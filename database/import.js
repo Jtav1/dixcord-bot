@@ -18,6 +18,7 @@ export const importConfigs = async () => {
   const delay = Math.floor(Math.random() * 60000 + 60000);
   const pinThreshold = isDev ? 1 : 3;
   const pinChannelId = isDev ? "710671234471559228" : "915462110761349201";
+  const announceChannelId = isDev ? "710671234471559228" : "911427650730487878";
 
   const configArray = [
     ["rare_frequency", 0.1],
@@ -25,7 +26,7 @@ export const importConfigs = async () => {
     ["pin_threshold", pinThreshold],
     ["pin_emoji", "\ud83d\udccc"],
     ["repost_emoji", "1072368151922233404"],
-    ["announce_channel_id", "710671234471559228"],
+    ["announce_channel_id", announceChannelId],
     ["take_a_look_delay", delay],
     ["take_a_look_repost_limit", 2],
     ["pin_channel_id", pinChannelId],
