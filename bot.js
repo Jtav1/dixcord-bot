@@ -12,6 +12,7 @@ import {
   importEmojiList,
   countRepost,
   countEmoji,
+  uncountRepost,
 } from "./middleware/emojis.js";
 import { messagePinner } from "./events/messages/utilities/messagePinner.js";
 import { getAllConfigurations } from "./middleware/configurations.js";
@@ -120,6 +121,7 @@ client.once(Events.ClientReady, async (readyClient) => {
 
 // https://stackoverflow.com/questions/66793543/reaction-event-discord-js
 client.on("messageReactionAdd", async (reaction, user) => {
+  console.log("we are in message react add for some reason");
   // fetch the message if it's not cached
   const message = !reaction.message.author
     ? await reaction.message.fetch()
@@ -144,11 +146,23 @@ client.on("messageReactionAdd", async (reaction, user) => {
   const repostReact = allReactions.get(repostEmojiId);
 
   if (repostReact) {
-    countRepost(message.author.id, message.id);
+    countRepost(message.author.id, message.id, user.id);
   }
 
   //this is how to split unicode emojis into their composite unicode string sorry i forgot to save the S.O. link
   //emoji.split("").map((unit) => "\\u" + unit.charCodeAt(0).toString(16).padStart(4, "0")).join("");
+});
+
+// https://stackoverflow.com/questions/66793543/reaction-event-discord-js
+client.on("messageReactionRemove", async (reaction, user) => {
+  // fetch the message if it's not cached
+  const message = !reaction.message.author
+    ? await reaction.message.fetch()
+    : reaction.message;
+
+  if (reaction._emoji.id === repostEmojiId) {
+    uncountRepost(message.id, user.id);
+  }
 });
 
 client.on(Events.Error, async (error) => {

@@ -95,7 +95,9 @@ export const initializeDatabase = async () => {
       repostTable +
       " (id int PRIMARY KEY AUTO_INCREMENT," +
       " userid VARCHAR(500) NOT NULL," +
-      " msgid VARCHAR(500) NOT NULL)"
+      " msgid VARCHAR(500) NOT NULL," +
+      " accuser VARCHAR(500) NOT NULL," +
+      " CONSTRAINT unique_repost_accusation UNIQUE (userid, msgid, accuser))"
   );
   await execQuery(repostTableCreateQuery);
 

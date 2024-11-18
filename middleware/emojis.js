@@ -75,13 +75,23 @@ export const getTopEmoji = async (number) => {
   return res;
 };
 
-export const countRepost = async (userid, msgid) => {
-  if (msgid && userid) {
+export const countRepost = async (userid, msgid, accuserid) => {
+  if (msgid && userid && accuserid) {
     const userRepostQuery = mysql.format(
-      "INSERT INTO user_repost_tracking (userid, msgid) VALUES (?, ?) ON DUPLICATE KEY UPDATE userid=userid",
-      [userid, msgid]
+      "INSERT INTO user_repost_tracking (userid, msgid, accuser) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM user_repost_tracking WHERE userid = ? and msgid = ? and accuser = ?)",
+      [userid, msgid, accuserid, userid, msgid, accuserid]
     );
     execQuery(userRepostQuery);
+  }
+};
+
+export const uncountRepost = async (msgid, accuserid) => {
+  if (msgid && accuserid) {
+    const deleteRepostQuery = mysql.format(
+      "DELETE FROM user_repost_tracking WHERE msgid = ? and accuser = ?",
+      [msgid, accuserid]
+    );
+    execQuery(deleteRepostQuery);
   }
 };
 
