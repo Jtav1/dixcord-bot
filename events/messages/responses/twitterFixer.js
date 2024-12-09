@@ -15,22 +15,29 @@ export const twitterFixer = async (messageContents) => {
 
   let reply = "";
 
-  if (twitterFixEnabled) {
+  if (
+    twitterFixEnabled &&
+    (messageContents.includes(" dd") ||
+      messageContents.includes(" dixbot") ||
+      messageContents.includes(" fix"))
+  ) {
     const msgAry = messageContents.split(" ");
 
     msgAry.forEach((word) => {
       let cleanWord = word.replace(/[<>]/g, "");
 
-      if (cleanWord.startsWith("https://x.com")) {
-        if (
-          messageContents.includes(" dd") ||
-          messageContents.includes(" dixbot") ||
-          messageContents.includes(" fix")
-        ) {
-          reply =
-            "fixed link: " +
-            cleanWord.replace("https://x.com/", "https://fixvx.com/");
-        }
+      if (cleanWord.startsWith("https://x.com" || "https://www.x.com"  )) {
+        reply =
+          "fixed link: " +
+          cleanWord.replace("x.com", "fixvx.com");
+      } else if (cleanWord.startsWith("https://instagram.com" || "https://www.instagram.com")) {
+        reply =
+          "fixed link: " +
+          cleanWord.replace("instagram.com", "ddinstagram.com");
+      } else if (cleanWord.startsWith("https://tiktok.com" || "https://www.tiktok.com")) {
+        reply =
+          "fixed link: " +
+          cleanWord.replace("tiktok.com", "vxtiktok.com");
       }
     });
   }
