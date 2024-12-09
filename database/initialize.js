@@ -89,6 +89,7 @@ export const initializeDatabase = async () => {
   );
   await execQuery(userEmojiTableCreateQuery);
 
+  // TODO: Delete user_repost_tracking table before next prod deployment
   const repostTable = "user_repost_tracking"; //Also found in: import.js
   const repostTableCreateQuery = mysql.format(
     "CREATE TABLE IF NOT EXISTS " +
@@ -97,6 +98,7 @@ export const initializeDatabase = async () => {
       " userid VARCHAR(500) NOT NULL," +
       " msgid VARCHAR(500) NOT NULL," +
       " accuser VARCHAR(500) NOT NULL," +
+      " timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, " +
       " CONSTRAINT unique_repost_accusation UNIQUE (userid, msgid, accuser))"
   );
   await execQuery(repostTableCreateQuery);
