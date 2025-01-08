@@ -8,6 +8,7 @@ import { fortuneTeller } from "./responses/fortuneTeller.js";
 
 //******* UTILITIES FUNCTIONS ********//;
 import { emojiDetector } from "./utilities/emojiDetector.js";
+import { keywordDetector } from "./utilities/keywordDetector.js";
 
 const name = "messageCreate";
 
@@ -19,6 +20,9 @@ const execute = async (message) => {
   if (!message.author.bot && !(message.author.id === clientId)) {
     // check every message for emojis
     emojiDetector(message);
+
+    //check every message for keywords
+    keywordDetector(message);
 
     // Strip incoming message for comparison
     const contentStripped = message.content

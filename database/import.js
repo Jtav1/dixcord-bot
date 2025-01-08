@@ -41,6 +41,17 @@ export const importConfigs = async () => {
   console.log("db: configuration import complete");
 };
 
+// Initial population of user_repost_tracking table
+export const importKeywordTrackingWords = async () => {
+  const keywordInsertQry = mysql.format(
+    "INSERT INTO user_keyword_tracking (keyword, timestamp) SELECT ?, null WHERE NOT EXISTS (SELECT 1 FROM user_keyword_tracking WHERE keyword = ?)",
+    ["penis", "penis"]
+  );
+
+  await execQuery(keywordInsertQry);
+  console.log("user_keyword_tracking population complete");
+};
+
 //Import all of the "take a look at this" responses
 // export const importTakeALookList = async () => {
 //   // if take a look at this file exists, parse it into an array, insert into db
@@ -125,6 +136,7 @@ export const importConfigs = async () => {
 
 export const importAll = async () => {
   await importConfigs();
+  await importKeywordTrackingWords();
   // await importTakeALookList();
   // await importFortunes();
   // await importLogFilterKeywords();
