@@ -103,18 +103,19 @@ export const initializeDatabase = async () => {
   );
   await execQuery(repostTableCreateQuery);
 
-  const keywordUsageTable = "user_keyword_tracking"; //Also found in: import.js
-  const keywordUsageTableQuery = mysql.format(
-    "CREATE TABLE IF NOT EXISTS " +
-      keywordUsageTable +
-      " (id int PRIMARY KEY AUTO_INCREMENT," +
-      " keyword VARCHAR(500) NOT NULL," +
-      " userid VARCHAR(500) DEFAULT null," +
-      " msgid VARCHAR(500) DEFAULT null," +
-      " timestamp DATETIME DEFAULT null, " +
-      " CONSTRAINT unique_keyword_tracking UNIQUE (keyword))"
-  );
-  await execQuery(keywordUsageTableQuery);
+  // Removed
+  // const keywordUsageTable = "user_keyword_tracking"; //Also found in: import.js
+  // const keywordUsageTableQuery = mysql.format(
+  //   "CREATE TABLE IF NOT EXISTS " +
+  //     keywordUsageTable +
+  //     " (id int PRIMARY KEY AUTO_INCREMENT," +
+  //     " keyword VARCHAR(500) NOT NULL," +
+  //     " userid VARCHAR(500) DEFAULT null," +
+  //     " msgid VARCHAR(500) DEFAULT null," +
+  //     " timestamp DATETIME DEFAULT null, " +
+  //     " CONSTRAINT unique_keyword_tracking UNIQUE (keyword))"
+  // );
+  // await execQuery(keywordUsageTableQuery);
 
   console.log("db: table initialization complete");
 };

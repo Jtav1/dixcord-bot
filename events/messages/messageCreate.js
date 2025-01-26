@@ -21,8 +21,9 @@ const execute = async (message) => {
     // check every message for emojis
     emojiDetector(message);
 
+    // Removed
     //check every message for keywords
-    keywordDetector(message);
+    // keywordDetector(message);
 
     // Strip incoming message for comparison
     const contentStripped = message.content
