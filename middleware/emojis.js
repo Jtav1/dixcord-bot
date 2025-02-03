@@ -27,33 +27,29 @@ export const importEmojiList = async (emojiObjectList) => {
   console.log("db: emoji import complete");
 };
 
-export const countEmoji = async (emoji, userid = null) => {
-  const emoCleaned = parseEmoji(emoji);
+export const countEmoji = async (emojiName, emojiId, userid = null) => {
+  const emoIncrementQry = mysql.format(
+    "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
+    [emojiName, emojiId]
+  );
 
-  if (emoCleaned) {
-    const emoIncrementQry = mysql.format(
-      "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
-      [emoCleaned.name, emoCleaned.id]
+  await execQuery(emoIncrementQry);
+
+  if (emojiId && userid) {
+    const userEmoQuery = mysql.format(
+      "INSERT INTO user_emoji_tracking (userid, emoid) VALUES (?, ?) ON DUPLICATE KEY UPDATE frequency = frequency + 1",
+      [userid, emojiId]
     );
 
-    await execQuery(emoIncrementQry);
+    const emoExistsQuery = mysql.format(
+      "SELECT 1 FROM emoji_frequency WHERE emoji_frequency.emoid = ?",
+      [emojiId]
+    );
 
-    if (emoCleaned.id && userid) {
-      const userEmoQuery = mysql.format(
-        "INSERT INTO user_emoji_tracking (userid, emoid) VALUES (?, ?) ON DUPLICATE KEY UPDATE frequency = frequency + 1",
-        [userid, emoCleaned.id]
-      );
+    const count = await execQuery(emoExistsQuery);
 
-      const emoExistsQuery = mysql.format(
-        "SELECT 1 FROM emoji_frequency WHERE emoji_frequency.emoid = ?",
-        [emoCleaned.id]
-      );
-
-      const count = await execQuery(emoExistsQuery);
-
-      if (count.length > 0) {
-        execQuery(userEmoQuery);
-      }
+    if (count.length > 0) {
+      execQuery(userEmoQuery);
     }
   }
 };

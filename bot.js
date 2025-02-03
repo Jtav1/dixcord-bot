@@ -17,6 +17,8 @@ import {
 import { messagePinner } from "./events/messages/utilities/messagePinner.js";
 import { getAllConfigurations } from "./middleware/configurations.js";
 
+import { plusplus, minusminus } from "./events/messages/utilities/plusplus.js";
+
 // Create a new client instance
 const client = new Client({
   intents: [
@@ -37,14 +39,25 @@ const pinThreshold = parseInt(
   configs.filter((config_entry) => config_entry.config === "pin_threshold")[0]
     .value
 );
+
 const pinEmoji = configs.filter(
   (config_entry) => config_entry.config === "pin_emoji"
 )[0].value;
+
 const repostEmojiId = configs.filter(
   (config_entry) => config_entry.config === "repost_emoji"
 )[0].value;
+
 const announceChannelId = configs.filter(
   (config_entry) => config_entry.config === "announce_channel_id"
+)[0].value;
+
+const plusEmoji = configs.filter(
+  (config_entry) => config_entry.config === "plusplus_emoji"
+)[0].value;
+
+const minusEmoji = configs.filter(
+  (config_entry) => config_entry.config === "minusminus_emoji"
 )[0].value;
 
 const commands = [];
@@ -121,7 +134,8 @@ client.once(Events.ClientReady, async (readyClient) => {
 
 // https://stackoverflow.com/questions/66793543/reaction-event-discord-js
 client.on("messageReactionAdd", async (reaction, user) => {
-  console.log("we are in message react add for some reason");
+  console.log("we are in message react add");
+
   // fetch the message if it's not cached
   const message = !reaction.message.author
     ? await reaction.message.fetch()
@@ -135,10 +149,23 @@ client.on("messageReactionAdd", async (reaction, user) => {
       await messagePinner(message, pinReact, user, client); // returns success bool
     }
   }
+
+  if (reaction._emoji.id === plusEmoji) {
+    await plusplus(reaction.message.author.id, "user");
+  }
+  if (reaction._emoji.id === minusEmoji) {
+    await minusminus(reaction.message.author.id, "user");
+  }
+
   let reactStr = "<:" + reaction._emoji.name + ":" + reaction._emoji.id + ">";
 
   // This shouldnt be necessary because countEmoji only counts server emoji BUT if we ever use a custom one, or add that in as another option...
-  if (reaction._emoji.name === pinEmoji) {
+  if (
+    reaction._emoji.name === pinEmoji ||
+    reaction._emoji.id === plusEmoji ||
+    reaction._emoji.id === minusEmoji
+  ) {
+    // do nothing - bad form i know
   } else {
     countEmoji(reactStr, user.id);
   }
@@ -162,6 +189,14 @@ client.on("messageReactionRemove", async (reaction, user) => {
 
   if (reaction._emoji.id === repostEmojiId) {
     uncountRepost(message.id, user.id);
+  }
+
+  // if the reactions are removed, do the opposite
+  if (reaction._emoji.id === plusEmoji) {
+    await minusminus(reaction.message.author.id, "user");
+  }
+  if (reaction._emoji.id === minusEmoji) {
+    await plusplus(reaction.message.author.id, "user");
   }
 });
 

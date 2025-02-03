@@ -30,6 +30,8 @@ export const importConfigs = async () => {
     ["take_a_look_delay", delay],
     ["take_a_look_repost_limit", 2],
     ["pin_channel_id", pinChannelId],
+    ["plusplus_emoji", "1333222081978040433"],
+    ["minusminus_emoji", "1333221818827411568"],
   ];
 
   const configInsertQry = mysql.format(
@@ -137,7 +139,7 @@ export const importConfigs = async () => {
 
 export const importAll = async () => {
   await importConfigs();
-  await importKeywordTrackingWords();
+  //await importKeywordTrackingWords();
   // await importTakeALookList();
   // await importFortunes();
   // await importLogFilterKeywords();

@@ -117,5 +117,16 @@ export const initializeDatabase = async () => {
   // );
   // await execQuery(keywordUsageTableQuery);
 
+  const plusTable = "plusplus_tracking"; //Also found in: import.js
+  const plusTableqQuery = mysql.format(
+    "CREATE TABLE IF NOT EXISTS " +
+      plusTable +
+      " (id int PRIMARY KEY AUTO_INCREMENT," +
+      " type VARCHAR(10) NOT NULL," +
+      " string VARCHAR(500) DEFAULT null," +
+      " value VARCHAR(500) DEFAULT null)"
+  );
+  await execQuery(plusTableqQuery);
+
   console.log("db: table initialization complete");
 };
