@@ -38,6 +38,10 @@ export const twitterFixer = async (messageContents) => {
         reply =
           "fixed link: " +
           cleanWord.replace("tiktok.com", "vxtiktok.com");
+      } else if (cleanWord.startsWith("https://bsky.app")) {
+        reply =
+          "fixed link: " +
+          cleanWord.replace("bsky.app", "bskx.app");
       }
     });
   }
