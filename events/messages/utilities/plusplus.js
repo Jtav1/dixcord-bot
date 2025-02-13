@@ -9,20 +9,44 @@ export const minusminus = async (string, typestr) => {
 };
 
 export const plusMinusMsg = async (rawMessage) => {
-  console.log(rawMessage.content);
+  console.log(rawMessage.author.id);
+
   const message = rawMessage.content;
   let matches = [];
 
-  // Find all instances of ++ or --
-  const regex = /(\S+)(\+\+|\-\-)/g;
+  // Find all instances of ++ or -- with optional whitespace
+  const regex = /(\S+)\s*(\+\+|\-\-)/g;
   let match;
 
   while ((match = regex.exec(message)) !== null) {
     // match[1] contains the characters before ++ or --
-    matches.push(match[1]);
+    // match[2] contains either ++ or --
+    matches.push({ target: match[1], type: match[2] });
   }
 
   if (matches.length > 0) {
-    console.log("Found plusplus/minusminus targets:", matches);
+    matches.forEach((m) => {
+
+      const isUserMention = (str) => {
+        const mentionRegex = /^<@!?(\d+)>$/;
+        return mentionRegex.test(str);
+      };
+
+      let matchtype = "word";
+
+      if (isUserMention(m.target)) {
+        if(m.target.replace('<@', '').replace('>', '') === rawMessage.author.id) {
+          matchtype = null;
+        } else {
+          matchtype = "user";
+        }
+      }
+
+      if(m.type === "++") {
+        console.log("found plusplus " + matchtype + ": " + m.target + ".")
+      } else if (m.type === "--") {
+        console.log("found minusminus " + matchtype + ": " + m.target + ".")
+      }
+    });
   }
 };

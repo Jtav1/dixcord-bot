@@ -134,7 +134,6 @@ client.once(Events.ClientReady, async (readyClient) => {
 
 // https://stackoverflow.com/questions/66793543/reaction-event-discord-js
 client.on("messageReactionAdd", async (reaction, user) => {
-  console.log("we are in message react add");
 
   // fetch the message if it's not cached
   const message = !reaction.message.author
@@ -150,10 +149,10 @@ client.on("messageReactionAdd", async (reaction, user) => {
     }
   }
 
-  if (reaction._emoji.id === plusEmoji) {
+  if (reaction._emoji.id === plusEmoji && (user.id !== message.author.id)) {
     await plusplus(reaction.message.author.id, "user");
   }
-  if (reaction._emoji.id === minusEmoji) {
+  if (reaction._emoji.id === minusEmoji && (user.id !== message.author.id)) {
     await minusminus(reaction.message.author.id, "user");
   }
 
@@ -192,10 +191,10 @@ client.on("messageReactionRemove", async (reaction, user) => {
   }
 
   // if the reactions are removed, do the opposite
-  if (reaction._emoji.id === plusEmoji) {
+  if (reaction._emoji.id === plusEmoji && (user.id !== message.author.id)) {
     await minusminus(reaction.message.author.id, "user");
   }
-  if (reaction._emoji.id === minusEmoji) {
+  if (reaction._emoji.id === minusEmoji && (user.id !== message.author.id)) {
     await plusplus(reaction.message.author.id, "user");
   }
 });
