@@ -28,7 +28,7 @@ async function execute(interaction) {
     timeoutUser(targetUser.id, interaction.guild).then((result) => {
       interaction.reply('CURSE OF RA 𓀀 𓀁 𓀂 𓀃 𓀄 𓀅 𓀆 𓀇 𓀈 𓀉 𓀊 𓀋 𓀌 𓀍 𓀎 𓀏 𓀐 𓀑 𓀒 𓀓 ... ' + result);
     }).catch((error) => {
-      console.log('Something broke lol');
+      console.log('Something broke with curse of ra lol');
       console.log(error);
     });
    
