@@ -124,6 +124,8 @@ export const initializeDatabase = async () => {
       " (id int PRIMARY KEY AUTO_INCREMENT," +
       " type VARCHAR(10) NOT NULL," +
       " string VARCHAR(500) DEFAULT null," +
+      " voter VARCHAR(500) DEFAULT null, " +
+      " timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, " +
       " value VARCHAR(500) DEFAULT null)"
   );
   await execQuery(plusTableqQuery);
