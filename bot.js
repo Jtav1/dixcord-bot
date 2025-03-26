@@ -17,7 +17,7 @@ import {
 import { messagePinner } from "./events/messages/utilities/messagePinner.js";
 import { getAllConfigurations } from "./middleware/configurations.js";
 
-import { plusplus, minusminus } from "./events/messages/utilities/plusplus.js";
+import { doplus, dominus } from "./events/messages/utilities/plusplus.js";
 
 // Create a new client instance
 const client = new Client({
@@ -150,10 +150,10 @@ client.on("messageReactionAdd", async (reaction, user) => {
   }
 
   if (reaction._emoji.id === plusEmoji && (user.id !== message.author.id)) {
-    await plusplus(reaction.message.author.id, "user");
+    await doplus(reaction.message.author.id, "user", user.id);
   }
   if (reaction._emoji.id === minusEmoji && (user.id !== message.author.id)) {
-    await minusminus(reaction.message.author.id, "user");
+    await dominus(reaction.message.author.id, "user", user.id);
   }
 
   let reactStr = "<:" + reaction._emoji.name + ":" + reaction._emoji.id + ">";
@@ -192,10 +192,10 @@ client.on("messageReactionRemove", async (reaction, user) => {
 
   // if the reactions are removed, do the opposite
   if (reaction._emoji.id === plusEmoji && (user.id !== message.author.id)) {
-    await minusminus(reaction.message.author.id, "user");
+    await dominus(reaction.message.author.id, "user", user.id);
   }
   if (reaction._emoji.id === minusEmoji && (user.id !== message.author.id)) {
-    await plusplus(reaction.message.author.id, "user");
+    await doplus(reaction.message.author.id, "user", user.id);
   }
 });
 

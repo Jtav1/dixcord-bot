@@ -2,7 +2,7 @@ import { parseEmoji } from "discord.js";
 
 import { countEmoji } from "../../../middleware/emojis.js";
 import { getAllConfigurations } from "../../../middleware/configurations.js";
-import { plusplus, minusminus } from "./plusplus.js";
+import { doplus, dominus } from "./plusplus.js";
 
 const configs = await getAllConfigurations();
 
@@ -39,9 +39,9 @@ export const emojiDetector = async (rawMessage) => {
 
     mapEmoAry.forEach((emo) => {
       if (emo.id === plusEmoji && doPlusMinus && messageType === "reply") {
-          plusplus(rawMessage.mentions.repliedUser.id, "user"); // plus the user being replied to with this emoji
+          doplus(rawMessage.mentions.repliedUser.id, "user", rawMessage.author.id); // plus the user being replied to with this emoji
       } else if (emo.id === minusEmoji && doPlusMinus && messageType === "reply") {
-          minusminus(rawMessage.mentions.repliedUser.id, "user"); // minus the user being replied to with this emoji
+          dominus(rawMessage.mentions.repliedUser.id, "user", rawMessage.author.id); // minus the user being replied to with this emoji
       } else if (emo) {
         countEmoji(emo.name, emo.id, rawMessage.author.id);
       }
