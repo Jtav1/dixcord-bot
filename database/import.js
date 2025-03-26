@@ -30,8 +30,8 @@ export const importConfigs = async () => {
     ["take_a_look_delay", delay],
     ["take_a_look_repost_limit", 2],
     ["pin_channel_id", pinChannelId],
-    ["plusplus_emoji", "1333222081978040433"],
-    ["minusminus_emoji", "1333221818827411568"],
+    ["plusplus_emoji", "1333222614033760326"],
+    ["minusminus_emoji", "1333222612683194442"],
   ];
 
   const configInsertQry = mysql.format(
