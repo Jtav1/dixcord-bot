@@ -30,6 +30,8 @@ export const importConfigs = async () => {
     ["take_a_look_delay", delay],
     ["take_a_look_repost_limit", 2],
     ["pin_channel_id", pinChannelId],
+    ["plusplus_emoji", "1333222081978040433"],
+    ["minusminus_emoji", "1333221818827411568"],
   ];
 
   const configInsertQry = mysql.format(
@@ -40,6 +42,18 @@ export const importConfigs = async () => {
   await execQuery(configInsertQry);
   console.log("db: configuration import complete");
 };
+
+// Removed
+// Initial population of user_repost_tracking table
+// export const importKeywordTrackingWords = async () => {
+//   const keywordInsertQry = mysql.format(
+//     "INSERT INTO user_keyword_tracking (keyword, timestamp) SELECT ?, null WHERE NOT EXISTS (SELECT 1 FROM user_keyword_tracking WHERE keyword = ?)",
+//     ["penis", "penis"]
+//   );
+
+//   await execQuery(keywordInsertQry);
+//   console.log("user_keyword_tracking population complete");
+// };
 
 //Import all of the "take a look at this" responses
 // export const importTakeALookList = async () => {
@@ -125,6 +139,7 @@ export const importConfigs = async () => {
 
 export const importAll = async () => {
   await importConfigs();
+  //await importKeywordTrackingWords();
   // await importTakeALookList();
   // await importFortunes();
   // await importLogFilterKeywords();

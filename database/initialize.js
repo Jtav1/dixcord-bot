@@ -89,15 +89,46 @@ export const initializeDatabase = async () => {
   );
   await execQuery(userEmojiTableCreateQuery);
 
+  // TODO: Delete user_repost_tracking table before next prod deployment
   const repostTable = "user_repost_tracking"; //Also found in: import.js
   const repostTableCreateQuery = mysql.format(
     "CREATE TABLE IF NOT EXISTS " +
       repostTable +
       " (id int PRIMARY KEY AUTO_INCREMENT," +
       " userid VARCHAR(500) NOT NULL," +
-      " msgid VARCHAR(500) NOT NULL)"
+      " msgid VARCHAR(500) NOT NULL," +
+      " accuser VARCHAR(500) NOT NULL," +
+      " timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+      " CONSTRAINT unique_repost_accusation UNIQUE (userid, msgid, accuser))"
   );
   await execQuery(repostTableCreateQuery);
+
+  // Removed
+  // const keywordUsageTable = "user_keyword_tracking"; //Also found in: import.js
+  // const keywordUsageTableQuery = mysql.format(
+  //   "CREATE TABLE IF NOT EXISTS " +
+  //     keywordUsageTable +
+  //     " (id int PRIMARY KEY AUTO_INCREMENT," +
+  //     " keyword VARCHAR(500) NOT NULL," +
+  //     " userid VARCHAR(500) DEFAULT null," +
+  //     " msgid VARCHAR(500) DEFAULT null," +
+  //     " timestamp DATETIME DEFAULT null, " +
+  //     " CONSTRAINT unique_keyword_tracking UNIQUE (keyword))"
+  // );
+  // await execQuery(keywordUsageTableQuery);
+
+  const plusTable = "plusplus_tracking"; //Also found in: import.js
+  const plusTableqQuery = mysql.format(
+    "CREATE TABLE IF NOT EXISTS " +
+      plusTable +
+      " (id int PRIMARY KEY AUTO_INCREMENT," +
+      " type VARCHAR(10) NOT NULL," +
+      " string VARCHAR(500) DEFAULT null," +
+      " voter VARCHAR(500) DEFAULT null, " +
+      " timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, " +
+      " value VARCHAR(500) DEFAULT null)"
+  );
+  await execQuery(plusTableqQuery);
 
   console.log("db: table initialization complete");
 };

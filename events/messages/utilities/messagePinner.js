@@ -44,7 +44,6 @@ export const messagePinner = async (message, pinReaction, user, client) => {
       })
       .setTitle("📌 Major Pin Alert")
       .setURL(message.url)
-      .setDescription(message.content)
       .addFields(
         {
           name: "Channel",
@@ -56,6 +55,13 @@ export const messagePinner = async (message, pinReaction, user, client) => {
       .setTimestamp()
       .setFooter({ text: "Pinned by dixbot yell at Justin if it broke" });
 
+    // For some reason the error uses >= 1 for null message so doing that instead of > 0
+    (message.content && message.content.length >=1 ? pinEmbed.setDescription(message.content) : null);
+
+    message.attachments.forEach((attachment, key) => {
+      pinEmbed.setImage(attachment.url)
+    });
+    
     //send embed message to the configured channel
     const channel = await client.channels.fetch(pinChannelId);
     await channel.send({ embeds: [pinEmbed] });
