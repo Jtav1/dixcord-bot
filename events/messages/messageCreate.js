@@ -44,7 +44,7 @@ const execute = async (message) => {
     }
 
     // Then, if there's a Take A Look OR fortune teller prompt, handle that
-    if (contentStripped.includes("takealookatthis")) {
+    if (contentStripped.includes("takealookatthis") || contentStripped.includes("takenalookatthis") || contentStripped.includes("tookalookatthis") || contentStripped.includes("takingalookatthis")) {
       response = await takeALook();
 
       //if not, check if there is a fortune teller request to reply to
