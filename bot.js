@@ -143,9 +143,22 @@ client.on("messageReactionAdd", async (reaction, user) => {
   const allReactions = message.reactions.valueOf();
   const pinReact = allReactions.get(pinEmoji);
 
+  const pinreplies = [
+    "lmao saving this shit for later",
+    "PINNED",
+    "!!! MAJOR PIN ALERT !!!",
+    "Dixbot will remember that...",
+    "Lets FUCKING go dude I'm pinning this",
+    "Alright, fine...",
+    "Puttin a pin on this one",
+    "^ pinned this btw",
+  ];
+
   if (pinReact) {
     if (pinReact.count === pinThreshold) {
       await messagePinner(message, pinReact, user, client); // returns success bool
+      const randomReply = pinreplies[Math.floor(Math.random() * pinreplies.length)];
+      message.reply(randomReply); // let the channel know it was pinned by the bot
     }
   }
 
