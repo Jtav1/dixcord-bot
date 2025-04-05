@@ -43,6 +43,20 @@ export const importConfigs = async () => {
   console.log("db: configuration import complete");
 };
 
+export const importUsers = async () => {
+  console.log("tbd");
+  // This function is a placeholder for user import logic. Get list of users and insert. May need to call this from bot.js
+
+  const userAry = [];
+  const configInsertQry = mysql.format(
+    "INSERT INTO user_lookup (userid, username, handle) VALUES ? ON DUPLICATE KEY UPDATE handle = VALUES(handle)",
+    [userAry]
+  );
+
+  await execQuery(configInsertQry);
+  console.log("db: configuration import complete");
+}
+
 // Removed
 // Initial population of user_repost_tracking table
 // export const importKeywordTrackingWords = async () => {
@@ -139,6 +153,7 @@ export const importConfigs = async () => {
 
 export const importAll = async () => {
   await importConfigs();
+  //await importUsers();
   //await importKeywordTrackingWords();
   // await importTakeALookList();
   // await importFortunes();

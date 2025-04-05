@@ -130,5 +130,17 @@ export const initializeDatabase = async () => {
   );
   await execQuery(plusTableqQuery);
 
+  //User Lookup Table
+  const userTblName = "user_lookup"; //Also found in: import.js
+  const userTblCreateQuery = mysql.format(
+    "CREATE TABLE IF NOT EXISTS " +
+    userTblName +
+      " (userid VARCHAR(255) NOT NULL," +
+      " username VARCHAR(255) NOT NULL," +
+      " handle VARCHAR(255) NOT NULL," +
+      " PRIMARY KEY (userid, username))"
+  );
+  await execQuery(userTblCreateQuery);
+
   console.log("db: table initialization complete");
 };
