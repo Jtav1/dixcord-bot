@@ -50,6 +50,9 @@ export const takeALook = async () => {
     limit = 0;
   }
 
+  //New calculation
+  const diceRoll = Math.random();
+
   //if the spam counter hasnt hit the limit
   if (limit < configuredLimit) {
     limit++;
@@ -58,22 +61,21 @@ export const takeALook = async () => {
     //store the time of the last response and count it
     //lastReplyTimestamp = Date.now();
 
-    response = "No spam!"; // https://i.imgur.com/kAClxb0.png = spam picture url lol
+    if (diceRoll <= (rareFrequency/2)) {
+      response = "https://i.imgur.com/kAClxb0.png no spam lool"; // spam picture url lol
+    } else {
+      response = "No spam!"; 
+    }
   }
 
   let imgLink = "";
-
-  //New calculation
-  let diceRoll = Math.random();
-
   if (diceRoll <= rareFrequency) {
-    imgLink = rareArray[(rareArray.length * Math.random()) | 0];
+    imgLink = rareArray[Math.floor(Math.random() * rareArray.length)];
   } else {
-    imgLink = commonArray[(commonArray.length * Math.random()) | 0];
+    imgLink = commonArray[Math.floor(Math.random() * commonArray.length)];
   }
 
   response.length < 1 ? (response = imgLink.link) : null;
-
   incrementTakeALookLink(imgLink);
 
   return response;
