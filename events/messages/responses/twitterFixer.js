@@ -33,6 +33,10 @@ export const twitterFixer = async (messageContents) => {
       } else if (cleanWord.startsWith("https://instagram.com" || "https://www.instagram.com")) {
         reply =
           "fixed link: " +
+          cleanWord.replace("twitter.com", "fixvx.com");
+      } else if (cleanWord.startsWith("https://twitter.com" || "https://www.twitter.com")) {
+        reply =
+          "fixed link: " +
           cleanWord.replace("instagram.com", "ddinstagram.com");
       } else if (cleanWord.startsWith("https://tiktok.com" || "https://www.tiktok.com")) {
         reply =

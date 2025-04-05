@@ -33,7 +33,14 @@ const execute = async (message) => {
 
     // If there's a twitter link to fix, do that
     const twitCheck = message.content.split(" ").filter((word) => {
-      return word.replace(/[<>]/g, "").includes("https://x.com/");
+      const tmpWord = word.replace(/[<>]/g, "");
+      return (
+        tmpWord.includes("https://x.com") || tmpWord.includes("https://www.x.com") ||
+        tmpWord.includes("https://twitter.com") || tmpWord.includes("https://www.twitter.com") ||
+        tmpWord.includes("https://instagram.com") || tmpWord.includes("https://www.instagram.com") ||
+        tmpWord.includes("https://tiktok.com") || tmpWord.includes("https://www.tiktok.com") ||
+        tmpWord.includes("https://bsky.app")
+      )
     });
 
     if (twitCheck.length > 0) {
