@@ -32,6 +32,8 @@ export const importConfigs = async () => {
     ["pin_channel_id", pinChannelId],
     ["plusplus_emoji", "1333222614033760326"],
     ["minusminus_emoji", "1333222612683194442"],
+    ["timeout_emoji", null], //TODO add a curse of ra emoji
+    ["timeout_vote_threshold", 5],
   ];
 
   const configInsertQry = mysql.format(
