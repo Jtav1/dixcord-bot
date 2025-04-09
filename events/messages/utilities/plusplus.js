@@ -10,19 +10,13 @@ filterWordArray = filterWordArray.map((w) => {
 export const doplus = async (string, typestr, voterid) => {
   // reminder typestr will be 'user' or 'word' for now
 
-  console.log(string)
-  console.log(typestr)
-  console.log(voterid)
-
   if(typestr != "user" || (typestr == "user" && string != voterid)) {
     plusplus(string, typestr, voterid).then(() => {
-      console.log("plusplus done");
+      //console.log("plusplus done");
     }).catch((err) => {
       console.log("plusplus error");
       console.log(err);
     });
-  } else {
-    console.log("user tried to plus themselves, type: " + typestr + " string: " + string + " voterid: " + voterid);
   }
 };
 
@@ -31,13 +25,11 @@ export const dominus = async (string, typestr, voterid) => {
 
   if(typestr != "user" || (typestr == "user" && string != voterid)) {
     minusminus(string, typestr, voterid).then(() => {
-      console.log("minusminus done");
+     // console.log("minusminus done");
     }).catch((err) => {
       console.log("minusminus error");
       console.log(err);
     });
-  } else {
-    console.log("user tried to minus themselves, type: " + typestr + " string: " + string + " voterid: " + voterid);
   }
 };
 
