@@ -1,5 +1,5 @@
 import { parseEmoji } from "discord.js";
-import { execQuery } from "../database/queryRunner.js";
+import { execQuery } from "./queryRunner.js";
 
 import mysql from "mysql2";
 

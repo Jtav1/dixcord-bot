@@ -1,4 +1,4 @@
-import { getAllConfigurations } from "../../../middleware/configurations.js";
+import { getAllConfigurations } from "../../../database/configurations.js";
 
 // timeout by democratic vote
 // times out a user if enough people react to it with the provided timeout indicator emoji

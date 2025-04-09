@@ -1,4 +1,4 @@
-import { getAllConfigurations } from "../../../middleware/configurations.js";
+import { getAllConfigurations } from "../../../database/configurations.js";
 
 // twitterFixer(str)
 //  reply with a vx twitter link if a non-vx twitter link is posted

@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from "discord.js";
-import { getTopScores, getBottomScores } from '../../middleware/plusplus.js';
+import { getTopScores, getBottomScores } from '../../database/plusplus.js';
 import { EmbedBuilder } from "discord.js";
 
 const cmdName = "plusplus-leaderboard";

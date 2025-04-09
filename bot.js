@@ -13,9 +13,9 @@ import {
   countRepost,
   countEmoji,
   uncountRepost,
-} from "./middleware/emojis.js";
+} from "./database/emojis.js";
 import { messagePinner } from "./events/messages/utilities/messagePinner.js";
-import { getAllConfigurations } from "./middleware/configurations.js";
+import { getAllConfigurations } from "./database/configurations.js";
 
 import { doplus, dominus } from "./events/messages/utilities/plusplus.js";
 

@@ -1,6 +1,6 @@
 // import something from middleware
-import { plusplus, minusminus } from "../../../middleware/plusplus.js";
-import { getAllLogFilterKeywords } from "../../../middleware/filters.js";
+import { plusplus, minusminus } from "../../../database/plusplus.js";
+import { getAllLogFilterKeywords } from "../../../database/filters.js";
 
 let filterWordArray = await getAllLogFilterKeywords();
 filterWordArray = filterWordArray.map((w) => {

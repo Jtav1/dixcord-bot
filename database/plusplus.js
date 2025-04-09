@@ -1,4 +1,4 @@
-import { execQuery } from "../database/queryRunner.js";
+import { execQuery } from "./queryRunner.js";
 
 import mysql from "mysql2";
 

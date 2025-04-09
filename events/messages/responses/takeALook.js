@@ -1,8 +1,8 @@
 import {
   incrementTakeALookLink,
   getAllTakeALookLinks,
-} from "../../../middleware/responses.js";
-import { getAllConfigurations } from "../../../middleware/configurations.js";
+} from "../../../database/responses.js";
+import { getAllConfigurations } from "../../../database/configurations.js";
 
 const takeAlookArray = await getAllTakeALookLinks();
 const commonArray = takeAlookArray.filter((x) => x.isdefault == 1);
