@@ -7,6 +7,8 @@ import { getAllConfigurations } from "../../../database/configurations.js";
 export const twitterFixer = async (messageContents) => {
   // pull this at response time to get a fresh object
 
+  console.log("in twitterfixer with " + messageContents)
+
   const configurations = await getAllConfigurations();
   const twitterFixEnabled =
     configurations.filter(
@@ -26,19 +28,19 @@ export const twitterFixer = async (messageContents) => {
     msgAry.forEach((word) => {
       let cleanWord = word.replace(/[<>]/g, "");
 
-      if (cleanWord.startsWith("https://x.com" || "https://www.x.com"  )) {
+      if (cleanWord.startsWith("https://x.com") || cleanWord.startsWith("https://www.x.com")) {
         reply =
           "fixed link: " +
           cleanWord.replace("x.com", "fixvx.com");
-      } else if (cleanWord.startsWith("https://instagram.com" || "https://www.instagram.com")) {
-        reply =
-          "fixed link: " +
-          cleanWord.replace("twitter.com", "fixvx.com");
-      } else if (cleanWord.startsWith("https://twitter.com" || "https://www.twitter.com")) {
+      } else if (cleanWord.startsWith("https://instagram.com") || cleanWord.startsWith("https://www.instagram.com")) {
         reply =
           "fixed link: " +
           cleanWord.replace("instagram.com", "ddinstagram.com");
-      } else if (cleanWord.startsWith("https://tiktok.com" || "https://www.tiktok.com")) {
+      } else if (cleanWord.startsWith("https://twitter.com") || cleanWord.startsWith("https://www.twitter.com")) {
+        reply =
+          "fixed link: " +
+          cleanWord.replace("twitter.com", "fixvx.com");
+      } else if (cleanWord.startsWith("https://tiktok.com") || cleanWord.startsWith("https://www.tiktok.com")) {
         reply =
           "fixed link: " +
           cleanWord.replace("tiktok.com", "vxtiktok.com");

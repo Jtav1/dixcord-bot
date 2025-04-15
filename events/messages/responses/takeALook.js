@@ -18,11 +18,13 @@ const repostTrackerTimeframe_ms = parseInt(
     (config_entry) => config_entry.config === "take_a_look_delay"
   )[0].value
 );
-const configuredLimit = parseInt(
-  configs.filter(
-    (config_entry) => config_entry.config === "take_a_look_repost_limit"
-  )[0].value
-);
+// const configuredLimit = parseInt(
+//   configs.filter(
+//     (config_entry) => config_entry.config === "take_a_look_repost_limit"
+//   )[0].value
+// );
+
+const configuredLimit = 1;
 
 // takeALook()
 //	selects an image and sends a reply containing the link
@@ -38,7 +40,6 @@ export const takeALook = async () => {
   );
 
   let nowTime = Date.now();
-  let response = "";
 
   // If there has not been a last reply or it has been long enough since the last reply, reset counter
   if (
@@ -57,26 +58,32 @@ export const takeALook = async () => {
   if (limit < configuredLimit) {
     limit++;
     lastReplyTimestamp = Date.now();
-  } else if (limit >= configuredLimit) {
-    //store the time of the last response and count it
-    //lastReplyTimestamp = Date.now();
 
-    if (diceRoll <= (rareFrequency/2)) {
-      response = "https://i.imgur.com/kAClxb0.png no spam lool"; // spam picture url lol
+    let imgLink = "";
+    if (diceRoll <= rareFrequency) {
+      imgLink = rareArray[Math.floor(Math.random() * rareArray.length)];
     } else {
-      response = "No spam!"; 
+      imgLink = commonArray[Math.floor(Math.random() * commonArray.length)];
     }
-  }
 
-  let imgLink = "";
-  if (diceRoll <= rareFrequency) {
-    imgLink = rareArray[Math.floor(Math.random() * rareArray.length)];
-  } else {
-    imgLink = commonArray[Math.floor(Math.random() * commonArray.length)];
-  }
-
-  response.length < 1 ? (response = imgLink.link) : null;
   incrementTakeALookLink(imgLink);
+  return imgLink.link;
 
-  return response;
+  } else if (limit == configuredLimit) {
+    //store the time of the last response and count it
+    limit++;
+    lastReplyTimestamp = Date.now();
+
+    console.log(diceRoll + " / " + (rareFrequency/2));
+    if (diceRoll <= (rareFrequency/2)) {
+      return "https://i.imgur.com/kAClxb0.png no spam loolll"; // spam picture url lol
+    } else {
+      return "No spam!"; 
+    }
+  } else if ( limit > configuredLimit) {
+    // do nothing lol
+  }
+
+  return "";
+  
 };

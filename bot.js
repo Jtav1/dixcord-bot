@@ -136,6 +136,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
     "Alright, fine...",
     "Puttin a pin on this one",
     "^ pinned this btw",
+    "Um... based? or cringe?",
   ];
 
   if (pinReact) {

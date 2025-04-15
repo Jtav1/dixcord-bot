@@ -37,7 +37,7 @@ const execute = async (message) => {
       return (
         tmpWord.includes("https://x.com") || tmpWord.includes("https://www.x.com") ||
         tmpWord.includes("https://twitter.com") || tmpWord.includes("https://www.twitter.com") ||
-        tmpWord.includes("https://instagram.com") || tmpWord.includes("https://www.instagram.com") ||
+        tmpWord.includes("instagram.com/") || tmpWord.includes("www.instagram.com") ||
         tmpWord.includes("https://tiktok.com") || tmpWord.includes("https://www.tiktok.com") ||
         tmpWord.includes("https://bsky.app")
       )
@@ -51,7 +51,11 @@ const execute = async (message) => {
     }
 
     // Then, if there's a Take A Look OR fortune teller prompt, handle that
-    if (contentStripped.includes("takealookatthis") || contentStripped.includes("takenalookatthis") || contentStripped.includes("tookalookatthis") || contentStripped.includes("takingalookatthis")) {
+    if (contentStripped.includes("takealookatthis") || 
+      contentStripped.includes("takenalookatthis") || 
+      contentStripped.includes("tookalookatthis") || 
+      contentStripped.includes("takingalookatthis") ||
+      contentStripped.includes("takealookatthese")){
       response = await takeALook();
 
       //if not, check if there is a fortune teller request to reply to
