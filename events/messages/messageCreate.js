@@ -12,6 +12,17 @@ import { plusMinusMsg } from "./utilities/plusplus.js";
 
 const name = "messageCreate";
 
+const TALTriggerWords = [
+  "takealookatthis",
+  "takenalookatthis",
+  "tookalookatthis",
+  "takingalookatthis",
+  "takealookatthese",
+  "takealookatdeez",
+  "takealookatdis",
+  "captaintake",
+];
+
 const execute = async (message) => {
   //******* INCOMING MESSAGE PROCESSING *******//
 
@@ -50,12 +61,8 @@ const execute = async (message) => {
       }
     }
 
-    // Then, if there's a Take A Look OR fortune teller prompt, handle that
-    if (contentStripped.includes("takealookatthis") || 
-      contentStripped.includes("takenalookatthis") || 
-      contentStripped.includes("tookalookatthis") || 
-      contentStripped.includes("takingalookatthis") ||
-      contentStripped.includes("takealookatthese")){
+    // Then, if there's a Take A Look prompt handle that
+    if (TALTriggerWords.some(word => contentStripped.includes(word))) {
       response = await takeALook();
 
       //if not, check if there is a fortune teller request to reply to

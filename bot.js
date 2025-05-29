@@ -116,6 +116,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });
 
+// TODO 1.7.5 REFACTOR THIS
 // https://stackoverflow.com/questions/66793543/reaction-event-discord-js
 client.on("messageReactionAdd", async (reaction, user) => {
 
@@ -136,7 +137,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
     "Alright, fine...",
     "Puttin a pin on this one",
     "^ pinned this btw",
-    "Um... based? or cringe?",
+    "Um... based? or cringe.",
   ];
 
   if (pinReact) {
@@ -153,9 +154,9 @@ client.on("messageReactionAdd", async (reaction, user) => {
   if (timeoutEmoji) {
     if (timeoutEmoji.count === timeoutThreshold) {
       if(await timeoutUser()){ //TODO this function
-        message.reply(timeoutUserResponse); // let the channel know this user was timed out
+        //message.reply(timeoutUserResponse); // let the channel know this user was timed out
       } else {
-        console.log("Failed to timeout user, message may have been already pinned or timeoutUser failed.");
+        //console.log("Failed to timeout user, message may have been already pinned or timeoutUser failed.");
       };
     }
   }
