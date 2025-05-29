@@ -5,7 +5,7 @@ COPY ./commands ./commands
 COPY ./database ./database
 COPY ./events ./events
 COPY ./logging ./logging
-COPY ./middleware ./middleware
+COPY ./database ./database
 COPY ./package*.json ./
 COPY ./delete-all-commands.js ./
 COPY ./deploy-commands.js ./
