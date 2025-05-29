@@ -21,6 +21,8 @@ const TALTriggerWords = [
   "takealookatdeez",
   "takealookatdis",
   "captaintake",
+  "tookalookatthat",
+  "takenalookatthese",
 ];
 
 const execute = async (message) => {
