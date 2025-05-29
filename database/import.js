@@ -30,8 +30,10 @@ export const importConfigs = async () => {
     ["take_a_look_delay", delay],
     ["take_a_look_repost_limit", 2],
     ["pin_channel_id", pinChannelId],
-    ["plusplus_emoji", "1333222081978040433"],
-    ["minusminus_emoji", "1333221818827411568"],
+    ["plusplus_emoji", "1333222614033760326"],
+    ["minusminus_emoji", "1333222612683194442"],
+    ["timeout_emoji", null], //TODO add a curse of ra emoji
+    ["timeout_vote_threshold", 5],
   ];
 
   const configInsertQry = mysql.format(
@@ -42,6 +44,20 @@ export const importConfigs = async () => {
   await execQuery(configInsertQry);
   console.log("db: configuration import complete");
 };
+
+export const importUsers = async () => {
+  console.log("tbd");
+  // This function is a placeholder for user import logic. Get list of users and insert. May need to call this from bot.js
+
+  const userAry = [];
+  const configInsertQry = mysql.format(
+    "INSERT INTO user_lookup (userid, username, handle) VALUES ? ON DUPLICATE KEY UPDATE handle = VALUES(handle)",
+    [userAry]
+  );
+
+  await execQuery(configInsertQry);
+  console.log("db: configuration import complete");
+}
 
 // Removed
 // Initial population of user_repost_tracking table
@@ -139,6 +155,7 @@ export const importConfigs = async () => {
 
 export const importAll = async () => {
   await importConfigs();
+  //await importUsers();
   //await importKeywordTrackingWords();
   // await importTakeALookList();
   // await importFortunes();

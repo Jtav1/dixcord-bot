@@ -1,7 +1,7 @@
 import { parseEmoji } from "discord.js";
 
-import { countEmoji } from "../../../middleware/emojis.js";
-import { getAllConfigurations } from "../../../middleware/configurations.js";
+import { countEmoji } from "../../../database/emojis.js";
+import { getAllConfigurations } from "../../../database/configurations.js";
 import { doplus, dominus } from "./plusplus.js";
 
 const configs = await getAllConfigurations();

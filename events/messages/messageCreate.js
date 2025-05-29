@@ -12,6 +12,17 @@ import { plusMinusMsg } from "./utilities/plusplus.js";
 
 const name = "messageCreate";
 
+const TALTriggerWords = [
+  "takealookatthis",
+  "takenalookatthis",
+  "tookalookatthis",
+  "takingalookatthis",
+  "takealookatthese",
+  "takealookatdeez",
+  "takealookatdis",
+  "captaintake",
+];
+
 const execute = async (message) => {
   //******* INCOMING MESSAGE PROCESSING *******//
 
@@ -33,7 +44,14 @@ const execute = async (message) => {
 
     // If there's a twitter link to fix, do that
     const twitCheck = message.content.split(" ").filter((word) => {
-      return word.replace(/[<>]/g, "").includes("https://x.com/");
+      const tmpWord = word.replace(/[<>]/g, "");
+      return (
+        tmpWord.includes("https://x.com") || tmpWord.includes("https://www.x.com") ||
+        tmpWord.includes("https://twitter.com") || tmpWord.includes("https://www.twitter.com") ||
+        tmpWord.includes("instagram.com/") || tmpWord.includes("www.instagram.com") ||
+        tmpWord.includes("https://tiktok.com") || tmpWord.includes("https://www.tiktok.com") ||
+        tmpWord.includes("https://bsky.app")
+      )
     });
 
     if (twitCheck.length > 0) {
@@ -43,8 +61,8 @@ const execute = async (message) => {
       }
     }
 
-    // Then, if there's a Take A Look OR fortune teller prompt, handle that
-    if (contentStripped.includes("takealookatthis")) {
+    // Then, if there's a Take A Look prompt handle that
+    if (TALTriggerWords.some(word => contentStripped.includes(word))) {
       response = await takeALook();
 
       //if not, check if there is a fortune teller request to reply to

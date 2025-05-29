@@ -1,8 +1,8 @@
 import { EmbedBuilder } from "discord.js";
 
 import { SlashCommandBuilder } from "discord.js";
-import { getTopReposters } from "../../middleware/emojis.js";
-import { getAllConfigurations } from "../../middleware/configurations.js";
+import { getTopReposters } from "../../database/emojis.js";
+import { getAllConfigurations } from "../../database/configurations.js";
 
 const cmdName = "top-reposters";
 

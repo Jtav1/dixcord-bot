@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
-import { timeoutUser } from '../../events/messages/utilities/timeout.js';
+import { timeoutUser } from './events/messages/utilities/timeout.js';
 
 const cmdName = 'curseofra';
 

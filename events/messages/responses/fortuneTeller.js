@@ -1,7 +1,7 @@
 import {
   getAllFortunes,
   incrementFortune,
-} from "../../../middleware/responses.js";
+} from "../../../database/responses.js";
 
 const allFortunes = await getAllFortunes();
 // https://naturalnode.github.io/natural/sentiment_analysis.html

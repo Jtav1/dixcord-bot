@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { getTotalScoreByString, getVotesById } from '../../middleware/plusplus.js';
+import { getTotalScoreByString, getVotesById } from '../../database/plusplus.js';
 
 const cmdName = 'plusplus-voter-frequency';
 

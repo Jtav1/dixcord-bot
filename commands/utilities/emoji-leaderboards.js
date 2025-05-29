@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from "discord.js";
-import { getTopEmoji } from "../../middleware/emojis.js";
+import { getTopEmoji } from "../../database/emojis.js";
 
 import { EmbedBuilder } from "discord.js";
 

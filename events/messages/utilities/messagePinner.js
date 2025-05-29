@@ -3,7 +3,7 @@ import {
   logPinnedMessage,
   isMessageAlreadyPinned,
 } from "../../../logging/dataLog.js";
-import { getAllConfigurations } from "../../../middleware/configurations.js";
+import { getAllConfigurations } from "../../../database/configurations.js";
 import { isDev } from "../../../configVars.js";
 
 const configs = await getAllConfigurations();
