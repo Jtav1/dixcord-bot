@@ -138,13 +138,17 @@ client.on("messageReactionAdd", async (reaction, user) => {
     "Puttin a pin on this one",
     "^ pinned this btw",
     "Um... based? or cringe.",
+    "I'm only going to pin it once this time",
   ];
+
 
   if (pinReact) {
     if (pinReact.count === pinThreshold) {
-      await messagePinner(message, pinReact, user, client); // returns success bool
+      let res = await messagePinner(message, pinReact, user, client); // returns success bool
       const randomReply = pinreplies[Math.floor(Math.random() * pinreplies.length)];
-      message.reply(randomReply); // let the channel know it was pinned by the bot
+      if(res){
+        message.reply(randomReply); // let the channel know it was pinned by the bot
+      }
     }
   }
 
