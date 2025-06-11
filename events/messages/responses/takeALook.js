@@ -18,13 +18,13 @@ const repostTrackerTimeframe_ms = parseInt(
     (config_entry) => config_entry.config === "take_a_look_delay"
   )[0].value
 );
-// const configuredLimit = parseInt(
-//   configs.filter(
-//     (config_entry) => config_entry.config === "take_a_look_repost_limit"
-//   )[0].value
-// );
+const configuredLimit = parseInt(
+  configs.filter(
+    (config_entry) => config_entry.config === "take_a_look_repost_limit"
+  )[0].value
+);
 
-const configuredLimit = 1;
+// const configuredLimit = 1;
 
 // takeALook()
 //	selects an image and sends a reply containing the link
