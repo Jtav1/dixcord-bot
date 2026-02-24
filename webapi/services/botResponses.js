@@ -3,7 +3,7 @@
  * Compatible with dixcord-bot tables: configurations, take_a_look_responses, eight_ball_responses.
  */
 
-import db from '../config/db.js';
+import db from "../config/db.js";
 
 // In-memory rate limit for take-a-look (per process; matches bot behavior)
 let takeALookLimit = 0;
@@ -13,7 +13,7 @@ let takeALookLastTimestamp = null;
  * Get all configuration rows. Returns [{ config, value }, ...].
  */
 export async function getAllConfigurations() {
-  const [rows] = await db.query('SELECT config, value FROM configurations');
+  const [rows] = await db.query("SELECT config, value FROM configurations");
   return rows || [];
 }
 
@@ -28,13 +28,18 @@ export function getConfigValue(configs, key) {
 // --- Take a look at this ---
 
 export async function getAllTakeALookLinks() {
-  const [rows] = await db.query('SELECT id, link, isdefault, frequency FROM take_a_look_responses');
+  const [rows] = await db.query(
+    "SELECT id, link, isdefault, frequency FROM take_a_look_responses",
+  );
   return rows || [];
 }
 
 export async function incrementTakeALookLink(linkRow) {
   if (!linkRow || linkRow.id == null) return;
-  await db.query('UPDATE take_a_look_responses SET frequency = frequency + 1 WHERE id = ?', [linkRow.id]);
+  await db.query(
+    "UPDATE take_a_look_responses SET frequency = frequency + 1 WHERE id = ?",
+    [linkRow.id],
+  );
 }
 
 /**
@@ -43,18 +48,31 @@ export async function incrementTakeALookLink(linkRow) {
  */
 export async function takeALook() {
   const configs = await getAllConfigurations();
-  const delayMs = parseInt(getConfigValue(configs, 'take_a_look_delay') || '60000', 10);
-  const configuredLimit = parseInt(getConfigValue(configs, 'take_a_look_repost_limit') || '3', 10);
-  const rareFrequency = parseFloat(getConfigValue(configs, 'rare_frequency') || '0.1');
+  const delayMs = parseInt(
+    getConfigValue(configs, "take_a_look_delay") || "60000",
+    10,
+  );
+  const configuredLimit = parseInt(
+    getConfigValue(configs, "take_a_look_repost_limit") || "3",
+    10,
+  );
+  const rareFrequency = parseFloat(
+    getConfigValue(configs, "rare_frequency") || "0.1",
+  );
 
   const links = await getAllTakeALookLinks();
-  const commonArray = links.filter((x) => x.isdefault === 1 || x.isdefault === '1');
-  const rareArray = links.filter((x) => x.isdefault === 0 || x.isdefault === '0');
+  const commonArray = links.filter(
+    (x) => x.isdefault === 1 || x.isdefault === "1",
+  );
+  const rareArray = links.filter(
+    (x) => x.isdefault === 0 || x.isdefault === "0",
+  );
 
   const now = Date.now();
   if (
     takeALookLastTimestamp == null ||
-    (takeALookLastTimestamp && Math.floor(now - takeALookLastTimestamp) >= delayMs)
+    (takeALookLastTimestamp &&
+      Math.floor(now - takeALookLastTimestamp) >= delayMs)
   ) {
     takeALookLimit = 0;
     takeALookLastTimestamp = null;
@@ -67,40 +85,43 @@ export async function takeALook() {
     takeALookLastTimestamp = Date.now();
     const pool = diceRoll <= rareFrequency ? rareArray : commonArray;
     if (pool.length === 0) {
-      return { response: '' };
+      return { response: "" };
     }
     const imgLink = pool[Math.floor(Math.random() * pool.length)];
     await incrementTakeALookLink(imgLink);
-    return { response: imgLink.link || '' };
+    return { response: imgLink.link || "" };
   }
 
   if (takeALookLimit === configuredLimit) {
     takeALookLimit += 1;
     takeALookLastTimestamp = Date.now();
     if (diceRoll <= rareFrequency / 2) {
-      return { response: 'https://i.imgur.com/kAClxb0.png no spam loolll' };
+      return { response: "https://i.imgur.com/kAClxb0.png no spam loolll" };
     }
-    return { response: 'No spam!' };
+    return { response: "No spam!" };
   }
 
-  return { response: '' };
+  return { response: "" };
 }
 
 // --- Fortune teller (8-ball) ---
 
 /** Bot DB may have typo column resoponse_string; we accept both. */
 function fortuneResponseString(row) {
-  return row.response_string ?? row.resoponse_string ?? '';
+  return row.response_string ?? row.resoponse_string ?? "";
 }
 
 export async function getAllFortunes() {
-  const [rows] = await db.query('SELECT * FROM eight_ball_responses');
+  const [rows] = await db.query("SELECT * FROM eight_ball_responses");
   return rows || [];
 }
 
 export async function incrementFortune(fortuneRow) {
   if (!fortuneRow || fortuneRow.id == null) return;
-  await db.query('UPDATE eight_ball_responses SET frequency = frequency + 1 WHERE id = ?', [fortuneRow.id]);
+  await db.query(
+    "UPDATE eight_ball_responses SET frequency = frequency + 1 WHERE id = ?",
+    [fortuneRow.id],
+  );
 }
 
 /**
@@ -109,7 +130,7 @@ export async function incrementFortune(fortuneRow) {
 export async function fortuneTeller() {
   const allFortunes = await getAllFortunes();
   if (allFortunes.length === 0) {
-    return { response: 'No fortunes configured.' };
+    return { response: "No fortunes configured." };
   }
   const fortune = allFortunes[Math.floor(Math.random() * allFortunes.length)];
   await incrementFortune(fortune);
@@ -123,30 +144,32 @@ export async function fortuneTeller() {
  */
 export async function twitterFixer(messageContents) {
   const configs = await getAllConfigurations();
-  const twitterFixEnabled = getConfigValue(configs, 'twitter_fix_enabled') === 'true';
+  const twitterFixEnabled =
+    getConfigValue(configs, "twitter_fix_enabled") === "true";
 
-  let reply = '';
+  let reply = "";
 
   if (
     twitterFixEnabled &&
     messageContents &&
-    (messageContents.includes(' dd') ||
-      messageContents.includes(' dixbot') ||
-      messageContents.includes(' fix'))
+    (messageContents.includes(" dd") ||
+      messageContents.includes(" dixbot") ||
+      messageContents.includes(" fix"))
   ) {
-    const words = messageContents.split(' ');
+    const words = messageContents.split(" ");
     for (const word of words) {
-      const clean = word.replace(/[<>]/g, '');
-      if (clean.startsWith('https://x.com') || clean.startsWith('https://www.x.com')) {
-        reply = 'fixed link: ' + clean.replace('x.com', 'fixvx.com');
-      } else if (clean.startsWith('https://instagram.com') || clean.startsWith('https://www.instagram.com')) {
-        reply = 'fixed link: ' + clean.replace('instagram.com', 'ddinstagram.com');
-      } else if (clean.startsWith('https://twitter.com') || clean.startsWith('https://www.twitter.com')) {
-        reply = 'fixed link: ' + clean.replace('twitter.com', 'fixvx.com');
-      } else if (clean.startsWith('https://tiktok.com') || clean.startsWith('https://www.tiktok.com')) {
-        reply = 'fixed link: ' + clean.replace('tiktok.com', 'vxtiktok.com');
-      } else if (clean.startsWith('https://bsky.app')) {
-        reply = 'fixed link: ' + clean.replace('bsky.app', 'bskx.app');
+      const clean = word.replace(/[<>]/g, "").replace(/www\./g, "");
+      if (clean.startsWith("https://x.com")) {
+        reply = "fixed link: " + clean.replace("x.com", "fixvx.com");
+      } else if (clean.startsWith("https://instagram.com")) {
+        reply =
+          "fixed link: " + clean.replace("instagram.com", "jgram.jtav.me");
+      } else if (clean.startsWith("https://twitter.com")) {
+        reply = "fixed link: " + clean.replace("twitter.com", "fixvx.com");
+      } else if (clean.startsWith("https://tiktok.com")) {
+        reply = "fixed link: " + clean.replace("tiktok.com", "vxtiktok.com");
+      } else if (clean.startsWith("https://bsky.app")) {
+        reply = "fixed link: " + clean.replace("bsky.app", "bskx.app");
       }
     }
   }

@@ -139,27 +139,30 @@ const initializeDatabase = () => {
 };
 
 // --- Import (seed default configs) ---
+const envOrDefault = (envKey, defaultVal) =>
+  envKey in process.env ? process.env[envKey] : defaultVal;
+
 const importConfigs = () => {
   const isDev = process.env.NODE_ENV !== 'production';
-  const delay = Math.floor(Math.random() * 60000 + 60000);
-  const pinThreshold = isDev ? 1 : 3;
-  const pinChannelId = isDev ? '710671234471559228' : '915462110761349201';
-  const announceChannelId = isDev ? '710671234471559228' : '911427650730487878';
+  const defaultDelay = Math.floor(Math.random() * 60000 + 60000);
+  const defaultPinThreshold = isDev ? 1 : 3;
+  const defaultPinChannelId = isDev ? '710671234471559228' : '915462110761349201';
+  const defaultAnnounceChannelId = isDev ? '710671234471559228' : '911427650730487878';
 
   const configArray = [
-    ['rare_frequency', '0.1'],
-    ['twitter_fix_enabled', 'true'],
-    ['pin_threshold', String(pinThreshold)],
-    ['pin_emoji', '\ud83d\udccc'],
-    ['repost_emoji', '1072368151922233404'],
-    ['announce_channel_id', announceChannelId],
-    ['take_a_look_delay', String(delay)],
-    ['take_a_look_repost_limit', '2'],
-    ['pin_channel_id', pinChannelId],
-    ['plusplus_emoji', '1333222614033760326'],
-    ['minusminus_emoji', '1333222612683194442'],
-    ['timeout_emoji', null],
-    ['timeout_vote_threshold', '5'],
+    ['rare_frequency', envOrDefault('RARE_FREQUENCY', '0.1')],
+    ['twitter_fix_enabled', envOrDefault('TWITTER_FIX_ENABLED', 'true')],
+    ['pin_threshold', envOrDefault('PIN_THRESHOLD', String(defaultPinThreshold))],
+    ['pin_emoji', envOrDefault('PIN_EMOJI', '\ud83d\udccc')],
+    ['repost_emoji', envOrDefault('REPOST_EMOJI', '1072368151922233404')],
+    ['announce_channel_id', envOrDefault('ANNOUNCE_CHANNEL_ID', defaultAnnounceChannelId)],
+    ['take_a_look_delay', envOrDefault('TAKE_A_LOOK_DELAY', String(defaultDelay))],
+    ['take_a_look_repost_limit', envOrDefault('TAKE_A_LOOK_REPOST_LIMIT', '2')],
+    ['pin_channel_id', envOrDefault('PIN_CHANNEL_ID', defaultPinChannelId)],
+    ['plusplus_emoji', envOrDefault('PLUSPLUS_EMOJI', '1333222614033760326')],
+    ['minusminus_emoji', envOrDefault('MINUSMINUS_EMOJI', '1333222612683194442')],
+    ['timeout_emoji', envOrDefault('TIMEOUT_EMOJI', null)],
+    ['timeout_vote_threshold', envOrDefault('TIMEOUT_VOTE_THRESHOLD', '5')],
   ];
 
   const insert = db.prepare(
