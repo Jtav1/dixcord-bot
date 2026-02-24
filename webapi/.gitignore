@@ -1,0 +1,10 @@
+node_modules/
+*.log
+.DS_Store
+data/
+*.sqlite\
+
+# dotenv environment variables file
+.env
+.env.test
+.env.prod
