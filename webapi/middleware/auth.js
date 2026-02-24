@@ -4,9 +4,13 @@ import db from '../config/db.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 
 /**
- * Verify JWT and attach user to req.user. Use on protected routes.
+ * Verify JWT and attach user to req.user. Only the admin user (ADMIN_USERNAME) may access.
  */
 export async function authenticate(req, res, next) {
+  const adminUsername = process.env.ADMIN_USERNAME;
+  if (!adminUsername) {
+    return res.status(503).json({ error: 'Admin not configured (set ADMIN_USERNAME and ADMIN_PASSWORD)' });
+  }
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Missing or invalid Authorization header' });
@@ -18,7 +22,11 @@ export async function authenticate(req, res, next) {
     if (!rows || rows.length === 0) {
       return res.status(401).json({ error: 'User not found' });
     }
-    req.user = rows[0];
+    const user = rows[0];
+    if (user.email !== adminUsername) {
+      return res.status(403).json({ error: 'Forbidden: only the configured admin user may access this API' });
+    }
+    req.user = user;
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {

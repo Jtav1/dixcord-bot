@@ -1,7 +1,7 @@
 {
-  "name": "js-express-api-template",
+  "name": "dixcord-bot-webapi",
   "version": "1.0.0",
-  "description": "Express.js REST API with MySQL and JWT authentication",
+  "description": "Express.js REST API for the dixcord-bot",
   "type": "module",
   "main": "index.js",
   "scripts": {

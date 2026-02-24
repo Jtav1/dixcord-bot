@@ -53,3 +53,24 @@ CREATE TRIGGER IF NOT EXISTS tasks_updated_at
 -- Indexes for common lookups
 CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
+
+-- Bot response tables (shared with dixcord-bot when using same DB)
+CREATE TABLE IF NOT EXISTS configurations (
+  config TEXT PRIMARY KEY,
+  value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS take_a_look_responses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  link TEXT UNIQUE,
+  isdefault INTEGER DEFAULT 0,
+  frequency INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS eight_ball_responses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  response_string TEXT NOT NULL,
+  sentiment TEXT NOT NULL CHECK (sentiment IN ('positive', 'negative', 'neutral')),
+  frequency INTEGER DEFAULT 0,
+  UNIQUE (response_string, sentiment)
+);

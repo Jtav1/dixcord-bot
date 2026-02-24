@@ -5,37 +5,21 @@ import { signToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// POST /api/auth/register
-router.post('/register', async (req, res) => {
-  try {
-    const { email, password, name } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
-    }
-    const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
-    if (existing.length > 0) {
-      return res.status(409).json({ error: 'Email already registered' });
-    }
-    const password_hash = await bcrypt.hash(password, 10);
-    const [result] = await db.query(
-      'INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)',
-      [email, password_hash, name || null]
-    );
-    const token = signToken(result.insertId);
-    const [rows] = await db.query('SELECT id, email, name, created_at FROM users WHERE id = ?', [result.insertId]);
-    res.status(201).json({ user: rows[0], token });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Registration failed' });
-  }
+// Registration disabled: only the admin user (from ADMIN_USERNAME / ADMIN_PASSWORD) can use the API
+router.post('/register', (req, res) => {
+  res.status(403).json({ error: 'Registration is disabled. Use runtime environment variables to create admin user.' });
 });
 
-// POST /api/auth/login
+// POST /api/auth/login — only the configured admin (ADMIN_USERNAME) may log in
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
+    }
+    const adminUsername = process.env.ADMIN_USERNAME;
+    if (adminUsername && email !== adminUsername) {
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
     const [rows] = await db.query('SELECT id, email, name, password_hash, created_at FROM users WHERE email = ?', [email]);
     if (rows.length === 0) {

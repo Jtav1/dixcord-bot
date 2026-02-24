@@ -37,3 +37,24 @@ CREATE TABLE IF NOT EXISTS tasks (
 -- Indexes for common lookups
 CREATE INDEX idx_posts_user_id ON posts(user_id);
 CREATE INDEX idx_tasks_user_id ON tasks(user_id);
+
+-- Bot response tables (shared with dixcord-bot when using same DB)
+CREATE TABLE IF NOT EXISTS configurations (
+  config VARCHAR(255) PRIMARY KEY,
+  value VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS take_a_look_responses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  link VARCHAR(255) UNIQUE,
+  isdefault SMALLINT DEFAULT 0,
+  frequency INT DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS eight_ball_responses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  response_string VARCHAR(500) NOT NULL,
+  sentiment ENUM('positive', 'negative', 'neutral') NOT NULL,
+  frequency INT DEFAULT 0,
+  UNIQUE KEY unique_response (response_string, sentiment)
+);
