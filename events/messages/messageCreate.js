@@ -1,5 +1,4 @@
 import { clientId } from "../../configVars.js";
-import { cleanLog } from "../../logging/dataLog.js";
 
 //******* RESPONSE FUNCTIONS *******//
 import { twitterFixer } from "./responses/twitterFixer.js";
@@ -48,12 +47,16 @@ const execute = async (message) => {
     const twitCheck = message.content.split(" ").filter((word) => {
       const tmpWord = word.replace(/[<>]/g, "");
       return (
-        tmpWord.includes("https://x.com") || tmpWord.includes("https://www.x.com") ||
-        tmpWord.includes("https://twitter.com") || tmpWord.includes("https://www.twitter.com") ||
-        tmpWord.includes("instagram.com/") || tmpWord.includes("www.instagram.com") ||
-        tmpWord.includes("https://tiktok.com") || tmpWord.includes("https://www.tiktok.com") ||
+        tmpWord.includes("https://x.com") ||
+        tmpWord.includes("https://www.x.com") ||
+        tmpWord.includes("https://twitter.com") ||
+        tmpWord.includes("https://www.twitter.com") ||
+        tmpWord.includes("instagram.com/") ||
+        tmpWord.includes("www.instagram.com") ||
+        tmpWord.includes("https://tiktok.com") ||
+        tmpWord.includes("https://www.tiktok.com") ||
         tmpWord.includes("https://bsky.app")
-      )
+      );
     });
 
     if (twitCheck.length > 0) {
@@ -64,7 +67,7 @@ const execute = async (message) => {
     }
 
     // Then, if there's a Take A Look prompt handle that
-    if (TALTriggerWords.some(word => contentStripped.includes(word))) {
+    if (TALTriggerWords.some((word) => contentStripped.includes(word))) {
       response = await takeALook();
 
       //if not, check if there is a fortune teller request to reply to
@@ -79,11 +82,6 @@ const execute = async (message) => {
     if (response.length > 0) {
       message.reply(response);
     }
-
-    // If it wasnt a dixbot keyword, log the message for later bot training purposes
-    // dataLog cleanLog pulls out all mentions of userID and a preset list of names
-
-    await cleanLog(message);
   }
 };
 
