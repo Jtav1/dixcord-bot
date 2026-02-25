@@ -16,43 +16,6 @@ CREATE TRIGGER IF NOT EXISTS users_updated_at
     UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id;
   END;
 
--- Posts (first example resource)
-CREATE TABLE IF NOT EXISTS posts (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  body TEXT,
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now')),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE TRIGGER IF NOT EXISTS posts_updated_at
-  AFTER UPDATE ON posts WHEN OLD.updated_at = NEW.updated_at
-  BEGIN
-    UPDATE posts SET updated_at = datetime('now') WHERE id = NEW.id;
-  END;
-
--- Tasks (second example resource)
-CREATE TABLE IF NOT EXISTS tasks (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  user_id INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  completed INTEGER DEFAULT 0,
-  created_at TEXT DEFAULT (datetime('now')),
-  updated_at TEXT DEFAULT (datetime('now')),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE TRIGGER IF NOT EXISTS tasks_updated_at
-  AFTER UPDATE ON tasks WHEN OLD.updated_at = NEW.updated_at
-  BEGIN
-    UPDATE tasks SET updated_at = datetime('now') WHERE id = NEW.id;
-  END;
-
--- Indexes for common lookups
-CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
 CREATE TABLE IF NOT EXISTS configurations (
@@ -73,4 +36,29 @@ CREATE TABLE IF NOT EXISTS eight_ball_responses (
   sentiment TEXT NOT NULL CHECK (sentiment IN ('positive', 'negative', 'neutral')),
   frequency INTEGER DEFAULT 0,
   UNIQUE (response_string, sentiment)
+);
+
+CREATE TABLE IF NOT EXISTS plusplus_tracking (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  type TEXT NOT NULL,
+  string TEXT,
+  voter TEXT,
+  timestamp TEXT DEFAULT (datetime('now')),
+  value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS emoji_frequency (
+  emoid TEXT PRIMARY KEY,
+  emoji TEXT NOT NULL,
+  frequency INTEGER NOT NULL DEFAULT 0,
+  animated INTEGER DEFAULT 0,
+  type TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_emoji_tracking (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userid TEXT NOT NULL,
+  emoid TEXT NOT NULL,
+  frequency INTEGER DEFAULT 1,
+  UNIQUE (userid, emoid)
 );

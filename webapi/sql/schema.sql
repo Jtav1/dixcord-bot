@@ -12,32 +12,6 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Posts (first example resource)
-CREATE TABLE IF NOT EXISTS posts (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
-  title VARCHAR(500) NOT NULL,
-  body TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
--- Tasks (second example resource)
-CREATE TABLE IF NOT EXISTS tasks (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL,
-  title VARCHAR(500) NOT NULL,
-  completed TINYINT(1) DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
--- Indexes for common lookups
-CREATE INDEX idx_posts_user_id ON posts(user_id);
-CREATE INDEX idx_tasks_user_id ON tasks(user_id);
-
 -- Bot response tables (shared with dixcord-bot when using same DB)
 CREATE TABLE IF NOT EXISTS configurations (
   config VARCHAR(255) PRIMARY KEY,
@@ -57,4 +31,29 @@ CREATE TABLE IF NOT EXISTS eight_ball_responses (
   sentiment ENUM('positive', 'negative', 'neutral') NOT NULL,
   frequency INT DEFAULT 0,
   UNIQUE KEY unique_response (response_string, sentiment)
+);
+
+CREATE TABLE IF NOT EXISTS plusplus_tracking (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  type VARCHAR(10) NOT NULL,
+  string VARCHAR(500) DEFAULT NULL,
+  voter VARCHAR(500) DEFAULT NULL,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+  value VARCHAR(500) DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS emoji_frequency (
+  emoid VARCHAR(255) PRIMARY KEY,
+  emoji VARCHAR(255) NOT NULL,
+  frequency INT NOT NULL DEFAULT 0,
+  animated TINYINT(1) DEFAULT 0,
+  type VARCHAR(50) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_emoji_tracking (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  userid VARCHAR(500) NOT NULL,
+  emoid VARCHAR(255) NOT NULL,
+  frequency INT DEFAULT 1,
+  UNIQUE KEY unique_user_emoji (userid, emoid)
 );
