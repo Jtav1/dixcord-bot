@@ -111,9 +111,18 @@ const initializeDatabase = () => {
       msgid TEXT NOT NULL,
       accuser TEXT NOT NULL,
       timestamp TEXT DEFAULT (datetime('now')),
+      msgcontents TEXT,
       UNIQUE (userid, msgid, accuser)
     )
   `);
+
+  // Migration: add msgcontents if table existed before this column was added
+  try {
+    const info = db.prepare("PRAGMA table_info(user_repost_tracking)").all();
+    if (info && !info.some((c) => c.name === "msgcontents")) {
+      db.exec("ALTER TABLE user_repost_tracking ADD COLUMN msgcontents TEXT");
+    }
+  } catch (_) {}
 
   exec(`
     CREATE TABLE IF NOT EXISTS plusplus_tracking (

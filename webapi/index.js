@@ -60,7 +60,7 @@ app.get("/", (req, res) => {
       botResponses:
         "/api/bot-responses/take-a-look, /api/bot-responses/fortune, /api/bot-responses/link-fixer (POST, auth required)",
       messageProcessing:
-        "/api/message-processing/emoji-count, /api/message-processing/plusminus (POST, auth required)",
+        "/api/message-processing/emoji-count, /api/message-processing/plusminus, /api/message-processing/count-repost (POST, auth required)",
     },
     auth: "Use header: Authorization: Bearer <token>",
   });

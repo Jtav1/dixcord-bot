@@ -107,9 +107,20 @@ export const initializeDatabase = async () => {
       msgid VARCHAR(500) NOT NULL,
       accuser VARCHAR(500) NOT NULL,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+      msgcontents TEXT,
       CONSTRAINT unique_repost_accusation UNIQUE (userid, msgid, accuser)
     )
   `);
+
+  // Migration: add msgcontents if table existed before this column was added
+  try {
+    const [cols] = await pool.query(
+      "SELECT COUNT(*) as c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_repost_tracking' AND COLUMN_NAME = 'msgcontents'"
+    );
+    if (cols && cols[0]?.c === 0) {
+      await execQuery("ALTER TABLE user_repost_tracking ADD COLUMN msgcontents TEXT");
+    }
+  } catch (_) {}
 
   // PlusPlus tracking table
   await execQuery(`
