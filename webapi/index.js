@@ -6,6 +6,7 @@ import db from "./config/db.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import botResponsesRoutes from "./routes/bot-responses.js";
+import messageProcessingRoutes from "./routes/message-processing.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -57,7 +58,9 @@ app.get("/", (req, res) => {
       auth: "/api/auth/login (register disabled; admin only)",
       users: "/api/users/me (GET, PUT, DELETE)",
       botResponses:
-        "/api/bot-responses/take-a-look, /api/bot-responses/fortune, /api/bot-responses/link-fix (POST, auth required)",
+        "/api/bot-responses/take-a-look, /api/bot-responses/fortune, /api/bot-responses/link-fixer (POST, auth required)",
+      messageProcessing:
+        "/api/message-processing/emoji-count, /api/message-processing/plusminus (POST, auth required)",
     },
     auth: "Use header: Authorization: Bearer <token>",
   });
@@ -68,6 +71,7 @@ app.get("/health", (req, res) => res.json({ status: "ok" }));
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/bot-responses", botResponsesRoutes);
+app.use("/api/message-processing", messageProcessingRoutes);
 
 // 404
 app.use((req, res) => res.status(404).json({ error: "Not found" }));
