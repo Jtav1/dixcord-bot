@@ -18,20 +18,25 @@ export async function getFilterKeywords() {
  * Ensure emoji_frequency has a row for this emoji; increment frequency.
  * If no row exists, insert one with frequency 1.
  */
-async function ensureAndIncrementEmoji(emojiId, emojiName) {
+async function ensureAndIncrementEmoji(emojiId, emojiName, emojiAnimated) {
   const id = String(emojiId ?? "");
   const name = String((emojiName ?? id) || "?");
+  const animated = emojiAnimated ? 1 : 0;
   const [existing] = await db.query("SELECT 1 FROM emoji_frequency WHERE emoid = ?", [id]);
   if (existing && existing.length > 0) {
-    await db.query(
-      "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoid = ?",
-      [id]
-    );
+    if(emojiId.length > 0 && emojiName.length > 0) {
+      await db.query(
+        "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoid = ?",
+        [id]
+      );
+    }
   } else {
-    await db.query(
-      "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 1, 0, ?)",
-      [id, name, "emoji"]
-    );
+    if(emojiId.length > 0 && emojiName.length > 0) {
+      await db.query(
+        "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 1, ?, ?)",
+        [id, name, animated, "emoji"]
+      );
+    }
   }
 }
 
@@ -68,21 +73,31 @@ export async function countEmoji(payload) {
     emojis = [],
     isReply = false,
     repliedUserId = null,
-    plusEmojiId = null,
-    minusEmojiId = null,
   } = payload;
+
+  // Fetch plusplus_emoji and minusminus_emoji config values from the database
+  // Assume db.query returns [rows] as in previous functions
+  const [plusRows] = await db.query(
+    "SELECT value FROM configurations WHERE config = 'plusplus_emoji'"
+  );
+  const [minusRows] = await db.query(
+    "SELECT value FROM configurations WHERE config = 'minusminus_emoji'"
+  );
+  const plusEmojiId = plusRows && plusRows.length > 0 ? String(plusRows[0].value) : null;
+  const minusEmojiId = minusRows && minusRows.length > 0 ? String(minusRows[0].value) : null;
+
+
   if (!authorId || !Array.isArray(emojis) || emojis.length === 0) {
     return { ok: true };
   }
 
-  const plusId = plusEmojiId ? String(plusEmojiId) : null;
-  const minusId = minusEmojiId ? String(minusEmojiId) : null;
-  const plusCount = emojis.filter((e) => e.id && String(e.id) === plusId).length;
-  const minusCount = emojis.filter((e) => e.id && String(e.id) === minusId).length;
+  const plusCount = emojis.filter((e) => e.id && String(e.id) === plusEmojiId).length;
+  const minusCount = emojis.filter((e) => e.id && String(e.id) === minusEmojiId).length;
+
   const doPlusMinus =
     isReply &&
     repliedUserId &&
-    plusCount + minusCount === 1 &&
+    (plusCount + minusCount === 1) &&
     emojis.length === 1;
 
   if (doPlusMinus && plusCount === 1) {
@@ -97,7 +112,7 @@ export async function countEmoji(payload) {
   for (const em of emojis) {
     const name = String(em.name ?? "?");
     const id = em.id != null ? String(em.id) : name;
-    await ensureAndIncrementEmoji(id, name);
+    await ensureAndIncrementEmoji(id, name, em.animated);
     if (id && authorId) {
       await upsertUserEmoji(authorId, id);
     }
