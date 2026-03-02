@@ -57,3 +57,9 @@ CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   frequency INT DEFAULT 1,
   UNIQUE KEY unique_user_emoji (userid, emoid)
 );
+
+CREATE TABLE IF NOT EXISTS link_replacements (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  source_host VARCHAR(255) NOT NULL UNIQUE,
+  target_host VARCHAR(255) NOT NULL
+);

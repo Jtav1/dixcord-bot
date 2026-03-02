@@ -1,9 +1,10 @@
 /**
  * Bot response logic using configured DB (mysql or sqlite via config/db.js).
- * Compatible with dixcord-bot tables: configurations, take_a_look_responses, eight_ball_responses.
+ * Compatible with dixcord-bot tables: configurations, take_a_look_responses, eight_ball_responses, link_replacements.
  */
 
 import db from "../config/db.js";
+import { getAll as getLinkReplacements } from "./linkReplacements.js";
 
 // In-memory rate limit for take-a-look (per process; matches bot behavior)
 let takeALookLimit = 0;
@@ -156,20 +157,16 @@ export async function twitterFixer(messageContents) {
       messageContents.includes(" dixbot") ||
       messageContents.includes(" fix"))
   ) {
+    const replacements = await getLinkReplacements();
     const words = messageContents.split(" ");
     for (const word of words) {
       const clean = word.replace(/[<>]/g, "").replace(/www\./g, "");
-      if (clean.startsWith("https://x.com")) {
-        reply = "fixed link: " + clean.replace("x.com", "fixvx.com");
-      } else if (clean.startsWith("https://instagram.com")) {
-        reply =
-          "fixed link: " + clean.replace("instagram.com", "jgram.jtav.me");
-      } else if (clean.startsWith("https://twitter.com")) {
-        reply = "fixed link: " + clean.replace("twitter.com", "fixvx.com");
-      } else if (clean.startsWith("https://tiktok.com")) {
-        reply = "fixed link: " + clean.replace("tiktok.com", "vxtiktok.com");
-      } else if (clean.startsWith("https://bsky.app")) {
-        reply = "fixed link: " + clean.replace("bsky.app", "bskx.app");
+      for (const { source_host, target_host } of replacements) {
+        const prefix = "https://" + source_host;
+        if (clean.startsWith(prefix)) {
+          reply = "fixed link: " + clean.replace(source_host, target_host);
+          break;
+        }
       }
     }
   }

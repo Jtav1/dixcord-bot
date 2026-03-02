@@ -8,7 +8,7 @@ router.use(authenticate);
 
 // GET /api/users/me - current user profile
 router.get('/me', async (req, res) => {
-  res.json({ user: req.user });
+  res.json({ ok: true, user: req.user });
 });
 
 // PUT /api/users/me - update profile
@@ -26,15 +26,15 @@ router.put('/me', async (req, res) => {
       values.push(await bcrypt.hash(password, 10));
     }
     if (updates.length === 0) {
-      return res.status(400).json({ error: 'No valid fields to update' });
+      return res.status(400).json({ ok: false, error: 'No valid fields to update' });
     }
     values.push(req.user.id);
     await db.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, values);
     const [rows] = await db.query('SELECT id, email, name, created_at FROM users WHERE id = ?', [req.user.id]);
-    res.json({ user: rows[0] });
+    res.json({ ok: true, user: rows[0] });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Update failed' });
+    res.status(500).json({ ok: false, error: 'Update failed' });
   }
 });
 
@@ -42,10 +42,10 @@ router.put('/me', async (req, res) => {
 router.delete('/me', async (req, res) => {
   try {
     await db.query('DELETE FROM users WHERE id = ?', [req.user.id]);
-    res.status(204).send();
+    res.json({ ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Delete failed' });
+    res.status(500).json({ ok: false, error: 'Delete failed' });
   }
 });
 

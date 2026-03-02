@@ -22,10 +22,10 @@ const router = express.Router();
 router.post("/emoji-count", authenticate, async (req, res) => {
   try {
     const result = await countEmoji(req.body);
-    res.json(result);
+    res.json({ ...result, ok: result.ok !== false });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to record emoji count" });
+    res.status(500).json({ ok: false, error: "Failed to record emoji count" });
   }
 });
 
@@ -39,12 +39,12 @@ router.post("/plusminus", authenticate, async (req, res) => {
   try {
     const result = await recordPlusMinusMessage(req.body);
     if (!result.ok) {
-      return res.status(400).json(result);
+      return res.status(400).json({ ...result, ok: false });
     }
-    res.json(result);
+    res.json({ ...result, ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to record plus/minus" });
+    res.status(500).json({ ok: false, error: "Failed to record plus/minus" });
   }
 });
 
@@ -64,12 +64,12 @@ router.post("/count-repost", authenticate, async (req, res) => {
   try {
     const result = await countRepost(req.body);
     if (!result.ok) {
-      return res.status(400).json(result);
+      return res.status(400).json({ ...result, ok: false });
     }
-    res.json(result);
+    res.json({ ...result, ok: true });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to record repost" });
+    res.status(500).json({ ok: false, error: "Failed to record repost" });
   }
 });
 

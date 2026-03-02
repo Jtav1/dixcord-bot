@@ -144,6 +144,15 @@ export const initializeDatabase = async () => {
     )
   `);
 
+  // Link replacements (twitter/social fixer: source host -> target host)
+  await execQuery(`
+    CREATE TABLE IF NOT EXISTS link_replacements (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      source_host VARCHAR(255) NOT NULL UNIQUE,
+      target_host VARCHAR(255) NOT NULL
+    )
+  `);
+
   console.log('db: MySQL table initialization complete');
 };
 

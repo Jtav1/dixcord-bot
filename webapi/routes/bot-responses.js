@@ -16,10 +16,10 @@ const router = express.Router();
 router.post("/take-a-look", authenticate, async (req, res) => {
   try {
     const { response } = await takeALook();
-    res.json({ response });
+    res.json({ ok: true, response });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to get take-a-look response" });
+    res.status(500).json({ ok: false, error: "Failed to get take-a-look response" });
   }
 });
 
@@ -31,10 +31,10 @@ router.post("/take-a-look", authenticate, async (req, res) => {
 router.post("/fortune", authenticate, async (req, res) => {
   try {
     const { response } = await fortuneTeller();
-    res.json({ response });
+    res.json({ ok: true, response });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to get fortune" });
+    res.status(500).json({ ok: false, error: "Failed to get fortune" });
   }
 });
 
@@ -48,10 +48,10 @@ router.post("/link-fixer", authenticate, async (req, res) => {
   try {
     const message = req.body?.message ?? "";
     const { response } = await twitterFixer(message);
-    res.json({ response });
+    res.json({ ok: true, response });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Failed to fix link" });
+    res.status(500).json({ ok: false, error: "Failed to fix link" });
   }
 });
 

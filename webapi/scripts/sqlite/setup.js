@@ -144,6 +144,14 @@ const initializeDatabase = () => {
     )
   `);
 
+  exec(`
+    CREATE TABLE IF NOT EXISTS link_replacements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_host TEXT NOT NULL UNIQUE,
+      target_host TEXT NOT NULL
+    )
+  `);
+
   console.log('db: SQLite table initialization complete');
 };
 
@@ -187,10 +195,31 @@ const importConfigs = () => {
   console.log('db: SQLite configuration import complete');
 };
 
+const importLinkReplacements = () => {
+  const defaultLinkReplacements = [
+    ['x.com', 'fixvx.com'],
+    ['twitter.com', 'fixvx.com'],
+    ['instagram.com', 'jgram.jtav.me'],
+    ['tiktok.com', 'vxtiktok.com'],
+    ['bsky.app', 'bskx.app'],
+  ];
+  const insert = db.prepare(
+    'INSERT OR IGNORE INTO link_replacements (source_host, target_host) VALUES (?, ?)'
+  );
+  const insertMany = db.transaction((entries) => {
+    for (const [source_host, target_host] of entries) {
+      insert.run(source_host, target_host);
+    }
+  });
+  insertMany(defaultLinkReplacements);
+  console.log('db: SQLite link_replacements import complete');
+};
+
 // --- Run ---
 try {
   initializeDatabase();
   importConfigs();
+  importLinkReplacements();
   db.close();
   process.exit(0);
 } catch (err) {

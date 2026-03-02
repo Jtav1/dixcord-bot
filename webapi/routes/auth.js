@@ -8,6 +8,7 @@ const router = express.Router();
 // Registration disabled: only the admin user (from ADMIN_USERNAME / ADMIN_PASSWORD) can use the API
 router.post("/register", (req, res) => {
   res.status(403).json({
+    ok: false,
     error: "Registration is disabled",
   });
 });
@@ -17,27 +18,28 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required" });
+      return res.status(400).json({ ok: false, error: "Email and password are required" });
     }
     const adminUsername = process.env.ADMIN_USERNAME;
     if (adminUsername && email !== adminUsername) {
-      return res.status(401).json({ error: "Invalid email or password" });
+      return res.status(401).json({ ok: false, error: "Invalid email or password" });
     }
     const [rows] = await db.query(
       "SELECT id, email, name, password_hash, created_at FROM users WHERE email = ?",
       [email],
     );
     if (rows.length === 0) {
-      return res.status(401).json({ error: "Invalid email or password" });
+      return res.status(401).json({ ok: false, error: "Invalid email or password" });
     }
     const user = rows[0];
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      return res.status(401).json({ error: "Invalid email or password" });
+      return res.status(401).json({ ok: false, error: "Invalid email or password" });
     }
     const token = signToken(user.id);
     delete user.password_hash;
     res.json({
+      ok: true,
       user: {
         id: user.id,
         email: user.email,
@@ -48,7 +50,7 @@ router.post("/login", async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Login failed" });
+    res.status(500).json({ ok: false, error: "Login failed" });
   }
 });
 

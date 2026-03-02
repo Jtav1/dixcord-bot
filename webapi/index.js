@@ -7,6 +7,8 @@ import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import botResponsesRoutes from "./routes/bot-responses.js";
 import messageProcessingRoutes from "./routes/message-processing.js";
+import configRoutes from "./routes/config.js";
+import linkReplacementsRoutes from "./routes/link-replacements.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -61,6 +63,9 @@ app.get("/", (req, res) => {
         "/api/bot-responses/take-a-look, /api/bot-responses/fortune, /api/bot-responses/link-fixer (POST, auth required)",
       messageProcessing:
         "/api/message-processing/emoji-count, /api/message-processing/plusminus, /api/message-processing/count-repost (POST, auth required)",
+      config: "/api/config (GET, auth required)",
+      linkReplacements:
+        "/api/link-replacements (GET list & GET /:id no auth; POST, PUT /:id, DELETE /:id auth required)",
     },
     auth: "Use header: Authorization: Bearer <token>",
   });
@@ -68,18 +73,21 @@ app.get("/", (req, res) => {
 
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 
+// Only /api/auth is public (login/register). All other /api/* routes require Authorization: Bearer <token>.
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/bot-responses", botResponsesRoutes);
 app.use("/api/message-processing", messageProcessingRoutes);
+app.use("/api/config", configRoutes);
+app.use("/api/link-replacements", linkReplacementsRoutes);
 
 // 404
-app.use((req, res) => res.status(404).json({ error: "Not found" }));
+app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 
 // Error handler
 app.use((err, req, res, next) => {
   console.error(err);
-  res.status(500).json({ error: "Internal server error" });
+  res.status(500).json({ ok: false, error: "Internal server error" });
 });
 
 await ensureAdminUser();

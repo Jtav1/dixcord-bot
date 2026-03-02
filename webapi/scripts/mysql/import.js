@@ -63,6 +63,24 @@ export const importConfigs = async () => {
   console.log('db: MySQL configuration import complete');
 };
 
+const defaultLinkReplacements = [
+  ['x.com', 'fixvx.com'],
+  ['twitter.com', 'fixvx.com'],
+  ['instagram.com', 'jgram.jtav.me'],
+  ['tiktok.com', 'vxtiktok.com'],
+  ['bsky.app', 'bskx.app'],
+];
+
+export const importLinkReplacements = async () => {
+  for (const [source_host, target_host] of defaultLinkReplacements) {
+    await execQuery(
+      `INSERT IGNORE INTO link_replacements (source_host, target_host) VALUES (?, ?)`,
+      [source_host, target_host]
+    );
+  }
+  console.log('db: MySQL link_replacements import complete');
+};
+
 export const importUsers = async () => {
   const userAry = [];
   if (userAry.length === 0) {
@@ -80,6 +98,7 @@ export const importUsers = async () => {
 
 export const importAll = async () => {
   await importConfigs();
+  await importLinkReplacements();
   // await importUsers();
 };
 
