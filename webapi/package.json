@@ -10,7 +10,9 @@
     "db:init:mysql": "node scripts/mysql/initialize.js",
     "db:import:mysql": "node scripts/mysql/import.js",
     "db:setup:mysql": "node scripts/mysql/initialize.js && node scripts/mysql/import.js",
-    "db:setup:sqlite": "node scripts/sqlite/setup.js"
+    "db:setup:sqlite": "node scripts/sqlite/setup.js",
+    "db:migrate:mysql": "node scripts/mysql/initialize.js && node scripts/mysql/import.js",
+    "db:migrate:sqlite": "node scripts/sqlite/setup.js"
   },
   "keywords": [
     "express",
