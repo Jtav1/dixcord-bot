@@ -7,9 +7,9 @@ const router = express.Router();
 /**
  * GET /api/config
  * Returns all rows from the configurations table.
- * Auth: required.
  * Response: { config: { [key]: value }, entries: [ { config, value } ] }
  * Use "config" for key-value lookup; "entries" for array form.
+ * Auth: required.
  */
 router.get("/", authenticate, async (req, res) => {
   try {

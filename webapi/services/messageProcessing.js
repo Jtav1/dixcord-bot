@@ -7,6 +7,10 @@ import db from "../config/db.js";
 
 // --- Config and filter keywords ---
 
+/**
+ * Get log filter keywords (lowercased) for plus/minus message parsing.
+ * @returns {Promise<string[]>}
+ */
 export async function getFilterKeywords() {
   const [rows] = await db.query("SELECT keyword FROM log_filter_keywords");
   return (rows || []).map((r) => (r.keyword || "").toLowerCase());
@@ -17,6 +21,7 @@ export async function getFilterKeywords() {
 /**
  * Ensure emoji_frequency has a row for this emoji; increment frequency.
  * If no row exists, insert one with frequency 1.
+ * @private
  */
 async function ensureAndIncrementEmoji(emojiId, emojiName, emojiAnimated) {
   const id = String(emojiId ?? "");
@@ -47,6 +52,7 @@ async function ensureAndIncrementEmoji(emojiId, emojiName, emojiAnimated) {
 
 /**
  * Upsert user_emoji_tracking. DB-agnostic: SELECT then INSERT or UPDATE.
+ * @private
  */
 async function upsertUserEmoji(userId, emojiId) {
   if (!userId || !emojiId) return;
@@ -70,9 +76,9 @@ async function upsertUserEmoji(userId, emojiId) {
 }
 
 /**
- * Record emoji usage from a message.
- * Body shape: { authorId: string, emojis: Array<{ name: string, id?: string }> }
- * Optional: isReply, repliedUserId, plusEmojiId, minusEmojiId — if exactly one plus or minus emoji in a reply, record a +/- vote for repliedUserId instead of counting.
+ * Record emoji usage from a message. Optionally records a +/- vote when replying with one plus/minus emoji.
+ * @param {object} payload - { authorId, emojis: Array<{ name, id? }>, isReply?, repliedUserId? }
+ * @returns {Promise<{ ok: boolean, applied?: string }>}
  */
 export async function countEmoji(payload) {
   const {
@@ -147,7 +153,8 @@ async function recordPlusPlus(string, typestr, voterid, value) {
 
 /**
  * Parse message for word++ / user++ / -- and record votes (respecting filter list).
- * Body shape: { message: { content: string, author: { id: string } }, voterId: string }
+ * @param {object} payload - { message: { content, author: { id } }, voterId }
+ * @returns {Promise<{ ok: boolean, recorded?: number }>}
  */
 export async function recordPlusMinusMessage(payload) {
   const { message, voterId } = payload;
@@ -194,9 +201,9 @@ export async function recordPlusMinusMessage(payload) {
 }
 
 /**
- * Record a single plus or minus from a reaction (e.g. user added +/- emoji to a message).
- * Body shape: { targetUserId: string, reactorId: string, value: 1 | -1 }
- * Writes to plusplus_tracking (type='user'). Self-votes are rejected.
+ * Record a single plus or minus from a reaction. Writes to plusplus_tracking (type='user'). Self-votes are rejected.
+ * @param {object} payload - { targetUserId, reactorId, value: 1 | -1 }
+ * @returns {Promise<{ ok: boolean, recorded?: number, value?: number }>}
  */
 export async function recordPlusMinusReaction(payload) {
   const { targetUserId, reactorId, value } = payload;
@@ -217,13 +224,8 @@ export async function recordPlusMinusReaction(payload) {
 
 /**
  * Record or withdraw a repost accusation.
- * Body shape: {
- *   userid: string (author of the message being accused of reposting),
- *   msgid: string,
- *   accuser: string (user who added the repost emoji),
- *   msgcontents?: string,
- *   repost: 1 | -1 (1 = create accusation, -1 = withdraw)
- * }
+ * @param {object} payload - { userid, msgid, accuser, msgcontents?, repost: 1 | -1 }
+ * @returns {Promise<{ ok: boolean, action?: string, deleted?: number }>}
  */
 export async function countRepost(payload) {
   const { userid, msgid, accuser, msgcontents = "", repost } = payload;

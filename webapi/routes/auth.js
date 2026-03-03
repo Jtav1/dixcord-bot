@@ -5,7 +5,11 @@ import { signToken } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// Registration disabled: only the admin user (from ADMIN_USERNAME / ADMIN_PASSWORD) can use the API
+/**
+ * POST /api/auth/register
+ * Registration disabled; only the admin user (from env) can use the API.
+ * Auth: none (returns 403).
+ */
 router.post("/register", (req, res) => {
   res.status(403).json({
     ok: false,
@@ -13,7 +17,13 @@ router.post("/register", (req, res) => {
   });
 });
 
-// POST /api/auth/login — only the configured admin (ADMIN_USERNAME) may log in
+/**
+ * POST /api/auth/login
+ * Login; only the configured admin (ADMIN_USERNAME) may log in.
+ * Body: { email, password }
+ * Response: { ok, user, token }
+ * Auth: none.
+ */
 router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;

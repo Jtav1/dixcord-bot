@@ -5,6 +5,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
 
 /**
  * Verify JWT and attach user to req.user. Only the admin user (ADMIN_USERNAME) may access.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
  */
 export async function authenticate(req, res, next) {
   const adminUsername = process.env.ADMIN_USERNAME;
@@ -37,7 +40,10 @@ export async function authenticate(req, res, next) {
 }
 
 /**
- * Optional auth: attach user if valid token present, don't fail if missing.
+ * Optional auth: attach user to req.user if valid token present; do not fail if missing.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
  */
 export async function optionalAuth(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -53,6 +59,11 @@ export async function optionalAuth(req, res, next) {
   next();
 }
 
+/**
+ * Sign a JWT for the given user id.
+ * @param {number|string} userId
+ * @returns {string}
+ */
 export function signToken(userId) {
   return jwt.sign(
     { userId },

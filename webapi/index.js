@@ -14,7 +14,10 @@ import leaderboardsRoutes from "./routes/leaderboards.js";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-/** Create or update the single admin user from ADMIN_USERNAME and ADMIN_PASSWORD. */
+/**
+ * Create or update the single admin user from ADMIN_USERNAME and ADMIN_PASSWORD.
+ * @returns {Promise<void>}
+ */
 async function ensureAdminUser() {
   const username = process.env.ADMIN_USERNAME;
   const password = process.env.ADMIN_PASSWORD;

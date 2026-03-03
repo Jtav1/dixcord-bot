@@ -11,7 +11,8 @@ let takeALookLimit = 0;
 let takeALookLastTimestamp = null;
 
 /**
- * Get all configuration rows. Returns [{ config, value }, ...].
+ * Get all configuration rows.
+ * @returns {Promise<Array<{ config: string, value: string }>>}
  */
 export async function getAllConfigurations() {
   const [rows] = await db.query("SELECT config, value FROM configurations");
@@ -20,6 +21,9 @@ export async function getAllConfigurations() {
 
 /**
  * Get a single config value by key, or null.
+ * @param {Array<{ config: string, value: string }>} configs
+ * @param {string} key
+ * @returns {string|null}
  */
 export function getConfigValue(configs, key) {
   const entry = configs.find((c) => c.config === key);
@@ -44,8 +48,8 @@ export async function incrementTakeALookLink(linkRow) {
 }
 
 /**
- * Returns { response: string } with either an image URL, "No spam!", or the spam image message.
- * Empty string means over limit (no reply).
+ * Take-a-look response: random image URL, "No spam!", or spam message. Empty string means over limit (no reply).
+ * @returns {Promise<{ response: string }>}
  */
 export async function takeALook() {
   const configs = await getAllConfigurations();
@@ -107,7 +111,7 @@ export async function takeALook() {
 
 // --- Fortune teller (8-ball) ---
 
-/** Bot DB may have typo column resoponse_string; we accept both. */
+/** @private Bot DB may have typo column resoponse_string; we accept both. */
 function fortuneResponseString(row) {
   return row.response_string ?? row.resoponse_string ?? "";
 }
@@ -126,7 +130,8 @@ export async function incrementFortune(fortuneRow) {
 }
 
 /**
- * Returns { response: string } with a random fortune.
+ * Random 8-ball style fortune.
+ * @returns {Promise<{ response: string }>}
  */
 export async function fortuneTeller() {
   const allFortunes = await getAllFortunes();
@@ -141,7 +146,9 @@ export async function fortuneTeller() {
 // --- Twitter/social link fixer ---
 
 /**
- * Returns { response: string } with "fixed link: ..." or empty if not applicable.
+ * Fix social links in message; returns "fixed link: ..." or empty if not applicable.
+ * @param {string} messageContents
+ * @returns {Promise<{ response: string }>}
  */
 export async function twitterFixer(messageContents) {
   const configs = await getAllConfigurations();

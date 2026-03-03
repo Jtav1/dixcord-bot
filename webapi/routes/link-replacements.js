@@ -6,7 +6,8 @@ const router = express.Router();
 
 /**
  * GET /api/link-replacements
- * List all link replacements (source_host -> target_host). No auth.
+ * List all link replacements (source_host -> target_host).
+ * Auth: none.
  */
 router.get("/", async (req, res) => {
   try {
@@ -20,7 +21,8 @@ router.get("/", async (req, res) => {
 
 /**
  * GET /api/link-replacements/:id
- * Get one link replacement by id. No auth.
+ * Get one link replacement by id.
+ * Auth: none.
  */
 router.get("/:id", async (req, res) => {
   try {
@@ -41,7 +43,9 @@ router.get("/:id", async (req, res) => {
 
 /**
  * POST /api/link-replacements
- * Create a link replacement. Body: { source_host, target_host }. Auth required.
+ * Create a link replacement.
+ * Body: { source_host, target_host }
+ * Auth: required.
  */
 router.post("/", authenticate, async (req, res) => {
   try {
@@ -72,7 +76,9 @@ router.post("/", authenticate, async (req, res) => {
 
 /**
  * PUT /api/link-replacements/:id
- * Update a link replacement. Body: { source_host?, target_host? }. Auth required.
+ * Update a link replacement.
+ * Body: { source_host?, target_host? }
+ * Auth: required.
  */
 router.put("/:id", authenticate, async (req, res) => {
   try {
@@ -104,7 +110,8 @@ router.put("/:id", authenticate, async (req, res) => {
 
 /**
  * DELETE /api/link-replacements/:id
- * Delete a link replacement. Auth required.
+ * Delete a link replacement.
+ * Auth: required.
  */
 router.delete("/:id", authenticate, async (req, res) => {
   try {

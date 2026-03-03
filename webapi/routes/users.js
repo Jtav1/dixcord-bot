@@ -6,12 +6,21 @@ import { authenticate } from '../middleware/auth.js';
 const router = express.Router();
 router.use(authenticate);
 
-// GET /api/users/me - current user profile
+/**
+ * GET /api/users/me
+ * Current user profile (from JWT).
+ * Auth: required.
+ */
 router.get('/me', async (req, res) => {
   res.json({ ok: true, user: req.user });
 });
 
-// PUT /api/users/me - update profile
+/**
+ * PUT /api/users/me
+ * Update current user profile (name and/or password).
+ * Body: { name?, password? }
+ * Auth: required.
+ */
 router.put('/me', async (req, res) => {
   try {
     const { name, password } = req.body;
@@ -38,7 +47,11 @@ router.put('/me', async (req, res) => {
   }
 });
 
-// DELETE /api/users/me - delete account
+/**
+ * DELETE /api/users/me
+ * Delete current user account.
+ * Auth: required.
+ */
 router.delete('/me', async (req, res) => {
   try {
     await db.query('DELETE FROM users WHERE id = ?', [req.user.id]);

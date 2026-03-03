@@ -7,7 +7,13 @@
 
 import db from "../config/db.js";
 
-/** Normalize limit from API request (number or string). Clamps to [1, max]. */
+/**
+ * Normalize limit from API request (number or string). Clamps to [1, max].
+ * @param {number|string} value
+ * @param {number} [defaultN=5]
+ * @param {number} [max=50]
+ * @returns {number}
+ */
 export function parseLimit(value, defaultN = 5, max = 50) {
   const n = value == null ? defaultN : parseInt(value, 10);
   return Math.min(Math.max(1, Number.isNaN(n) ? defaultN : n), max);
@@ -15,6 +21,10 @@ export function parseLimit(value, defaultN = 5, max = 50) {
 
 // --- Plusplus (plusplus_tracking) ---
 
+/**
+ * @param {number} [limit]
+ * @returns {Promise<Array<{ string, typestr, total }>>}
+ */
 export async function getPlusPlusTopScores(limit) {
   const n = parseLimit(limit, 5, 50);
   const [rows] = await db.query(
@@ -24,6 +34,10 @@ export async function getPlusPlusTopScores(limit) {
   return Array.isArray(rows) ? rows : [];
 }
 
+/**
+ * @param {number} [limit]
+ * @returns {Promise<Array<{ string, typestr, total }>>}
+ */
 export async function getPlusPlusBottomScores(limit) {
   const n = parseLimit(limit, 5, 50);
   const [rows] = await db.query(
@@ -33,6 +47,11 @@ export async function getPlusPlusBottomScores(limit) {
   return Array.isArray(rows) ? rows : [];
 }
 
+/**
+ * @param {string} string
+ * @param {string} [type='word']
+ * @returns {Promise<{ string, type, total }|null>}
+ */
 export async function getPlusPlusTotalByString(string, type = "word") {
   if (!string || (type !== "word" && type !== "user")) return null;
   const [rows] = await db.query(
@@ -43,6 +62,10 @@ export async function getPlusPlusTotalByString(string, type = "word") {
   return { string, type, total: total == null ? 0 : Number(total) };
 }
 
+/**
+ * @param {string} voterId
+ * @returns {Promise<{ voterId: string, total: number }|null>}
+ */
 export async function getPlusPlusVotesByVoter(voterId) {
   if (!voterId) return null;
   const [rows] = await db.query(
@@ -53,6 +76,10 @@ export async function getPlusPlusVotesByVoter(voterId) {
   return { voterId: String(voterId), total: Number(total) };
 }
 
+/**
+ * @param {number} [limit]
+ * @returns {Promise<Array<{ voter, total }>>}
+ */
 export async function getPlusPlusTopVoters(limit) {
   const n = parseLimit(limit, 3, 50);
   const [rows] = await db.query(
@@ -64,6 +91,10 @@ export async function getPlusPlusTopVoters(limit) {
 
 // --- Emoji (emoji_frequency) ---
 
+/**
+ * @param {number} [limit]
+ * @returns {Promise<Array<{ emoji, frequency, emoid, animated }>>}
+ */
 export async function getTopEmoji(limit) {
   const n = parseLimit(limit, 5, 50);
   const [rows] = await db.query(
@@ -75,6 +106,10 @@ export async function getTopEmoji(limit) {
 
 // --- Repost (user_repost_tracking) ---
 
+/**
+ * @param {number} [limit]
+ * @returns {Promise<Array<{ userid, count }>>}
+ */
 export async function getTopReposters(limit) {
   const n = parseLimit(limit, 5, 50);
   const [rows] = await db.query(
@@ -84,6 +119,10 @@ export async function getTopReposters(limit) {
   return Array.isArray(rows) ? rows : [];
 }
 
+/**
+ * @param {string} userId
+ * @returns {Promise<{ userId: string, count: number }|null>}
+ */
 export async function getRepostsForUser(userId) {
   if (!userId) return null;
   const [rows] = await db.query(

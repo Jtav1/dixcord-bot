@@ -8,6 +8,7 @@ const router = express.Router();
  * POST /api/leaderboards/plusplus
  * Top and bottom plusplus scores (mirrors plusplus-leaderboard command).
  * Body: { limit?: number } (optional, default 5, max 50)
+ * Auth: required.
  */
 router.post("/plusplus", authenticate, async (req, res) => {
   try {
@@ -27,6 +28,7 @@ router.post("/plusplus", authenticate, async (req, res) => {
  * GET /api/leaderboards/plusplus/total
  * Total score for a word or user (mirrors plusplus-total command).
  * Query: string= required, type=word|user (default word)
+ * Auth: required.
  */
 router.get("/plusplus/total", authenticate, async (req, res) => {
   try {
@@ -49,6 +51,7 @@ router.get("/plusplus/total", authenticate, async (req, res) => {
 /**
  * GET /api/leaderboards/plusplus/voter/:userId
  * Number of +/- votes cast by a user (mirrors plusplus-voter-frequency command).
+ * Auth: required.
  */
 router.get("/plusplus/voter/:userId", authenticate, async (req, res) => {
   try {
@@ -67,6 +70,7 @@ router.get("/plusplus/voter/:userId", authenticate, async (req, res) => {
  * POST /api/leaderboards/plusplus/top-voters
  * Top plusplus voters by vote count (mirrors plusplus-top-voters command).
  * Body: { limit?: number } (optional, default 3, max 50)
+ * Auth: required.
  */
 router.post("/plusplus/top-voters", authenticate, async (req, res) => {
   try {
@@ -83,6 +87,7 @@ router.post("/plusplus/top-voters", authenticate, async (req, res) => {
  * POST /api/leaderboards/emoji
  * Top used emojis (mirrors top-emojis command).
  * Body: { limit?: number } (optional, default 5, max 50)
+ * Auth: required.
  */
 router.post("/emoji", authenticate, async (req, res) => {
   try {
@@ -99,6 +104,7 @@ router.post("/emoji", authenticate, async (req, res) => {
  * POST /api/leaderboards/repost
  * Top reposters by accusation count (mirrors top-reposters command).
  * Body: { limit?: number } (optional, default 5, max 50)
+ * Auth: required.
  */
 router.post("/repost", authenticate, async (req, res) => {
   try {
@@ -114,6 +120,7 @@ router.post("/repost", authenticate, async (req, res) => {
 /**
  * GET /api/leaderboards/repost/user/:userId
  * Repost count for a user (mirrors reposts-by-user command).
+ * Auth: required.
  */
 router.get("/repost/user/:userId", authenticate, async (req, res) => {
   try {

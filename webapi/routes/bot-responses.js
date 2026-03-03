@@ -39,9 +39,9 @@ router.post("/fortune", authenticate, async (req, res) => {
 });
 
 /**
- * POST /api/bot-responses/link-fix
+ * POST /api/bot-responses/link-fixer
+ * Returns a fixed embed-friendly link if message contains a social link and trigger.
  * Body: { message: string }
- * Returns a fixed embed-friendly link if message contains a social link + trigger.
  * Auth: required.
  */
 router.post("/link-fixer", authenticate, async (req, res) => {
