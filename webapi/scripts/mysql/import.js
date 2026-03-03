@@ -10,6 +10,7 @@
  * Dump tables: configurations, eight_ball_responses, emoji_frequency,
  * log_filter_keywords, pin_history, plusplus_tracking, take_a_look_responses,
  * user_emoji_tracking, user_lookup, user_repost_tracking.
+ * API-only tables (created by initialize): sticker_frequency.
  */
 import "dotenv/config";
 import mysql from "mysql2/promise";

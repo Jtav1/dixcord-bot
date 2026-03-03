@@ -51,6 +51,16 @@ export const initializeDatabase = async () => {
     )
   `);
 
+  // Sticker tracking table (no animated column)
+  await execQuery(`
+    CREATE TABLE IF NOT EXISTS sticker_frequency (
+      stickerid VARCHAR(255) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      frequency INT NOT NULL DEFAULT 0,
+      PRIMARY KEY (stickerid)
+    )
+  `);
+
   // Pinned message table
   await execQuery(`
     CREATE TABLE IF NOT EXISTS pin_history (

@@ -5,6 +5,8 @@ import {
   recordPlusMinusMessage,
   recordPlusMinusReaction,
   countRepost,
+  importEmojiList,
+  importStickerList,
   isMessageAlreadyPinned,
   logPinnedMessage,
 } from "../services/messageProcessing.js";
@@ -83,6 +85,50 @@ router.post("/count-repost", authenticate, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to record repost" });
+  }
+});
+
+/**
+ * POST /api/message-processing/emoji-import
+ * Sync server emoji list (mirrors bot database/emojis.js importEmojiList).
+ * Deletes emoji_frequency rows with frequency = 0 and type = 'emoji', then upserts provided emojis.
+ * Body: { emojis: Array<{ id: string, name: string, animated?: boolean }> }
+ * Response: { ok: true, imported: number }
+ * Auth: required.
+ */
+router.post("/emoji-import", authenticate, async (req, res) => {
+  try {
+    const { emojis } = req.body ?? {};
+    const result = await importEmojiList(emojis);
+    if (!result.ok) {
+      return res.status(400).json({ ok: false, error: "emojis array is required" });
+    }
+    res.json({ ok: true, imported: result.imported ?? 0 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Failed to import emoji list" });
+  }
+});
+
+/**
+ * POST /api/message-processing/sticker-import
+ * Sync server sticker list (like emoji-import; no animated field).
+ * Deletes sticker_frequency rows with frequency = 0, then upserts provided stickers.
+ * Body: { stickers: Array<{ id: string, name: string }> }
+ * Response: { ok: true, imported: number }
+ * Auth: required.
+ */
+router.post("/sticker-import", authenticate, async (req, res) => {
+  try {
+    const { stickers } = req.body ?? {};
+    const result = await importStickerList(stickers);
+    if (!result.ok) {
+      return res.status(400).json({ ok: false, error: "stickers array is required" });
+    }
+    res.json({ ok: true, imported: result.imported ?? 0 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Failed to import sticker list" });
   }
 });
 

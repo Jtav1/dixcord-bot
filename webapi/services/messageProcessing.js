@@ -264,6 +264,79 @@ export async function countRepost(payload) {
   return { ok: false };
 }
 
+// --- Emoji import (sync server emoji list; mirrors bot database/emojis.js importEmojiList) ---
+
+/**
+ * Import server emoji list: delete unused type='emoji' rows (frequency = 0), then upsert each emoji.
+ * Preserves frequency for existing emojis; adds new ones with frequency 0.
+ * @param {Array<{ id: string, name: string, animated?: boolean }>} emojis - From guild.emojis.cache or similar
+ * @returns {Promise<{ ok: boolean, imported?: number }>}
+ */
+export async function importEmojiList(emojis) {
+  if (!Array.isArray(emojis)) return { ok: false };
+  const list = emojis.filter(
+    (e) => e != null && (e.id != null || e.name != null),
+  );
+  // 1. Cleanup: remove server emojis that were never used (same as bot importEmojiList)
+  await db.query(
+    "DELETE FROM emoji_frequency WHERE frequency = 0 AND type = 'emoji'",
+  );
+  let imported = 0;
+  for (const e of list) {
+    const id = String(e.id ?? "").trim();
+    const name = String((e.name ?? id) || "?").trim();
+    const animated = e.animated ? 1 : 0;
+    const type = (e.type != null ? String(e.type) : "emoji").trim() || "emoji";
+    if (id.length === 0 && name === "?") continue;
+    const [existing] = await db.query(
+      "SELECT 1 FROM emoji_frequency WHERE emoid = ?",
+      [id || name],
+    );
+    if (existing && existing.length > 0) continue; // preserve frequency
+    await db.query(
+      "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 0, ?, ?)",
+      [id || name, name, animated, type],
+    );
+    imported++;
+  }
+  return { ok: true, imported };
+}
+
+// --- Sticker import (sync server sticker list; like emoji import, no animated) ---
+
+/**
+ * Import server sticker list: delete unused rows (frequency = 0), then upsert each sticker.
+ * Preserves frequency for existing stickers; adds new ones with frequency 0.
+ * @param {Array<{ id: string, name: string }>} stickers - From guild.stickers.cache or similar
+ * @returns {Promise<{ ok: boolean, imported?: number }>}
+ */
+export async function importStickerList(stickers) {
+  if (!Array.isArray(stickers)) return { ok: false };
+  const list = stickers.filter(
+    (s) => s != null && (s.id != null || s.name != null),
+  );
+  await db.query(
+    "DELETE FROM sticker_frequency WHERE frequency = 0",
+  );
+  let imported = 0;
+  for (const s of list) {
+    const id = String(s.id ?? "").trim();
+    const name = String((s.name ?? id) || "?").trim();
+    if (id.length === 0 && name === "?") continue;
+    const [existing] = await db.query(
+      "SELECT 1 FROM sticker_frequency WHERE stickerid = ?",
+      [id || name],
+    );
+    if (existing && existing.length > 0) continue;
+    await db.query(
+      "INSERT INTO sticker_frequency (stickerid, name, frequency) VALUES (?, ?, 0)",
+      [id || name, name],
+    );
+    imported++;
+  }
+  return { ok: true, imported };
+}
+
 // --- Pin history (for pin decision + log) ---
 
 /**

@@ -63,6 +63,14 @@ const initializeDatabase = () => {
   `);
 
   exec(`
+    CREATE TABLE IF NOT EXISTS sticker_frequency (
+      stickerid TEXT NOT NULL PRIMARY KEY,
+      name TEXT NOT NULL,
+      frequency INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  exec(`
     CREATE TABLE IF NOT EXISTS pin_history (
       msgid TEXT PRIMARY KEY,
       timestamp TEXT DEFAULT (datetime('now'))

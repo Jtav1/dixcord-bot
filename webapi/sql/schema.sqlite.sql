@@ -55,6 +55,12 @@ CREATE TABLE IF NOT EXISTS emoji_frequency (
   type TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS sticker_frequency (
+  stickerid TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  frequency INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userid TEXT NOT NULL,
