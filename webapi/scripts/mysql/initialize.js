@@ -1,6 +1,7 @@
 /**
  * MySQL database initialization for dixcord-bot tables.
  * Mirrors database/initialize.js from the main bot.
+ * Must include every table from dump (e.g. webapi/data/dump-dixbot-dev-*.sql) for smooth transition.
  *
  * Run from webapi dir: node scripts/mysql/initialize.js
  * Requires: DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME in .env

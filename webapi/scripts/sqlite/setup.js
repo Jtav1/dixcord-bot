@@ -1,6 +1,7 @@
 /**
  * SQLite database setup for dixcord-bot: initialization + default data import.
  * Mirrors database/initialize.js and database/import.js from the main bot.
+ * Must include every table from dump (e.g. webapi/data/dump-dixbot-dev-*.sql) for smooth transition.
  *
  * Run: npm run db:setup:sqlite
  * Requires: DB_FILE in .env (or defaults to ./data/api_template.sqlite)

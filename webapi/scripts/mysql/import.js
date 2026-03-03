@@ -4,6 +4,12 @@
  *
  * Run from webapi dir: node scripts/mysql/import.js
  * Requires: DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME in .env
+ *
+ * Tables from dump (dump-dixbot-dev-*.sql) are created by initialize.js, not here.
+ * This script only seeds: configurations, link_replacements; optionally user_lookup.
+ * Dump tables: configurations, eight_ball_responses, emoji_frequency,
+ * log_filter_keywords, pin_history, plusplus_tracking, take_a_look_responses,
+ * user_emoji_tracking, user_lookup, user_repost_tracking.
  */
 import "dotenv/config";
 import mysql from "mysql2/promise";
