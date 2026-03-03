@@ -108,4 +108,4 @@ config.ignore
 /data
 .DS_Store
 .vscode
-.cursor
+/.cursor
