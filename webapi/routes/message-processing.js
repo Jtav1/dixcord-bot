@@ -5,6 +5,8 @@ import {
   recordPlusMinusMessage,
   recordPlusMinusReaction,
   countRepost,
+  isMessageAlreadyPinned,
+  logPinnedMessage,
 } from "../services/messageProcessing.js";
 
 const router = express.Router();
@@ -81,6 +83,47 @@ router.post("/count-repost", authenticate, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to record repost" });
+  }
+});
+
+/**
+ * POST /api/message-processing/pin-check
+ * Check if a message was already logged as pinned.
+ * Body: { messageId: string }
+ * Response: { alreadyPinned: boolean }
+ * Auth: required.
+ */
+router.post("/pin-check", authenticate, async (req, res) => {
+  try {
+    const { messageId } = req.body ?? {};
+    const alreadyPinned = await isMessageAlreadyPinned(messageId);
+    res.json({ alreadyPinned });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      ok: false,
+      error: "Failed to check pin status",
+    });
+  }
+});
+
+/**
+ * POST /api/message-processing/pin-log
+ * Log a message as pinned (idempotent; no-op if already logged).
+ * Body: { messageId: string }
+ * Response: { ok: true }
+ * Auth: required.
+ */
+router.post("/pin-log", authenticate, async (req, res) => {
+  try {
+    const result = await logPinnedMessage(req.body?.messageId);
+    if (!result.ok) {
+      return res.status(400).json({ ...result, error: "messageId is required" });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Failed to log pinned message" });
   }
 });
 

@@ -263,3 +263,35 @@ export async function countRepost(payload) {
 
   return { ok: false };
 }
+
+// --- Pin history (for pin decision + log) ---
+
+/**
+ * Check if a message was already logged as pinned.
+ * @param {string} messageId - Discord message ID (snowflake)
+ * @returns {Promise<boolean>}
+ */
+export async function isMessageAlreadyPinned(messageId) {
+  if (!messageId || String(messageId).trim() === "") return false;
+  const id = String(messageId).trim();
+  const [rows] = await db.query("SELECT 1 FROM pin_history WHERE msgid = ?", [
+    id,
+  ]);
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+/**
+ * Log a message as pinned (idempotent: no-op if already logged).
+ * @param {string} messageId - Discord message ID (snowflake)
+ * @returns {Promise<{ ok: boolean }>}
+ */
+export async function logPinnedMessage(messageId) {
+  if (!messageId || String(messageId).trim() === "") {
+    return { ok: false };
+  }
+  const id = String(messageId).trim();
+  const already = await isMessageAlreadyPinned(id);
+  if (already) return { ok: true };
+  await db.query("INSERT INTO pin_history (msgid) VALUES (?)", [id]);
+  return { ok: true };
+}

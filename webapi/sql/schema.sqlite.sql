@@ -63,6 +63,11 @@ CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   UNIQUE (userid, emoid)
 );
 
+CREATE TABLE IF NOT EXISTS pin_history (
+  msgid TEXT PRIMARY KEY,
+  timestamp TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS link_replacements (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   source_host TEXT NOT NULL UNIQUE,
