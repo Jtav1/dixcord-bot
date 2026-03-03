@@ -1,0 +1,11 @@
+node_modules
+.env
+.env.*
+!.env.example
+*.sqlite
+data
+.git
+.gitignore
+README.md
+*.md
+.DS_Store
