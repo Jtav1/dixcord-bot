@@ -9,6 +9,7 @@ import botResponsesRoutes from "./routes/bot-responses.js";
 import messageProcessingRoutes from "./routes/message-processing.js";
 import configRoutes from "./routes/config.js";
 import linkReplacementsRoutes from "./routes/link-replacements.js";
+import leaderboardsRoutes from "./routes/leaderboards.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -66,6 +67,8 @@ app.get("/", (req, res) => {
       config: "/api/config (GET, auth required)",
       linkReplacements:
         "/api/link-replacements (GET list & GET /:id no auth; POST, PUT /:id, DELETE /:id auth required)",
+      leaderboards:
+        "/api/leaderboards/plusplus, /plusplus/total, /plusplus/voter/:userId, /plusplus/top-voters, /emoji, /repost, /repost/user/:userId (GET, auth required)",
     },
     auth: "Use header: Authorization: Bearer <token>",
   });
@@ -80,6 +83,7 @@ app.use("/api/bot-responses", botResponsesRoutes);
 app.use("/api/message-processing", messageProcessingRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api/link-replacements", linkReplacementsRoutes);
+app.use("/api/leaderboards", leaderboardsRoutes);
 
 // 404
 app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
