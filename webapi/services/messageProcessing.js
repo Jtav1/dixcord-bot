@@ -193,6 +193,26 @@ export async function recordPlusMinusMessage(payload) {
   return { ok: true, recorded };
 }
 
+/**
+ * Record a single plus or minus from a reaction (e.g. user added +/- emoji to a message).
+ * Body shape: { targetUserId: string, reactorId: string, value: 1 | -1 }
+ * Writes to plusplus_tracking (type='user'). Self-votes are rejected.
+ */
+export async function recordPlusMinusReaction(payload) {
+  const { targetUserId, reactorId, value } = payload;
+  if (!targetUserId || !reactorId) {
+    return { ok: false, error: "targetUserId and reactorId are required" };
+  }
+  if (value !== 1 && value !== -1) {
+    return { ok: false, error: "value must be 1 (plus) or -1 (minus)" };
+  }
+  if (String(targetUserId) === String(reactorId)) {
+    return { ok: false, error: "Cannot vote for yourself" };
+  }
+  await recordPlusPlus(String(targetUserId), "user", String(reactorId), value);
+  return { ok: true, recorded: 1, value };
+}
+
 // --- Repost tracking ---
 
 /**

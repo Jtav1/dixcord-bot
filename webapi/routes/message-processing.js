@@ -3,6 +3,7 @@ import { authenticate } from "../middleware/auth.js";
 import {
   countEmoji,
   recordPlusMinusMessage,
+  recordPlusMinusReaction,
   countRepost,
 } from "../services/messageProcessing.js";
 
@@ -31,13 +32,23 @@ router.post("/emoji-count", authenticate, async (req, res) => {
 
 /**
  * POST /api/message-processing/plusminus
- * Parse message for word++ / user++ / -- and record votes (filter list applied).
- * Body: { message: { content: string, author: { id: string } }, voterId: string }
+ * Two modes (use type to choose):
+ * - type: "message" — Parse message for word++ / user++ / -- and record votes (filter list applied).
+ *   Body: { type: "message", message: { content: string, author: { id: string } }, voterId: string }
+ * - type: "reaction" — Record a single +/- from a reaction (e.g. emoji on a message).
+ *   Body: { type: "reaction", targetUserId: string, reactorId: string, value: 1 | -1 }
  * Auth: required.
  */
 router.post("/plusminus", authenticate, async (req, res) => {
   try {
-    const result = await recordPlusMinusMessage(req.body);
+    const body = req.body ?? {};
+    const type = body.type === "reaction" ? "reaction" : "message";
+
+    const result =
+      type === "reaction"
+        ? await recordPlusMinusReaction(body)
+        : await recordPlusMinusMessage(body);
+
     if (!result.ok) {
       return res.status(400).json({ ...result, ok: false });
     }
