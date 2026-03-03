@@ -7,9 +7,9 @@ const router = express.Router();
 /**
  * GET /api/link-replacements
  * List all link replacements (source_host -> target_host).
- * Auth: none.
+ * Auth: required.
  */
-router.get("/", async (req, res) => {
+router.get("/", authenticate, async (req, res) => {
   try {
     const list = await linkReplacements.getAll();
     res.json({ ok: true, linkReplacements: list });
@@ -22,9 +22,9 @@ router.get("/", async (req, res) => {
 /**
  * GET /api/link-replacements/:id
  * Get one link replacement by id.
- * Auth: none.
+ * Auth: required.
  */
-router.get("/:id", async (req, res) => {
+router.get("/:id", authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
