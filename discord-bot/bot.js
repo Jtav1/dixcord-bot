@@ -5,8 +5,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { token, clientId, guildId, isDev, version } from "./configVars.js";
-import { importEmojiList } from "./database/emojis.js";
-import { getAllConfigurations } from "./database/configurations.js";
+import { importEmojiList } from "./api/emojis.js";
+import { getAllConfigurations } from "./api/configurations.js";
 import {
   handleReactionAdd,
   handleReactionRemove,
@@ -25,14 +25,6 @@ const client = new Client({
 
 const configs = await getAllConfigurations();
 
-// const timeoutEmoji =
-//   configs.find((config_entry) => config_entry.config === "timeout_emoji")
-//     ?.value || null;
-// const timeoutThreshold = parseInt(
-//   configs.find(
-//     (config_entry) => config_entry.config === "timeout_vote_threshold",
-//   )?.value || null,
-// );
 
 const pinThreshold = parseInt(
   configs.find((config_entry) => config_entry.config === "pin_threshold")

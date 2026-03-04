@@ -1,4 +1,4 @@
-import { getFortuneResponse } from "../../../database/responses.js";
+import { getFortuneResponse } from "../../../api/responses.js";
 
 /**
  * Returns a random 8-ball fortune. The webapi does random selection and increment.

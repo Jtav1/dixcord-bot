@@ -1,7 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 import * as api from "../api/client.js";
 
-import { getAllConfigurations } from "../../../database/configurations.js";
+import { getAllConfigurations } from "../../../api/configurations.js";
 import { isDev } from "../../../configVars.js";
 
 const configs = await getAllConfigurations();

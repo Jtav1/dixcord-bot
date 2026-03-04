@@ -2,7 +2,7 @@ import {
   plusplus,
   minusminus,
   recordPlusMinusFromMessage,
-} from "../../../database/plusplus.js";
+} from "../../../api/plusplus.js";
 
 /** Used by reaction handler only (user votes). */
 export const doplus = async (string, typestr, voterid) => {

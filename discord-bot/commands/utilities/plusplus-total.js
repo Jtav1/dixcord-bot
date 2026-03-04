@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { getTotalScoreByString } from '../../database/plusplus.js';
+import { getTotalScoreByString } from '../../api/plusplus.js';
 
 const cmdName = 'plusplus-total';
 

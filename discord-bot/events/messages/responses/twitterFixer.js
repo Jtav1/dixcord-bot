@@ -1,4 +1,4 @@
-import { getLinkFixerResponse } from "../../../database/responses.js";
+import { getLinkFixerResponse } from "../../../api/responses.js";
 
 /**
  * Returns a fixed embed-friendly link if the message contains a social link and trigger.

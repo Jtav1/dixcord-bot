@@ -10,7 +10,7 @@ import { emojiDetector } from "./utilities/emojiDetector.js";
 import { plusMinusMsg } from "./utilities/plusplus.js";
 
 const name = "messageCreate";
-
+// TODO v2.1 - make these generic / in db
 const TALTriggerWords = [
   "takealookatthis",
   "takenalookatthis",

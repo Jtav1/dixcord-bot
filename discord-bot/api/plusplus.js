@@ -1,4 +1,4 @@
-import * as api from "../api/client.js";
+import * as api from "./client.js";
 
 /**
  * Record a plus vote from a reaction (user only). Calls API with type "reaction".

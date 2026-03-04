@@ -5,7 +5,7 @@ import {
   countEmoji,
   countRepost,
   uncountRepost,
-} from "../../../database/emojis.js";
+} from "../../../api/emojis.js";
 
 /** Fetch a random pin quip from the API; returns fallback if unavailable. */
 async function getRandomPinQuip() {

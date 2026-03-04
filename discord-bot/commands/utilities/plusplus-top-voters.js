@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { getTopVoters } from '../../database/plusplus.js';
+import { getTopVoters } from '../../api/plusplus.js';
 import { EmbedBuilder } from "discord.js";
 
 const cmdName = 'plusplus-top-voters';

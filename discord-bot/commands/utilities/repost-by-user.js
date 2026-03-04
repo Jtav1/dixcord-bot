@@ -1,6 +1,6 @@
 import { SlashCommandBuilder } from "discord.js";
-import { getRepostsForUser } from "../../database/emojis.js";
-import { getAllConfigurations } from "../../database/configurations.js";
+import { getRepostsForUser } from "../../api/emojis.js";
+import { getAllConfigurations } from "../../api/configurations.js";
 
 const cmdName = "reposts-by-user";
 

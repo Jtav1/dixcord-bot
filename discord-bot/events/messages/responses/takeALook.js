@@ -1,4 +1,4 @@
-import { takeALook as getTakeALookResponse } from "../../../database/responses.js";
+import { takeALook as getTakeALookResponse } from "../../../api/responses.js";
 
 /**
  * Take-a-look response: random image URL, "No spam!", or empty if over limit.

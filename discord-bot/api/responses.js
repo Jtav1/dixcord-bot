@@ -1,4 +1,4 @@
-import * as api from "../api/client.js";
+import * as api from "./client.js";
 
 /**
  * Take-a-look response (random image URL or rate-limit message). POST /api/bot-responses/take-a-look.

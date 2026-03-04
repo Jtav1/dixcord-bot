@@ -1,4 +1,4 @@
-import * as api from "../api/client.js";
+import * as api from "./client.js";
 
 /**
  * Fetch all configurations from the web API.

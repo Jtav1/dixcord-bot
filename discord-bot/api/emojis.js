@@ -1,4 +1,4 @@
-import * as api from "../api/client.js";
+import * as api from "./client.js";
 
 /**
  * Sync server emoji list with the web API.
