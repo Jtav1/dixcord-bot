@@ -37,6 +37,138 @@ router.get("/triggers", authenticate, async (req, res) => {
 });
 
 /**
+ * GET /api/trigger-responses/triggers/list
+ * List all triggers with id and selection_mode (for CRUD).
+ * Auth: required.
+ */
+router.get("/triggers/list", authenticate, async (req, res) => {
+  try {
+    const list = await triggerResponses.getTriggers();
+    res.json({ ok: true, triggers: list });
+  } catch (err) {
+    console.error("GET /api/trigger-responses/triggers/list error:", err);
+    res.status(500).json({ ok: false, error: "Failed to list triggers" });
+  }
+});
+
+/**
+ * GET /api/trigger-responses/triggers/responses?trigger=xxx | ?triggerId=xxx
+ * Get all responses for a trigger by trigger text or trigger id.
+ * Auth: required.
+ */
+router.get("/triggers/responses", authenticate, async (req, res) => {
+  try {
+    const { trigger, triggerId } = req.query;
+    const idParam = triggerId != null && triggerId !== "" ? parseInt(triggerId, 10) : null;
+    const triggerParam = typeof trigger === "string" && trigger.trim() ? trigger.trim() : null;
+    if (idParam != null && !Number.isNaN(idParam)) {
+      const data = await triggerResponses.getResponsesForTrigger(idParam);
+      if (!data) {
+        return res.status(404).json({ ok: false, error: "Trigger not found" });
+      }
+      return res.json({ ok: true, ...data });
+    }
+    if (triggerParam) {
+      const data = await triggerResponses.getResponsesForTrigger(triggerParam);
+      if (!data) {
+        return res.status(404).json({ ok: false, error: "Trigger not found" });
+      }
+      return res.json({ ok: true, ...data });
+    }
+    return res.status(400).json({
+      ok: false,
+      error: "Query parameter 'trigger' (trigger text) or 'triggerId' (trigger id) is required",
+    });
+  } catch (err) {
+    console.error("GET /api/trigger-responses/triggers/responses error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get responses for trigger" });
+  }
+});
+
+/**
+ * GET /api/trigger-responses/triggers/:id
+ * Get one trigger by id with its responses array (each response has id, response_string, order, linkId).
+ * Auth: required.
+ */
+router.get("/triggers/:id", authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ ok: false, error: "Invalid trigger id" });
+    }
+    const trigger = await triggerResponses.getTriggerById(id);
+    if (!trigger) {
+      return res.status(404).json({ ok: false, error: "Trigger not found" });
+    }
+    res.json({ ok: true, ...trigger });
+  } catch (err) {
+    console.error("GET /api/trigger-responses/triggers/:id error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get trigger" });
+  }
+});
+
+/**
+ * POST /api/trigger-responses/triggers
+ * Create a trigger (if it doesn't exist) with selection_mode and an array of responses.
+ * Body: { trigger_string, selection_mode?, responses: [ { response_string, order? } ] }
+ * Auth: required.
+ */
+router.post("/triggers", authenticate, async (req, res) => {
+  try {
+    const { trigger_string, selection_mode, responses } = req.body ?? {};
+    if (!trigger_string || typeof trigger_string !== "string" || !trigger_string.trim()) {
+      return res.status(400).json({
+        ok: false,
+        error: "trigger_string (non-empty string) is required",
+      });
+    }
+    if (!Array.isArray(responses) || responses.length === 0) {
+      return res.status(400).json({
+        ok: false,
+        error: "responses (non-empty array of { response_string, order? }) is required",
+      });
+    }
+    const trigger = await triggerResponses.createTriggerWithResponses({
+      trigger_string: trigger_string.trim(),
+      selection_mode,
+      responses,
+    });
+    if (!trigger) {
+      return res.status(500).json({ ok: false, error: "Failed to create trigger with responses" });
+    }
+    res.status(201).json({ ok: true, ...trigger });
+  } catch (err) {
+    console.error("POST /api/trigger-responses/triggers error:", err);
+    res.status(500).json({ ok: false, error: "Failed to create trigger" });
+  }
+});
+
+/**
+ * PUT /api/trigger-responses/triggers/:id
+ * Update trigger: selection_mode and/or responses (set order by link id, or add new response).
+ * Body: { selection_mode?, responses?: [ { id: linkId, order? } | { response_string, order? } ] }
+ * Auth: required.
+ */
+router.put("/triggers/:id", authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ ok: false, error: "Invalid trigger id" });
+    }
+    const { selection_mode, responses } = req.body ?? {};
+    const updated = await triggerResponses.updateTrigger(id, { selection_mode, responses });
+    if (!updated) {
+      return res.status(404).json({ ok: false, error: "Trigger not found" });
+    }
+    const trigger = await triggerResponses.getTriggerById(id);
+    res.json({ ok: true, ...trigger });
+  } catch (err) {
+    console.error("PUT /api/trigger-responses/triggers/:id error:", err);
+    res.status(500).json({ ok: false, error: "Failed to update trigger" });
+  }
+});
+
+/**
  * GET /api/trigger-responses/random?trigger=xxx
  * Return one random response string for the given trigger. Used by bot when message matches a trigger.
  * Auth: required.
@@ -64,8 +196,79 @@ router.get("/random", authenticate, async (req, res) => {
 });
 
 /**
+ * GET /api/trigger-responses/responses/:id
+ * Get one response by id (responses table).
+ * Auth: required.
+ */
+router.get("/responses/:id", authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ ok: false, error: "Invalid response id" });
+    }
+    const response = await triggerResponses.getResponseById(id);
+    if (!response) {
+      return res.status(404).json({ ok: false, error: "Response not found" });
+    }
+    res.json({ ok: true, ...response });
+  } catch (err) {
+    console.error("GET /api/trigger-responses/responses/:id error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get response" });
+  }
+});
+
+/**
+ * PUT /api/trigger-responses/responses/:id
+ * Update a response's text. Body: { response_string }
+ * Auth: required.
+ */
+router.put("/responses/:id", authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ ok: false, error: "Invalid response id" });
+    }
+    const { response_string } = req.body ?? {};
+    if (response_string == null || typeof response_string !== "string" || !response_string.trim()) {
+      return res.status(400).json({ ok: false, error: "response_string (non-empty string) is required" });
+    }
+    const updated = await triggerResponses.updateResponse(id, { response_string });
+    if (!updated) {
+      return res.status(404).json({ ok: false, error: "Response not found" });
+    }
+    const response = await triggerResponses.getResponseById(id);
+    res.json({ ok: true, ...response });
+  } catch (err) {
+    console.error("PUT /api/trigger-responses/responses/:id error:", err);
+    res.status(500).json({ ok: false, error: "Failed to update response" });
+  }
+});
+
+/**
+ * DELETE /api/trigger-responses/responses/:id
+ * Delete a response (removes from all triggers via cascade).
+ * Auth: required.
+ */
+router.delete("/responses/:id", authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ ok: false, error: "Invalid response id" });
+    }
+    const deleted = await triggerResponses.deleteResponse(id);
+    if (!deleted) {
+      return res.status(404).json({ ok: false, error: "Response not found" });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /api/trigger-responses/responses/:id error:", err);
+    res.status(500).json({ ok: false, error: "Failed to delete response" });
+  }
+});
+
+/**
  * GET /api/trigger-responses/:id
- * Get one trigger-response pair by id.
+ * Get one trigger-response link (junction) by id.
  * Auth: required.
  */
 router.get("/:id", authenticate, async (req, res) => {

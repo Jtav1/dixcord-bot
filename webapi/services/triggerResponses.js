@@ -54,6 +54,17 @@ export async function getTriggerList() {
 }
 
 /**
+ * All triggers with id and selection_mode (for CRUD clients).
+ * @returns {Promise<Array<{ id: number, trigger_string: string, selection_mode: string }>>}
+ */
+export async function getTriggers() {
+  const [rows] = await db.query(
+    "SELECT id, trigger_string, selection_mode FROM triggers ORDER BY trigger_string",
+  );
+  return Array.isArray(rows) ? rows : [];
+}
+
+/**
  * Get last_used_response_id (responses.id) for a trigger from trigger_response_state.
  * @param {string} trigger
  * @returns {Promise<number|null>}
@@ -267,5 +278,201 @@ export async function remove(id) {
     "DELETE FROM trigger_response WHERE id = ?",
     [id],
   );
+  return (result?.affectedRows ?? result?.changes ?? 0) > 0;
+}
+
+// --- Trigger-centric (trigger id + responses array) ---
+
+/**
+ * Get all responses for a trigger by trigger id or trigger string.
+ * @param {number|string} triggerIdOrString - Trigger id (number) or trigger_string
+ * @returns {Promise<{ trigger_id: number, trigger_string: string, selection_mode: string, responses: Array<{ id: number, response_string: string, order: number|null, linkId: number }> }|null>}
+ */
+export async function getResponsesForTrigger(triggerIdOrString) {
+  let triggerId = null;
+  if (typeof triggerIdOrString === "number" && Number.isInteger(triggerIdOrString)) {
+    triggerId = triggerIdOrString;
+  } else if (typeof triggerIdOrString === "string" && triggerIdOrString.trim()) {
+    const [rows] = await db.query(
+      "SELECT id FROM triggers WHERE trigger_string = ? LIMIT 1",
+      [triggerIdOrString.trim()],
+    );
+    if (rows && rows.length > 0) triggerId = rows[0].id;
+  }
+  if (triggerId == null) return null;
+  const trigger = await getTriggerById(triggerId);
+  if (!trigger) return null;
+  return {
+    trigger_id: trigger.id,
+    trigger_string: trigger.trigger_string,
+    selection_mode: trigger.selection_mode,
+    responses: trigger.responses,
+  };
+}
+
+/**
+ * Get trigger by id with its responses (ordered by response_order, then response_id).
+ * @param {number} triggerId
+ * @returns {Promise<{ id: number, trigger_string: string, selection_mode: string, created_at: string, responses: Array<{ id: number, response_string: string, order: number|null, linkId: number }> }|null>}
+ */
+export async function getTriggerById(triggerId) {
+  const [tRows] = await db.query(
+    "SELECT id, trigger_string, selection_mode, created_at FROM triggers WHERE id = ?",
+    [triggerId],
+  );
+  if (!tRows || tRows.length === 0) return null;
+  const trigger = tRows[0];
+  const [linkRows] = await db.query(
+    `SELECT tr.id AS linkId, tr.response_order AS response_order_val, r.id, r.response_string
+     FROM trigger_response tr
+     JOIN responses r ON r.id = tr.response_id
+     WHERE tr.trigger_id = ?
+     ${orderByResponseOrderClause}`,
+    [triggerId],
+  );
+  const responses = (linkRows || []).map((r) => ({
+    id: r.id,
+    response_string: r.response_string,
+    order: r.response_order_val ?? null,
+    linkId: r.linkId,
+  }));
+  return {
+    id: trigger.id,
+    trigger_string: trigger.trigger_string,
+    selection_mode: trigger.selection_mode || "random",
+    created_at: trigger.created_at,
+    responses,
+  };
+}
+
+/**
+ * Create a trigger (if not exists) with selection_mode and an array of responses.
+ * Each response can have response_string and optional order (used when trigger is ordered).
+ * @param {{ trigger_string: string, selection_mode?: string, responses: Array<{ response_string: string, order?: number|null }> }} params
+ * @returns {Promise<{ id: number, trigger_string: string, selection_mode: string, created_at: string, responses: Array<{ id: number, response_string: string, order: number|null, linkId: number }> }|null>}
+ */
+export async function createTriggerWithResponses({
+  trigger_string,
+  selection_mode = "random",
+  responses,
+}) {
+  if (!trigger_string || typeof trigger_string !== "string" || !trigger_string.trim()) return null;
+  if (!Array.isArray(responses) || responses.length === 0) return null;
+  const mode =
+    selection_mode && VALID_MODES.includes(selection_mode.toLowerCase())
+      ? selection_mode.toLowerCase()
+      : "random";
+  const triggerId = await getOrCreateTriggerId(trigger_string.trim(), mode);
+  if (triggerId == null) return null;
+  const created = [];
+  for (const item of responses) {
+    const str = item?.response_string;
+    if (str == null || typeof str !== "string" || !str.trim()) continue;
+    const responseId = await getOrCreateResponseId(str.trim());
+    if (responseId == null) continue;
+    const order =
+      item.order !== undefined && item.order !== null && item.order !== ""
+        ? Number(item.order)
+        : null;
+    const [ins] = await db.query(
+      "INSERT INTO trigger_response (trigger_id, response_id, response_order) VALUES (?, ?, ?)",
+      [triggerId, responseId, order],
+    );
+    const linkId = ins?.insertId ?? ins?.lastInsertRowid;
+    if (linkId != null) {
+      created.push({
+        id: responseId,
+        response_string: str.trim(),
+        order,
+        linkId,
+      });
+    }
+  }
+  const trigger = await getTriggerById(triggerId);
+  return trigger;
+}
+
+/**
+ * Update a trigger: selection_mode and/or response list (set order for existing links, add new responses).
+ * responses: [ { id: linkId, order? } ] to set order, or [ { response_string, order? } ] to add new.
+ * @param {number} triggerId
+ * @param {{ selection_mode?: string, responses?: Array<{ id?: number, response_string?: string, order?: number|null }> }} updates
+ * @returns {Promise<boolean>}
+ */
+export async function updateTrigger(triggerId, { selection_mode, responses }) {
+  const [tRows] = await db.query("SELECT id FROM triggers WHERE id = ?", [triggerId]);
+  if (!tRows || tRows.length === 0) return false;
+  if (selection_mode !== undefined) {
+    const mode =
+      selection_mode && VALID_MODES.includes(selection_mode.toLowerCase())
+        ? selection_mode.toLowerCase()
+        : "random";
+    await db.query("UPDATE triggers SET selection_mode = ? WHERE id = ?", [mode, triggerId]);
+  }
+  if (Array.isArray(responses)) {
+    for (const item of responses) {
+      if (item.id != null && Number.isInteger(Number(item.id))) {
+        const linkId = Number(item.id);
+        const order =
+          item.order !== undefined && item.order !== null && item.order !== ""
+            ? Number(item.order)
+            : null;
+        await db.query(
+          "UPDATE trigger_response SET response_order = ? WHERE id = ? AND trigger_id = ?",
+          [order, linkId, triggerId],
+        );
+      } else if (item.response_string != null && typeof item.response_string === "string" && item.response_string.trim()) {
+        const responseId = await getOrCreateResponseId(item.response_string.trim());
+        if (responseId == null) continue;
+        const order =
+          item.order !== undefined && item.order !== null && item.order !== ""
+            ? Number(item.order)
+            : null;
+        await db.query(
+          "INSERT INTO trigger_response (trigger_id, response_id, response_order) VALUES (?, ?, ?)",
+          [triggerId, responseId, order],
+        );
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * Get response by id (responses table).
+ * @param {number} responseId
+ * @returns {Promise<{ id: number, response_string: string, created_at: string }|null>}
+ */
+export async function getResponseById(responseId) {
+  const [rows] = await db.query(
+    "SELECT id, response_string, created_at FROM responses WHERE id = ?",
+    [responseId],
+  );
+  return rows && rows.length > 0 ? rows[0] : null;
+}
+
+/**
+ * Update a response's text (responses table).
+ * @param {number} responseId
+ * @param {{ response_string?: string }} updates
+ * @returns {Promise<boolean>} false if response_string invalid or response not found
+ */
+export async function updateResponse(responseId, { response_string }) {
+  if (response_string == null || typeof response_string !== "string" || !response_string.trim())
+    return false;
+  const [result] = await db.query(
+    "UPDATE responses SET response_string = ? WHERE id = ?",
+    [response_string.trim(), responseId],
+  );
+  return (result?.affectedRows ?? result?.changes ?? 0) > 0;
+}
+
+/**
+ * Delete a response (responses table). Cascade removes trigger_response links.
+ * @param {number} responseId
+ * @returns {Promise<boolean>}
+ */
+export async function deleteResponse(responseId) {
+  const [result] = await db.query("DELETE FROM responses WHERE id = ?", [responseId]);
   return (result?.affectedRows ?? result?.changes ?? 0) > 0;
 }
