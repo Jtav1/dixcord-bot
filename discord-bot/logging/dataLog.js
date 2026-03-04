@@ -1,8 +1,6 @@
-import { dataDirectory, isDev } from "../configVars.js";
 import { execQuery } from "../database/queryRunner.js";
 import { getAllLogFilterKeywords } from "../database/filters.js";
 
-import fs from "fs";
 import mysql from "mysql2";
 
 let filterWordArray = await getAllLogFilterKeywords();
