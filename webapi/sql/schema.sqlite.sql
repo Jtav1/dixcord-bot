@@ -79,3 +79,9 @@ CREATE TABLE IF NOT EXISTS link_replacements (
   source_host TEXT NOT NULL UNIQUE,
   target_host TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS pin_quips (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  quip TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);

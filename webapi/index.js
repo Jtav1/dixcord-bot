@@ -10,6 +10,7 @@ import messageProcessingRoutes from "./routes/message-processing.js";
 import configRoutes from "./routes/config.js";
 import linkReplacementsRoutes from "./routes/link-replacements.js";
 import leaderboardsRoutes from "./routes/leaderboards.js";
+import pinQuipsRoutes from "./routes/pin-quips.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -112,6 +113,17 @@ app.get("/", (req, res) => {
           "DELETE /api/link-replacements/:id",
         ],
       },
+      pinQuips: {
+        authRequired: true,
+        routes: [
+          "GET /api/pin-quips",
+          "GET /api/pin-quips/random",
+          "GET /api/pin-quips/:id",
+          "POST /api/pin-quips (body: { quip })",
+          "PUT /api/pin-quips/:id (body: { quip })",
+          "DELETE /api/pin-quips/:id",
+        ],
+      },
       leaderboards: {
         authRequired: true,
         routes: [
@@ -138,6 +150,7 @@ app.use("/api/bot-responses", botResponsesRoutes);
 app.use("/api/message-processing", messageProcessingRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api/link-replacements", linkReplacementsRoutes);
+app.use("/api/pin-quips", pinQuipsRoutes);
 app.use("/api/leaderboards", leaderboardsRoutes);
 
 // 404

@@ -162,6 +162,14 @@ const initializeDatabase = () => {
     )
   `);
 
+  exec(`
+    CREATE TABLE IF NOT EXISTS pin_quips (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      quip TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   console.log("db: SQLite table initialization complete");
 };
 
@@ -221,6 +229,32 @@ const importConfigs = () => {
   console.log("db: SQLite configuration import complete");
 };
 
+const DEFAULT_PIN_QUIPS = [
+  "lmao saving this shit for later",
+  "PINNED",
+  "!!! MAJOR PIN ALERT !!!",
+  "Dixbot will remember that...",
+  "Lets FUCKING go dude I'm pinning this",
+  "Alright, fine...",
+  "Puttin a pin on this one",
+  "^ pinned this btw",
+  "Um... based? or cringe.",
+  "I'm only going to pin it once this time",
+];
+
+const importPinQuips = () => {
+  const count = db.prepare("SELECT COUNT(*) as c FROM pin_quips").get();
+  if (count && count.c > 0) return;
+  const insert = db.prepare("INSERT INTO pin_quips (quip) VALUES (?)");
+  const insertMany = db.transaction((quips) => {
+    for (const quip of quips) {
+      insert.run(quip);
+    }
+  });
+  insertMany(DEFAULT_PIN_QUIPS);
+  console.log("db: SQLite pin_quips seed complete");
+};
+
 const importLinkReplacements = () => {
   const defaultLinkReplacements = [
     ["x.com", "fixvx.com"],
@@ -245,6 +279,7 @@ const importLinkReplacements = () => {
 try {
   initializeDatabase();
   importConfigs();
+  importPinQuips();
   importLinkReplacements();
   db.close();
   process.exit(0);

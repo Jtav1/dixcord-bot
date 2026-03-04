@@ -164,6 +164,36 @@ export const initializeDatabase = async () => {
     )
   `);
 
+  // Pin quips (messages said when bot pins a message)
+  await execQuery(`
+    CREATE TABLE IF NOT EXISTS pin_quips (
+      id INT PRIMARY KEY AUTO_INCREMENT,
+      quip VARCHAR(500) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  const defaultPinQuips = [
+    'lmao saving this shit for later',
+    'PINNED',
+    '!!! MAJOR PIN ALERT !!!',
+    "Dixbot will remember that...",
+    "Lets FUCKING go dude I'm pinning this",
+    "Alright, fine...",
+    "Puttin a pin on this one",
+    "^ pinned this btw",
+    "Um... based? or cringe.",
+    "I'm only going to pin it once this time",
+  ];
+  const [pinQuipRows] = await pool.query('SELECT COUNT(*) as count FROM pin_quips');
+  const pinQuipsCount = pinQuipRows?.[0]?.count ?? 0;
+  if (pinQuipsCount === 0) {
+    for (const quip of defaultPinQuips) {
+      await pool.query('INSERT INTO pin_quips (quip) VALUES (?)', [quip]);
+    }
+    console.log('db: MySQL pin_quips seed complete');
+  }
+
   console.log('db: MySQL table initialization complete');
 };
 
