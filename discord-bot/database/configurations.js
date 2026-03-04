@@ -1,28 +1,47 @@
-import { execQuery } from "./queryRunner.js";
+import * as api from "../api/client.js";
 
-import mysql from "mysql2";
-
+/**
+ * Fetch all configurations from the web API.
+ * GET /api/config returns { entries: [ { config, value } ] }.
+ * @returns {Promise<Array<{ config: string, value: string }>>}
+ */
 export const getAllConfigurations = async () => {
-  var query = mysql.format("SELECT * FROM configurations");
-  return await execQuery(query);
+  const { data } = await api.get("/api/config");
+  if (!data?.ok || !Array.isArray(data.entries)) {
+    throw new Error(data?.error || "Failed to load configuration from API");
+  }
+  return data.entries;
 };
 
-export const addConfiguration = async (config, value) => {
-  const query = mysql.format(
-    "INSERT IGNORE INTO configurations (config, value) VALUES ?",
-    [[[config, value]]]
+/**
+ * Add configuration. Not supported by the web API (read-only config endpoint).
+ * @throws {Error}
+ */
+export const addConfiguration = async () => {
+  throw new Error(
+    "addConfiguration is not supported when using the web API (config is read-only)",
   );
-
-  console.log(query);
-
-  return await execQuery(query);
 };
 
+/**
+ * Update configuration value by name via the web API.
+ * PUT /api/config with body { config, value }. Only updates if the item exists.
+ * @param {string} config - Configuration item name
+ * @param {string} value - New value
+ * @returns {Promise<void>}
+ * @throws {Error} If the API returns an error (e.g. 404 when item does not exist)
+ */
 export const updateConfigurationByName = async (config, value) => {
-  const query = mysql.format(
-    "UPDATE configurations SET VALUE = ? WHERE config = ?",
-    [value, config]
-  );
-
-  return await execQuery(query);
+  try {
+    const { data } = await api.put("/api/config", {
+      config,
+      value: value ?? "",
+    });
+    if (!data?.ok) {
+      throw new Error(data?.error || "Failed to update configuration");
+    }
+  } catch (err) {
+    const message = err.response?.data?.error || err.message;
+    throw new Error(message);
+  }
 };
