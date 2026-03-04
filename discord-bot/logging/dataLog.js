@@ -1,35 +1,26 @@
-import { execQuery } from "../database/queryRunner.js";
-import { getAllLogFilterKeywords } from "../database/filters.js";
+import * as api from "../api/client.js";
 
-import mysql from "mysql2";
-
-let filterWordArray = await getAllLogFilterKeywords();
-filterWordArray = filterWordArray.map((w) => {
-  return w.keyword;
-});
-
-export const logPinnedMessage = (msgid) => {
-  if (msgid) {
-    const boolPreviouslyPinned =
-      isMessageAlreadyPinned(msgid) > 0 ? true : false; // shouldnt 0 be falsy idk how js works im dumb
-
-    if (!boolPreviouslyPinned) {
-      const pinLogQry = mysql.format(
-        "INSERT INTO pin_history (msgid) VALUES (?)",
-        [msgid],
-      );
-      execQuery(pinLogQry);
-    } else {
-    }
-  }
+/**
+ * Check whether a message was already logged as pinned.
+ * POST /api/message-processing/pin-check with { messageId }.
+ * @param {string} msgid - Message ID
+ * @returns {Promise<boolean>}
+ */
+export const isMessageAlreadyPinned = async (msgid) => {
+  if (!msgid) return false;
+  const { data } = await api.post("/api/message-processing/pin-check", {
+    messageId: msgid,
+  });
+  return Boolean(data?.alreadyPinned);
 };
 
-export const isMessageAlreadyPinned = async (msgid) => {
-  var query = mysql.format(
-    "SELECT * FROM pin_history WHERE msgid LIKE CONCAT('%' ? '%')",
-    msgid,
-  );
-  const results = await execQuery(query);
-
-  return results.length > 0;
+/**
+ * Log a message as pinned (idempotent; API no-op if already logged).
+ * POST /api/message-processing/pin-log with { messageId }.
+ * @param {string} msgid - Message ID
+ * @returns {Promise<void>}
+ */
+export const logPinnedMessage = async (msgid) => {
+  if (!msgid) return;
+  await api.post("/api/message-processing/pin-log", { messageId: msgid });
 };

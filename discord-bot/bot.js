@@ -186,9 +186,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
     await dominus(reaction.message.author.id, "user", user.id);
   }
 
-  let reactStr = "<:" + reaction._emoji.name + ":" + reaction._emoji.id + ">";
-
-  // This shouldnt be necessary because countEmoji only counts server emoji BUT if we ever use a custom one, or add that in as another option...
+  // Skip counting for pin/plus/minus emojis; count all other reactions
   if (
     reaction._emoji.name === pinEmoji ||
     reaction._emoji.id === plusEmoji ||
@@ -196,7 +194,7 @@ client.on("messageReactionAdd", async (reaction, user) => {
   ) {
     // do nothing - bad form i know
   } else {
-    countEmoji(reactStr, user.id);
+    await countEmoji(reaction._emoji.name, reaction._emoji.id, user.id);
   }
 
   const repostReact = allReactions.get(repostEmojiId);

@@ -1,77 +1,37 @@
-import { execQuery } from "./queryRunner.js";
+import * as api from "../api/client.js";
 
-import mysql from "mysql2";
+/**
+ * Take-a-look response (random image URL or rate-limit message). POST /api/bot-responses/take-a-look.
+ * The webapi handles links, rate limit, and increment.
+ * @returns {Promise<string>}
+ */
+export const takeALook = async () => {
+  const { data } = await api.post("/api/bot-responses/take-a-look");
+  if (!data?.ok) return "";
+  return data.response ?? "";
+};
 
-export const getRareArray = async () => {
-  var query = mysql.format(
-    "SELECT link FROM take_a_look_responses WHERE isdefault = 0"
-  );
-  const results = await execQuery(query);
+/**
+ * Random 8-ball fortune. POST /api/bot-responses/fortune.
+ * @returns {Promise<string>}
+ */
+export const getFortuneResponse = async () => {
+  const { data } = await api.post("/api/bot-responses/fortune");
+  if (!data?.ok) return "";
+  return data.response ?? "";
+};
 
-  //map this to an array of strings
-  const tempArray = results.map((row) => {
-    return row.link;
+/**
+ * Link-fixer response for social links (x/twitter, instagram, tiktok, bsky). POST /api/bot-responses/link-fixer.
+ * The webapi uses config and link_replacements; no processing in the bot.
+ * @param {string} message - Raw message content
+ * @returns {Promise<string>}
+ */
+export const getLinkFixerResponse = async (message) => {
+  if (!message) return "";
+  const { data } = await api.post("/api/bot-responses/link-fixer", {
+    message: String(message),
   });
-
-  return tempArray;
-};
-
-export const getCommonArray = async () => {
-  var query = mysql.format(
-    "SELECT link FROM take_a_look_responses WHERE isdefault = 1"
-  );
-  const results = await execQuery(query);
-
-  //map this to an array of strings
-  const tempArray = results.map((row) => {
-    return row.link;
-  });
-
-  return tempArray;
-};
-
-export const getAllTakeALookLinks = async () => {
-  var query = mysql.format("SELECT * FROM take_a_look_responses");
-  return await execQuery(query);
-};
-
-export const insertTakeALookLink = async (link, isdefault) => {
-  const linkInsertQry = mysql.format(
-    "INSERT IGNORE INTO take_a_look_responses (link, isdefault) VALUES (?, ?)",
-    [link, isdefault]
-  );
-
-  return await execQuery(linkInsertQry);
-};
-
-export const incrementTakeALookLink = async (link) => {
-  const incrementQuery = mysql.format(
-    "UPDATE take_a_look_responses SET frequency = frequency + 1 WHERE id = ?",
-    [link.id]
-  );
-
-  return await execQuery(incrementQuery);
-};
-
-export const getAllFortunes = async () => {
-  var query = mysql.format("SELECT * FROM eight_ball_responses");
-  return await execQuery(query);
-};
-
-export const insertFortune = async (text, sentiment) => {
-  const fortuneInsertQry = mysql.format(
-    "INSERT IGNORE INTO eight_ball_responses (resoponse_string, sentiment) VALUES (?, ?)",
-    [text, sentiment]
-  );
-
-  return await execQuery(fortuneInsertQry);
-};
-
-export const incrementFortune = async (fortune) => {
-  const incrementQuery = mysql.format(
-    "UPDATE eight_ball_responses SET frequency = frequency + 1 WHERE id = ?",
-    [fortune.id]
-  );
-
-  return await execQuery(incrementQuery);
+  if (!data?.ok) return "";
+  return data.response ?? "";
 };

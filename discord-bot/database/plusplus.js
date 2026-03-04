@@ -1,108 +1,104 @@
-import { execQuery } from "./queryRunner.js";
+import * as api from "../api/client.js";
 
-import mysql from "mysql2";
-
+/**
+ * Record a plus vote from a reaction (user only). Calls API with type "reaction".
+ * Message content (word++/user++) is handled by recordPlusMinusFromMessage; the webapi does that parsing.
+ */
 export const plusplus = async (string, typestr, voterid) => {
-  if (typestr && string && voterid) {
-    const plusplusQuery = mysql.format(
-      "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
-      [typestr, string, voterid, 1]
-    );
-    execQuery(plusplusQuery);
-  }
+  if (typestr !== "user" || !string || !voterid || string === voterid) return;
+  await api.post("/api/message-processing/plusminus", {
+    type: "reaction",
+    targetUserId: string,
+    reactorId: voterid,
+    value: 1,
+  });
 };
 
+/**
+ * Record a minus vote from a reaction (user only). Calls API with type "reaction".
+ */
 export const minusminus = async (string, typestr, voterid) => {
-  if (typestr && string && voterid) {
-    const plusplusQuery = mysql.format(
-      "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
-      [typestr, string, voterid, -1]
-    );
-    execQuery(plusplusQuery);
-  }
+  if (typestr !== "user" || !string || !voterid || string === voterid) return;
+  await api.post("/api/message-processing/plusminus", {
+    type: "reaction",
+    targetUserId: string,
+    reactorId: voterid,
+    value: -1,
+  });
 };
 
+/**
+ * Send message content to the API for plus/minus parsing. The webapi (recordPlusMinusMessage)
+ * does all parsing: word++/user++/--, filter list, self-vote skip. No parsing in the bot.
+ * @param {string} messageContent - Raw message content
+ * @param {string} voterId - Author's user id
+ */
+export const recordPlusMinusFromMessage = async (messageContent, voterId) => {
+  if (!voterId) return;
+  await api.post("/api/message-processing/plusminus", {
+    type: "message",
+    message: { content: messageContent ?? "", author: { id: voterId } },
+    voterId,
+  });
+};
+
+/**
+ * Total score for a string (word or user). GET /api/leaderboards/plusplus/total
+ * @returns {Promise<Array<{ total: number }>>} For backward compat with callers that use result[0].total
+ */
 export const getTotalScoreByString = async (string, typestr) => {
-  let res = [];
-
-  var query = mysql.format(
-    "SELECT SUM(value) as total FROM plusplus_tracking WHERE string = ? AND type = ?",
-    [string, typestr]
-  );
-
-  try {
-    const results = await execQuery(query);
-    res = results;
-  } catch (e) {
-    console.err(e);
-  }
-  return res;
+  if (!string) return [{ total: 0 }];
+  const type = typestr === "user" ? "user" : "word";
+  const { data } = await api.get("/api/leaderboards/plusplus/total", {
+    params: { string, type },
+  });
+  if (!data?.ok) return [{ total: 0 }];
+  return [{ total: Number(data.total) ?? 0 }];
 };
 
-export const getTopScores = async (number) => {
-  let res = [];
-
-  var query = mysql.format(
-    "SELECT string, type as typestr, SUM(value) as total FROM plusplus_tracking GROUP BY string ORDER BY total DESC LIMIT ?",
-    [number]
-  );
-
-  try {
-    const results = await execQuery(query);
-    res = results;
-  } catch (e) {
-    console.err(e);
-  }
-  return res;
+/**
+ * Top plusplus scores. POST /api/leaderboards/plusplus
+ * @returns {Promise<Array<{ string: string, typestr: string, total: number }>>}
+ */
+export const getTopScores = async (number = 5) => {
+  const { data } = await api.post("/api/leaderboards/plusplus", {
+    limit: number,
+  });
+  if (!data?.ok || !Array.isArray(data.top)) return [];
+  return data.top;
 };
 
-export const getBottomScores = async (number) => {
-  let res = [];
-
-  var query = mysql.format(
-    "SELECT string, type as typestr, SUM(value) as total FROM plusplus_tracking GROUP BY string ORDER BY total ASC LIMIT ?",
-    [number]
-  );
-
-  try {
-    const results = await execQuery(query);
-    res = results;
-  } catch (e) {
-    console.err(e);
-  }
-  return res;
+/**
+ * Bottom plusplus scores. POST /api/leaderboards/plusplus
+ * @returns {Promise<Array<{ string: string, typestr: string, total: number }>>}
+ */
+export const getBottomScores = async (number = 5) => {
+  const { data } = await api.post("/api/leaderboards/plusplus", {
+    limit: number,
+  });
+  if (!data?.ok || !Array.isArray(data.bottom)) return [];
+  return data.bottom;
 };
 
+/**
+ * Number of votes cast by a voter. GET /api/leaderboards/plusplus/voter/:userId
+ * @returns {Promise<Array<{ total: number }>>} For backward compat with callers that use result[0].total
+ */
 export const getVotesById = async (voterid) => {
-  let res = [];
-
-  var query = mysql.format(
-    "SELECT COUNT(*) as total FROM plusplus_tracking WHERE voter = ?",
-    [voterid]
-  );
-
-  try {
-    const results = await execQuery(query);
-    res = results;
-  } catch (e) {
-    console.err(e);
-  }
-  return res;
+  if (!voterid) return [{ total: 0 }];
+  const { data } = await api.get(`/api/leaderboards/plusplus/voter/${voterid}`);
+  if (!data?.ok) return [{ total: 0 }];
+  return [{ total: Number(data.total) ?? 0 }];
 };
 
-export const getTopVoters = async (number) => {
-  let res = [];
-
-  var query = mysql.format(
-    "SELECT voter, COUNT(*) as total FROM plusplus_tracking GROUP BY voter ORDER BY total DESC LIMIT ?",
-    [number]
-  );
-
-  try {
-    const results = await execQuery(query);
-    res = results;
-  } catch (e) {
-    console.err(e);
-  }
-  return res;
+/**
+ * Top voters by vote count. POST /api/leaderboards/plusplus/top-voters
+ * @returns {Promise<Array<{ voter: string, total: number }>>}
+ */
+export const getTopVoters = async (number = 3) => {
+  const { data } = await api.post("/api/leaderboards/plusplus/top-voters", {
+    limit: number,
+  });
+  if (!data?.ok || !Array.isArray(data.topVoters)) return [];
+  return data.topVoters;
 };

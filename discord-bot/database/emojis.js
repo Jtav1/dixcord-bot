@@ -1,126 +1,106 @@
-import { parseEmoji } from "discord.js";
-import { execQuery } from "./queryRunner.js";
+import * as api from "../api/client.js";
 
-import mysql from "mysql2";
-
-//Import emojis into database by checking what the server has, clearing out all un-incremented emoji entries
-//and then inserting all
+/**
+ * Sync server emoji list with the web API.
+ * POST /api/message-processing/emoji-import
+ * @param {Iterable<{ id: string, name: string, animated?: boolean, type?: string }>} emojiObjectList - e.g. guild.emojis (Collection)
+ */
 export const importEmojiList = async (emojiObjectList) => {
-  let emojiArray = [];
-
-  emojiObjectList.forEach((e) => {
-    emojiArray.push([`${e.id}`, `${e.name}`, 0, e.animated, `${e.type}`]);
-  });
-
-  await execQuery(
-    "DELETE FROM emoji_frequency WHERE frequency = 0 and type = 'emoji'"
-  );
-
-  if (emojiArray.length < 2) emojiArray = [emojiArray];
-
-  const emoInsertQry = mysql.format(
-    "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES ? ON DUPLICATE KEY UPDATE emoid=emoid",
-    [emojiArray]
-  );
-
-  await execQuery(emoInsertQry);
-  console.log("db: emoji import complete");
+  const list = Array.isArray(emojiObjectList)
+    ? emojiObjectList
+    : Array.from(emojiObjectList.values?.() ?? emojiObjectList);
+  const emojis = list.map((e) => ({
+    id: String(e.id),
+    name: String(e.name),
+    animated: Boolean(e.animated),
+  }));
+  await api.post("/api/message-processing/emoji-import", { emojis });
+  console.log("db: emoji import complete (via webapi)");
 };
 
+/**
+ * Record emoji usage. POST /api/message-processing/emoji-count
+ * @param {string} emojiName - Emoji name
+ * @param {string} [emojiId] - Emoji ID (optional for unicode)
+ * @param {string|null} [userid] - User who used the emoji (author/reactor)
+ */
 export const countEmoji = async (emojiName, emojiId, userid = null) => {
-  const emoIncrementQry = mysql.format(
-    "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoji = ? AND emoid = ?",
-    [emojiName, emojiId]
+  const authorId = userid || undefined;
+  const emojis = [{ name: emojiName, id: emojiId ?? undefined }].filter(
+    (e) => e.name != null && e.name !== "",
   );
-
-  await execQuery(emoIncrementQry);
-
-  if (emojiId && userid) {
-    const userEmoQuery = mysql.format(
-      "INSERT INTO user_emoji_tracking (userid, emoid) VALUES (?, ?) ON DUPLICATE KEY UPDATE frequency = frequency + 1",
-      [userid, emojiId]
-    );
-
-    const emoExistsQuery = mysql.format(
-      "SELECT 1 FROM emoji_frequency WHERE emoji_frequency.emoid = ?",
-      [emojiId]
-    );
-
-    const count = await execQuery(emoExistsQuery);
-
-    if (count.length > 0) {
-      execQuery(userEmoQuery);
-    }
-  }
+  if (emojis.length === 0) return;
+  await api.post("/api/message-processing/emoji-count", {
+    authorId,
+    emojis,
+  });
 };
 
-export const getTopEmoji = async (number) => {
-  let res = [];
-
-  var query = mysql.format(
-    "SELECT emoji, frequency, emoid, animated FROM emoji_frequency ORDER BY frequency DESC LIMIT ?",
-    [number]
-  );
-
-  try {
-    const results = await execQuery(query);
-    res = results;
-  } catch (e) {
-    console.err(e);
-  }
-  return res;
+/**
+ * Top used emojis. POST /api/leaderboards/emoji
+ * @param {number} number - Limit (default 5, max 50)
+ * @returns {Promise<Array<{ emoji: string, frequency: number, emoid: string, animated?: number }>>}
+ */
+export const getTopEmoji = async (number = 5) => {
+  const { data } = await api.post("/api/leaderboards/emoji", {
+    limit: number,
+  });
+  if (!data?.ok || !Array.isArray(data.top)) return [];
+  return data.top;
 };
 
+/**
+ * Record a repost accusation. POST /api/message-processing/count-repost
+ * @param {string} userid - Message author (accused)
+ * @param {string} msgid - Message ID
+ * @param {string} accuserid - User who added repost reaction
+ */
 export const countRepost = async (userid, msgid, accuserid) => {
-  if (msgid && userid && accuserid) {
-    const userRepostQuery = mysql.format(
-      "INSERT INTO user_repost_tracking (userid, msgid, accuser) SELECT ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM user_repost_tracking WHERE userid = ? and msgid = ? and accuser = ?)",
-      [userid, msgid, accuserid, userid, msgid, accuserid]
-    );
-    execQuery(userRepostQuery);
-  }
+  if (!msgid || !userid || !accuserid) return;
+  await api.post("/api/message-processing/count-repost", {
+    userid,
+    msgid,
+    accuser: accuserid,
+    repost: 1,
+  });
 };
 
+/**
+ * Withdraw a repost accusation. POST /api/message-processing/count-repost (repost: -1)
+ * @param {string} msgid - Message ID
+ * @param {string} accuserid - User who is removing their repost reaction
+ */
 export const uncountRepost = async (msgid, accuserid) => {
-  if (msgid && accuserid) {
-    const deleteRepostQuery = mysql.format(
-      "DELETE FROM user_repost_tracking WHERE msgid = ? and accuser = ?",
-      [msgid, accuserid]
-    );
-    execQuery(deleteRepostQuery);
-  }
+  if (!msgid || !accuserid) return;
+  await api.post("/api/message-processing/count-repost", {
+    userid: "0",
+    msgid,
+    accuser: accuserid,
+    repost: -1,
+  });
 };
 
-export const getTopReposters = async (number) => {
-  let res = [];
-
-  var query = mysql.format(
-    "SELECT count(userid) as 'count', userid FROM user_repost_tracking GROUP BY userid ORDER BY count(userid) DESC LIMIT ?",
-    [number]
-  );
-
-  try {
-    const results = await execQuery(query);
-    res = results;
-  } catch (e) {
-    console.err(e);
-  }
-  return res;
+/**
+ * Top reposters by accusation count. POST /api/leaderboards/repost
+ * @param {number} number - Limit (default 5, max 50)
+ * @returns {Promise<Array<{ userid: string, count: number }>>}
+ */
+export const getTopReposters = async (number = 5) => {
+  const { data } = await api.post("/api/leaderboards/repost", {
+    limit: number,
+  });
+  if (!data?.ok || !Array.isArray(data.top)) return [];
+  return data.top;
 };
 
+/**
+ * Repost count for a user. GET /api/leaderboards/repost/user/:userId
+ * @param {string} userid - User ID
+ * @returns {Promise<number>}
+ */
 export const getRepostsForUser = async (userid) => {
-  let res = [];
-
-  var query = mysql.format(
-    "SELECT count(userid) as 'count', userid FROM user_repost_tracking WHERE userid = ?",
-    [userid]
-  );
-
-  try {
-    const results = await execQuery(query);
-    res = results[0].count;
-  } catch (e) {
-    console.err(e);
-  }
-  return res;
+  if (!userid) return 0;
+  const { data } = await api.get(`/api/leaderboards/repost/user/${userid}`);
+  if (!data?.ok) return 0;
+  return Number(data.count) ?? 0;
 };

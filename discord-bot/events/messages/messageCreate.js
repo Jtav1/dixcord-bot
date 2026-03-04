@@ -75,7 +75,7 @@ const execute = async (message) => {
       contentStripped.startsWith(clientId) &&
       message.content.endsWith("?")
     ) {
-      response = fortuneTeller(message.content.toLowerCase(), clientId);
+      response = await fortuneTeller(message.content.toLowerCase(), clientId);
     }
 
     // if a reply was generated, send it

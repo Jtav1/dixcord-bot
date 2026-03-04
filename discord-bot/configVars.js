@@ -39,7 +39,7 @@ if (!guildId || guildId.length < 1)
 
 // Web API (optional: set WEBAPI_URL, WEBAPI_USERNAME, WEBAPI_PASSWORD to use API auth)
 const webapiUrl =
-  process.env.WEBAPI_URL?.replace(/\/$/, "") || "localhost:3000";
+  process.env.WEBAPI_URL?.replace(/\/$/, "") || "http://localhost:3000";
 const webapiUsername = process.env.WEBAPI_USERNAME || "justin";
 const webapiPassword = process.env.WEBAPI_PASSWORD || "password";
 
