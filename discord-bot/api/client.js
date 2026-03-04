@@ -29,6 +29,11 @@ function requireConfig() {
  */
 export async function login() {
   requireConfig();
+  console.log("[API query]", {
+    method: "POST",
+    endpoint: "/api/auth/login",
+    data: { body: { email: webapiUsername } },
+  });
   const { data } = await axios.post(`${webapiUrl}/api/auth/login`, {
     email: webapiUsername,
     password: webapiPassword,
@@ -58,6 +63,19 @@ export function clearToken() {
 export async function request(method, path, options = {}) {
   requireConfig();
   const url = path.startsWith("http") ? path : `${webapiUrl}${path}`;
+
+  const dataProvided = {};
+  if (options.params && Object.keys(options.params).length > 0) {
+    dataProvided.params = options.params;
+  }
+  if (options.data !== undefined && options.data !== null) {
+    dataProvided.body = options.data;
+  }
+  console.log("[API query]", {
+    method,
+    endpoint: path,
+    ...(Object.keys(dataProvided).length > 0 ? { data: dataProvided } : {}),
+  });
 
   const doRequest = async (authToken) => {
     return axios.request({

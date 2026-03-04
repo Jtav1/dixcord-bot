@@ -57,6 +57,19 @@ async function ensureAdminUser() {
 app.use(cors());
 app.use(express.json());
 
+// Log incoming API requests: method, path, query and body
+app.use((req, res, next) => {
+  const data = {};
+  if (req.query && Object.keys(req.query).length > 0) data.query = req.query;
+  if (req.body && Object.keys(req.body).length > 0) data.body = req.body;
+  console.log("[API request]", {
+    method: req.method,
+    endpoint: req.originalUrl,
+    ...(Object.keys(data).length > 0 ? { data } : {}),
+  });
+  next();
+});
+
 // Health check (no auth)
 app.get("/", (req, res) => {
   res.json({
