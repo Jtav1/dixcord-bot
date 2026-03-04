@@ -61,17 +61,69 @@ app.get("/", (req, res) => {
     name: "js-express-api-template",
     version: "1.0.0",
     endpoints: {
-      auth: "/api/auth/login (register disabled; admin only)",
-      users: "/api/users/me (GET, PUT, DELETE)",
-      botResponses:
-        "/api/bot-responses/take-a-look, /api/bot-responses/fortune, /api/bot-responses/link-fixer (POST, auth required)",
-      messageProcessing:
-        "/api/message-processing/emoji-count, /api/message-processing/plusminus, /api/message-processing/count-repost (POST, auth required)",
-      config: "/api/config (GET, auth required)",
-      linkReplacements:
-        "/api/link-replacements (GET list & GET /:id no auth; POST, PUT /:id, DELETE /:id auth required)",
-      leaderboards:
-        "/api/leaderboards/plusplus, /plusplus/total, /plusplus/voter/:userId, /plusplus/top-voters, /emoji, /repost, /repost/user/:userId (GET, auth required)",
+      auth: {
+        public: [
+          "POST /api/auth/login (admin only; returns JWT)",
+          "POST /api/auth/register (disabled; returns 403)",
+        ],
+      },
+      users: {
+        authRequired: true,
+        routes: [
+          "GET /api/users/me",
+          "PUT /api/users/me",
+          "DELETE /api/users/me",
+        ],
+      },
+      botResponses: {
+        authRequired: true,
+        routes: [
+          "POST /api/bot-responses/take-a-look",
+          "POST /api/bot-responses/fortune",
+          "POST /api/bot-responses/link-fixer (body: { message })",
+        ],
+      },
+      messageProcessing: {
+        authRequired: true,
+        routes: [
+          "POST /api/message-processing/emoji-count",
+          "POST /api/message-processing/plusminus",
+          "POST /api/message-processing/count-repost",
+          "POST /api/message-processing/emoji-import",
+          "POST /api/message-processing/sticker-import",
+          "POST /api/message-processing/pin-check (body: { messageId })",
+          "POST /api/message-processing/pin-log (body: { messageId })",
+        ],
+      },
+      config: {
+        authRequired: true,
+        routes: [
+          "GET /api/config",
+          "PUT /api/config (body: { config, value }; updates value if item exists)",
+        ],
+      },
+      linkReplacements: {
+        authRequired: true,
+        routes: [
+          "GET /api/link-replacements",
+          "GET /api/link-replacements/:id",
+          "POST /api/link-replacements (body: { source_host, target_host })",
+          "PUT /api/link-replacements/:id",
+          "DELETE /api/link-replacements/:id",
+        ],
+      },
+      leaderboards: {
+        authRequired: true,
+        routes: [
+          "POST /api/leaderboards/plusplus (body: { limit? })",
+          "GET /api/leaderboards/plusplus/total?string=&type=word|user",
+          "GET /api/leaderboards/plusplus/voter/:userId",
+          "POST /api/leaderboards/plusplus/top-voters (body: { limit? })",
+          "POST /api/leaderboards/emoji (body: { limit? })",
+          "POST /api/leaderboards/repost (body: { limit? })",
+          "GET /api/leaderboards/repost/user/:userId",
+        ],
+      },
     },
     auth: "Use header: Authorization: Bearer <token>",
   });
