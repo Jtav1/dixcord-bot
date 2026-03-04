@@ -1,5 +1,4 @@
 import "dotenv/config";
-import fs from "node:fs";
 
 // Utility function for killing program if missing setup
 const writeError = (err) => {
@@ -38,34 +37,20 @@ if (!clientId || clientId.length < 1)
 if (!guildId || guildId.length < 1)
   writeError("config: missing DISCORD_GUILD_ID env var");
 
-// Database stuff
-const mysqlHost = process.env.MYSQL_HOST;
-const mysqlPort = process.env.MYSQL_PORT;
-const mysqlUser = process.env.MYSQL_USER;
-const mysqlPw = process.env.MYSQL_PW;
-const mysqlDb = process.env.MYSQL_DB;
-
-if (!mysqlHost || mysqlHost.length < 1)
-  writeError("config: missing MYSQL_HOST env var");
-if (!mysqlPort || mysqlPort.length < 1)
-  writeError("config: missing MYSQL_PORT env var");
-if (!mysqlUser || mysqlUser.length < 1)
-  writeError("config: missing MYSQL_USER env var");
-if (!mysqlPw || mysqlPw.length < 1)
-  writeError("config: missing MYSQL_PW env var");
-if (!mysqlDb || mysqlDb.length < 1)
-  writeError("config: missing MYSQL_DB env var");
+// Web API (optional: set WEBAPI_URL, WEBAPI_USERNAME, WEBAPI_PASSWORD to use API auth)
+const webapiUrl =
+  process.env.WEBAPI_URL?.replace(/\/$/, "") || "localhost:3000";
+const webapiUsername = process.env.WEBAPI_USERNAME || "justin";
+const webapiPassword = process.env.WEBAPI_PASSWORD || "password";
 
 export {
   token,
   clientId,
   guildId,
   dataDirectory,
-  mysqlHost,
-  mysqlPort,
-  mysqlUser,
-  mysqlPw,
-  mysqlDb,
   isDev,
   version,
+  webapiUrl,
+  webapiUsername,
+  webapiPassword,
 };

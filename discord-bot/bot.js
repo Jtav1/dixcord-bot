@@ -3,11 +3,8 @@ import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 
 import fs from "node:fs";
 import path from "node:path";
-import { exec } from "child_process";
 
 import { token, clientId, guildId, isDev, version } from "./configVars.js";
-import { initializeDatabase } from "./database/initialize.js";
-import { importAll } from "./database/import.js";
 import {
   importEmojiList,
   countRepost,
@@ -30,19 +27,35 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
 
-await initializeDatabase();
-await importAll();
-
 const configs = await getAllConfigurations();
 
-const timeoutEmoji = configs.find((config_entry) => config_entry.config === "timeout_emoji")?.value || null;
-const timeoutThreshold = parseInt(configs.find((config_entry) => config_entry.config === "timeout_vote_threshold")?.value || null);
-const pinThreshold = parseInt(configs.find((config_entry) => config_entry.config === "pin_threshold")?.value || null);
-const pinEmoji = configs.find((config_entry) => config_entry.config === "pin_emoji")?.value || null;
-const repostEmojiId = configs.find((config_entry) => config_entry.config === "repost_emoji")?.value || null;
-const announceChannelId = configs.find((config_entry) => config_entry.config === "announce_channel_id")?.value || null;
-const plusEmoji = configs.find((config_entry) => config_entry.config === "plusplus_emoji")?.value || null;
-const minusEmoji = configs.find((config_entry) => config_entry.config === "minusminus_emoji")?.value || null;
+const timeoutEmoji =
+  configs.find((config_entry) => config_entry.config === "timeout_emoji")
+    ?.value || null;
+const timeoutThreshold = parseInt(
+  configs.find(
+    (config_entry) => config_entry.config === "timeout_vote_threshold",
+  )?.value || null,
+);
+const pinThreshold = parseInt(
+  configs.find((config_entry) => config_entry.config === "pin_threshold")
+    ?.value || null,
+);
+const pinEmoji =
+  configs.find((config_entry) => config_entry.config === "pin_emoji")?.value ||
+  null;
+const repostEmojiId =
+  configs.find((config_entry) => config_entry.config === "repost_emoji")
+    ?.value || null;
+const announceChannelId =
+  configs.find((config_entry) => config_entry.config === "announce_channel_id")
+    ?.value || null;
+const plusEmoji =
+  configs.find((config_entry) => config_entry.config === "plusplus_emoji")
+    ?.value || null;
+const minusEmoji =
+  configs.find((config_entry) => config_entry.config === "minusminus_emoji")
+    ?.value || null;
 
 const commands = [];
 
@@ -85,7 +98,7 @@ for (const category of commandsCategories) {
       commands.push(command);
     } else {
       console.log(
-        `[WARNING] The command at ${filePath} is missing a required "cmdName" or "data" or "execute" property.`
+        `[WARNING] The command at ${filePath} is missing a required "cmdName" or "data" or "execute" property.`,
       );
     }
   }
@@ -96,7 +109,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isCommand()) return;
 
   let runCommand = commands.find(
-    (cmd) => cmd.cmdName === interaction.commandName
+    (cmd) => cmd.cmdName === interaction.commandName,
   );
   try {
     await runCommand.execute(interaction);
@@ -119,7 +132,6 @@ client.once(Events.ClientReady, async (readyClient) => {
 // TODO 1.7.5 REFACTOR THIS
 // https://stackoverflow.com/questions/66793543/reaction-event-discord-js
 client.on("messageReactionAdd", async (reaction, user) => {
-
   // fetch the message if it's not cached
   const message = !reaction.message.author
     ? await reaction.message.fetch()
@@ -141,34 +153,36 @@ client.on("messageReactionAdd", async (reaction, user) => {
     "I'm only going to pin it once this time",
   ];
 
-
   if (pinReact) {
     if (pinReact.count === pinThreshold) {
       let res = await messagePinner(message, pinReact, user, client); // returns success bool
-      const randomReply = pinreplies[Math.floor(Math.random() * pinreplies.length)];
-      if(res){
+      const randomReply =
+        pinreplies[Math.floor(Math.random() * pinreplies.length)];
+      if (res) {
         message.reply(randomReply); // let the channel know it was pinned by the bot
       }
     }
   }
 
-  const timeoutUserResponse = "**CURSE OF RA** 𓀀 𓀁 𓀂 𓀃 𓀄 𓀅 𓀆 𓀇 𓀈 𓀉 𓀊 𓀋 𓀌 𓀍 𓀎 𓀏 𓀐 𓀑 𓀒 𓀓 𓀔 𓀴 𓀵 𓀶 𓀷 𓀸 𓀹 𓀺 𓀻 𓀼 𓀽 𓀾 𓀿 𓁀 𓁁 𓁂 𓁃 𓁄 𓁅 𓁆 𓁇 𓁈 𓁉 𓁊 𓁋 𓁌 𓁍 𓁎 𓁏 𓁐 𓁑 𓀄 𓀅 𓀆 𓀇 𓀈 𓀉 𓀊... You shall suffer the ancient hex of silence for this.";
+  const timeoutUserResponse =
+    "**CURSE OF RA** 𓀀 𓀁 𓀂 𓀃 𓀄 𓀅 𓀆 𓀇 𓀈 𓀉 𓀊 𓀋 𓀌 𓀍 𓀎 𓀏 𓀐 𓀑 𓀒 𓀓 𓀔 𓀴 𓀵 𓀶 𓀷 𓀸 𓀹 𓀺 𓀻 𓀼 𓀽 𓀾 𓀿 𓁀 𓁁 𓁂 𓁃 𓁄 𓁅 𓁆 𓁇 𓁈 𓁉 𓁊 𓁋 𓁌 𓁍 𓁎 𓁏 𓁐 𓁑 𓀄 𓀅 𓀆 𓀇 𓀈 𓀉 𓀊... You shall suffer the ancient hex of silence for this.";
 
   //TODO add mod check to change amount of votes
   if (timeoutEmoji) {
     if (timeoutEmoji.count === timeoutThreshold) {
-      if(await timeoutUser()){ //TODO this function
+      if (await timeoutUser()) {
+        //TODO this function
         //message.reply(timeoutUserResponse); // let the channel know this user was timed out
       } else {
         //console.log("Failed to timeout user, message may have been already pinned or timeoutUser failed.");
-      };
+      }
     }
   }
 
-  if (reaction._emoji.id === plusEmoji && (user.id !== message.author.id)) {
+  if (reaction._emoji.id === plusEmoji && user.id !== message.author.id) {
     await doplus(reaction.message.author.id, "user", user.id);
   }
-  if (reaction._emoji.id === minusEmoji && (user.id !== message.author.id)) {
+  if (reaction._emoji.id === minusEmoji && user.id !== message.author.id) {
     await dominus(reaction.message.author.id, "user", user.id);
   }
 
@@ -207,10 +221,10 @@ client.on("messageReactionRemove", async (reaction, user) => {
   }
 
   // if the reactions are removed, do the opposite
-  if (reaction._emoji.id === plusEmoji && (user.id !== message.author.id)) {
+  if (reaction._emoji.id === plusEmoji && user.id !== message.author.id) {
     await dominus(reaction.message.author.id, "user", user.id);
   }
-  if (reaction._emoji.id === minusEmoji && (user.id !== message.author.id)) {
+  if (reaction._emoji.id === minusEmoji && user.id !== message.author.id) {
     await doplus(reaction.message.author.id, "user", user.id);
   }
 });
