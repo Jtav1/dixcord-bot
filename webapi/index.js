@@ -93,7 +93,6 @@ app.get("/", (req, res) => {
       botResponses: {
         authRequired: true,
         routes: [
-          "POST /api/bot-responses/take-a-look",
           "POST /api/bot-responses/fortune",
           "POST /api/bot-responses/link-fixer (body: { message })",
         ],
@@ -145,8 +144,8 @@ app.get("/", (req, res) => {
           "GET /api/trigger-responses/triggers",
           "GET /api/trigger-responses/random?trigger=xxx",
           "GET /api/trigger-responses/:id",
-          "POST /api/trigger-responses (body: { trigger_string, response_string })",
-          "PUT /api/trigger-responses/:id",
+          "POST /api/trigger-responses (body: { trigger_string, response_string, response_order?, selection_mode? })",
+          "PUT /api/trigger-responses/:id (body: { trigger_string?, response_string?, response_order?, selection_mode? })",
           "DELETE /api/trigger-responses/:id",
         ],
       },

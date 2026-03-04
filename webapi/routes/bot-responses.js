@@ -1,27 +1,8 @@
 import express from "express";
 import { authenticate } from "../middleware/auth.js";
-import {
-  takeALook,
-  fortuneTeller,
-  twitterFixer,
-} from "../services/botResponses.js";
+import { fortuneTeller, twitterFixer } from "../services/botResponses.js";
 
 const router = express.Router();
-
-/**
- * POST /api/bot-responses/take-a-look
- * Returns a random "take a look" image URL or rate-limit message.
- * Auth: required.
- */
-router.post("/take-a-look", authenticate, async (req, res) => {
-  try {
-    const { response } = await takeALook();
-    res.json({ ok: true, response });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ ok: false, error: "Failed to get take-a-look response" });
-  }
-});
 
 /**
  * POST /api/bot-responses/fortune

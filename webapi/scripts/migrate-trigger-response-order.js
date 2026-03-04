@@ -1,6 +1,7 @@
 /**
  * One-off migration: add response_order and selection_mode to trigger_responses,
- * and create trigger_response_state table. Safe to run on DBs that already have these.
+ * create trigger_response_state table, and prepopulate trigger_responses with default triggers.
+ * Safe to run on DBs that already have these.
  *
  * Run from webapi dir: node scripts/migrate-trigger-response-order.js
  */
@@ -8,6 +9,19 @@ import "dotenv/config";
 import db from "../config/db.js";
 
 const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
+
+const PREPOPULATE_TRIGGERS = [
+  "takealookatthis",
+  "takenalookatthis",
+  "tookalookatthis",
+  "takingalookatthis",
+  "takealookatthese",
+  "takealookatdeez",
+  "takealookatdis",
+  "captaintake",
+  "tookalookatthat",
+  "takenalookatthese",
+];
 
 async function run() {
   try {
@@ -60,6 +74,21 @@ async function run() {
         )
       `);
       console.log("Ensured trigger_response_state table exists");
+    }
+
+    // Prepopulate trigger_responses with default triggers (one row per trigger, placeholder response)
+    for (const trigger of PREPOPULATE_TRIGGERS) {
+      const [existing] = await db.query(
+        "SELECT 1 FROM trigger_responses WHERE trigger_string = ? LIMIT 1",
+        [trigger],
+      );
+      if (!existing?.length) {
+        await db.query(
+          "INSERT INTO trigger_responses (trigger_string, response_string, response_order, selection_mode) VALUES (?, ?, ?, ?)",
+          [trigger, "", null, "random"],
+        );
+        console.log("Prepopulated trigger:", trigger);
+      }
     }
     console.log("Migration done.");
   } catch (err) {

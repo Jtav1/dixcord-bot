@@ -79,3 +79,12 @@ The bot also needs these for Discord:
 - **Remove commands:** `node delete-all-commands.js`.
 
 ---
+
+## Migration Guide
+
+### 1.x -> 2.0
+
+1. DB dump
+2. New DB schema
+3. Run DB creation scripts
+4. Write script to convert this into the new schema and insert (yea I know thats insane but only justin has to do it and only once lol)

@@ -1,17 +1,6 @@
 import * as api from "./client.js";
 
 /**
- * Take-a-look response (random image URL or rate-limit message). POST /api/bot-responses/take-a-look.
- * The webapi handles links, rate limit, and increment.
- * @returns {Promise<string>}
- */
-export const takeALook = async () => {
-  const { data } = await api.post("/api/bot-responses/take-a-look");
-  if (!data?.ok) return "";
-  return data.response ?? "";
-};
-
-/**
  * Random 8-ball fortune. POST /api/bot-responses/fortune.
  * @returns {Promise<string>}
  */

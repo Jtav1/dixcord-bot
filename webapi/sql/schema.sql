@@ -81,17 +81,33 @@ CREATE TABLE IF NOT EXISTS pin_quips (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Trigger strings and response strings (e.g. "take a look" triggers -> random image/link)
-CREATE TABLE IF NOT EXISTS trigger_responses (
+-- Triggers: one row per unique trigger string (selection_mode for random vs ordered)
+CREATE TABLE IF NOT EXISTS triggers (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  trigger_string VARCHAR(255) NOT NULL,
-  response_string VARCHAR(500) NOT NULL,
-  response_order INT NULL,
+  trigger_string VARCHAR(255) NOT NULL UNIQUE,
   selection_mode VARCHAR(10) NOT NULL DEFAULT 'random',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Round-robin state: last-used response id per trigger
+-- Responses: reusable response strings (many-to-many with triggers via trigger_response)
+CREATE TABLE IF NOT EXISTS responses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  response_string VARCHAR(500) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Junction: which responses belong to which trigger, with optional order
+CREATE TABLE IF NOT EXISTS trigger_response (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  trigger_id INT NOT NULL,
+  response_id INT NOT NULL,
+  response_order INT NULL,
+  FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE,
+  FOREIGN KEY (response_id) REFERENCES responses(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_trigger_response (trigger_id, response_id)
+);
+
+-- Round-robin state: last-used response id (responses.id) per trigger
 CREATE TABLE IF NOT EXISTS trigger_response_state (
   trigger_string VARCHAR(255) PRIMARY KEY,
   last_used_response_id INT NULL

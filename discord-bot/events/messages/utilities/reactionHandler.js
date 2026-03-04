@@ -1,11 +1,7 @@
-import * as api from "../api/client.js";
+import * as api from "../../../api/client.js";
 import { messagePinner } from "./messagePinner.js";
 import { doplus, dominus } from "./plusplus.js";
-import {
-  countEmoji,
-  countRepost,
-  uncountRepost,
-} from "../../../api/emojis.js";
+import { countEmoji, countRepost, uncountRepost } from "../../../api/emojis.js";
 
 /** Fetch a random pin quip from the API; returns fallback if unavailable. */
 async function getRandomPinQuip() {

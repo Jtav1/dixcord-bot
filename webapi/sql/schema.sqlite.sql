@@ -86,17 +86,31 @@ CREATE TABLE IF NOT EXISTS pin_quips (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
--- Trigger strings and response strings (e.g. "take a look" triggers -> random image/link)
-CREATE TABLE IF NOT EXISTS trigger_responses (
+-- Triggers: one row per unique trigger string (selection_mode for random vs ordered)
+CREATE TABLE IF NOT EXISTS triggers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  trigger_string TEXT NOT NULL,
-  response_string TEXT NOT NULL,
-  response_order INTEGER NULL,
+  trigger_string TEXT NOT NULL UNIQUE,
   selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered')),
   created_at TEXT DEFAULT (datetime('now'))
 );
 
--- Round-robin state: last-used response id per trigger
+-- Responses: reusable response strings (many-to-many with triggers via trigger_response)
+CREATE TABLE IF NOT EXISTS responses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  response_string TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Junction: which responses belong to which trigger, with optional order
+CREATE TABLE IF NOT EXISTS trigger_response (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  trigger_id INTEGER NOT NULL REFERENCES triggers(id) ON DELETE CASCADE,
+  response_id INTEGER NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
+  response_order INTEGER NULL,
+  UNIQUE (trigger_id, response_id)
+);
+
+-- Round-robin state: last-used response id (responses.id) per trigger
 CREATE TABLE IF NOT EXISTS trigger_response_state (
   trigger_string TEXT PRIMARY KEY,
   last_used_response_id INTEGER NULL

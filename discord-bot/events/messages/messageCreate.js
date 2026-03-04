@@ -8,6 +8,7 @@ import {
   getTriggerList,
   getRandomResponseForTrigger,
 } from "../../api/triggerResponses.js";
+import { getLinkReplacementSourceHosts } from "../../api/linkReplacements.js";
 
 //******* UTILITIES FUNCTIONS ********//;
 import { emojiDetector } from "./utilities/emojiDetector.js";
@@ -17,6 +18,9 @@ const name = "messageCreate";
 
 /** Cached trigger strings from API; loaded on first message. */
 let cachedTriggers = null;
+
+/** Cached link-replacement source hosts from API; loaded on first message. */
+let cachedLinkHosts = null;
 
 const execute = async (message) => {
   //******* INCOMING MESSAGE PROCESSING *******//
@@ -35,22 +39,15 @@ const execute = async (message) => {
     // Strip incoming message for comparison
     const contentStripped = message.content
       .toLowerCase()
-      .replace(/[^a-zA-Z0-9]/g, "");
+      .replace(/[^a-zA-Z0-9!]/g, "")
 
-    // If there's a twitter link to fix, do that
+    // If there's a link to fix, do that (using source hosts from DB)
+    if (cachedLinkHosts === null) {
+      cachedLinkHosts = await getLinkReplacementSourceHosts();
+    }
     const twitCheck = message.content.split(" ").filter((word) => {
       const tmpWord = word.replace(/[<>]/g, "");
-      return (
-        tmpWord.includes("https://x.com") ||
-        tmpWord.includes("https://www.x.com") ||
-        tmpWord.includes("https://twitter.com") ||
-        tmpWord.includes("https://www.twitter.com") ||
-        tmpWord.includes("instagram.com/") ||
-        tmpWord.includes("www.instagram.com") ||
-        tmpWord.includes("https://tiktok.com") ||
-        tmpWord.includes("https://www.tiktok.com") ||
-        tmpWord.includes("https://bsky.app")
-      );
+      return cachedLinkHosts.some((host) => tmpWord.includes(host));
     });
 
     if (twitCheck.length > 0) {
@@ -67,6 +64,8 @@ const execute = async (message) => {
     const matchedTrigger = cachedTriggers.find((word) =>
       contentStripped.includes(word),
     );
+    console.log(cachedTriggers);
+    console.log(matchedTrigger);
     if (matchedTrigger) {
       response = await getRandomResponseForTrigger(matchedTrigger);
     }
