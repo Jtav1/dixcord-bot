@@ -92,12 +92,13 @@ router.get("/:id", authenticate, async (req, res) => {
 /**
  * POST /api/trigger-responses
  * Create a trigger-response pair.
- * Body: { trigger_string, response_string }
+ * Body: { trigger_string, response_string, response_order?, selection_mode? }
  * Auth: required.
  */
 router.post("/", authenticate, async (req, res) => {
   try {
-    const { trigger_string, response_string } = req.body ?? {};
+    const { trigger_string, response_string, response_order, selection_mode } =
+      req.body ?? {};
     if (
       trigger_string == null ||
       response_string == null ||
@@ -115,6 +116,8 @@ router.post("/", authenticate, async (req, res) => {
     const id = await triggerResponses.create(
       trigger_string.trim(),
       response_string.trim(),
+      response_order,
+      selection_mode,
     );
     if (id == null) {
       return res
@@ -134,7 +137,7 @@ router.post("/", authenticate, async (req, res) => {
 /**
  * PUT /api/trigger-responses/:id
  * Update a trigger-response pair.
- * Body: { trigger_string?, response_string? }
+ * Body: { trigger_string?, response_string?, response_order?, selection_mode? }
  * Auth: required.
  */
 router.put("/:id", authenticate, async (req, res) => {
@@ -143,17 +146,25 @@ router.put("/:id", authenticate, async (req, res) => {
     if (Number.isNaN(id)) {
       return res.status(400).json({ ok: false, error: "Invalid id" });
     }
-    const { trigger_string, response_string } = req.body ?? {};
+    const { trigger_string, response_string, response_order, selection_mode } =
+      req.body ?? {};
     const updates = {};
     if (typeof trigger_string === "string" && trigger_string.trim())
       updates.trigger_string = trigger_string.trim();
     if (typeof response_string === "string" && response_string.trim())
       updates.response_string = response_string.trim();
+    if (response_order !== undefined)
+      updates.response_order =
+        response_order === null || response_order === ""
+          ? null
+          : parseInt(response_order, 10);
+    if (typeof selection_mode === "string" && selection_mode.trim())
+      updates.selection_mode = selection_mode.trim();
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({
         ok: false,
         error:
-          "Provide at least one of trigger_string or response_string to update",
+          "Provide at least one of trigger_string, response_string, response_order, or selection_mode to update",
       });
     }
     const updated = await triggerResponses.update(id, updates);

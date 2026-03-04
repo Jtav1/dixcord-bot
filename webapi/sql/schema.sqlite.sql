@@ -91,5 +91,13 @@ CREATE TABLE IF NOT EXISTS trigger_responses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trigger_string TEXT NOT NULL,
   response_string TEXT NOT NULL,
+  response_order INTEGER NULL,
+  selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered')),
   created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- Round-robin state: last-used response id per trigger
+CREATE TABLE IF NOT EXISTS trigger_response_state (
+  trigger_string TEXT PRIMARY KEY,
+  last_used_response_id INTEGER NULL
 );

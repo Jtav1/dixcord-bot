@@ -86,5 +86,13 @@ CREATE TABLE IF NOT EXISTS trigger_responses (
   id INT AUTO_INCREMENT PRIMARY KEY,
   trigger_string VARCHAR(255) NOT NULL,
   response_string VARCHAR(500) NOT NULL,
+  response_order INT NULL,
+  selection_mode VARCHAR(10) NOT NULL DEFAULT 'random',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Round-robin state: last-used response id per trigger
+CREATE TABLE IF NOT EXISTS trigger_response_state (
+  trigger_string VARCHAR(255) PRIMARY KEY,
+  last_used_response_id INT NULL
 );
