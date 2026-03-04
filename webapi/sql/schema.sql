@@ -80,3 +80,11 @@ CREATE TABLE IF NOT EXISTS pin_quips (
   quip VARCHAR(500) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Trigger strings and response strings (e.g. "take a look" triggers -> random image/link)
+CREATE TABLE IF NOT EXISTS trigger_responses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  trigger_string VARCHAR(255) NOT NULL,
+  response_string VARCHAR(500) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

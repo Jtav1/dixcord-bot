@@ -85,3 +85,11 @@ CREATE TABLE IF NOT EXISTS pin_quips (
   quip TEXT NOT NULL,
   created_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Trigger strings and response strings (e.g. "take a look" triggers -> random image/link)
+CREATE TABLE IF NOT EXISTS trigger_responses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  trigger_string TEXT NOT NULL,
+  response_string TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now'))
+);

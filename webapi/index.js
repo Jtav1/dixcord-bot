@@ -11,6 +11,7 @@ import configRoutes from "./routes/config.js";
 import linkReplacementsRoutes from "./routes/link-replacements.js";
 import leaderboardsRoutes from "./routes/leaderboards.js";
 import pinQuipsRoutes from "./routes/pin-quips.js";
+import triggerResponsesRoutes from "./routes/trigger-responses.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -124,6 +125,18 @@ app.get("/", (req, res) => {
           "DELETE /api/pin-quips/:id",
         ],
       },
+      triggerResponses: {
+        authRequired: true,
+        routes: [
+          "GET /api/trigger-responses",
+          "GET /api/trigger-responses/triggers",
+          "GET /api/trigger-responses/random?trigger=xxx",
+          "GET /api/trigger-responses/:id",
+          "POST /api/trigger-responses (body: { trigger_string, response_string })",
+          "PUT /api/trigger-responses/:id",
+          "DELETE /api/trigger-responses/:id",
+        ],
+      },
       leaderboards: {
         authRequired: true,
         routes: [
@@ -151,6 +164,7 @@ app.use("/api/message-processing", messageProcessingRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api/link-replacements", linkReplacementsRoutes);
 app.use("/api/pin-quips", pinQuipsRoutes);
+app.use("/api/trigger-responses", triggerResponsesRoutes);
 app.use("/api/leaderboards", leaderboardsRoutes);
 
 // 404

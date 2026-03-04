@@ -1,28 +1,22 @@
 import { clientId } from "../../configVars.js";
 
-//******* RESPONSE FUNCTIONS *******//
-import { twitterFixer } from "./responses/twitterFixer.js";
-import { takeALook } from "./responses/takeALook.js";
-import { fortuneTeller } from "./responses/fortuneTeller.js";
+import {
+  getLinkFixerResponse,
+  getFortuneResponse,
+} from "../../api/responses.js";
+import {
+  getTriggerList,
+  getRandomResponseForTrigger,
+} from "../../api/triggerResponses.js";
 
 //******* UTILITIES FUNCTIONS ********//;
 import { emojiDetector } from "./utilities/emojiDetector.js";
 import { plusMinusMsg } from "./utilities/plusplus.js";
 
 const name = "messageCreate";
-// TODO v2.1 - make these generic / in db
-const TALTriggerWords = [
-  "takealookatthis",
-  "takenalookatthis",
-  "tookalookatthis",
-  "takingalookatthis",
-  "takealookatthese",
-  "takealookatdeez",
-  "takealookatdis",
-  "captaintake",
-  "tookalookatthat",
-  "takenalookatthese",
-];
+
+/** Cached trigger strings from API; loaded on first message. */
+let cachedTriggers = null;
 
 const execute = async (message) => {
   //******* INCOMING MESSAGE PROCESSING *******//
@@ -60,22 +54,30 @@ const execute = async (message) => {
     });
 
     if (twitCheck.length > 0) {
-      const twitFixReply = await twitterFixer(message.content);
+      const twitFixReply = await getLinkFixerResponse(message.content ?? "");
       if (twitFixReply.length > 0) {
         response = twitFixReply;
       }
     }
 
-    // Then, if there's a Take A Look prompt handle that
-    if (TALTriggerWords.some((word) => contentStripped.includes(word))) {
-      response = await takeALook();
+    // Then, if message matches a trigger from the DB, get a random response for it
+    if (cachedTriggers === null) {
+      cachedTriggers = await getTriggerList();
+    }
+    const matchedTrigger = cachedTriggers.find((word) =>
+      contentStripped.includes(word),
+    );
+    if (matchedTrigger) {
+      response = await getRandomResponseForTrigger(matchedTrigger);
+    }
 
-      //if not, check if there is a fortune teller request to reply to
-    } else if (
+    // If no response yet, check for fortune teller (mention + ?)
+    if (
+      !response &&
       contentStripped.startsWith(clientId) &&
       message.content.endsWith("?")
     ) {
-      response = await fortuneTeller(message.content.toLowerCase(), clientId);
+      response = await getFortuneResponse();
     }
 
     // if a reply was generated, send it
