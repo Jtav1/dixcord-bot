@@ -62,7 +62,7 @@ function isAllowedOrigin(origin) {
   try {
     const host = new URL(origin).hostname;
     if (host === "192.168.0.2") return true;
-    const m = host.match(/^172\.17\.(\d{1,3})\.(\d{1,3})$/);
+    const m = host.match(/^172\.21\.(\d{1,3})\.(\d{1,3})$/);
     if (m) {
       const a = parseInt(m[1], 10);
       const b = parseInt(m[2], 10);
