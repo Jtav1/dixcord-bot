@@ -92,11 +92,7 @@ async function seed() {
     for (const triggerId of triggerIds) {
       for (const responseId of responseIds) {
         await connection.query(
-<<<<<<< HEAD
           "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight) VALUES (?, ?, NULL, 10)",
-=======
-          "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight) VALUES (?, ?, \"random\", 10)",
->>>>>>> origin/v2.0
           [triggerId, responseId],
         );
       }
