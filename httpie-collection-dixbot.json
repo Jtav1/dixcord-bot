@@ -15,11 +15,11 @@
     },
     "auth": {
       "type": "bearer",
+      "target": "headers",
       "credentials": {
         "username": "",
-        "password": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjEsImlhdCI6MTc3MjU5NjI1MCwiZXhwIjoxNzczMjAxMDUwfQ.Q2kwryGHMVsTRNgEHJHR3BT0OKpCwnkalhl2zwfWkcc"
-      },
-      "target": "headers"
+        "password": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOjIsImlhdCI6MTc3MjY4NTU5MSwiZXhwIjoxNzczMjkwMzkxfQ.JTbDCHSDruFTwiCG9HPg2MxV_lOTgcNkL40k2vBvh-g"
+      }
     },
     "requests": [
       {
@@ -125,7 +125,7 @@
             "name": ""
           },
           "text": {
-            "value": "{ \"email\" :\"justin\", \"password\":\"password\" }",
+            "value": "{ \n  \"email\" :\"dixbot\", \n  \"password\":\"password\" \n}",
             "format": "application/json"
           },
           "form": {
@@ -1344,7 +1344,7 @@
             "name": ""
           },
           "text": {
-            "value": "{\n  \"trigger_string\": \"testrandom\",\n  \"selection_mode\": \"random\",\n  \"responses\": [\n    {\n      \"response_string\": \"random 1\"\n    },\n    {\n      \"response_string\": \"random 2\"\n    },\n    {\n      \"response_string\": \"random 3\"\n    }\n  ]\n}",
+            "value": "{\n  \"trigger_string\": \"testrandom\",\n  \"selection_mode\": \"random\",\n  \"responses\": [\n    {\n      \"response_string\": \"random 1\",\n      \"weight\": 10\n    },\n    {\n      \"response_string\": \"random 2\",\n      \"weight\": 100\n    },\n    {\n      \"response_string\": \"random 3\",\n      \"weight\": 1000\n    }\n  ]\n}",
             "format": "application/json"
           },
           "form": {
@@ -1394,13 +1394,48 @@
       },
       {
         "name": "",
+        "url": "{{devUrl}}/api/trigger-responses/triggers/:id",
+        "method": "PUT",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"selection_mode\": \"random\",\n  \"responses\": [\n    { \"id\": 5, \"weight\": 10 },\n    { \"id\": 2, \"weight\": 100 }\n  ]\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
         "url": "{{devUrl}}/api/trigger-responses/random",
         "method": "GET",
         "headers": [],
         "queryParams": [
           {
             "name": "trigger",
-            "value": "takealookatthis",
+            "value": "test",
             "enabled": true
           }
         ],
@@ -1583,7 +1618,7 @@
             "name": ""
           },
           "text": {
-            "value": "{\n  \"trigger_string\": \"bye\",\n  \"response_string\": \"See you!\",\n  \"response_order\": null,\n  \"selection_mode\": \"random\"\n}\n",
+            "value": "{\n  \"trigger_string\": \"bye\",\n  \"response_string\": \"See you!\",\n  \"response_order\": null,\n  \"selection_mode\": \"random\",\n  \"weight\": 100\n}\n",
             "format": "application/json"
           },
           "form": {
@@ -1618,7 +1653,42 @@
             "name": ""
           },
           "text": {
-            "value": "{\n    \"response_order\": 2,\n    \"selection_mode\": \"ordered\"\n  }",
+            "value": "{\n  \"response_order\": 2,\n  \"selection_mode\": \"ordered\"\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/trigger-responses/:id",
+        "method": "PUT",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "13",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"response_order\": 2,\n  \"selection_mode\": \"random\",\n  \"weight\": 50\n}",
             "format": "application/json"
           },
           "form": {
