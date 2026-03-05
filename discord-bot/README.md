@@ -75,7 +75,7 @@ The bot also needs these for Discord:
 
 ## Deploying slash commands
 
-- **Register commands:** `node deploy-commands.js` (or equivalent via your setup).
+- **Register commands:** `node deploy-commands.js`.
 - **Remove commands:** `node delete-all-commands.js`.
 
 ---

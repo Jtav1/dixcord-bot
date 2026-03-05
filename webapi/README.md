@@ -88,6 +88,8 @@ Authorization: Bearer <your-jwt-token>
 
 ## API Endpoints
 
+All routes except Auth require: `Authorization: Bearer <token>`.
+
 ### Auth (no token)
 
 | Method | Path | Description |
@@ -103,49 +105,109 @@ Authorization: Bearer <your-jwt-token>
 | PUT | `/api/users/me` | Update profile (name, password) |
 | DELETE | `/api/users/me` | Delete account |
 
-### Posts (token required)
+### Bot Responses (token required)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/posts` | List current user's posts |
-| GET | `/api/posts/:id` | Get one post |
-| POST | `/api/posts` | Create post `{ title, body? }` |
-| PUT | `/api/posts/:id` | Update post |
-| DELETE | `/api/posts/:id` | Delete post |
+| POST | `/api/bot-responses/fortune` | Random 8-ball fortune |
+| POST | `/api/bot-responses/link-fixer` | Fix social links in message; body: `{ message }` |
 
-### Tasks (token required)
+### Message Processing (token required)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/tasks` | List current user's tasks |
-| GET | `/api/tasks/:id` | Get one task |
-| POST | `/api/tasks` | Create task `{ title, completed? }` |
-| PUT | `/api/tasks/:id` | Update task |
-| DELETE | `/api/tasks/:id` | Delete task |
+| POST | `/api/message-processing/emoji-count` | Emoji count |
+| POST | `/api/message-processing/plusminus` | Plus/minus processing |
+| POST | `/api/message-processing/count-repost` | Count repost |
+| POST | `/api/message-processing/emoji-import` | Emoji import |
+| POST | `/api/message-processing/sticker-import` | Sticker import |
+| POST | `/api/message-processing/pin-check` | Pin check; body: `{ messageId }` |
+| POST | `/api/message-processing/pin-log` | Pin log; body: `{ messageId }` |
+
+### Config (token required)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/config` | List config key/value pairs |
+| PUT | `/api/config` | Set config; body: `{ config, value }` (updates if exists) |
+
+### Link Replacements (token required)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/link-replacements` | List all link replacements |
+| GET | `/api/link-replacements/:id` | Get one by id |
+| POST | `/api/link-replacements` | Create; body: `{ source_host, target_host }` |
+| PUT | `/api/link-replacements/:id` | Update |
+| DELETE | `/api/link-replacements/:id` | Delete |
+
+### Pin Quips (token required)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/pin-quips` | List all pin quips |
+| GET | `/api/pin-quips/random` | One random quip |
+| GET | `/api/pin-quips/:id` | Get one by id |
+| POST | `/api/pin-quips` | Create; body: `{ quip }` |
+| PUT | `/api/pin-quips/:id` | Update; body: `{ quip }` |
+| DELETE | `/api/pin-quips/:id` | Delete |
+
+### Trigger-Responses (token required)
+
+Trigger-response CRUD, trigger-centric routes (triggers + responses array), and response management. **Sample requests:** see [docs/trigger-responses-examples.md](docs/trigger-responses-examples.md).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/trigger-responses` | List all links (flat pairs) |
+| GET | `/api/trigger-responses/triggers` | List trigger strings (for bot) |
+| GET | `/api/trigger-responses/triggers/list` | List triggers with id, selection_mode |
+| GET | `/api/trigger-responses/triggers/responses` | All responses for trigger; query: `?trigger=` or `?triggerId=` |
+| GET | `/api/trigger-responses/triggers/:id` | Get trigger by id with responses |
+| POST | `/api/trigger-responses/triggers` | Create trigger with responses array |
+| PUT | `/api/trigger-responses/triggers/:id` | Update trigger / response order / add response |
+| GET | `/api/trigger-responses/random` | One random response; query: `?trigger=` |
+| GET | `/api/trigger-responses/responses/:id` | Get response by id |
+| PUT | `/api/trigger-responses/responses/:id` | Update response text; body: `{ response_string }` |
+| DELETE | `/api/trigger-responses/responses/:id` | Delete response |
+| GET | `/api/trigger-responses/:id` | Get one link by junction id |
+| POST | `/api/trigger-responses` | Create one link; body: `{ trigger_string, response_string, response_order?, selection_mode? }` |
+| PUT | `/api/trigger-responses/:id` | Update one link by junction id |
+| DELETE | `/api/trigger-responses/:id` | Delete one link by junction id |
+
+### Leaderboards (token required)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/leaderboards/plusplus` | Plusplus leaderboard; body: `{ limit? }` |
+| GET | `/api/leaderboards/plusplus/total` | Query: `?string=&type=word|user` |
+| GET | `/api/leaderboards/plusplus/voter/:userId` | Voter stats |
+| POST | `/api/leaderboards/plusplus/top-voters` | Top voters; body: `{ limit? }` |
+| POST | `/api/leaderboards/emoji` | Emoji leaderboard; body: `{ limit? }` |
+| POST | `/api/leaderboards/repost` | Repost leaderboard; body: `{ limit? }` |
+| GET | `/api/leaderboards/repost/user/:userId` | Repost user stats |
+
+### Other
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | API info and list of endpoints (no auth) |
+| GET | `/health` | Health check (no auth) |
 
 ---
 
 ## Example: cURL
 
 ```bash
-# Register
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","password":"secret123","name":"You"}'
-
 # Login (save token from response)
 curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com","password":"secret123"}'
+  -d '{"email":"admin@example.com","password":"your-admin-password"}'
 
-# Create a post (replace TOKEN)
-curl -X POST http://localhost:3000/api/posts \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer TOKEN" \
-  -d '{"title":"My first post","body":"Hello world"}'
+# List trigger-responses (replace TOKEN)
+curl -H "Authorization: Bearer TOKEN" http://localhost:3000/api/trigger-responses
 
-# List posts
-curl -H "Authorization: Bearer TOKEN" http://localhost:3000/api/posts
+# Get config
+curl -H "Authorization: Bearer TOKEN" http://localhost:3000/api/config
 ```
 
 ---
@@ -153,19 +215,27 @@ curl -H "Authorization: Bearer TOKEN" http://localhost:3000/api/posts
 ## Project layout
 
 ```
-├── index.js           # Express app entry
+├── index.js              # Express app entry
 ├── config/
-│   └── db.js          # DB adapter (MySQL or SQLite)
+│   └── db.js             # DB adapter (MySQL or SQLite)
 ├── middleware/
-│   └── auth.js        # JWT verify + sign
+│   └── auth.js           # JWT verify + sign
 ├── routes/
-│   ├── auth.js        # register, login
-│   ├── users.js       # profile CRUD
-│   ├── posts.js       # posts CRUD
-│   └── tasks.js       # tasks CRUD
+│   ├── auth.js           # login, register
+│   ├── users.js          # profile CRUD
+│   ├── bot-responses.js  # fortune, link-fixer
+│   ├── message-processing.js
+│   ├── config.js
+│   ├── link-replacements.js
+│   ├── pin-quips.js
+│   ├── trigger-responses.js
+│   └── leaderboards.js
+├── services/             # Business logic
 ├── sql/
-│   ├── schema.sql     # MySQL schema
-│   └── schema.sqlite.sql  # SQLite schema (auto-used when DB_TYPE=sqlite)
+│   ├── schema.sql        # MySQL schema
+│   └── schema.sqlite.sql # SQLite schema (auto-used when DB_TYPE=sqlite)
+├── docs/
+│   └── trigger-responses-examples.md  # Sample requests for trigger-response API
 ├── .env.example
 └── package.json
 ```
