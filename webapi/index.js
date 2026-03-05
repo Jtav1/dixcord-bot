@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import db from "./config/db.js";
 import authRoutes from "./routes/auth.js";
@@ -54,24 +56,54 @@ async function ensureAdminUser() {
   }
 }
 
-app.use(cors());
+// CORS: allow only frontend/admin origins (192.168.0.2 and Docker bridge 172.17.0.0/16)
+function isAllowedOrigin(origin) {
+  if (!origin) return true; // same-origin or non-browser
+  try {
+    const host = new URL(origin).hostname;
+    if (host === "192.168.0.2") return true;
+    const m = host.match(/^172\.17\.(\d{1,3})\.(\d{1,3})$/);
+    if (m) {
+      const a = parseInt(m[1], 10);
+      const b = parseInt(m[2], 10);
+      if (a >= 0 && a <= 255 && b >= 0 && b <= 255) return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+app.use(helmet());
+app.use(
+  cors({
+    origin(origin, cb) {
+      if (isAllowedOrigin(origin)) return cb(null, true);
+      cb(null, false);
+    },
+  })
+);
 app.use(express.json());
 
-// Log incoming API requests: method, path, query and body
-app.use((req, res, next) => {
-  const data = {};
-  if (req.query && Object.keys(req.query).length > 0) data.query = req.query;
-  if (req.body && Object.keys(req.body).length > 0) data.body = req.body;
-  console.log("[API request]", {
-    method: req.method,
-    endpoint: req.originalUrl,
-    ...(Object.keys(data).length > 0 ? { data } : {}),
-  });
-  next();
+// Rate limit: public routes (/, /health) — reduce abuse
+const publicLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 60,
+  message: { ok: false, error: "Too many requests, try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limit: auth (login/register) — reduce brute-force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { ok: false, error: "Too many login attempts, try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 // Health check (no auth)
-app.get("/", (req, res) => {
+app.get("/", publicLimiter, (req, res) => {
   res.json({
     name: "js-express-api-template",
     version: "1.0.0",
@@ -174,10 +206,10 @@ app.get("/", (req, res) => {
   });
 });
 
-app.get("/health", (req, res) => res.json({ status: "ok" }));
+app.get("/health", publicLimiter, (req, res) => res.json({ status: "ok" }));
 
 // Only /api/auth is public (login/register). All other /api/* routes require Authorization: Bearer <token>.
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/bot-responses", botResponsesRoutes);
 app.use("/api/message-processing", messageProcessingRoutes);
