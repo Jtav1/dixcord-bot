@@ -1,6 +1,6 @@
 {
   "name": "dixcord-bot-webapi",
-  "version": "1.0.0",
+  "version": "v2.0",
   "description": "Express.js REST API for the dixcord-bot",
   "type": "module",
   "main": "index.js",
@@ -12,6 +12,7 @@
     "db:setup:mysql": "node scripts/mysql/setup.js",
     "db:setup:sqlite": "node scripts/sqlite/setup.js",
     "db:seed:trigger-responses": "node scripts/sqlite/seed-trigger-responses.js",
+    "db:seed:trigger-responses:mysql": "node scripts/mysql/seed-trigger-responses.js",
     "db:migrate:mysql": "node scripts/mysql/setup.js",
     "db:migrate:sqlite": "node scripts/sqlite/setup.js"
   },
