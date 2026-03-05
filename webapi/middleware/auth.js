@@ -1,7 +1,11 @@
 import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+if (!process.env.JWT_SECRET || String(process.env.JWT_SECRET).trim() === '') {
+  console.error('Fatal: JWT_SECRET must be set in .env or system environment. The webapi will not start without it.');
+  process.exit(1);
+}
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
  * Verify JWT and attach user to req.user. Only the admin user (ADMIN_USERNAME) may access.
