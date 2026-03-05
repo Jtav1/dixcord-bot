@@ -80,7 +80,7 @@ const insertResponse = db.prepare(
   "INSERT INTO responses (response_string) VALUES (?)",
 );
 const insertLink = db.prepare(
-  "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight) VALUES (?, ?, NULL, 10)",
+  "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight) VALUES (?, ?, 'random', 10)",
 );
 
 const seed = db.transaction(() => {
