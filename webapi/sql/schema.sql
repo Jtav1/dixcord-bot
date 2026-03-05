@@ -89,12 +89,13 @@ CREATE TABLE IF NOT EXISTS responses (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Junction: which responses belong to which trigger, with optional order
+-- Junction: which responses belong to which trigger, with optional order and weight (1-1000)
 CREATE TABLE IF NOT EXISTS trigger_response (
   id INT AUTO_INCREMENT PRIMARY KEY,
   trigger_id INT NOT NULL,
   response_id INT NOT NULL,
   response_order INT NULL,
+  weight INT NOT NULL DEFAULT 1,
   FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE,
   FOREIGN KEY (response_id) REFERENCES responses(id) ON DELETE CASCADE,
   UNIQUE KEY unique_trigger_response (trigger_id, response_id)

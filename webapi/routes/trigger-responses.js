@@ -110,7 +110,7 @@ router.get("/triggers/:id", authenticate, async (req, res) => {
 /**
  * POST /api/trigger-responses/triggers
  * Create a trigger (if it doesn't exist) with selection_mode and an array of responses.
- * Body: { trigger_string, selection_mode?, responses: [ { response_string, order? } ] }
+ * Body: { trigger_string, selection_mode?, responses: [ { response_string, order?, weight? } ] }
  * Auth: required.
  */
 router.post("/triggers", authenticate, async (req, res) => {
@@ -145,8 +145,8 @@ router.post("/triggers", authenticate, async (req, res) => {
 
 /**
  * PUT /api/trigger-responses/triggers/:id
- * Update trigger: selection_mode and/or responses (set order by link id, or add new response).
- * Body: { selection_mode?, responses?: [ { id: linkId, order? } | { response_string, order? } ] }
+ * Update trigger: selection_mode and/or responses (set order/weight by link id, or add new response).
+ * Body: { selection_mode?, responses?: [ { id: linkId, order?, weight? } | { response_string, order?, weight? } ] }
  * Auth: required.
  */
 router.put("/triggers/:id", authenticate, async (req, res) => {
@@ -295,12 +295,12 @@ router.get("/:id", authenticate, async (req, res) => {
 /**
  * POST /api/trigger-responses
  * Create a trigger-response pair.
- * Body: { trigger_string, response_string, response_order?, selection_mode? }
+ * Body: { trigger_string, response_string, response_order?, selection_mode?, weight? }
  * Auth: required.
  */
 router.post("/", authenticate, async (req, res) => {
   try {
-    const { trigger_string, response_string, response_order, selection_mode } =
+    const { trigger_string, response_string, response_order, selection_mode, weight } =
       req.body ?? {};
     if (
       trigger_string == null ||
@@ -321,6 +321,7 @@ router.post("/", authenticate, async (req, res) => {
       response_string.trim(),
       response_order,
       selection_mode,
+      weight,
     );
     if (id == null) {
       return res
@@ -340,7 +341,7 @@ router.post("/", authenticate, async (req, res) => {
 /**
  * PUT /api/trigger-responses/:id
  * Update a trigger-response pair.
- * Body: { trigger_string?, response_string?, response_order?, selection_mode? }
+ * Body: { trigger_string?, response_string?, response_order?, selection_mode?, weight? }
  * Auth: required.
  */
 router.put("/:id", authenticate, async (req, res) => {
@@ -349,7 +350,7 @@ router.put("/:id", authenticate, async (req, res) => {
     if (Number.isNaN(id)) {
       return res.status(400).json({ ok: false, error: "Invalid id" });
     }
-    const { trigger_string, response_string, response_order, selection_mode } =
+    const { trigger_string, response_string, response_order, selection_mode, weight } =
       req.body ?? {};
     const updates = {};
     if (typeof trigger_string === "string" && trigger_string.trim())
@@ -363,11 +364,12 @@ router.put("/:id", authenticate, async (req, res) => {
           : parseInt(response_order, 10);
     if (typeof selection_mode === "string" && selection_mode.trim())
       updates.selection_mode = selection_mode.trim();
+    if (weight !== undefined) updates.weight = weight;
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({
         ok: false,
         error:
-          "Provide at least one of trigger_string, response_string, response_order, or selection_mode to update",
+          "Provide at least one of trigger_string, response_string, response_order, selection_mode, or weight to update",
       });
     }
     const updated = await triggerResponses.update(id, updates);

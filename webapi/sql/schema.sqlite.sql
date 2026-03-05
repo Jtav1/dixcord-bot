@@ -94,12 +94,13 @@ CREATE TABLE IF NOT EXISTS responses (
   created_at TEXT DEFAULT (datetime('now'))
 );
 
--- Junction: which responses belong to which trigger, with optional order
+-- Junction: which responses belong to which trigger, with optional order and weight (1-1000)
 CREATE TABLE IF NOT EXISTS trigger_response (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trigger_id INTEGER NOT NULL REFERENCES triggers(id) ON DELETE CASCADE,
   response_id INTEGER NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
   response_order INTEGER NULL,
+  weight INTEGER NOT NULL DEFAULT 1 CHECK (weight >= 1 AND weight <= 1000),
   UNIQUE (trigger_id, response_id)
 );
 
