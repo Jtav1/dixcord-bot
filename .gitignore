@@ -110,3 +110,5 @@ config.ignore
 .vscode
 /.cursor
 *.txt
+
+dump*.sql
