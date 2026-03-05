@@ -88,7 +88,7 @@ for (const category of commandsCategories) {
       commands.push(command);
     } else {
       console.log(
-        `[WARNING] The command at ${filePath} is missing a required "cmdName" or "data" or "execute" property.`,
+        `[WARNING] Command ${commandCategoryPath} is missing a required "cmdName" or "data" or "execute" property.`,
       );
     }
   }
