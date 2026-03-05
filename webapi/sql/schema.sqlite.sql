@@ -23,13 +23,6 @@ CREATE TABLE IF NOT EXISTS configurations (
   value TEXT
 );
 
-CREATE TABLE IF NOT EXISTS take_a_look_responses (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  link TEXT UNIQUE,
-  isdefault INTEGER DEFAULT 0,
-  frequency INTEGER DEFAULT 0
-);
-
 CREATE TABLE IF NOT EXISTS eight_ball_responses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   response_string TEXT NOT NULL,

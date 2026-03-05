@@ -18,13 +18,6 @@ CREATE TABLE IF NOT EXISTS configurations (
   value VARCHAR(255)
 );
 
-CREATE TABLE IF NOT EXISTS take_a_look_responses (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  link VARCHAR(255) UNIQUE,
-  isdefault SMALLINT DEFAULT 0,
-  frequency INT DEFAULT 0
-);
-
 CREATE TABLE IF NOT EXISTS eight_ball_responses (
   id INT AUTO_INCREMENT PRIMARY KEY,
   response_string VARCHAR(500) NOT NULL,
