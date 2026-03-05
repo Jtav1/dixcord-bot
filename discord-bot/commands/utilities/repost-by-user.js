@@ -1,13 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import { getRepostsForUser } from "../../api/emojis.js";
-import { getAllConfigurations } from "../../api/configurations.js";
 
 const cmdName = "reposts-by-user";
-
-const configs = await getAllConfigurations();
-const repostEmojiId = configs.filter(
-  (config_entry) => config_entry.config === "repost_emoji"
-)[0].value;
 
 const data = new SlashCommandBuilder()
   .setName("reposts-by-user")
