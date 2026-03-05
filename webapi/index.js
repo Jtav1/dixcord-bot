@@ -82,7 +82,7 @@ app.use(
     },
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: "100kb" }));
 
 // Rate limit: public routes (/, /health) — reduce abuse
 const publicLimiter = rateLimit({
