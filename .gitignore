@@ -109,3 +109,4 @@ config.ignore
 .DS_Store
 .vscode
 /.cursor
+*.txt
