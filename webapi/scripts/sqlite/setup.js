@@ -31,6 +31,7 @@ const dataDir = path.dirname(dbPath);
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
+console.log("db: SQLite database path:", dbPath);
 
 const db = new Database(dbPath);
 
@@ -45,6 +46,25 @@ const exec = (sql) => {
 };
 
 const initializeDatabase = () => {
+  // Users (for authentication and profile)
+  exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      name TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  exec(`
+    CREATE TRIGGER IF NOT EXISTS users_updated_at
+      AFTER UPDATE ON users WHEN OLD.updated_at = NEW.updated_at
+      BEGIN
+        UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id;
+      END
+  `);
+
   exec(`
     CREATE TABLE IF NOT EXISTS configurations (
       config TEXT PRIMARY KEY,
@@ -167,6 +187,39 @@ const initializeDatabase = () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       quip TEXT NOT NULL,
       created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
+  // Trigger-response: triggers, responses, junction, round-robin state
+  exec(`
+    CREATE TABLE IF NOT EXISTS triggers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trigger_string TEXT NOT NULL UNIQUE,
+      selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered')),
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  exec(`
+    CREATE TABLE IF NOT EXISTS responses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      response_string TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  exec(`
+    CREATE TABLE IF NOT EXISTS trigger_response (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      trigger_id INTEGER NOT NULL REFERENCES triggers(id) ON DELETE CASCADE,
+      response_id INTEGER NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
+      response_order INTEGER NULL,
+      weight INTEGER NOT NULL DEFAULT 1 CHECK (weight >= 1 AND weight <= 1000),
+      UNIQUE (trigger_id, response_id)
+    )
+  `);
+  exec(`
+    CREATE TABLE IF NOT EXISTS trigger_response_state (
+      trigger_string TEXT PRIMARY KEY,
+      last_used_response_id INTEGER NULL
     )
   `);
 
