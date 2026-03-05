@@ -6,10 +6,9 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 # Application code
+COPY ./api ./api
 COPY ./commands ./commands
-COPY ./database ./database
 COPY ./events ./events
-COPY ./logging ./logging
 COPY ./delete-all-commands.js ./deploy-commands.js ./
 COPY ./configVars.js ./bot.js ./
 
