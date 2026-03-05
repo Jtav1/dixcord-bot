@@ -72,6 +72,7 @@ typings/
 .env
 .env.test
 .env.prod
+.env.dev
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -109,6 +110,3 @@ config.ignore
 .DS_Store
 .vscode
 /.cursor
-*.txt
-
-dump*.sql

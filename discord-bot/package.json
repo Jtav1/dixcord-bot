@@ -1,0 +1,26 @@
+{
+  "name": "dixcord-bot",
+  "version": "v2.0",
+  "description": "",
+  "main": "bot.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "run": "node bot.js",
+    "dev": "node --watch bot.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.13.6",
+    "@discordjs/voice": "^0.13.0",
+    "bufferutil": "^4.0.8",
+    "discord.js": "^14.18.0",
+    "dotenv": "^8.6.0",
+    "moment": "^2.30.1",
+    "mysql2": "^3.11.3",
+    "redis": "^4.6.12",
+    "sentiment": "^5.0.2",
+    "utf-8-validate": "^5.0.10"
+  }
+}
