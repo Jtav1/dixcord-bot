@@ -196,14 +196,16 @@ const initializeDatabase = () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trigger_string TEXT NOT NULL UNIQUE,
       selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered')),
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now')),
+      frequency INTEGER DEFAULT 0
     )
   `);
   exec(`
     CREATE TABLE IF NOT EXISTS responses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       response_string TEXT NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now')),
+      frequency INTEGER DEFAULT 0
     )
   `);
   exec(`
@@ -212,7 +214,8 @@ const initializeDatabase = () => {
       trigger_id INTEGER NOT NULL REFERENCES triggers(id) ON DELETE CASCADE,
       response_id INTEGER NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
       response_order INTEGER NULL,
-      weight INTEGER NOT NULL DEFAULT 1 CHECK (weight >= 1 AND weight <= 1000),
+      weight INTEGER NULL DEFAULT NULL CHECK (weight IS NULL OR (weight >= 0 AND weight <= 100)),
+      frequency INTEGER DEFAULT 0,
       UNIQUE (trigger_id, response_id)
     )
   `);

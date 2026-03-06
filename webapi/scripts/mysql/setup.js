@@ -191,14 +191,16 @@ const initializeDatabase = async () => {
       id INT AUTO_INCREMENT PRIMARY KEY,
       trigger_string VARCHAR(255) NOT NULL UNIQUE,
       selection_mode VARCHAR(10) NOT NULL DEFAULT 'random',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      frequency INT DEFAULT 0
     )
   `);
   await execQuery(`
     CREATE TABLE IF NOT EXISTS responses (
       id INT AUTO_INCREMENT PRIMARY KEY,
       response_string VARCHAR(500) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      frequency INT DEFAULT 0
     )
   `);
   await execQuery(`
@@ -207,7 +209,8 @@ const initializeDatabase = async () => {
       trigger_id INT NOT NULL,
       response_id INT NOT NULL,
       response_order INT NULL,
-      weight INT NOT NULL DEFAULT 1,
+      weight INT NULL DEFAULT NULL,
+      frequency INT DEFAULT 0,
       FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE,
       FOREIGN KEY (response_id) REFERENCES responses(id) ON DELETE CASCADE,
       UNIQUE KEY unique_trigger_response (trigger_id, response_id)

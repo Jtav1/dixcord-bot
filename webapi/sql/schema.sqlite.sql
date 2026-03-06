@@ -84,23 +84,26 @@ CREATE TABLE IF NOT EXISTS triggers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trigger_string TEXT NOT NULL UNIQUE,
   selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered')),
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT (datetime('now')),
+  frequency INTEGER DEFAULT 0
 );
 
 -- Responses: reusable response strings (many-to-many with triggers via trigger_response)
 CREATE TABLE IF NOT EXISTS responses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   response_string TEXT NOT NULL,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT (datetime('now')),
+  frequency INTEGER DEFAULT 0
 );
 
--- Junction: which responses belong to which trigger, with optional order and weight (1-1000)
+-- Junction: which responses belong to which trigger, with optional order and weight (0-100 or null)
 CREATE TABLE IF NOT EXISTS trigger_response (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trigger_id INTEGER NOT NULL REFERENCES triggers(id) ON DELETE CASCADE,
   response_id INTEGER NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
   response_order INTEGER NULL,
-  weight INTEGER NOT NULL DEFAULT 1 CHECK (weight >= 1 AND weight <= 1000),
+  weight INTEGER NULL DEFAULT NULL CHECK (weight IS NULL OR (weight >= 0 AND weight <= 100)),
+  frequency INTEGER DEFAULT 0,
   UNIQUE (trigger_id, response_id)
 );
 

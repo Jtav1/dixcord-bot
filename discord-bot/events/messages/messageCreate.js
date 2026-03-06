@@ -5,7 +5,7 @@ import {
   getFortuneResponse,
 } from "../../api/responses.js";
 import {
-  getTriggerList,
+  getTriggersList,
   getRandomResponseForTrigger,
 } from "../../api/triggerResponses.js";
 import { getLinkReplacementSourceHosts } from "../../api/linkReplacements.js";
@@ -16,7 +16,7 @@ import { plusMinusMsg } from "./utilities/plusplus.js";
 
 const name = "messageCreate";
 
-/** Cached trigger strings from API; loaded on first message. */
+/** Cached triggers (with selection_mode) from API; loaded on first message. */
 let cachedTriggers = null;
 
 /** Cached link-replacement source hosts from API; loaded on first message. */
@@ -59,13 +59,11 @@ const execute = async (message) => {
 
     // Then, if message matches a trigger from the DB, get a random response for it
     if (cachedTriggers === null) {
-      cachedTriggers = await getTriggerList();
+      cachedTriggers = await getTriggersList();
     }
-    const matchedTrigger = cachedTriggers.find((word) =>
-      contentStripped.includes(word),
+    const matchedTrigger = cachedTriggers.find((t) =>
+      contentStripped.includes(t.trigger_string),
     );
-    console.log(cachedTriggers);
-    console.log(matchedTrigger);
     if (matchedTrigger) {
       response = await getRandomResponseForTrigger(matchedTrigger);
     }
