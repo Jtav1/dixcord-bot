@@ -1,6 +1,4 @@
--- Create database
-CREATE DATABASE IF NOT EXISTS api_template;
-USE api_template;
+
 
 -- Users (for authentication and profile)
 CREATE TABLE IF NOT EXISTS users (
