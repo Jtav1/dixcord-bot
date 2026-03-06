@@ -81,16 +81,6 @@ const initializeDatabase = async () => {
     )
   `);
 
-  // Take a look responses table
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS take_a_look_responses (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      link VARCHAR(255) UNIQUE,
-      isdefault SMALLINT DEFAULT 0,
-      frequency INT DEFAULT 0
-    )
-  `);
-
   // Fortune (eight ball) responses table
   await execQuery(`
     CREATE TABLE IF NOT EXISTS eight_ball_responses (
@@ -99,14 +89,6 @@ const initializeDatabase = async () => {
       sentiment ENUM('positive', 'negative', 'neutral') NOT NULL,
       frequency INT DEFAULT 0,
       UNIQUE KEY unique_response (response_string, sentiment)
-    )
-  `);
-
-  // Log filter keywords table
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS log_filter_keywords (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      keyword VARCHAR(255) UNIQUE
     )
   `);
 
@@ -138,10 +120,12 @@ const initializeDatabase = async () => {
   // Migration: add msgcontents if table existed before this column was added
   try {
     const [cols] = await pool.query(
-      "SELECT COUNT(*) as c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_repost_tracking' AND COLUMN_NAME = 'msgcontents'"
+      "SELECT COUNT(*) as c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_repost_tracking' AND COLUMN_NAME = 'msgcontents'",
     );
     if (cols && cols[0]?.c === 0) {
-      await execQuery("ALTER TABLE user_repost_tracking ADD COLUMN msgcontents TEXT");
+      await execQuery(
+        "ALTER TABLE user_repost_tracking ADD COLUMN msgcontents TEXT",
+      );
     }
   } catch (_) {}
 
@@ -154,16 +138,6 @@ const initializeDatabase = async () => {
       voter VARCHAR(500) DEFAULT NULL,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
       value VARCHAR(500) DEFAULT NULL
-    )
-  `);
-
-  // User lookup table
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS user_lookup (
-      userid VARCHAR(255) NOT NULL,
-      username VARCHAR(255) NOT NULL,
-      handle VARCHAR(255) NOT NULL,
-      PRIMARY KEY (userid, username)
     )
   `);
 
@@ -235,7 +209,9 @@ const initializeDatabase = async () => {
     "Um... based? or cringe.",
     "I'm only going to pin it once this time",
   ];
-  const [pinQuipRows] = await pool.query("SELECT COUNT(*) as count FROM pin_quips");
+  const [pinQuipRows] = await pool.query(
+    "SELECT COUNT(*) as count FROM pin_quips",
+  );
   const pinQuipsCount = pinQuipRows?.[0]?.count ?? 0;
   if (pinQuipsCount === 0) {
     for (const quip of defaultPinQuips) {
@@ -275,7 +251,7 @@ const importConfigs = async () => {
 
   await execQuery(
     `INSERT IGNORE INTO configurations (config, value) VALUES ${placeholders}`,
-    values
+    values,
   );
 
   console.log("db: MySQL configuration import complete");
@@ -293,25 +269,15 @@ const importLinkReplacements = async () => {
   for (const [source_host, target_host] of defaultLinkReplacements) {
     await execQuery(
       `INSERT IGNORE INTO link_replacements (source_host, target_host) VALUES (?, ?)`,
-      [source_host, target_host]
+      [source_host, target_host],
     );
   }
   console.log("db: MySQL link_replacements import complete");
 };
 
 const importUsers = async () => {
-  const userAry = [];
-  if (userAry.length === 0) {
-    console.log("db: no users to import (placeholder)");
-    return;
-  }
-  const placeholders = userAry.map(() => "(?, ?, ?)").join(", ");
-  const values = userAry.flat();
-  await execQuery(
-    `INSERT INTO user_lookup (userid, username, handle) VALUES ${placeholders} ON DUPLICATE KEY UPDATE handle = VALUES(handle)`,
-    values
-  );
-  console.log("db: MySQL user import complete");
+  // user_lookup table removed in v2.0; no-op for backward compatibility with run()
+  console.log("db: user_lookup no longer used (v2.0)");
 };
 
 const run = async () => {

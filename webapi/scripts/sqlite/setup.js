@@ -98,28 +98,12 @@ const initializeDatabase = () => {
   `);
 
   exec(`
-    CREATE TABLE IF NOT EXISTS take_a_look_responses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      link TEXT UNIQUE,
-      isdefault INTEGER DEFAULT 0,
-      frequency INTEGER DEFAULT 0
-    )
-  `);
-
-  exec(`
     CREATE TABLE IF NOT EXISTS eight_ball_responses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       response_string TEXT NOT NULL,
       sentiment TEXT NOT NULL CHECK (sentiment IN ('positive', 'negative', 'neutral')),
       frequency INTEGER DEFAULT 0,
       UNIQUE (response_string, sentiment)
-    )
-  `);
-
-  exec(`
-    CREATE TABLE IF NOT EXISTS log_filter_keywords (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      keyword TEXT UNIQUE
     )
   `);
 
@@ -162,15 +146,6 @@ const initializeDatabase = () => {
       voter TEXT,
       timestamp TEXT DEFAULT (datetime('now')),
       value TEXT
-    )
-  `);
-
-  exec(`
-    CREATE TABLE IF NOT EXISTS user_lookup (
-      userid TEXT NOT NULL,
-      username TEXT NOT NULL,
-      handle TEXT NOT NULL,
-      PRIMARY KEY (userid, username)
     )
   `);
 

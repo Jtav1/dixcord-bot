@@ -62,6 +62,16 @@ CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   UNIQUE (userid, emoid)
 );
 
+CREATE TABLE IF NOT EXISTS user_repost_tracking (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userid TEXT NOT NULL,
+  msgid TEXT NOT NULL,
+  accuser TEXT NOT NULL,
+  timestamp TEXT DEFAULT (datetime('now')),
+  msgcontents TEXT,
+  UNIQUE (userid, msgid, accuser)
+);
+
 CREATE TABLE IF NOT EXISTS pin_history (
   msgid TEXT PRIMARY KEY,
   timestamp TEXT DEFAULT (datetime('now'))
