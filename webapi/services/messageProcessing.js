@@ -10,12 +10,22 @@ import db from "../config/db.js";
 /**
  * Ensure emoji_frequency has a row for this emoji; increment frequency.
  * If no row exists, insert one with frequency 1.
+ * @param {string} [emojiType] - Type from request (e.g. 'emoji'); if missing, type is stored as null.
  * @private
  */
-async function ensureAndIncrementEmoji(emojiId, emojiName, emojiAnimated) {
+async function ensureAndIncrementEmoji(
+  emojiId,
+  emojiName,
+  emojiAnimated,
+  emojiType,
+) {
   const id = String(emojiId ?? "");
   const name = String((emojiName ?? id) || "?");
   const animated = emojiAnimated ? 1 : 0;
+  const type =
+    emojiType != null && String(emojiType).trim() !== ""
+      ? String(emojiType).trim()
+      : null;
 
   const [existing] = await db.query(
     "SELECT 1 FROM emoji_frequency WHERE emoid = ?",
@@ -33,7 +43,7 @@ async function ensureAndIncrementEmoji(emojiId, emojiName, emojiAnimated) {
     if (emojiId.length > 0 && emojiName.length > 0) {
       await db.query(
         "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 1, ?, ?)",
-        [id, name, animated, "emoji"],
+        [id, name, animated, type],
       );
     }
   }
@@ -121,7 +131,7 @@ export async function countEmoji(payload) {
   for (const em of emojis) {
     const name = String(em.name ?? "?");
     const id = em.id != null ? String(em.id) : name;
-    await ensureAndIncrementEmoji(id, name, em.animated);
+    await ensureAndIncrementEmoji(id, name, em.animated, em.type);
     if (id && authorId) {
       await upsertUserEmoji(authorId, id);
     }
@@ -268,14 +278,17 @@ export async function importEmojiList(emojis) {
   );
   // 1. Cleanup: remove server emojis that were never used (same as bot importEmojiList)
   await db.query(
-    "DELETE FROM emoji_frequency WHERE frequency = 0 AND type = 'emoji'",
+    "DELETE FROM emoji_frequency WHERE frequency = 0 AND (type = 'emoji' OR type IS NULL)",
   );
   let imported = 0;
   for (const e of list) {
     const id = String(e.id ?? "").trim();
     const name = String((e.name ?? id) || "?").trim();
     const animated = e.animated ? 1 : 0;
-    const type = (e.type != null ? String(e.type) : "emoji").trim() || "emoji";
+    const type =
+      e.type != null && String(e.type).trim() !== ""
+        ? String(e.type).trim()
+        : null;
     if (id.length === 0 && name === "?") continue;
     const [existing] = await db.query(
       "SELECT 1 FROM emoji_frequency WHERE emoid = ?",
@@ -304,9 +317,7 @@ export async function importStickerList(stickers) {
   const list = stickers.filter(
     (s) => s != null && (s.id != null || s.name != null),
   );
-  await db.query(
-    "DELETE FROM sticker_frequency WHERE frequency = 0",
-  );
+  await db.query("DELETE FROM sticker_frequency WHERE frequency = 0");
   let imported = 0;
   for (const s of list) {
     const id = String(s.id ?? "").trim();

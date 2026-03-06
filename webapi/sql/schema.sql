@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS emoji_frequency (
   emoji VARCHAR(255) NOT NULL,
   frequency INT NOT NULL DEFAULT 0,
   animated TINYINT(1) DEFAULT 0,
-  type VARCHAR(50) NOT NULL
+  type VARCHAR(50) DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS sticker_frequency (
