@@ -5,17 +5,6 @@
 
 import db from "../config/db.js";
 
-// --- Config and filter keywords ---
-
-/**
- * Get log filter keywords (lowercased) for plus/minus message parsing.
- * @returns {Promise<string[]>}
- */
-export async function getFilterKeywords() {
-  const [rows] = await db.query("SELECT keyword FROM log_filter_keywords");
-  return (rows || []).map((r) => (r.keyword || "").toLowerCase());
-}
-
 // --- Emoji detector (count emoji usage) ---
 
 /**
@@ -152,7 +141,7 @@ async function recordPlusPlus(string, typestr, voterid, value) {
 }
 
 /**
- * Parse message for word++ / user++ / -- and record votes (respecting filter list).
+ * Parse message for word++ / user++ / -- and record votes.
  * @param {object} payload - { message: { content, author: { id } }, voterId }
  * @returns {Promise<{ ok: boolean, recorded?: number }>}
  */
@@ -161,7 +150,6 @@ export async function recordPlusMinusMessage(payload) {
   const content = message?.content ?? "";
   if (!voterId) return { ok: false, error: "voterId is required" };
 
-  const filterWords = await getFilterKeywords();
   const regex = /(\S+)\s*(\+\+|\-\-)/g;
 
   let match;
@@ -186,7 +174,6 @@ export async function recordPlusMinusMessage(payload) {
     target = target.replace(/[-+\s]/g, "");
 
     if (target.length < 1) matchtype = null;
-    if (filterWords.includes(target.toLowerCase())) continue; // ignore filtered words
     if (!matchtype) continue;
 
     if (m.type === "++" && matchtype) {
