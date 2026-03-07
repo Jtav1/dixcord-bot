@@ -1,7 +1,7 @@
 /**
  * Trigger-response: triggers and responses in separate tables, linked by trigger_response (many-to-many).
  * CRUD by junction id; get response by trigger (random or round-robin).
- * Uses config/db.js (mysql or sqlite) and trigger_response_state for round-robin.
+ * Uses config/db.js (mysql or sqlite) and trigger_response_state for ordered round-robin (by response_order).
  */
 
 import db from "../config/db.js";
@@ -10,6 +10,8 @@ const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
 const orderByResponseOrderClause = isSqlite
   ? "ORDER BY tr.response_order IS NULL, tr.response_order ASC, tr.response_id ASC"
   : "ORDER BY ISNULL(tr.response_order), tr.response_order ASC, tr.response_id ASC";
+/** For ordered triggers only: responses are ordered by response_order (assumed always set). */
+const orderByResponseOrderOnlyClause = "ORDER BY tr.response_order ASC";
 const orderByRandomClause = isSqlite ? "RANDOM()" : "RAND()";
 
 const WEIGHT_MIN = 0;
@@ -77,35 +79,35 @@ export async function getTriggers() {
 }
 
 /**
- * Get last_used_response_id (responses.id) for a trigger from trigger_response_state.
- * @param {string} trigger
+ * Get last_used_response_order for a trigger from trigger_response_state.
+ * @param {number} triggerId
  * @returns {Promise<number|null>}
  */
-async function getLastUsedResponseId(trigger) {
+async function getLastUsedResponseOrder(triggerId) {
   const [rows] = await db.query(
-    "SELECT last_used_response_id FROM trigger_response_state WHERE trigger_string = ?",
-    [trigger],
+    "SELECT last_used_response_order FROM trigger_response_state WHERE trigger_id = ?",
+    [triggerId],
   );
   if (!rows || rows.length === 0) return null;
-  const id = rows[0].last_used_response_id;
-  return id == null ? null : Number(id);
+  const order = rows[0].last_used_response_order;
+  return order == null ? null : Number(order);
 }
 
 /**
- * Set last_used_response_id (responses.id) for a trigger (INSERT or UPDATE).
- * @param {string} trigger
- * @param {number|null} responseId
+ * Set last_used_response_order for a trigger (INSERT or UPDATE).
+ * @param {number} triggerId
+ * @param {number|null} responseOrder
  */
-async function setLastUsedResponseId(trigger, responseId) {
+async function setLastUsedResponseOrder(triggerId, responseOrder) {
   if (isSqlite) {
     await db.query(
-      "INSERT INTO trigger_response_state (trigger_string, last_used_response_id) VALUES (?, ?) ON CONFLICT(trigger_string) DO UPDATE SET last_used_response_id = excluded.last_used_response_id",
-      [trigger, responseId],
+      "INSERT INTO trigger_response_state (trigger_id, last_used_response_order) VALUES (?, ?) ON CONFLICT(trigger_id) DO UPDATE SET last_used_response_order = excluded.last_used_response_order",
+      [triggerId, responseOrder],
     );
   } else {
     await db.query(
-      "INSERT INTO trigger_response_state (trigger_string, last_used_response_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE last_used_response_id = VALUES(last_used_response_id)",
-      [trigger, responseId],
+      "INSERT INTO trigger_response_state (trigger_id, last_used_response_order) VALUES (?, ?) ON DUPLICATE KEY UPDATE last_used_response_order = VALUES(last_used_response_order)",
+      [triggerId, responseOrder],
     );
   }
 }
@@ -217,22 +219,23 @@ export async function getRandomResponse(trigger) {
 
   if (selection_mode === "ordered") {
     const [orderedRows] = await db.query(
-      `SELECT r.id, r.response_string, tr.id AS trigger_response_id
+      `SELECT r.id, r.response_string, tr.id AS trigger_response_id, tr.response_order
        FROM trigger_response tr
        JOIN responses r ON r.id = tr.response_id
        WHERE tr.trigger_id = ?
-       ${orderByResponseOrderClause}`,
+       ${orderByResponseOrderOnlyClause}`,
       [triggerId],
     );
     if (!orderedRows || orderedRows.length === 0) return null;
-    const lastId = await getLastUsedResponseId(t);
-    let nextIndex = 0;
-    if (lastId != null) {
-      const idx = orderedRows.findIndex((r) => Number(r.id) === Number(lastId));
-      nextIndex = idx < 0 ? 0 : (idx + 1) % orderedRows.length;
+    const lastOrder = await getLastUsedResponseOrder(triggerId);
+    let chosen = orderedRows[0];
+    if (lastOrder != null) {
+      const nextRow = orderedRows.find(
+        (r) => Number(r.response_order) > Number(lastOrder),
+      );
+      if (nextRow) chosen = nextRow;
     }
-    const chosen = orderedRows[nextIndex];
-    await setLastUsedResponseId(t, chosen.id);
+    await setLastUsedResponseOrder(triggerId, chosen.response_order);
     await incrementSelectionFrequencies(
       triggerId,
       chosen.id,
@@ -242,7 +245,7 @@ export async function getRandomResponse(trigger) {
   }
 
   if (selection_mode === "weighted") {
-    return getWeightedResponseForTrigger(triggerId, t);
+    return getWeightedResponseForTrigger(triggerId);
   }
 
   const result = await getRandomResponseByRandomSelection(triggerId);
@@ -324,6 +327,10 @@ export async function create(
     "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight) VALUES (?, ?, ?, ?)",
     [triggerId, responseId, response_order ?? null, w],
   );
+  await db.query("DELETE FROM trigger_response_state WHERE trigger_id = ?", [
+    triggerId,
+  ]);
+
   return result?.insertId ?? result?.lastInsertRowid ?? null;
 }
 
@@ -536,6 +543,9 @@ export async function createTriggerWithResponses({
       });
     }
   }
+  await db.query("DELETE FROM trigger_response_state WHERE trigger_id = ?", [
+    triggerId,
+  ]);
   const trigger = await getTriggerById(triggerId);
   return trigger;
 }
@@ -607,6 +617,10 @@ export async function updateTrigger(triggerId, { selection_mode, responses }) {
         await db.query(
           "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight) VALUES (?, ?, ?, ?)",
           [triggerId, responseId, order, w],
+        );
+        await db.query(
+          "DELETE FROM trigger_response_state WHERE trigger_id = ?",
+          [triggerId],
         );
       }
     }

@@ -117,8 +117,8 @@ CREATE TABLE IF NOT EXISTS trigger_response (
   UNIQUE (trigger_id, response_id)
 );
 
--- Round-robin state: last-used response id (responses.id) per trigger
+-- Round-robin state: last-used response_order per trigger (for ordered selection)
 CREATE TABLE IF NOT EXISTS trigger_response_state (
-  trigger_string TEXT PRIMARY KEY,
-  last_used_response_id INTEGER NULL
+  trigger_id INTEGER PRIMARY KEY REFERENCES triggers(id) ON DELETE CASCADE,
+  last_used_response_order INTEGER NULL
 );
