@@ -10,6 +10,7 @@ const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
 const orderByResponseOrderClause = isSqlite
   ? "ORDER BY tr.response_order IS NULL, tr.response_order ASC, tr.response_id ASC"
   : "ORDER BY ISNULL(tr.response_order), tr.response_order ASC, tr.response_id ASC";
+const orderByRandomClause = isSqlite ? "RANDOM()" : "RAND()";
 
 const WEIGHT_MIN = 0;
 const WEIGHT_MAX = 100;
@@ -24,7 +25,9 @@ function clampWeight(value) {
  * @returns {Promise<Array<{ id: number, trigger_string: string, response_string: string, response_order: number|null, weight: number, selection_mode: string, created_at: string, trigger_id: number, response_id: number }>>}
  */
 export async function getAll() {
-  const nullsOrder = isSqlite ? "tr.response_order IS NULL" : "ISNULL(tr.response_order)";
+  const nullsOrder = isSqlite
+    ? "tr.response_order IS NULL"
+    : "ISNULL(tr.response_order)";
   const [rows] = await db.query(
     `SELECT tr.id, t.trigger_string, r.response_string, tr.response_order, tr.weight, t.selection_mode, t.created_at, t.id AS trigger_id, r.id AS response_id
      FROM trigger_response tr
@@ -113,10 +116,84 @@ async function setLastUsedResponseId(trigger, responseId) {
  * @param {number} responseId
  * @param {number} triggerResponseId - junction (trigger_response) row id
  */
-async function incrementSelectionFrequencies(triggerId, responseId, triggerResponseId) {
-  await db.query("UPDATE triggers SET frequency = frequency + 1 WHERE id = ?", [triggerId]);
-  await db.query("UPDATE responses SET frequency = frequency + 1 WHERE id = ?", [responseId]);
-  await db.query("UPDATE trigger_response SET frequency = frequency + 1 WHERE id = ?", [triggerResponseId]);
+async function incrementSelectionFrequencies(
+  triggerId,
+  responseId,
+  triggerResponseId,
+) {
+  await db.query("UPDATE triggers SET frequency = frequency + 1 WHERE id = ?", [
+    triggerId,
+  ]);
+  await db.query(
+    "UPDATE responses SET frequency = frequency + 1 WHERE id = ?",
+    [responseId],
+  );
+  await db.query(
+    "UPDATE trigger_response SET frequency = frequency + 1 WHERE id = ?",
+    [triggerResponseId],
+  );
+}
+
+/**
+ * Select one response at random for the trigger via DB ORDER BY RAND()/RANDOM().
+ * @param {number} triggerId
+ * @returns {Promise<{ id: number, response_string: string, trigger_response_id: number }|null>}
+ */
+async function getRandomResponseByRandomSelection(triggerId) {
+  const [rows] = await db.query(
+    `SELECT r.id, r.response_string, tr.id AS trigger_response_id
+     FROM trigger_response tr
+     JOIN responses r ON r.id = tr.response_id
+     WHERE tr.trigger_id = ?
+     ORDER BY ${orderByRandomClause}
+     LIMIT 1`,
+    [triggerId],
+  );
+  return rows && rows.length > 0 ? rows[0] : null;
+}
+
+/**
+ * Weighted selection: roll 1-100; if roll >= maxWeight pick from responses with weight >= maxWeight,
+ * else pick from responses with weight < maxWeight; then return one at random from that subset.
+ * @param {number} triggerId
+ * @returns {Promise<{ id: number, response_string: string }|null>}
+ */
+async function getWeightedResponseForTrigger(triggerId) {
+  const [weightRows] = await db.query(
+    `SELECT r.id, r.response_string, COALESCE(tr.weight, 0) AS weight, tr.id AS trigger_response_id
+     FROM trigger_response tr
+     JOIN responses r ON r.id = tr.response_id
+     WHERE tr.trigger_id = ?`,
+    [triggerId],
+  );
+  if (!weightRows || weightRows.length === 0) return null;
+  const normalized = weightRows.map((row) => ({
+    ...row,
+    weight: clampWeight(row.weight),
+  }));
+  const maxWeight = Math.max(...normalized.map((r) => r.weight));
+
+  const roll = 100 - (Math.floor(Math.random() * 100) + 1);
+
+  let candidates =
+    roll < maxWeight
+      ? normalized.filter((r) => r.weight >= maxWeight)
+      : normalized.filter((r) => r.weight < maxWeight);
+
+  console.log(roll);
+  console.log(candidates.length);
+
+  if (candidates.length === 0) {
+    candidates = normalized.filter((r) => r.weight >= maxWeight);
+  }
+  const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+  if (!chosen) return null;
+  await incrementSelectionFrequencies(
+    triggerId,
+    chosen.id,
+    chosen.trigger_response_id,
+  );
+  return { id: chosen.id, response_string: chosen.response_string };
 }
 
 /**
@@ -134,19 +211,20 @@ export async function getRandomResponse(trigger) {
   );
   if (!triggerRows || triggerRows.length === 0) return null;
   const triggerId = triggerRows[0].id;
-  const selection_mode = (triggerRows[0].selection_mode || "random").toLowerCase();
-
-  const [orderedRows] = await db.query(
-    `SELECT r.id, r.response_string, tr.id AS trigger_response_id
-     FROM trigger_response tr
-     JOIN responses r ON r.id = tr.response_id
-     WHERE tr.trigger_id = ?
-     ${orderByResponseOrderClause}`,
-    [triggerId],
-  );
-  if (!orderedRows || orderedRows.length === 0) return null;
+  const selection_mode = (
+    triggerRows[0].selection_mode || "random"
+  ).toLowerCase();
 
   if (selection_mode === "ordered") {
+    const [orderedRows] = await db.query(
+      `SELECT r.id, r.response_string, tr.id AS trigger_response_id
+       FROM trigger_response tr
+       JOIN responses r ON r.id = tr.response_id
+       WHERE tr.trigger_id = ?
+       ${orderByResponseOrderClause}`,
+      [triggerId],
+    );
+    if (!orderedRows || orderedRows.length === 0) return null;
     const lastId = await getLastUsedResponseId(t);
     let nextIndex = 0;
     if (lastId != null) {
@@ -155,41 +233,26 @@ export async function getRandomResponse(trigger) {
     }
     const chosen = orderedRows[nextIndex];
     await setLastUsedResponseId(t, chosen.id);
-    await incrementSelectionFrequencies(triggerId, chosen.id, chosen.trigger_response_id);
+    await incrementSelectionFrequencies(
+      triggerId,
+      chosen.id,
+      chosen.trigger_response_id,
+    );
     return { id: chosen.id, response_string: chosen.response_string };
   }
 
-  const [weightRows] = await db.query(
-    `SELECT r.id, r.response_string, COALESCE(tr.weight, 0) AS weight, tr.id AS trigger_response_id
-     FROM trigger_response tr
-     JOIN responses r ON r.id = tr.response_id
-     WHERE tr.trigger_id = ?`,
-    [triggerId],
+  if (selection_mode === "weighted") {
+    return getWeightedResponseForTrigger(triggerId, t);
+  }
+
+  const result = await getRandomResponseByRandomSelection(triggerId);
+  if (!result) return null;
+  await incrementSelectionFrequencies(
+    triggerId,
+    result.id,
+    result.trigger_response_id,
   );
-  if (!weightRows || weightRows.length === 0) return null;
-  let totalWeight = 0;
-  for (const row of weightRows) {
-    const w = Math.max(WEIGHT_MIN, Math.min(WEIGHT_MAX, Number(row.weight) || WEIGHT_MIN));
-    totalWeight += w;
-  }
-  let chosen = null;
-  if (totalWeight <= 0) {
-    chosen = weightRows[0];
-  } else {
-    let r = Math.random() * totalWeight;
-    for (const row of weightRows) {
-      const w = Math.max(WEIGHT_MIN, Math.min(WEIGHT_MAX, Number(row.weight) || WEIGHT_MIN));
-      r -= w;
-      if (r < 0) {
-        chosen = row;
-        break;
-      }
-    }
-    if (!chosen) chosen = weightRows[weightRows.length - 1];
-  }
-  if (!chosen) return null;
-  await incrementSelectionFrequencies(triggerId, chosen.id, chosen.trigger_response_id);
-  return { id: chosen.id, response_string: chosen.response_string };
+  return { id: result.id, response_string: result.response_string };
 }
 
 const VALID_MODES = ["random", "ordered", "weighted"];
@@ -207,7 +270,10 @@ async function getOrCreateTriggerId(trigger_string, selection_mode) {
   if (rows && rows.length > 0) {
     const existing = rows[0];
     if (mode !== (existing.selection_mode || "random")) {
-      await db.query("UPDATE triggers SET selection_mode = ? WHERE id = ?", [mode, existing.id]);
+      await db.query("UPDATE triggers SET selection_mode = ? WHERE id = ?", [
+        mode,
+        existing.id,
+      ]);
     }
     return existing.id;
   }
@@ -247,7 +313,10 @@ export async function create(
   selection_mode = "random",
   weight,
 ) {
-  const triggerId = await getOrCreateTriggerId(trigger_string.trim(), selection_mode);
+  const triggerId = await getOrCreateTriggerId(
+    trigger_string.trim(),
+    selection_mode,
+  );
   const responseId = await getOrCreateResponseId(response_string.trim());
   if (triggerId == null || responseId == null) return null;
   const w = weight == null || weight === "" ? null : clampWeight(weight);
@@ -276,11 +345,22 @@ export async function update(
   let triggerId = junction.trigger_id;
   let responseId = junction.response_id;
 
-  if (trigger_string !== undefined && typeof trigger_string === "string" && trigger_string.trim()) {
-    const newTriggerId = await getOrCreateTriggerId(trigger_string.trim(), selection_mode ?? "random");
+  if (
+    trigger_string !== undefined &&
+    typeof trigger_string === "string" &&
+    trigger_string.trim()
+  ) {
+    const newTriggerId = await getOrCreateTriggerId(
+      trigger_string.trim(),
+      selection_mode ?? "random",
+    );
     if (newTriggerId != null) triggerId = newTriggerId;
   }
-  if (response_string !== undefined && typeof response_string === "string" && response_string.trim()) {
+  if (
+    response_string !== undefined &&
+    typeof response_string === "string" &&
+    response_string.trim()
+  ) {
     const newResponseId = await getOrCreateResponseId(response_string.trim());
     if (newResponseId != null) responseId = newResponseId;
   }
@@ -289,7 +369,10 @@ export async function update(
       selection_mode && VALID_MODES.includes(selection_mode.toLowerCase())
         ? selection_mode.toLowerCase()
         : "random";
-    await db.query("UPDATE triggers SET selection_mode = ? WHERE id = ?", [mode, triggerId]);
+    await db.query("UPDATE triggers SET selection_mode = ? WHERE id = ?", [
+      mode,
+      triggerId,
+    ]);
   }
 
   const updates = [];
@@ -323,10 +406,9 @@ export async function update(
  * @returns {Promise<boolean>}
  */
 export async function remove(id) {
-  const [result] = await db.query(
-    "DELETE FROM trigger_response WHERE id = ?",
-    [id],
-  );
+  const [result] = await db.query("DELETE FROM trigger_response WHERE id = ?", [
+    id,
+  ]);
   return (result?.affectedRows ?? result?.changes ?? 0) > 0;
 }
 
@@ -339,9 +421,15 @@ export async function remove(id) {
  */
 export async function getResponsesForTrigger(triggerIdOrString) {
   let triggerId = null;
-  if (typeof triggerIdOrString === "number" && Number.isInteger(triggerIdOrString)) {
+  if (
+    typeof triggerIdOrString === "number" &&
+    Number.isInteger(triggerIdOrString)
+  ) {
     triggerId = triggerIdOrString;
-  } else if (typeof triggerIdOrString === "string" && triggerIdOrString.trim()) {
+  } else if (
+    typeof triggerIdOrString === "string" &&
+    triggerIdOrString.trim()
+  ) {
     const [rows] = await db.query(
       "SELECT id FROM triggers WHERE trigger_string = ? LIMIT 1",
       [triggerIdOrString.trim()],
@@ -406,7 +494,12 @@ export async function createTriggerWithResponses({
   selection_mode = "random",
   responses,
 }) {
-  if (!trigger_string || typeof trigger_string !== "string" || !trigger_string.trim()) return null;
+  if (
+    !trigger_string ||
+    typeof trigger_string !== "string" ||
+    !trigger_string.trim()
+  )
+    return null;
   if (!Array.isArray(responses) || responses.length === 0) return null;
   const mode =
     selection_mode && VALID_MODES.includes(selection_mode.toLowerCase())
@@ -424,7 +517,10 @@ export async function createTriggerWithResponses({
       item.order !== undefined && item.order !== null && item.order !== ""
         ? Number(item.order)
         : null;
-    const w = item.weight == null || item.weight === "" ? null : clampWeight(item.weight);
+    const w =
+      item.weight == null || item.weight === ""
+        ? null
+        : clampWeight(item.weight);
     const [ins] = await db.query(
       "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight) VALUES (?, ?, ?, ?)",
       [triggerId, responseId, order, w],
@@ -452,14 +548,19 @@ export async function createTriggerWithResponses({
  * @returns {Promise<boolean>}
  */
 export async function updateTrigger(triggerId, { selection_mode, responses }) {
-  const [tRows] = await db.query("SELECT id FROM triggers WHERE id = ?", [triggerId]);
+  const [tRows] = await db.query("SELECT id FROM triggers WHERE id = ?", [
+    triggerId,
+  ]);
   if (!tRows || tRows.length === 0) return false;
   if (selection_mode !== undefined) {
     const mode =
       selection_mode && VALID_MODES.includes(selection_mode.toLowerCase())
         ? selection_mode.toLowerCase()
         : "random";
-    await db.query("UPDATE triggers SET selection_mode = ? WHERE id = ?", [mode, triggerId]);
+    await db.query("UPDATE triggers SET selection_mode = ? WHERE id = ?", [
+      mode,
+      triggerId,
+    ]);
   }
   if (Array.isArray(responses)) {
     for (const item of responses) {
@@ -469,7 +570,12 @@ export async function updateTrigger(triggerId, { selection_mode, responses }) {
           item.order !== undefined && item.order !== null && item.order !== ""
             ? Number(item.order)
             : null;
-        const weight = item.weight !== undefined ? (item.weight === null ? null : clampWeight(item.weight)) : undefined;
+        const weight =
+          item.weight !== undefined
+            ? item.weight === null
+              ? null
+              : clampWeight(item.weight)
+            : undefined;
         if (weight !== undefined) {
           await db.query(
             "UPDATE trigger_response SET response_order = ?, weight = ? WHERE id = ? AND trigger_id = ?",
@@ -481,14 +587,23 @@ export async function updateTrigger(triggerId, { selection_mode, responses }) {
             [order, linkId, triggerId],
           );
         }
-      } else if (item.response_string != null && typeof item.response_string === "string" && item.response_string.trim()) {
-        const responseId = await getOrCreateResponseId(item.response_string.trim());
+      } else if (
+        item.response_string != null &&
+        typeof item.response_string === "string" &&
+        item.response_string.trim()
+      ) {
+        const responseId = await getOrCreateResponseId(
+          item.response_string.trim(),
+        );
         if (responseId == null) continue;
         const order =
           item.order !== undefined && item.order !== null && item.order !== ""
             ? Number(item.order)
             : null;
-        const w = item.weight == null || item.weight === "" ? null : clampWeight(item.weight);
+        const w =
+          item.weight == null || item.weight === ""
+            ? null
+            : clampWeight(item.weight);
         await db.query(
           "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight) VALUES (?, ?, ?, ?)",
           [triggerId, responseId, order, w],
@@ -519,7 +634,11 @@ export async function getResponseById(responseId) {
  * @returns {Promise<boolean>} false if response_string invalid or response not found
  */
 export async function updateResponse(responseId, { response_string }) {
-  if (response_string == null || typeof response_string !== "string" || !response_string.trim())
+  if (
+    response_string == null ||
+    typeof response_string !== "string" ||
+    !response_string.trim()
+  )
     return false;
   const [result] = await db.query(
     "UPDATE responses SET response_string = ? WHERE id = ?",
@@ -534,6 +653,8 @@ export async function updateResponse(responseId, { response_string }) {
  * @returns {Promise<boolean>}
  */
 export async function deleteResponse(responseId) {
-  const [result] = await db.query("DELETE FROM responses WHERE id = ?", [responseId]);
+  const [result] = await db.query("DELETE FROM responses WHERE id = ?", [
+    responseId,
+  ]);
   return (result?.affectedRows ?? result?.changes ?? 0) > 0;
 }

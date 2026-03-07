@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS pin_quips (
 CREATE TABLE IF NOT EXISTS triggers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trigger_string TEXT NOT NULL UNIQUE,
-  selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered')),
+  selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered', 'weighted')),
   created_at TEXT DEFAULT (datetime('now')),
   frequency INTEGER DEFAULT 0
 );

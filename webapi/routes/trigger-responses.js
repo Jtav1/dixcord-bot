@@ -170,7 +170,7 @@ router.put("/triggers/:id", authenticate, async (req, res) => {
 
 /**
  * GET /api/trigger-responses/random?trigger=xxx
- * Return one random response string for the given trigger. Used by bot when message matches a trigger.
+ * Return one response for the given trigger (selection_mode: random, weighted, or ordered is handled in service).
  * Auth: required.
  */
 router.get("/random", authenticate, async (req, res) => {

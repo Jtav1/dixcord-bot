@@ -41,10 +41,6 @@ INSERT INTO dixbotv2.user_repost_tracking (userid, msgid, accuser, `timestamp`, 
 INSERT INTO dixbotv2.responses (response_string, frequency)
   SELECT link, COALESCE(frequency, 0) FROM dixbot.take_a_look_responses;
 
-INSERT INTO dixbotv2.triggers (trigger_string, selection_mode, frequency)
-  SELECT DISTINCT `trigger`, 'random', 0
-  FROM dixbot.take_a_look_triggers
-  WHERE `trigger` IS NOT NULL AND TRIM(`trigger`) != '';
 
 -- Junction: every migrated trigger linked to every migrated response
 INSERT INTO dixbotv2.trigger_response (trigger_id, response_id, frequency)
