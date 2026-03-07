@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS triggers (
 -- Responses: reusable response strings (many-to-many with triggers via trigger_response)
 CREATE TABLE IF NOT EXISTS responses (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  response_string VARCHAR(500) NOT NULL,
+  response_string VARCHAR(1000) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   frequency INT DEFAULT 0
 );
