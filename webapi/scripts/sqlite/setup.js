@@ -98,28 +98,12 @@ const initializeDatabase = () => {
   `);
 
   exec(`
-    CREATE TABLE IF NOT EXISTS take_a_look_responses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      link TEXT UNIQUE,
-      isdefault INTEGER DEFAULT 0,
-      frequency INTEGER DEFAULT 0
-    )
-  `);
-
-  exec(`
     CREATE TABLE IF NOT EXISTS eight_ball_responses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       response_string TEXT NOT NULL,
       sentiment TEXT NOT NULL CHECK (sentiment IN ('positive', 'negative', 'neutral')),
       frequency INTEGER DEFAULT 0,
       UNIQUE (response_string, sentiment)
-    )
-  `);
-
-  exec(`
-    CREATE TABLE IF NOT EXISTS log_filter_keywords (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      keyword TEXT UNIQUE
     )
   `);
 
@@ -166,15 +150,6 @@ const initializeDatabase = () => {
   `);
 
   exec(`
-    CREATE TABLE IF NOT EXISTS user_lookup (
-      userid TEXT NOT NULL,
-      username TEXT NOT NULL,
-      handle TEXT NOT NULL,
-      PRIMARY KEY (userid, username)
-    )
-  `);
-
-  exec(`
     CREATE TABLE IF NOT EXISTS link_replacements (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       source_host TEXT NOT NULL UNIQUE,
@@ -196,14 +171,16 @@ const initializeDatabase = () => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trigger_string TEXT NOT NULL UNIQUE,
       selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered')),
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now')),
+      frequency INTEGER DEFAULT 0
     )
   `);
   exec(`
     CREATE TABLE IF NOT EXISTS responses (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       response_string TEXT NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
+      created_at TEXT DEFAULT (datetime('now')),
+      frequency INTEGER DEFAULT 0
     )
   `);
   exec(`
@@ -212,14 +189,15 @@ const initializeDatabase = () => {
       trigger_id INTEGER NOT NULL REFERENCES triggers(id) ON DELETE CASCADE,
       response_id INTEGER NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
       response_order INTEGER NULL,
-      weight INTEGER NOT NULL DEFAULT 1 CHECK (weight >= 1 AND weight <= 1000),
+      weight INTEGER NULL DEFAULT NULL CHECK (weight IS NULL OR (weight >= 0 AND weight <= 100)),
+      frequency INTEGER DEFAULT 0,
       UNIQUE (trigger_id, response_id)
     )
   `);
   exec(`
     CREATE TABLE IF NOT EXISTS trigger_response_state (
-      trigger_string TEXT PRIMARY KEY,
-      last_used_response_id INTEGER NULL
+      trigger_id INTEGER PRIMARY KEY REFERENCES triggers(id) ON DELETE CASCADE,
+      last_used_response_order INTEGER NULL
     )
   `);
 

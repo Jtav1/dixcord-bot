@@ -101,6 +101,15 @@
 
 ## PUT /api/link-replacements/:id
 
+**400 Bad Request** (no fields to update)
+
+```json
+{
+  "ok": false,
+  "error": "Provide at least one of source_host or target_host to update"
+}
+```
+
 **200 OK**
 
 ```json

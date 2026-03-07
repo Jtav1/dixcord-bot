@@ -18,7 +18,7 @@ const router = express.Router();
  * Record emoji usage in a message (and optionally a single +/- vote when replying).
  * Body: {
  *   authorId: string,
- *   emojis: Array<{ name: string, id?: string }>,
+ *   emojis: Array<{ name: string, id?: string, type?: string }>,
  *   isReply?: boolean,
  *   repliedUserId?: string,
  * }
@@ -92,7 +92,7 @@ router.post("/count-repost", authenticate, async (req, res) => {
  * POST /api/message-processing/emoji-import
  * Sync server emoji list (mirrors bot database/emojis.js importEmojiList).
  * Deletes emoji_frequency rows with frequency = 0 and type = 'emoji', then upserts provided emojis.
- * Body: { emojis: Array<{ id: string, name: string, animated?: boolean }> }
+ * Body: { emojis: Array<{ id: string, name: string, animated?: boolean, type?: string }> }
  * Response: { ok: true, imported: number }
  * Auth: required.
  */
@@ -101,7 +101,9 @@ router.post("/emoji-import", authenticate, async (req, res) => {
     const { emojis } = req.body ?? {};
     const result = await importEmojiList(emojis);
     if (!result.ok) {
-      return res.status(400).json({ ok: false, error: "emojis array is required" });
+      return res
+        .status(400)
+        .json({ ok: false, error: "emojis array is required" });
     }
     res.json({ ok: true, imported: result.imported ?? 0 });
   } catch (err) {
@@ -123,7 +125,9 @@ router.post("/sticker-import", authenticate, async (req, res) => {
     const { stickers } = req.body ?? {};
     const result = await importStickerList(stickers);
     if (!result.ok) {
-      return res.status(400).json({ ok: false, error: "stickers array is required" });
+      return res
+        .status(400)
+        .json({ ok: false, error: "stickers array is required" });
     }
     res.json({ ok: true, imported: result.imported ?? 0 });
   } catch (err) {
@@ -164,7 +168,9 @@ router.post("/pin-log", authenticate, async (req, res) => {
   try {
     const result = await logPinnedMessage(req.body?.messageId);
     if (!result.ok) {
-      return res.status(400).json({ ...result, error: "messageId is required" });
+      return res
+        .status(400)
+        .json({ ...result, error: "messageId is required" });
     }
     res.json({ ok: true });
   } catch (err) {

@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS emoji_frequency (
   emoji TEXT NOT NULL,
   frequency INTEGER NOT NULL DEFAULT 0,
   animated INTEGER DEFAULT 0,
-  type TEXT NOT NULL
+  type TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS sticker_frequency (
@@ -60,6 +60,16 @@ CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   emoid TEXT NOT NULL,
   frequency INTEGER DEFAULT 1,
   UNIQUE (userid, emoid)
+);
+
+CREATE TABLE IF NOT EXISTS user_repost_tracking (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userid TEXT NOT NULL,
+  msgid TEXT NOT NULL,
+  accuser TEXT NOT NULL,
+  timestamp TEXT DEFAULT (datetime('now')),
+  msgcontents TEXT,
+  UNIQUE (userid, msgid, accuser)
 );
 
 CREATE TABLE IF NOT EXISTS pin_history (
@@ -83,29 +93,32 @@ CREATE TABLE IF NOT EXISTS pin_quips (
 CREATE TABLE IF NOT EXISTS triggers (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trigger_string TEXT NOT NULL UNIQUE,
-  selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered')),
-  created_at TEXT DEFAULT (datetime('now'))
+  selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered', 'weighted')),
+  created_at TEXT DEFAULT (datetime('now')),
+  frequency INTEGER DEFAULT 0
 );
 
 -- Responses: reusable response strings (many-to-many with triggers via trigger_response)
 CREATE TABLE IF NOT EXISTS responses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   response_string TEXT NOT NULL,
-  created_at TEXT DEFAULT (datetime('now'))
+  created_at TEXT DEFAULT (datetime('now')),
+  frequency INTEGER DEFAULT 0
 );
 
--- Junction: which responses belong to which trigger, with optional order and weight (1-1000)
+-- Junction: which responses belong to which trigger, with optional order and weight (0-100 or null)
 CREATE TABLE IF NOT EXISTS trigger_response (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trigger_id INTEGER NOT NULL REFERENCES triggers(id) ON DELETE CASCADE,
   response_id INTEGER NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
   response_order INTEGER NULL,
-  weight INTEGER NOT NULL DEFAULT 1 CHECK (weight >= 1 AND weight <= 1000),
+  weight INTEGER NULL DEFAULT NULL CHECK (weight IS NULL OR (weight >= 0 AND weight <= 100)),
+  frequency INTEGER DEFAULT 0,
   UNIQUE (trigger_id, response_id)
 );
 
--- Round-robin state: last-used response id (responses.id) per trigger
+-- Round-robin state: last-used response_order per trigger (for ordered selection)
 CREATE TABLE IF NOT EXISTS trigger_response_state (
-  trigger_string TEXT PRIMARY KEY,
-  last_used_response_id INTEGER NULL
+  trigger_id INTEGER PRIMARY KEY REFERENCES triggers(id) ON DELETE CASCADE,
+  last_used_response_order INTEGER NULL
 );
