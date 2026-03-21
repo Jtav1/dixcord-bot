@@ -56,9 +56,9 @@ const initializeDatabase = async () => {
     CREATE TABLE IF NOT EXISTS emoji_frequency (
       emoid VARCHAR(255) NOT NULL,
       emoji VARCHAR(255) NOT NULL,
-      frequency INT NOT NULL,
+      frequency INT NOT NULL DEFAULT 0,
       animated BOOLEAN,
-      type VARCHAR(50) NOT NULL,
+      type VARCHAR(50),
       PRIMARY KEY (emoid)
     )
   `);

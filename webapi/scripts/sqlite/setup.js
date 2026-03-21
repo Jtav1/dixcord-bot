@@ -76,9 +76,9 @@ const initializeDatabase = () => {
     CREATE TABLE IF NOT EXISTS emoji_frequency (
       emoid TEXT NOT NULL PRIMARY KEY,
       emoji TEXT NOT NULL,
-      frequency INTEGER NOT NULL,
+      frequency INTEGER NOT NULL DEFAULT 0,
       animated INTEGER,
-      type TEXT NOT NULL
+      type TEXT
     )
   `);
 
