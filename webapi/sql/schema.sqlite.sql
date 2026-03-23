@@ -16,6 +16,12 @@ CREATE TRIGGER IF NOT EXISTS users_updated_at
     UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id;
   END;
 
+CREATE TABLE IF NOT EXISTS chat_member_mapping (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  discord_handle TEXT NOT NULL UNIQUE,
+  discord_id TEXT NOT NULL UNIQUE
+);
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
 CREATE TABLE IF NOT EXISTS configurations (

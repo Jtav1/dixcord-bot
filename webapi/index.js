@@ -138,6 +138,7 @@ app.get("/", publicLimiter, (req, res) => {
           "POST /api/message-processing/count-repost",
           "POST /api/message-processing/emoji-import",
           "POST /api/message-processing/sticker-import",
+          "POST /api/message-processing/user-mapping-import (body: { users: [{ name, discord_handle, discord_id }] })",
           "POST /api/message-processing/pin-check (body: { messageId })",
           "POST /api/message-processing/pin-log (body: { messageId })",
         ],

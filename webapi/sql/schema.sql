@@ -10,6 +10,13 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS chat_member_mapping (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  discord_handle VARCHAR(255) NOT NULL UNIQUE,
+  discord_id VARCHAR(255) NOT NULL UNIQUE
+);
+
 -- Bot response tables (shared with dixcord-bot when using same DB)
 CREATE TABLE IF NOT EXISTS configurations (
   config VARCHAR(255) PRIMARY KEY,

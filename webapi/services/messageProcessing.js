@@ -337,6 +337,45 @@ export async function importStickerList(stickers) {
   return { ok: true, imported };
 }
 
+// --- User mapping import (Discord snowflake directory) ---
+
+/**
+ * Bulk upsert rows into chat_member_mapping, keyed by discord_id.
+ * @param {Array<{ name: string, discord_handle: string, discord_id: string }>} users
+ * @returns {Promise<{ ok: boolean, imported?: number }>} imported = rows processed (insert or update); skips invalid rows.
+ */
+export async function importUserMappingList(users) {
+  if (!Array.isArray(users)) return { ok: false };
+  const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
+  let imported = 0;
+  for (const u of users) {
+    if (u == null) continue;
+    const discord_id = String(u.discord_id ?? "").trim();
+    const name = String(u.name ?? "").trim();
+    const discord_handle = String(u.discord_handle ?? "").trim();
+    if (!discord_id || !name || !discord_handle) continue;
+    if (isSqlite) {
+      await db.query(
+        `INSERT INTO chat_member_mapping (name, discord_handle, discord_id) VALUES (?, ?, ?)
+         ON CONFLICT(discord_id) DO UPDATE SET
+           name = excluded.name,
+           discord_handle = excluded.discord_handle`,
+        [name, discord_handle, discord_id],
+      );
+    } else {
+      await db.query(
+        `INSERT INTO chat_member_mapping (name, discord_handle, discord_id) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           name = VALUES(name),
+           discord_handle = VALUES(discord_handle)`,
+        [name, discord_handle, discord_id],
+      );
+    }
+    imported++;
+  }
+  return { ok: true, imported };
+}
+
 // --- Pin history (for pin decision + log) ---
 
 /**

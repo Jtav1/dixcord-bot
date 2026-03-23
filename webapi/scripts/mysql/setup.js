@@ -43,6 +43,16 @@ const initializeDatabase = async () => {
     )
   `);
 
+  // Discord user display/cache (snowflake -> stable id for FKs elsewhere)
+  await execQuery(`
+    CREATE TABLE IF NOT EXISTS chat_member_mapping (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      discord_handle VARCHAR(255) NOT NULL UNIQUE,
+      discord_id VARCHAR(255) NOT NULL UNIQUE
+    )
+  `);
+
   // Configuration table
   await execQuery(`
     CREATE TABLE IF NOT EXISTS configurations (

@@ -66,6 +66,15 @@ const initializeDatabase = () => {
   `);
 
   exec(`
+    CREATE TABLE IF NOT EXISTS chat_member_mapping (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      discord_handle TEXT NOT NULL UNIQUE,
+      discord_id TEXT NOT NULL UNIQUE
+    )
+  `);
+
+  exec(`
     CREATE TABLE IF NOT EXISTS configurations (
       config TEXT PRIMARY KEY,
       value TEXT

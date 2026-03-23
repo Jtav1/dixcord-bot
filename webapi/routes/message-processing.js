@@ -7,6 +7,7 @@ import {
   countRepost,
   importEmojiList,
   importStickerList,
+  importUserMappingList,
   isMessageAlreadyPinned,
   logPinnedMessage,
 } from "../services/messageProcessing.js";
@@ -133,6 +134,29 @@ router.post("/sticker-import", authenticate, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to import sticker list" });
+  }
+});
+
+/**
+ * POST /api/message-processing/user-mapping-import
+ * Upsert Discord users into chat_member_mapping (mirrors bot api/userMapping.js).
+ * Body: { users: Array<{ name: string, discord_handle: string, discord_id: string }> }
+ * Response: { ok: true, imported: number }
+ * Auth: required.
+ */
+router.post("/user-mapping-import", authenticate, async (req, res) => {
+  try {
+    const { users } = req.body ?? {};
+    const result = await importUserMappingList(users);
+    if (!result.ok) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "users array is required" });
+    }
+    res.json({ ok: true, imported: result.imported ?? 0 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Failed to import user mapping" });
   }
 });
 
