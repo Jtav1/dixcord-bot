@@ -39,7 +39,7 @@ const execute = async (message) => {
     // Strip incoming message for comparison
     const contentStripped = message.content
       .toLowerCase()
-      .replace(/[^a-zA-Z0-9!]/g, "")
+      .replace(/[^a-zA-Z0-9!]/g, "");
 
     // If there's a link to fix, do that (using source hosts from DB)
     if (cachedLinkHosts === null) {

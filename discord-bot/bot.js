@@ -4,7 +4,7 @@ import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 import fs from "node:fs";
 import path from "node:path";
 
-import { token, clientId, guildId, isDev, version } from "./configVars.js";
+import { token, guildId, isDev, version } from "./configVars.js";
 import { importEmojiList } from "./api/emojis.js";
 import { syncUserMappingFromGuild } from "./api/userMapping.js";
 import { getAllConfigurations } from "./api/configurations.js";
@@ -26,7 +26,6 @@ const client = new Client({
 });
 
 const configs = await getAllConfigurations();
-
 
 const pinThreshold = parseInt(
   configs.find((config_entry) => config_entry.config === "pin_threshold")

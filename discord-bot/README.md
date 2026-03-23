@@ -1,16 +1,12 @@
 # dixcord-bot
 
-**Work in progress.**
-
 Discord bot for the Dixon Cox Butte Preservation Society. This README covers the bot only; the `webapi/` directory and related web API assets are documented separately.
-
-This isn't super complex or really even that good. it's just a side project to make our group chat more fun.
 
 ---
 
 ## Dependency: API backend
 
-The bot **depends on its web API backend** for almost all behavior. It does not run meaningfully without it. The API provides:
+The bot **depends on its web API backend** for almost all behavior. It loads configuration at startup (`GET /api/config`) and does not run meaningfully without a reachable API and valid credentials. The API provides:
 
 - Configuration (pin threshold, emoji IDs, channels, etc.)
 - Trigger–response pairs, link replacements, and bot responses (fortune, link-fixer)
@@ -18,15 +14,15 @@ The bot **depends on its web API backend** for almost all behavior. It does not 
 
 ### Connecting to the API
 
-Set these environment variables so the bot can authenticate and talk to the backend:
+Set these environment variables so the bot can authenticate and talk to the backend. There are **no in-code defaults**—if any of the three are missing, API calls will fail.
 
-| Variable          | Description                                 | Default                 |
-| ----------------- | ------------------------------------------- | ----------------------- |
-| `WEBAPI_URL`      | Base URL of the web API (no trailing slash) | `http://localhost:3000` |
-| `WEBAPI_USERNAME` | Login email for the API                     | `user`                  |
-| `WEBAPI_PASSWORD` | Login password for the API                  | `password`              |
+| Variable          | Description                                 |
+| ----------------- | ------------------------------------------- |
+| `WEBAPI_URL`      | Base URL of the web API (no trailing slash) |
+| `WEBAPI_USERNAME` | Login email for the API                     |
+| `WEBAPI_PASSWORD` | Login password for the API                  |
 
-The bot logs in via `POST /api/auth/login` with `email` and `password`, stores the JWT, and re-authenticates automatically when it receives a 401 error from a request. Ensure the web API is running and that this user exists before starting the bot. Note that the user and password must match the user and password set in the webapi since the webapi user is ONLY created via env vars at this time.
+The bot logs in via `POST /api/auth/login` with `email` and `password`, stores the JWT, and re-authenticates automatically when it receives a 401 from a request. Ensure the web API is running and that this user exists before starting the bot. Use the same credentials as configured for the web API (for example its admin user).
 
 ---
 
@@ -49,42 +45,57 @@ The bot logs in via `POST /api/auth/login` with `email` and `password`, stores t
 
 ### Slash commands
 
-| Command                     | Description                                                                         |
-| --------------------------- | ----------------------------------------------------------------------------------- |
-| `/dixbot`                   | Sends a short help/reference (link fix, triggers, 8-ball, spam note, logging note). |
-| `/plusplus-total`           | Shows the ++ score for a given word or user.                                        |
-| `/plusplus-leaderboard`     | Top and bottom 5 plusplus scores.                                                   |
-| `/plusplus-top-voters`      | Top 3 plusplus voters.                                                              |
-| `/plusplus-voter-frequency` | How many times a user has +/-’d something (option: user).                           |
-| `/top-emojis`               | Top 5 most used emojis in the server.                                               |
-| `/reposts-by-user`          | Number of reposts for a given user.                                                 |
-| `/top-reposters`            | Top 5 “worst reposters” by repost count.                                            |
+| Command                     | Description                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------- |
+| `/dixbot`                   | Short help/reference (link fix, triggers, 8-ball, spam note, logging note).     |
+| `/plusplus-total`           | Shows the ++ score for a given word or user (optional `word` / `user` options). |
+| `/plusplus-leaderboard`     | Top and bottom 5 plusplus scores.                                               |
+| `/plusplus-top-voters`      | Top 3 plusplus voters.                                                          |
+| `/plusplus-voter-frequency` | How many times a user has +/-’d something (optional `user`).                    |
+| `/top-emojis`               | Top 5 most used emojis in the server.                                           |
+| `/reposts-by-user`          | Number of reposts for a given user.                                             |
+| `/top-reposters`            | Top 5 “worst reposters” by repost count.                                        |
 
 ---
 
-## Required environment variables (Discord)
+## Environment variables
 
-The bot also needs these for Discord:
+### Discord (required)
 
-- `DISCORD_TOKEN` – Bot token.
-- `DISCORD_CLIENT_ID` – Application (client) ID.
-- `DISCORD_GUILD_ID` – Guild (server) ID for command registration and context.
-- `DEV_FLAG` – Set appropriately for development vs production (affects data paths and announce behavior).
+| Variable            | Description                                                                                                                                                                                                                                           |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DISCORD_TOKEN`     | Bot token.                                                                                                                                                                                                                                            |
+| `DISCORD_CLIENT_ID` | Application (client) ID.                                                                                                                                                                                                                              |
+| `DISCORD_GUILD_ID`  | Guild (server) ID for command registration and context.                                                                                                                                                                                               |
+| `DEV_FLAG`          | Must be non-empty. Used in `configVars.js` for dev vs production (data paths and announce channel behavior). For example `DEV_FLAG=1` for development; use a value that matches your deployment (see `configVars.js` for how production is detected). |
+
+### Web API
+
+See [Connecting to the API](#connecting-to-the-api) above. Copy `.env.example` to `.env` and fill in values when developing locally.
+
+---
+
+## Running the bot
+
+From the `discord-bot` directory (so `deploy-commands.js` and imports resolve correctly):
+
+- **Install:** `npm ci` (or `npm install`)
+- **Production-style:** `npm run run` → `node bot.js`
+- **Dev (watch restarts):** `npm run dev` → `node --watch bot.js`
+
+Ensure the web API is up and env vars are set before starting.
+
+### Docker
+
+The `Dockerfile` uses Node 22, installs dependencies with `npm ci`, and runs `node ./bot.js`. Build and run from the `discord-bot` context so paths match.
 
 ---
 
 ## Deploying slash commands
 
-- **Register commands:** `node deploy-commands.js`.
-- **Remove commands:** `node delete-all-commands.js`.
+Slash commands are registered for the guild in `configVars.js` (`DISCORD_GUILD_ID`).
 
----
+- **Register or refresh commands:** `node deploy-commands.js`
+- **Remove all guild commands:** `node delete-all-commands.js`
 
-## Migration Guide
-
-### 1.x -> 2.0
-
-1. DB dump
-2. New DB schema
-3. Run DB creation scripts
-4. Write script to convert this into the new schema and insert (yea I know thats insane but only justin has to do it and only once lol)
+Run these from the `discord-bot` directory after installing dependencies.

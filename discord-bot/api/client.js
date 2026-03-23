@@ -17,7 +17,7 @@ let token = null;
 function requireConfig() {
   if (!webapiUrl || !webapiUsername || !webapiPassword) {
     throw new Error(
-      "Web API auth is not configured. Set WEBAPI_URL, WEBAPI_USERNAME, and WEBAPI_PASSWORD."
+      "Web API auth is not configured. Set WEBAPI_URL, WEBAPI_USERNAME, and WEBAPI_PASSWORD.",
     );
   }
 }

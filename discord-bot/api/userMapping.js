@@ -5,7 +5,7 @@ import { guildId } from "../configVars.js";
  * Channel used to validate scope and to scan message authors (union with guild members).
  * Hard-coded per deployment; must belong to DISCORD_GUILD_ID.
  */
-export const IMPORT_CHANNEL_ID = "551622630516457499";
+export const IMPORT_CHANNEL_ID = "";
 
 /**
  * Sync Discord user rows with the web API.

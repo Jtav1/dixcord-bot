@@ -8,12 +8,12 @@ const configs = await getAllConfigurations();
 const filteredConfigs = configs.filter(
   (config_entry) => config_entry.config === "pin_channel_id",
 );
-const pinChannelId =
-  filteredConfigs.length > 0
-    ? filteredConfigs[0].value
-    : isDev
-      ? "710671234471559228"
-      : "915462110761349201";
+
+if (filteredConfigs.length === 0 || !filteredConfigs[0].value) {
+  throw new Error("pin_channel_id configuration not found or has empty value.");
+}
+
+const pinChannelId = filteredConfigs[0].value;
 
 /**
  * Check whether a message was already logged as pinned.
@@ -40,9 +40,15 @@ export const logPinnedMessage = async (msgid) => {
   await api.post("/api/message-processing/pin-log", { messageId: msgid });
 };
 
-// messagePinner
-// pins message if sufficent pin emoji reactions are added to it
-// return: none/void
+/**
+ * pin message if sufficent pin emoji reactions are added to it
+ * POST /api/message-processing/pin-log with { messageId }.
+ * @param {string} message
+ * @param {object} pinReaction
+ * @param {object} user
+ * @param {object} client
+ * @returns {boolean} false (can ignore)
+ */
 export const messagePinner = async (message, pinReaction, user, client) => {
   //check to see if the message is pinned already
   const isPinnedAlready = await isMessageAlreadyPinned(message.id);
