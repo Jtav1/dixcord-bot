@@ -6,6 +6,7 @@ import path from "node:path";
 
 import { token, clientId, guildId, isDev, version } from "./configVars.js";
 import { importEmojiList } from "./api/emojis.js";
+import { syncUserMappingFromGuild } from "./api/userMapping.js";
 import { getAllConfigurations } from "./api/configurations.js";
 import {
   handleReactionAdd,
@@ -16,6 +17,7 @@ import {
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions,
@@ -115,6 +117,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   const emojis = await guild.emojis.fetch();
 
   await importEmojiList(emojis);
+  await syncUserMappingFromGuild(readyClient);
 
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });
