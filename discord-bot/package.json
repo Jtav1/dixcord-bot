@@ -1,6 +1,6 @@
 {
   "name": "dixcord-bot",
-  "version": "v2.0",
+  "version": "v2.1",
   "description": "",
   "main": "bot.js",
   "type": "module",
