@@ -207,12 +207,12 @@
           "type": "inherited"
         },
         "body": {
-          "type": "text",
+          "type": "none",
           "file": {
             "name": ""
           },
           "text": {
-            "value": "{ \n  \"name\": \"justin\",\n  \"password\": \"password\"\n}",
+            "value": "",
             "format": "application/json"
           },
           "form": {
@@ -357,7 +357,7 @@
             "name": ""
           },
           "text": {
-            "value": "{\n  \"authorId\": \"164208106291724298\",\n  \"emojis\": [\n    {\"name\":\"buttpensive\", \"id\":\"1006702351308042300\"}, \n    {\"name\":\"orbing\", \"id\":\"1039426457761488977\"}]\n  ,\n  \"isReply\": true,\n  \"repliedUserId\": \"164208443442424292\"\n}",
+            "value": "{\n  \"app\": \"discord\",\n  \"authorId\": \"164208106291724298\",\n  \"emojis\": [\n    {\"name\":\"buttpensive\", \"id\":\"1006702351308042300\"},\n    {\"name\":\"orbing\", \"id\":\"1039426457761488977\"}\n  ],\n  \"isReply\": true,\n  \"repliedUserId\": \"164208443442424292\"\n}",
             "format": "application/json"
           },
           "form": {
@@ -386,7 +386,7 @@
             "name": ""
           },
           "text": {
-            "value": "{\n  \"message\": {\n    \"content\": \"great work @user++ and thanks--\",\n    \"author\": { \"id\": \"111222333444555666\" }\n  },\n  \"voterId\": \"111222333444555666\"\n}",
+            "value": "{\n  \"app\": \"discord\",\n  \"type\": \"message\",\n  \"message\": {\n    \"content\": \"great work @user++ and thanks--\",\n    \"author\": { \"id\": \"111222333444555666\" }\n  },\n  \"voterId\": \"111222333444555666\"\n}",
             "format": "application/json"
           },
           "form": {
@@ -415,7 +415,36 @@
             "name": ""
           },
           "text": {
-            "value": "{\n  \"type\": \"reaction\",\n  \"targetUserId\": \"999888777666555444\",\n  \"reactorId\": \"111222333444555666\",\n  \"value\": 1\n}",
+            "value": "{\n  \"app\": \"discord\",\n  \"type\": \"reaction\",\n  \"targetUserId\": \"999888777666555444\",\n  \"reactorId\": \"111222333444555666\",\n  \"value\": 1\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/message-processing/count-repost",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"app\": \"discord\",\n  \"userid\": \"111222333444555666\",\n  \"msgid\": \"987654321098765432\",\n  \"accuser\": \"999888777666555444\",\n  \"msgcontents\": \"optional excerpt\",\n  \"repost\": 1\n}",
             "format": "application/json"
           },
           "form": {
@@ -468,7 +497,7 @@
           "type": "inherited"
         },
         "body": {
-          "type": "text",
+          "type": "none",
           "file": {
             "name": ""
           },
@@ -589,7 +618,7 @@
             "name": ""
           },
           "text": {
-            "value": "{\n  \"limit\": 5\n}",
+            "value": "{\n  \"app\": \"discord\",\n  \"limit\": 5\n}",
             "format": "application/json"
           },
           "form": {
@@ -609,8 +638,13 @@
         "headers": [],
         "queryParams": [
           {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          },
+          {
             "name": "string",
-            "value": "penis",
+            "value": "example",
             "enabled": true
           },
           {
@@ -624,7 +658,7 @@
           "type": "inherited"
         },
         "body": {
-          "type": "text",
+          "type": "none",
           "file": {
             "name": ""
           },
@@ -647,7 +681,13 @@
         "url": "{{devUrl}}/api/leaderboards/plusplus/voter/:userId",
         "method": "GET",
         "headers": [],
-        "queryParams": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          }
+        ],
         "pathParams": [
           {
             "name": "userId",
@@ -693,7 +733,7 @@
             "name": ""
           },
           "text": {
-            "value": "{\n  \"limit\": 5\n}",
+            "value": "{\n  \"app\": \"discord\",\n  \"limit\": 5\n}",
             "format": "application/json"
           },
           "form": {
@@ -751,7 +791,7 @@
             "name": ""
           },
           "text": {
-            "value": "{\n  \"limit\": 3\n}",
+            "value": "{\n  \"app\": \"discord\",\n  \"limit\": 3\n}",
             "format": "application/json"
           },
           "form": {
@@ -769,7 +809,13 @@
         "url": "{{devUrl}}/api/leaderboards/repost/user/:userId",
         "method": "GET",
         "headers": [],
-        "queryParams": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          }
+        ],
         "pathParams": [
           {
             "name": "userId",
@@ -917,6 +963,35 @@
       },
       {
         "name": "",
+        "url": "{{devUrl}}/api/message-processing/user-mapping-import",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"app\": \"discord\",\n  \"users\": [\n    {\n      \"name\": \"Display Name\",\n      \"discord_handle\": \"handle\",\n      \"discord_id\": \"164208106291724298\"\n    }\n  ]\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
         "url": "{{devUrl}}/api/pin-quips",
         "method": "GET",
         "headers": [],
@@ -926,7 +1001,7 @@
           "type": "inherited"
         },
         "body": {
-          "type": "text",
+          "type": "none",
           "file": {
             "name": ""
           },
@@ -955,7 +1030,7 @@
           "type": "inherited"
         },
         "body": {
-          "type": "text",
+          "type": "none",
           "file": {
             "name": ""
           },
@@ -990,7 +1065,7 @@
           "type": "inherited"
         },
         "body": {
-          "type": "text",
+          "type": "none",
           "file": {
             "name": ""
           },
@@ -1089,12 +1164,12 @@
           "type": "inherited"
         },
         "body": {
-          "type": "text",
+          "type": "none",
           "file": {
             "name": ""
           },
           "text": {
-            "value": "{ \n  \"stickers\": [\n    {\n      \"id\": \"1\",\n      \"name\": \"sticker1\"\n    }\n  ]\n}",
+            "value": "",
             "format": "application/json"
           },
           "form": {
@@ -1211,7 +1286,7 @@
           "type": "inherited"
         },
         "body": {
-          "type": "text",
+          "type": "none",
           "file": {
             "name": ""
           },
@@ -1246,7 +1321,7 @@
           "type": "inherited"
         },
         "body": {
-          "type": "text",
+          "type": "none",
           "file": {
             "name": ""
           },
@@ -1301,7 +1376,7 @@
       },
       {
         "name": "",
-        "url": "{{devUrl}}/api/trigger-responses/triggers/",
+        "url": "{{devUrl}}/api/trigger-responses/triggers",
         "method": "POST",
         "headers": [],
         "queryParams": [],
@@ -1330,7 +1405,7 @@
       },
       {
         "name": "",
-        "url": "{{devUrl}}/api/trigger-responses/triggers/",
+        "url": "{{devUrl}}/api/trigger-responses/triggers",
         "method": "POST",
         "headers": [],
         "queryParams": [],
@@ -1604,7 +1679,7 @@
       },
       {
         "name": "",
-        "url": "{{devUrl}}/api/trigger-responses/",
+        "url": "{{devUrl}}/api/trigger-responses",
         "method": "POST",
         "headers": [],
         "queryParams": [],
