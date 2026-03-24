@@ -7,6 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "run": "node bot.js",
+    "start": "node scripts/start.js",
     "dev": "node --watch bot.js"
   },
   "author": "",

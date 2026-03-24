@@ -12,5 +12,6 @@ const rest = new REST().setToken(token);
     console.log("Successfully deleted all guild commands.");
   } catch (error) {
     console.error(error);
+    process.exit(1);
   }
 })();
