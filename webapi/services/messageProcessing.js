@@ -147,12 +147,24 @@ export async function countEmoji(payload) {
     emojis.length === 1;
 
   if (doPlusMinus && plusCount === 1) {
-    const ok = await recordPlusPlus(repliedUserId, "user", authorId, 1, chatApp);
+    const ok = await recordPlusPlus(
+      repliedUserId,
+      "user",
+      authorId,
+      1,
+      chatApp,
+    );
     if (!ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
     return { ok: true, applied: "plus" };
   }
   if (doPlusMinus && minusCount === 1) {
-    const ok = await recordPlusPlus(repliedUserId, "user", authorId, -1, chatApp);
+    const ok = await recordPlusPlus(
+      repliedUserId,
+      "user",
+      authorId,
+      -1,
+      chatApp,
+    );
     if (!ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
     return { ok: true, applied: "minus" };
   }
@@ -189,10 +201,12 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
   const voterRes = await requireChatMemberMappingId(voterDiscordId, chatApp);
   if (!voterRes.ok) return false;
 
+  console.log(target, String(target), voterRes.id, value);
+
   if (typestr === "word") {
     if (!target || String(target).trim() === "") return false;
     await db.query(
-      "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, NULL, ?)",
+      "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
       ["word", String(target), voterRes.id, value],
     );
     return true;
@@ -201,8 +215,8 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
   const targetRes = await requireChatMemberMappingId(target, chatApp);
   if (!targetRes.ok) return false;
   await db.query(
-    "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, NULL, ?, ?, ?)",
-    ["user", voterRes.id, targetRes.id, value],
+    "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
+    ["user", targetRes.id, voterRes.id, value],
   );
   return true;
 }
@@ -420,7 +434,8 @@ export const isChatMemberImportAppSupported = isChatMemberAppSupported;
  * @returns {Promise<{ ok: boolean, imported?: number, error?: string }>}
  */
 export async function importUserMappingList(users, app) {
-  if (!Array.isArray(users)) return { ok: false, error: "users must be an array" };
+  if (!Array.isArray(users))
+    return { ok: false, error: "users must be an array" };
   if (!isChatMemberAppSupported(app)) {
     return {
       ok: false,

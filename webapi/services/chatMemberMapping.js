@@ -88,10 +88,7 @@ export async function requireChatMemberMappingId(platformUserId, app) {
   if (!isChatMemberAppSupported(app)) {
     return { ok: false, error: 'Unsupported app; use "discord".' };
   }
-  const mid = await getChatMemberMappingIdByPlatformUserId(
-    platformUserId,
-    app,
-  );
+  const mid = await getChatMemberMappingIdByPlatformUserId(platformUserId, app);
   if (mid == null) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
   return { ok: true, id: mid };
 }

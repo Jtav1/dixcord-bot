@@ -35,9 +35,10 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
   type VARCHAR(10) NOT NULL,
   string VARCHAR(500) DEFAULT NULL,
-  voter VARCHAR(500) DEFAULT NULL,
+  voter INT DEFAULT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-  value VARCHAR(500) DEFAULT NULL
+  value VARCHAR(500) DEFAULT NULL,
+  CONSTRAINT fk_plusplus_voter FOREIGN KEY (voter) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS emoji_frequency (
@@ -61,20 +62,23 @@ CREATE TABLE IF NOT EXISTS pin_history (
 
 CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  userid VARCHAR(500) NOT NULL,
+  userid INT NOT NULL,
   emoid VARCHAR(255) NOT NULL,
   frequency INT DEFAULT 1,
-  UNIQUE KEY unique_user_emoji (userid, emoid)
+  UNIQUE KEY unique_user_emoji (userid, emoid),
+  CONSTRAINT fk_user_emoji_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS user_repost_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  userid VARCHAR(500) NOT NULL,
+  userid INT NOT NULL,
   msgid VARCHAR(500) NOT NULL,
-  accuser VARCHAR(500) NOT NULL,
+  accuser INT NOT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   msgcontents TEXT DEFAULT NULL,
-  UNIQUE KEY unique_repost_accusation (userid, msgid, accuser)
+  UNIQUE KEY unique_repost_accusation (userid, msgid, accuser),
+  CONSTRAINT fk_repost_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  CONSTRAINT fk_repost_accuser FOREIGN KEY (accuser) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS link_replacements (

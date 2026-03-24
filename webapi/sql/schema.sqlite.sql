@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   type TEXT NOT NULL,
   string TEXT,
-  voter TEXT,
+  voter INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
   timestamp TEXT DEFAULT (datetime('now')),
   value TEXT
 );
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS sticker_frequency (
 
 CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  userid TEXT NOT NULL,
+  userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   emoid TEXT NOT NULL,
   frequency INTEGER DEFAULT 1,
   UNIQUE (userid, emoid)
@@ -70,9 +70,9 @@ CREATE TABLE IF NOT EXISTS user_emoji_tracking (
 
 CREATE TABLE IF NOT EXISTS user_repost_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  userid TEXT NOT NULL,
+  userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   msgid TEXT NOT NULL,
-  accuser TEXT NOT NULL,
+  accuser INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   timestamp TEXT DEFAULT (datetime('now')),
   msgcontents TEXT,
   UNIQUE (userid, msgid, accuser)
