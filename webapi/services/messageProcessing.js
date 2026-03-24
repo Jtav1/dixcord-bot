@@ -134,17 +134,17 @@ export async function countEmoji(payload) {
   }
 
   const plusCount = emojis.filter(
-    (e) => e.id && String(e.id) === plusEmojiId,
+    (e) =>
+      (e.id && String(e.id) === plusEmojiId) ||
+      (e.name && e.name === plusEmojiId),
   ).length;
   const minusCount = emojis.filter(
-    (e) => e.id && String(e.id) === minusEmojiId,
+    (e) =>
+      (e.id && String(e.id) === minusEmojiId) ||
+      (e.name && e.name === minusEmojiId),
   ).length;
 
-  const doPlusMinus =
-    isReply &&
-    repliedUserId &&
-    plusCount + minusCount === 1 &&
-    emojis.length === 1;
+  const doPlusMinus = isReply && repliedUserId && plusCount + minusCount === 1;
 
   if (doPlusMinus && plusCount === 1) {
     const ok = await recordPlusPlus(
@@ -201,8 +201,6 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
   const voterRes = await requireChatMemberMappingId(voterDiscordId, chatApp);
   if (!voterRes.ok) return false;
 
-  console.log(target, String(target), voterRes.id, value);
-
   if (typestr === "word") {
     if (!target || String(target).trim() === "") return false;
     await db.query(
@@ -214,6 +212,7 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
 
   const targetRes = await requireChatMemberMappingId(target, chatApp);
   if (!targetRes.ok) return false;
+
   await db.query(
     "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
     ["user", targetRes.id, voterRes.id, value],

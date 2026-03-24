@@ -28,9 +28,6 @@ const execute = async (interaction) => {
     ? await getTotalScoreByString(user.id, "user")
     : null;
 
-  console.log(totalWordScore);
-  console.log(totalUserScore);
-
   let outStr = "";
 
   if (word && !user) {
