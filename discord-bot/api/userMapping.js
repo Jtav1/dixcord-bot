@@ -15,6 +15,7 @@ export const IMPORT_CHANNEL_ID = "";
 export const importUserMappingList = async (userRows) => {
   const list = Array.isArray(userRows) ? userRows : Array.from(userRows ?? []);
   await api.post("/api/message-processing/user-mapping-import", {
+    app: "discord",
     users: list,
   });
   console.log("db: user mapping import complete (via webapi)");
