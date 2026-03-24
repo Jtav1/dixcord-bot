@@ -1,11 +1,5 @@
 import * as api from "./client.js";
-import { guildId } from "../configVars.js";
-
-/**
- * Channel used to validate scope and to scan message authors (union with guild members).
- * Hard-coded per deployment; must belong to DISCORD_GUILD_ID.
- */
-export const IMPORT_CHANNEL_ID = "";
+import { guildId, userMappingImportChannelId } from "../configVars.js";
 
 /**
  * Sync Discord user rows with the web API.
@@ -22,19 +16,20 @@ export const importUserMappingList = async (userRows) => {
 };
 
 /**
- * Collect guild members (non-bot) plus any message authors in IMPORT_CHANNEL_ID, then POST to webapi.
+ * Collect guild members (non-bot) plus any message authors in the channel from
+ * DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID, then POST to webapi.
  * @param {import('discord.js').Client} client
  */
 export async function syncUserMappingFromGuild(client) {
   const oauthGuild = await client.guilds.fetch(guildId);
   const guild = await oauthGuild.fetch();
   const channel = await guild.channels
-    .fetch(IMPORT_CHANNEL_ID)
+    .fetch(userMappingImportChannelId)
     .catch(() => null);
 
   if (!channel || channel.guildId !== guild.id) {
     console.warn(
-      "user-mapping: IMPORT_CHANNEL_ID not found or not in guild; skipping user mapping sync",
+      "user-mapping: DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID not found or not in guild; skipping user mapping sync",
     );
     return;
   }

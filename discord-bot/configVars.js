@@ -31,6 +31,10 @@ const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
 const guildId = process.env.DISCORD_GUILD_ID; // Guild targeted by deploy-commands.js and bot context
 
+/** Channel ID for extra message-author union during user-mapping sync; optional. Must belong to DISCORD_GUILD_ID. */
+const userMappingImportChannelId =
+  process.env.DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID ?? "";
+
 //prettier-ignore
 if (!token || token.length < 1) writeError("config: missing DISCORD_TOKEN env var");
 
@@ -49,6 +53,7 @@ export {
   token,
   clientId,
   guildId,
+  userMappingImportChannelId,
   dataDirectory,
   isDev,
   version,
