@@ -39,7 +39,9 @@ export async function handleRemindMeIfApplicable(message) {
   const botId = message.client.user.id;
   if (!message.mentions.has(botId)) return false;
 
-  const rest = message.content.replace(new RegExp(`^<@!?${botId}>\\s*`), "").trim();
+  const rest = message.content
+    .replace(new RegExp(`^<@!?${botId}>\\s*`), "")
+    .trim();
   if (!/^remind me\b/i.test(rest)) return false;
 
   const afterRemind = rest.replace(/^remind me\b/i, "").trim();
@@ -59,7 +61,7 @@ export async function handleRemindMeIfApplicable(message) {
       discord_user_id: message.author.id,
       discord_channel_id: message.channel.id,
       discord_guild_id: message.guild.id,
-      message_body: parsed.remainderText,
+      message_body: " reminder: " + parsed.remainderText,
       scheduled_at: parsed.scheduledAt,
     });
 
@@ -69,9 +71,7 @@ export async function handleRemindMeIfApplicable(message) {
       return true;
     }
 
-    const at = new Date(
-      data.scheduled_at ?? parsed.scheduledAt,
-    ).toISOString();
+    const at = new Date(data.scheduled_at ?? parsed.scheduledAt).toISOString();
     await message.reply(
       `Reminder scheduled (#${data.id}) for <t:${Math.floor(new Date(at).getTime() / 1000)}:F> (UTC).`,
     );
@@ -79,9 +79,7 @@ export async function handleRemindMeIfApplicable(message) {
     return true;
   } catch (e) {
     releaseRemindScheduleClaim(message.id);
-    const err = /** @type {{ response?: { data?: { error?: string } } }} */ (
-      e
-    );
+    const err = /** @type {{ response?: { data?: { error?: string } } }} */ (e);
     const msg = err?.response?.data?.error || "Request failed.";
     await message.reply(msg);
     return true;
