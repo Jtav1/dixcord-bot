@@ -12,6 +12,7 @@ import {
   handleReactionAdd,
   handleReactionRemove,
 } from "./events/messages/utilities/reactionHandler.js";
+import { startScheduledMessageDelivery } from "./jobs/scheduledMessageDelivery.js";
 
 // Create a new client instance
 const client = new Client({
@@ -117,6 +118,8 @@ client.once(Events.ClientReady, async (readyClient) => {
 
   await importEmojiList(emojis);
   await syncUserMappingFromGuild(readyClient);
+
+  startScheduledMessageDelivery(readyClient);
 
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });

@@ -119,6 +119,17 @@ export function put(path, body, options = {}) {
 }
 
 /**
+ * PATCH request.
+ * @param {string} path
+ * @param {object} [body] - JSON body
+ * @param {object} [options] - Axios config
+ * @returns {Promise<import('axios').AxiosResponse>}
+ */
+export function patch(path, body, options = {}) {
+  return request("PATCH", path, { ...options, data: body });
+}
+
+/**
  * DELETE request.
  * @param {string} path
  * @param {object} [options] - Axios config

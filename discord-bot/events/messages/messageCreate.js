@@ -9,6 +9,7 @@ import {
   getRandomResponseForTrigger,
 } from "../../api/triggerResponses.js";
 import { getLinkReplacementSourceHosts } from "../../api/linkReplacements.js";
+import { handleRemindMeIfApplicable } from "../../utils/remindMe.js";
 
 //******* UTILITIES FUNCTIONS ********//;
 import { emojiDetector } from "./utilities/emojiDetector.js";
@@ -28,6 +29,10 @@ const execute = async (message) => {
   let response = "";
 
   if (!message.author.bot && !(message.author.id === clientId)) {
+    if (await handleRemindMeIfApplicable(message)) {
+      return;
+    }
+
     // check every message for emojis
     await emojiDetector(message);
     await plusMinusMsg(message);

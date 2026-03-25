@@ -129,3 +129,19 @@ CREATE TABLE IF NOT EXISTS trigger_response_state (
   last_used_response_order INT NULL,
   FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE
 );
+
+-- Scheduled messages (bot polls due rows and posts to channel). Requester is chat_member_mapping.id (per-app user rows).
+CREATE TABLE IF NOT EXISTS scheduled_messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  discord_channel_id VARCHAR(32) NOT NULL,
+  discord_guild_id VARCHAR(32) NULL,
+  message_body TEXT NOT NULL,
+  scheduled_at DATETIME NOT NULL,
+  status ENUM('pending', 'sent') NOT NULL DEFAULT 'pending',
+  sent_at DATETIME NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_scheduled_messages_due (status, scheduled_at),
+  KEY idx_scheduled_messages_user (user_id, status),
+  CONSTRAINT fk_scheduled_messages_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
+);

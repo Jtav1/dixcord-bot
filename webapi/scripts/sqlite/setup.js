@@ -210,6 +210,26 @@ const initializeDatabase = () => {
     )
   `);
 
+  exec(`
+    CREATE TABLE IF NOT EXISTS scheduled_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+      discord_channel_id TEXT NOT NULL,
+      discord_guild_id TEXT,
+      message_body TEXT NOT NULL,
+      scheduled_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent')),
+      sent_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  exec(
+    "CREATE INDEX IF NOT EXISTS idx_scheduled_messages_due ON scheduled_messages (status, scheduled_at)",
+  );
+  exec(
+    "CREATE INDEX IF NOT EXISTS idx_scheduled_messages_user ON scheduled_messages (user_id, status)",
+  );
+
   console.log("db: SQLite table initialization complete");
 };
 

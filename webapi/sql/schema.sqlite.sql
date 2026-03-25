@@ -128,3 +128,19 @@ CREATE TABLE IF NOT EXISTS trigger_response_state (
   trigger_id INTEGER PRIMARY KEY REFERENCES triggers(id) ON DELETE CASCADE,
   last_used_response_order INTEGER NULL
 );
+
+-- Scheduled messages (bot polls due rows and posts to channel). Requester is chat_member_mapping.id.
+CREATE TABLE IF NOT EXISTS scheduled_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  discord_channel_id TEXT NOT NULL,
+  discord_guild_id TEXT,
+  message_body TEXT NOT NULL,
+  scheduled_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent')),
+  sent_at TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_due ON scheduled_messages (status, scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_user ON scheduled_messages (user_id, status);
