@@ -72,9 +72,9 @@ export async function handleRemindMeIfApplicable(message) {
     }
 
     const at = new Date(data.scheduled_at ?? parsed.scheduledAt).toISOString();
-    await message.reply(
-      `Reminder scheduled (#${data.id}) for <t:${Math.floor(new Date(at).getTime() / 1000)}:F> (UTC).`,
-    );
+    // await message.reply(
+    //   `Reminder scheduled (#${data.id}) for <t:${Math.floor(new Date(at).getTime() / 1000)}:F> (UTC).`,
+    // );
     await syncScheduledMessagesDueFromApi(message.client);
     return true;
   } catch (e) {
