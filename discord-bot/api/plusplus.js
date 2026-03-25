@@ -7,6 +7,7 @@ import * as api from "./client.js";
 export const plusplus = async (string, typestr, voterid) => {
   if (typestr !== "user" || !string || !voterid || string === voterid) return;
   await api.post("/api/message-processing/plusminus", {
+    app: "discord",
     type: "reaction",
     targetUserId: string,
     reactorId: voterid,
@@ -20,6 +21,7 @@ export const plusplus = async (string, typestr, voterid) => {
 export const minusminus = async (string, typestr, voterid) => {
   if (typestr !== "user" || !string || !voterid || string === voterid) return;
   await api.post("/api/message-processing/plusminus", {
+    app: "discord",
     type: "reaction",
     targetUserId: string,
     reactorId: voterid,
@@ -36,6 +38,7 @@ export const minusminus = async (string, typestr, voterid) => {
 export const recordPlusMinusFromMessage = async (messageContent, voterId) => {
   if (!voterId) return;
   await api.post("/api/message-processing/plusminus", {
+    app: "discord",
     type: "message",
     message: { content: messageContent ?? "", author: { id: voterId } },
     voterId,
@@ -50,7 +53,7 @@ export const getTotalScoreByString = async (string, typestr) => {
   if (!string) return [{ total: 0 }];
   const type = typestr === "user" ? "user" : "word";
   const { data } = await api.get("/api/leaderboards/plusplus/total", {
-    params: { string, type },
+    params: { app: "discord", string, type },
   });
   if (!data?.ok) return [{ total: 0 }];
   return [{ total: Number(data.total) ?? 0 }];
@@ -62,6 +65,7 @@ export const getTotalScoreByString = async (string, typestr) => {
  */
 export const getTopScores = async (number = 5) => {
   const { data } = await api.post("/api/leaderboards/plusplus", {
+    app: "discord",
     limit: number,
   });
   if (!data?.ok || !Array.isArray(data.top)) return [];
@@ -74,6 +78,7 @@ export const getTopScores = async (number = 5) => {
  */
 export const getBottomScores = async (number = 5) => {
   const { data } = await api.post("/api/leaderboards/plusplus", {
+    app: "discord",
     limit: number,
   });
   if (!data?.ok || !Array.isArray(data.bottom)) return [];
@@ -86,7 +91,9 @@ export const getBottomScores = async (number = 5) => {
  */
 export const getVotesById = async (voterid) => {
   if (!voterid) return [{ total: 0 }];
-  const { data } = await api.get(`/api/leaderboards/plusplus/voter/${voterid}`);
+  const { data } = await api.get(`/api/leaderboards/plusplus/voter/${voterid}`, {
+    params: { app: "discord" },
+  });
   if (!data?.ok) return [{ total: 0 }];
   return [{ total: Number(data.total) ?? 0 }];
 };
@@ -97,6 +104,7 @@ export const getVotesById = async (voterid) => {
  */
 export const getTopVoters = async (number = 3) => {
   const { data } = await api.post("/api/leaderboards/plusplus/top-voters", {
+    app: "discord",
     limit: number,
   });
   if (!data?.ok || !Array.isArray(data.topVoters)) return [];

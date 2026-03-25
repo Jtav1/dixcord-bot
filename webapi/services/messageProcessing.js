@@ -1,9 +1,31 @@
 /**
  * Message processing / logging: emoji counting and plus/minus in messages.
  * Uses configured DB (mysql or sqlite). Compatible with dixcord-bot tables.
+ * Payload user ids are Discord snowflakes (strings); storage uses chat_member_mapping FK ints.
  */
 
 import db from "../config/db.js";
+import {
+  CHAT_MEMBER_APP_CONFIG,
+  isChatMemberAppSupported,
+  requireChatMemberMappingId,
+  UNKNOWN_CHAT_MEMBER_ERROR,
+} from "./chatMemberMapping.js";
+
+/**
+ * @param {Record<string, unknown> | null | undefined} payload
+ * @returns {{ ok: true, app: string } | { ok: false, error: string }}
+ */
+function requireChatAppFromPayload(payload) {
+  const app = payload?.app;
+  if (!isChatMemberAppSupported(app)) {
+    return {
+      ok: false,
+      error: 'Parameter "app" is required and must be "discord".',
+    };
+  }
+  return { ok: true, app };
+}
 
 // --- Emoji detector (count emoji usage) ---
 
@@ -51,35 +73,40 @@ async function ensureAndIncrementEmoji(
 
 /**
  * Upsert user_emoji_tracking. DB-agnostic: SELECT then INSERT or UPDATE.
+ * @param {number} chatMemberMappingId - chat_member_mapping.id
  * @private
  */
-async function upsertUserEmoji(userId, emojiId) {
-  if (!userId || !emojiId) return;
+async function upsertUserEmoji(chatMemberMappingId, emojiId) {
+  if (chatMemberMappingId == null || !emojiId) return;
 
   const [rows] = await db.query(
     "SELECT frequency FROM user_emoji_tracking WHERE userid = ? AND emoid = ?",
-    [userId, emojiId],
+    [chatMemberMappingId, emojiId],
   );
 
   if (rows && rows.length > 0) {
     await db.query(
       "UPDATE user_emoji_tracking SET frequency = frequency + 1 WHERE userid = ? AND emoid = ?",
-      [userId, emojiId],
+      [chatMemberMappingId, emojiId],
     );
   } else {
     await db.query(
       "INSERT INTO user_emoji_tracking (userid, emoid, frequency) VALUES (?, ?, 1)",
-      [userId, emojiId],
+      [chatMemberMappingId, emojiId],
     );
   }
 }
 
 /**
  * Record emoji usage from a message. Optionally records a +/- vote when replying with one plus/minus emoji.
- * @param {object} payload - { authorId, emojis: Array<{ name, id? }>, isReply?, repliedUserId? }
- * @returns {Promise<{ ok: boolean, applied?: string }>}
+ * @param {object} payload - { app: string, authorId: string (snowflake), emojis: Array<{ name, id? }>, isReply?, repliedUserId? }
+ * @returns {Promise<{ ok: boolean, applied?: string, error?: string }>}
  */
 export async function countEmoji(payload) {
+  const appCheck = requireChatAppFromPayload(payload);
+  if (!appCheck.ok) return appCheck;
+  const chatApp = appCheck.app;
+
   const {
     authorId,
     emojis = [],
@@ -107,33 +134,50 @@ export async function countEmoji(payload) {
   }
 
   const plusCount = emojis.filter(
-    (e) => e.id && String(e.id) === plusEmojiId,
+    (e) =>
+      (e.id && String(e.id) === plusEmojiId) ||
+      (e.name && e.name === plusEmojiId),
   ).length;
   const minusCount = emojis.filter(
-    (e) => e.id && String(e.id) === minusEmojiId,
+    (e) =>
+      (e.id && String(e.id) === minusEmojiId) ||
+      (e.name && e.name === minusEmojiId),
   ).length;
 
-  const doPlusMinus =
-    isReply &&
-    repliedUserId &&
-    plusCount + minusCount === 1 &&
-    emojis.length === 1;
+  const doPlusMinus = isReply && repliedUserId && plusCount + minusCount === 1;
 
   if (doPlusMinus && plusCount === 1) {
-    await recordPlusPlus(repliedUserId, "user", authorId, 1);
+    const ok = await recordPlusPlus(
+      repliedUserId,
+      "user",
+      authorId,
+      1,
+      chatApp,
+    );
+    if (!ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
     return { ok: true, applied: "plus" };
   }
   if (doPlusMinus && minusCount === 1) {
-    await recordPlusPlus(repliedUserId, "user", authorId, -1);
+    const ok = await recordPlusPlus(
+      repliedUserId,
+      "user",
+      authorId,
+      -1,
+      chatApp,
+    );
+    if (!ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
     return { ok: true, applied: "minus" };
   }
+
+  const authorMap = await requireChatMemberMappingId(authorId, chatApp);
+  if (!authorMap.ok) return { ok: false, error: authorMap.error };
 
   for (const em of emojis) {
     const name = String(em.name ?? "?");
     const id = em.id != null ? String(em.id) : name;
     await ensureAndIncrementEmoji(id, name, em.animated, em.type);
     if (id && authorId) {
-      await upsertUserEmoji(authorId, id);
+      await upsertUserEmoji(authorMap.id, id);
     }
   }
   return { ok: true };
@@ -141,24 +185,57 @@ export async function countEmoji(payload) {
 
 // --- Plus/minus in messages ---
 
-async function recordPlusPlus(string, typestr, voterid, value) {
-  if (!typestr || !string || !voterid) return;
-  if (typestr === "user" && string === voterid) return;
+/**
+ * @param {string} target - word text, or target user snowflake when typestr is 'user'
+ * @param {'word'|'user'} typestr
+ * @param {string} voterDiscordId - voter snowflake
+ * @param {number} value - 1 or -1
+ * @param {string} chatApp - e.g. "discord"
+ * @returns {Promise<boolean>} false if mapping missing or invalid
+ */
+async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
+  if (!typestr || !voterDiscordId) return false;
+  if (typestr === "user" && String(target) === String(voterDiscordId))
+    return false;
+
+  const voterRes = await requireChatMemberMappingId(voterDiscordId, chatApp);
+  if (!voterRes.ok) return false;
+
+  if (typestr === "word") {
+    if (!target || String(target).trim() === "") return false;
+    await db.query(
+      "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
+      ["word", String(target), voterRes.id, value],
+    );
+    return true;
+  }
+
+  const targetRes = await requireChatMemberMappingId(target, chatApp);
+  if (!targetRes.ok) return false;
+
   await db.query(
     "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
-    [typestr, string, voterid, value],
+    ["user", targetRes.id, voterRes.id, value],
   );
+  return true;
 }
 
 /**
  * Parse message for word++ / user++ / -- and record votes.
- * @param {object} payload - { message: { content, author: { id } }, voterId }
- * @returns {Promise<{ ok: boolean, recorded?: number }>}
+ * @param {object} payload - { app: string, message: { content, author: { id } }, voterId: string (snowflake) }
+ * @returns {Promise<{ ok: boolean, recorded?: number, error?: string }>}
  */
 export async function recordPlusMinusMessage(payload) {
+  const appCheck = requireChatAppFromPayload(payload);
+  if (!appCheck.ok) return appCheck;
+  const chatApp = appCheck.app;
+
   const { message, voterId } = payload;
   const content = message?.content ?? "";
   if (!voterId) return { ok: false, error: "voterId is required" };
+
+  const voterOk = await requireChatMemberMappingId(voterId, chatApp);
+  if (!voterOk.ok) return { ok: false, error: voterOk.error };
 
   const regex = /(\S+)\s*(\+\+|\-\-)/g;
 
@@ -187,11 +264,11 @@ export async function recordPlusMinusMessage(payload) {
     if (!matchtype) continue;
 
     if (m.type === "++" && matchtype) {
-      await recordPlusPlus(target, matchtype, voterId, 1);
-      recorded++;
+      const ok = await recordPlusPlus(target, matchtype, voterId, 1, chatApp);
+      if (ok) recorded++;
     } else if (m.type === "--" && matchtype) {
-      await recordPlusPlus(target, matchtype, voterId, -1);
-      recorded++;
+      const ok = await recordPlusPlus(target, matchtype, voterId, -1, chatApp);
+      if (ok) recorded++;
     }
   }
   return { ok: true, recorded };
@@ -199,10 +276,14 @@ export async function recordPlusMinusMessage(payload) {
 
 /**
  * Record a single plus or minus from a reaction. Writes to plusplus_tracking (type='user'). Self-votes are rejected.
- * @param {object} payload - { targetUserId, reactorId, value: 1 | -1 }
- * @returns {Promise<{ ok: boolean, recorded?: number, value?: number }>}
+ * @param {object} payload - { app: string, targetUserId: string, reactorId: string, value: 1 | -1 } (snowflakes)
+ * @returns {Promise<{ ok: boolean, recorded?: number, value?: number, error?: string }>}
  */
 export async function recordPlusMinusReaction(payload) {
+  const appCheck = requireChatAppFromPayload(payload);
+  if (!appCheck.ok) return appCheck;
+  const chatApp = appCheck.app;
+
   const { targetUserId, reactorId, value } = payload;
   if (!targetUserId || !reactorId) {
     return { ok: false, error: "targetUserId and reactorId are required" };
@@ -213,7 +294,14 @@ export async function recordPlusMinusReaction(payload) {
   if (String(targetUserId) === String(reactorId)) {
     return { ok: false, error: "Cannot vote for yourself" };
   }
-  await recordPlusPlus(String(targetUserId), "user", String(reactorId), value);
+  const ok = await recordPlusPlus(
+    String(targetUserId),
+    "user",
+    String(reactorId),
+    value,
+    chatApp,
+  );
+  if (!ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
   return { ok: true, recorded: 1, value };
 }
 
@@ -221,31 +309,43 @@ export async function recordPlusMinusReaction(payload) {
 
 /**
  * Record or withdraw a repost accusation.
- * @param {object} payload - { userid, msgid, accuser, msgcontents?, repost: 1 | -1 }
- * @returns {Promise<{ ok: boolean, action?: string, deleted?: number }>}
+ * @param {object} payload - { app: string, userid, msgid, accuser (snowflakes), msgcontents?, repost: 1 | -1 }
+ * @returns {Promise<{ ok: boolean, action?: string, deleted?: number, error?: string }>}
  */
 export async function countRepost(payload) {
+  const appCheck = requireChatAppFromPayload(payload);
+  if (!appCheck.ok) return appCheck;
+  const chatApp = appCheck.app;
+
   const { userid, msgid, accuser, msgcontents = "", repost } = payload;
   if (!userid || !msgid || !accuser)
     return { ok: false, error: "userid, msgid, and accuser are required" };
   if (repost !== 1 && repost !== -1)
     return { ok: false, error: "repost must be 1 or -1" };
 
+  const authorRes = await requireChatMemberMappingId(userid, chatApp);
+  if (!authorRes.ok) return { ok: false, error: authorRes.error };
+  const accRes = await requireChatMemberMappingId(accuser, chatApp);
+  if (!accRes.ok) return { ok: false, error: accRes.error };
+
+  const authorId = authorRes.id;
+  const accuserId = accRes.id;
+
   if (repost === 1) {
     const [existing] = await db.query(
       "SELECT 1 FROM user_repost_tracking WHERE userid = ? AND msgid = ? AND accuser = ?",
-      [userid, msgid, accuser],
+      [authorId, msgid, accuserId],
     );
     if (existing && existing.length > 0) {
       const now = new Date().toISOString().slice(0, 19).replace("T", " ");
       await db.query(
         "UPDATE user_repost_tracking SET msgcontents = ?, timestamp = ? WHERE userid = ? AND msgid = ? AND accuser = ?",
-        [msgcontents || null, now, userid, msgid, accuser],
+        [msgcontents || null, now, authorId, msgid, accuserId],
       );
     } else {
       await db.query(
         "INSERT INTO user_repost_tracking (userid, msgid, accuser, msgcontents) VALUES (?, ?, ?, ?)",
-        [userid, msgid, accuser, msgcontents || null],
+        [authorId, msgid, accuserId, msgcontents || null],
       );
     }
     return { ok: true, action: "created" };
@@ -254,7 +354,7 @@ export async function countRepost(payload) {
   if (repost === -1) {
     const [result] = await db.query(
       "DELETE FROM user_repost_tracking WHERE msgid = ? AND accuser = ?",
-      [msgid, accuser],
+      [msgid, accuserId],
     );
     const deleted = result?.affectedRows ?? result?.changes ?? 0;
     return { ok: true, action: "withdrawn", deleted };
@@ -263,75 +363,115 @@ export async function countRepost(payload) {
   return { ok: false };
 }
 
-// --- Emoji import (sync server emoji list; mirrors bot database/emojis.js importEmojiList) ---
+// --- Guild emoji / sticker catalog (emoji_frequency; type = 'emoji' | 'sticker') ---
 
 /**
- * Import server emoji list: delete unused type='emoji' rows (frequency = 0), then upsert each emoji.
- * Preserves frequency for existing emojis; adds new ones with frequency 0.
- * @param {Array<{ id: string, name: string, animated?: boolean }>} emojis - From guild.emojis.cache or similar
- * @returns {Promise<{ ok: boolean, imported?: number }>}
+ * Sync guild custom emojis or stickers into `emoji_frequency`.
+ * Rows are distinguished by `emoji_frequency.type`: `"emoji"` or `"sticker"` (not Discord API subtype).
+ * Deletes only zero-frequency rows of the same asset kind, then inserts missing ids with frequency 0.
+ * @param {Array<{ id: string, name: string, animated?: boolean }>} items - From guild.emojis / guild.stickers
+ * @param {"emoji"|"sticker"} assetKind
+ * @returns {Promise<{ ok: boolean, imported?: number }>} imported = new rows added (existing emoids skipped)
  */
-export async function importEmojiList(emojis) {
-  if (!Array.isArray(emojis)) return { ok: false };
-  const list = emojis.filter(
+export async function importGuildAssetFrequencyList(items, assetKind) {
+  if (!Array.isArray(items)) return { ok: false };
+  if (assetKind !== "emoji" && assetKind !== "sticker") return { ok: false };
+
+  const list = items.filter(
     (e) => e != null && (e.id != null || e.name != null),
   );
-  // 1. Cleanup: remove server emojis that were never used (same as bot importEmojiList)
-  await db.query(
-    "DELETE FROM emoji_frequency WHERE frequency = 0 AND (type = 'emoji' OR type IS NULL)",
-  );
+
+  if (assetKind === "emoji") {
+    await db.query(
+      "DELETE FROM emoji_frequency WHERE frequency = 0 AND (type = 'emoji' OR type IS NULL)",
+    );
+  } else {
+    await db.query(
+      "DELETE FROM emoji_frequency WHERE frequency = 0 AND type = 'sticker'",
+    );
+  }
+
   let imported = 0;
   for (const e of list) {
     const id = String(e.id ?? "").trim();
     const name = String((e.name ?? id) || "?").trim();
-    const animated = e.animated ? 1 : 0;
-    const type =
-      e.type != null && String(e.type).trim() !== ""
-        ? String(e.type).trim()
-        : null;
     if (id.length === 0 && name === "?") continue;
+    const emoid = id || name;
+
     const [existing] = await db.query(
       "SELECT 1 FROM emoji_frequency WHERE emoid = ?",
-      [id || name],
+      [emoid],
     );
-    if (existing && existing.length > 0) continue; // preserve frequency
-    await db.query(
-      "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 0, ?, ?)",
-      [id || name, name, animated, type],
-    );
+    if (existing && existing.length > 0) continue;
+
+    if (assetKind === "emoji") {
+      const animated = e.animated ? 1 : 0;
+      await db.query(
+        "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 0, ?, ?)",
+        [emoid, name, animated, "emoji"],
+      );
+    } else {
+      await db.query(
+        "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 0, 0, ?)",
+        [emoid, name, "sticker"],
+      );
+    }
     imported++;
   }
   return { ok: true, imported };
 }
 
-// --- Sticker import (sync server sticker list; like emoji import, no animated) ---
+// --- User mapping import (per-app handle/id columns on chat_member_mapping) ---
+
+/** @deprecated Use isChatMemberAppSupported from ./chatMemberMapping.js */
+export const isChatMemberImportAppSupported = isChatMemberAppSupported;
 
 /**
- * Import server sticker list: delete unused rows (frequency = 0), then upsert each sticker.
- * Preserves frequency for existing stickers; adds new ones with frequency 0.
- * @param {Array<{ id: string, name: string }>} stickers - From guild.stickers.cache or similar
- * @returns {Promise<{ ok: boolean, imported?: number }>}
+ * Bulk upsert rows into chat_member_mapping. Conflict target is the app’s id column (unique).
+ * @param {Array<Record<string, unknown>>} users
+ * @param {string} app - e.g. `"discord"` (only supported value today)
+ * @returns {Promise<{ ok: boolean, imported?: number, error?: string }>}
  */
-export async function importStickerList(stickers) {
-  if (!Array.isArray(stickers)) return { ok: false };
-  const list = stickers.filter(
-    (s) => s != null && (s.id != null || s.name != null),
-  );
-  await db.query("DELETE FROM sticker_frequency WHERE frequency = 0");
+export async function importUserMappingList(users, app) {
+  if (!Array.isArray(users))
+    return { ok: false, error: "users must be an array" };
+  if (!isChatMemberAppSupported(app)) {
+    return {
+      ok: false,
+      error: 'Unsupported app; currently only "discord" is accepted.',
+    };
+  }
+
+  const cfg = CHAT_MEMBER_APP_CONFIG[app];
+  const hc = cfg.handleColumn;
+  const ic = cfg.idColumn;
+  const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
   let imported = 0;
-  for (const s of list) {
-    const id = String(s.id ?? "").trim();
-    const name = String((s.name ?? id) || "?").trim();
-    if (id.length === 0 && name === "?") continue;
-    const [existing] = await db.query(
-      "SELECT 1 FROM sticker_frequency WHERE stickerid = ?",
-      [id || name],
-    );
-    if (existing && existing.length > 0) continue;
-    await db.query(
-      "INSERT INTO sticker_frequency (stickerid, name, frequency) VALUES (?, ?, 0)",
-      [id || name, name],
-    );
+
+  for (const u of users) {
+    if (u == null) continue;
+    const platformId = String(cfg.pickId(u) ?? "").trim();
+    const name = String(u.name ?? "").trim();
+    const handle = String(cfg.pickHandle(u) ?? "").trim();
+    if (!platformId || !name || !handle) continue;
+
+    if (isSqlite) {
+      await db.query(
+        `INSERT INTO chat_member_mapping (name, \`${hc}\`, \`${ic}\`) VALUES (?, ?, ?)
+         ON CONFLICT(\`${ic}\`) DO UPDATE SET
+           name = excluded.name,
+           \`${hc}\` = excluded.${hc}`,
+        [name, handle, platformId],
+      );
+    } else {
+      await db.query(
+        `INSERT INTO chat_member_mapping (name, \`${hc}\`, \`${ic}\`) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           name = VALUES(name),
+           \`${hc}\` = VALUES(${hc})`,
+        [name, handle, platformId],
+      );
+    }
     imported++;
   }
   return { ok: true, imported };

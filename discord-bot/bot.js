@@ -4,18 +4,21 @@ import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 import fs from "node:fs";
 import path from "node:path";
 
-import { token, clientId, guildId, isDev, version } from "./configVars.js";
+import { token, guildId, isDev, version } from "./configVars.js";
 import { importEmojiList } from "./api/emojis.js";
+import { syncUserMappingFromGuild } from "./api/userMapping.js";
 import { getAllConfigurations } from "./api/configurations.js";
 import {
   handleReactionAdd,
   handleReactionRemove,
 } from "./events/messages/utilities/reactionHandler.js";
+import { startScheduledMessageDelivery } from "./jobs/scheduledMessageDelivery.js";
 
 // Create a new client instance
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions,
@@ -24,7 +27,6 @@ const client = new Client({
 });
 
 const configs = await getAllConfigurations();
-
 
 const pinThreshold = parseInt(
   configs.find((config_entry) => config_entry.config === "pin_threshold")
@@ -115,6 +117,9 @@ client.once(Events.ClientReady, async (readyClient) => {
   const emojis = await guild.emojis.fetch();
 
   await importEmojiList(emojis);
+  await syncUserMappingFromGuild(readyClient);
+
+  startScheduledMessageDelivery(readyClient);
 
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });

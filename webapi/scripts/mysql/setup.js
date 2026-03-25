@@ -43,6 +43,16 @@ const initializeDatabase = async () => {
     )
   `);
 
+  // Discord user display/cache (snowflake -> stable id for FKs elsewhere)
+  await execQuery(`
+    CREATE TABLE IF NOT EXISTS chat_member_mapping (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(255) NOT NULL UNIQUE,
+      discord_handle VARCHAR(255) NOT NULL UNIQUE,
+      discord_id VARCHAR(255) NOT NULL UNIQUE
+    )
+  `);
+
   // Configuration table
   await execQuery(`
     CREATE TABLE IF NOT EXISTS configurations (
@@ -56,9 +66,9 @@ const initializeDatabase = async () => {
     CREATE TABLE IF NOT EXISTS emoji_frequency (
       emoid VARCHAR(255) NOT NULL,
       emoji VARCHAR(255) NOT NULL,
-      frequency INT NOT NULL,
+      frequency INT NOT NULL DEFAULT 0,
       animated BOOLEAN,
-      type VARCHAR(50) NOT NULL,
+      type VARCHAR(50),
       PRIMARY KEY (emoid)
     )
   `);
@@ -198,6 +208,23 @@ const initializeDatabase = async () => {
     )
   `);
 
+  await execQuery(`
+    CREATE TABLE IF NOT EXISTS scheduled_messages (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      discord_channel_id VARCHAR(32) NOT NULL,
+      discord_guild_id VARCHAR(32) NULL,
+      message_body TEXT NOT NULL,
+      scheduled_at DATETIME NOT NULL,
+      status ENUM('pending', 'sent') NOT NULL DEFAULT 'pending',
+      sent_at DATETIME NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_scheduled_messages_due (status, scheduled_at),
+      KEY idx_scheduled_messages_user (user_id, status),
+      CONSTRAINT fk_scheduled_messages_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
+    )
+  `);
+
   const defaultPinQuips = [
     "lmao saving this shit for later",
     "PINNED",
@@ -276,17 +303,11 @@ const importLinkReplacements = async () => {
   console.log("db: MySQL link_replacements import complete");
 };
 
-const importUsers = async () => {
-  // user_lookup table removed in v2.0; no-op for backward compatibility with run()
-  console.log("db: user_lookup no longer used (v2.0)");
-};
-
 const run = async () => {
   try {
     await initializeDatabase();
     await importConfigs();
     await importLinkReplacements();
-    // await importUsers();
     await pool.end();
     process.exit(0);
   } catch (err) {

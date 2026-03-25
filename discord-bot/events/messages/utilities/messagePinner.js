@@ -2,18 +2,17 @@ import { EmbedBuilder } from "discord.js";
 import * as api from "../../../api/client.js";
 
 import { getAllConfigurations } from "../../../api/configurations.js";
-import { isDev } from "../../../configVars.js";
 
 const configs = await getAllConfigurations();
 const filteredConfigs = configs.filter(
   (config_entry) => config_entry.config === "pin_channel_id",
 );
-const pinChannelId =
-  filteredConfigs.length > 0
-    ? filteredConfigs[0].value
-    : isDev
-      ? "710671234471559228"
-      : "915462110761349201";
+
+if (filteredConfigs.length === 0 || !filteredConfigs[0].value) {
+  throw new Error("pin_channel_id configuration not found or has empty value.");
+}
+
+const pinChannelId = filteredConfigs[0].value;
 
 /**
  * Check whether a message was already logged as pinned.
@@ -40,59 +39,81 @@ export const logPinnedMessage = async (msgid) => {
   await api.post("/api/message-processing/pin-log", { messageId: msgid });
 };
 
-// messagePinner
-// pins message if sufficent pin emoji reactions are added to it
-// return: none/void
+/**
+ * Log + embed + send to pin channel (caller must ensure not already pinned).
+ * @param {import("discord.js").Message} message
+ * @param {import("discord.js").Client} client
+ * @param {string[]} pinnedByMentions - e.g. ["<@id>", ...]
+ * @returns {Promise<true>}
+ */
+async function logAndSendPinEmbed(message, client, pinnedByMentions) {
+  await logPinnedMessage(message.id);
+
+  const pinEmbed = new EmbedBuilder()
+    .setColor(0xbc0302)
+    .setAuthor({
+      name: message.author.displayName + " (" + message.author.username + ")",
+      iconURL: message.author.displayAvatarURL(),
+      url: message.url,
+    })
+    .setTitle("📌 Major Pin Alert")
+    .setURL(message.url)
+    .addFields(
+      {
+        name: "Channel",
+        value: "<#" + message.channelId + ">",
+        inline: true,
+      },
+      { name: "Pinned by:", value: pinnedByMentions.join(", "), inline: true },
+    )
+    .setTimestamp()
+    .setFooter({ text: "Pinned by dixbot" });
+
+  // For some reason the error uses >= 1 for null message so doing that instead of > 0
+  message.content && message.content.length >= 1
+    ? pinEmbed.setDescription(message.content)
+    : null;
+
+  message.attachments.forEach((attachment, key) => {
+    pinEmbed.setImage(attachment.url);
+  });
+
+  const channel = await client.channels.fetch(pinChannelId);
+  await channel.send({ embeds: [pinEmbed] });
+
+  return true;
+}
+
+/**
+ * Pin alert flow: skip if already logged, else log + embed to pin channel.
+ * @param {import("discord.js").Message} message
+ * @param {import("discord.js").Client} client
+ * @param {string[]} pinnedByMentions
+ * @returns {Promise<boolean>} true if alert was sent
+ */
+export async function sendPinAlert(message, client, pinnedByMentions) {
+  if (await isMessageAlreadyPinned(message.id)) return false;
+  return logAndSendPinEmbed(message, client, pinnedByMentions);
+}
+
+/**
+ * pin message if sufficent pin emoji reactions are added to it
+ * POST /api/message-processing/pin-log with { messageId }.
+ * @param {string} message
+ * @param {object} pinReaction
+ * @param {object} user
+ * @param {object} client
+ * @returns {boolean} false (can ignore)
+ */
 export const messagePinner = async (message, pinReaction, user, client) => {
-  //check to see if the message is pinned already
-  const isPinnedAlready = await isMessageAlreadyPinned(message.id);
+  if (await isMessageAlreadyPinned(message.id)) return false;
 
-  //if not, log that we're pinning this message
-  if (!isPinnedAlready) {
-    await logPinnedMessage(message.id);
+  const users = await pinReaction.users.fetch();
+  const userArray = [];
 
-    const users = await pinReaction.users.fetch();
-    const userArray = [];
+  users.each((u) => {
+    userArray.push("<@" + u.id + ">");
+  });
 
-    users.each((user) => {
-      userArray.push("<@" + user.id + ">");
-    });
-
-    const pinEmbed = new EmbedBuilder()
-      .setColor(0xbc0302)
-      .setAuthor({
-        name: message.author.displayName + " (" + message.author.username + ")",
-        iconURL: message.author.displayAvatarURL(),
-        url: message.url,
-      })
-      .setTitle("📌 Major Pin Alert")
-      .setURL(message.url)
-      .addFields(
-        {
-          name: "Channel",
-          value: "<#" + message.channelId + ">",
-          inline: true,
-        },
-        { name: "Pinned by:", value: userArray.join(", "), inline: true },
-      )
-      .setTimestamp()
-      .setFooter({ text: "Pinned by dixbot yell at Justin if it broke" });
-
-    // For some reason the error uses >= 1 for null message so doing that instead of > 0
-    message.content && message.content.length >= 1
-      ? pinEmbed.setDescription(message.content)
-      : null;
-
-    message.attachments.forEach((attachment, key) => {
-      pinEmbed.setImage(attachment.url);
-    });
-
-    //send embed message to the configured channel
-    const channel = await client.channels.fetch(pinChannelId);
-    await channel.send({ embeds: [pinEmbed] });
-
-    return true;
-  }
-
-  return false;
+  return logAndSendPinEmbed(message, client, userArray);
 };

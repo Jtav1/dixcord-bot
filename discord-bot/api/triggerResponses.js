@@ -29,12 +29,19 @@ export const getTriggersList = async () => {
  * @returns {Promise<{ trigger_id: number, trigger_string: string, selection_mode: string, responses: Array<{ id: number, response_string: string, order: number|null, weight: number, linkId: number }> }|null>}
  */
 export const getAllResponsesForTrigger = async (triggerString) => {
-  if (!triggerString || typeof triggerString !== "string" || !triggerString.trim())
+  if (
+    !triggerString ||
+    typeof triggerString !== "string" ||
+    !triggerString.trim()
+  )
     return null;
   try {
-    const { data } = await api.get("/api/trigger-responses/triggers/responses", {
-      params: { trigger: triggerString.trim() },
-    });
+    const { data } = await api.get(
+      "/api/trigger-responses/triggers/responses",
+      {
+        params: { trigger: triggerString.trim() },
+      },
+    );
     if (!data?.ok || !data.responses) return null;
     return {
       trigger_id: data.trigger_id,

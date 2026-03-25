@@ -1,12 +1,12 @@
-import { SlashCommandBuilder } from 'discord.js';
-import { getTopVoters } from '../../api/plusplus.js';
+import { SlashCommandBuilder } from "discord.js";
+import { getTopVoters } from "../../api/plusplus.js";
 import { EmbedBuilder } from "discord.js";
 
-const cmdName = 'plusplus-top-voters';
+const cmdName = "plusplus-top-voters";
 
 const data = new SlashCommandBuilder()
-  .setName('plusplus-top-voters')
-  .setDescription('The top 3 plusplus voters');
+  .setName("plusplus-top-voters")
+  .setDescription("The top 3 plusplus voters");
 
 const execute = async (interaction) => {
   let topVoters = await getTopVoters(3);

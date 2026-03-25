@@ -8,7 +8,7 @@ const cmdName = "top-reposters";
 
 const configs = await getAllConfigurations();
 const repostEmojiId = configs.filter(
-  (config_entry) => config_entry.config === "repost_emoji"
+  (config_entry) => config_entry.config === "repost_emoji",
 )[0].value;
 
 const data = new SlashCommandBuilder()

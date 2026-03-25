@@ -7,11 +7,11 @@ import { doplus, dominus } from "./plusplus.js";
 const configs = await getAllConfigurations();
 
 const plusEmoji = configs.filter(
-  (config_entry) => config_entry.config === "plusplus_emoji"
+  (config_entry) => config_entry.config === "plusplus_emoji",
 )[0].value;
 
 const minusEmoji = configs.filter(
-  (config_entry) => config_entry.config === "minusminus_emoji"
+  (config_entry) => config_entry.config === "minusminus_emoji",
 )[0].value;
 
 // emojiDetector

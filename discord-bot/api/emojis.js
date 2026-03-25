@@ -13,6 +13,7 @@ export const importEmojiList = async (emojiObjectList) => {
     id: String(e.id),
     name: String(e.name),
     animated: Boolean(e.animated),
+    type: "emoji",
   }));
   await api.post("/api/message-processing/emoji-import", { emojis });
   console.log("db: emoji import complete (via webapi)");
@@ -31,6 +32,7 @@ export const countEmoji = async (emojiName, emojiId, userid = null) => {
   );
   if (emojis.length === 0) return;
   await api.post("/api/message-processing/emoji-count", {
+    app: "discord",
     authorId,
     emojis,
   });
@@ -58,6 +60,7 @@ export const getTopEmoji = async (number = 5) => {
 export const countRepost = async (userid, msgid, accuserid) => {
   if (!msgid || !userid || !accuserid) return;
   await api.post("/api/message-processing/count-repost", {
+    app: "discord",
     userid,
     msgid,
     accuser: accuserid,
@@ -73,6 +76,7 @@ export const countRepost = async (userid, msgid, accuserid) => {
 export const uncountRepost = async (msgid, accuserid) => {
   if (!msgid || !accuserid) return;
   await api.post("/api/message-processing/count-repost", {
+    app: "discord",
     userid: "0",
     msgid,
     accuser: accuserid,
@@ -87,6 +91,7 @@ export const uncountRepost = async (msgid, accuserid) => {
  */
 export const getTopReposters = async (number = 5) => {
   const { data } = await api.post("/api/leaderboards/repost", {
+    app: "discord",
     limit: number,
   });
   if (!data?.ok || !Array.isArray(data.top)) return [];
@@ -100,7 +105,9 @@ export const getTopReposters = async (number = 5) => {
  */
 export const getRepostsForUser = async (userid) => {
   if (!userid) return 0;
-  const { data } = await api.get(`/api/leaderboards/repost/user/${userid}`);
+  const { data } = await api.get(`/api/leaderboards/repost/user/${userid}`, {
+    params: { app: "discord" },
+  });
   if (!data?.ok) return 0;
   return Number(data.count) ?? 0;
 };

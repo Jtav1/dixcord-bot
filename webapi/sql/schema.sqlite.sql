@@ -16,6 +16,12 @@ CREATE TRIGGER IF NOT EXISTS users_updated_at
     UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id;
   END;
 
+CREATE TABLE IF NOT EXISTS chat_member_mapping (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL UNIQUE,
+  discord_handle TEXT NOT NULL UNIQUE,
+  discord_id TEXT NOT NULL UNIQUE
+);
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
 CREATE TABLE IF NOT EXISTS configurations (
@@ -35,7 +41,7 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   type TEXT NOT NULL,
   string TEXT,
-  voter TEXT,
+  voter INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
   timestamp TEXT DEFAULT (datetime('now')),
   value TEXT
 );
@@ -56,7 +62,7 @@ CREATE TABLE IF NOT EXISTS sticker_frequency (
 
 CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  userid TEXT NOT NULL,
+  userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   emoid TEXT NOT NULL,
   frequency INTEGER DEFAULT 1,
   UNIQUE (userid, emoid)
@@ -64,9 +70,9 @@ CREATE TABLE IF NOT EXISTS user_emoji_tracking (
 
 CREATE TABLE IF NOT EXISTS user_repost_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  userid TEXT NOT NULL,
+  userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   msgid TEXT NOT NULL,
-  accuser TEXT NOT NULL,
+  accuser INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   timestamp TEXT DEFAULT (datetime('now')),
   msgcontents TEXT,
   UNIQUE (userid, msgid, accuser)
@@ -122,3 +128,19 @@ CREATE TABLE IF NOT EXISTS trigger_response_state (
   trigger_id INTEGER PRIMARY KEY REFERENCES triggers(id) ON DELETE CASCADE,
   last_used_response_order INTEGER NULL
 );
+
+-- Scheduled messages (bot polls due rows and posts to channel). Requester is chat_member_mapping.id.
+CREATE TABLE IF NOT EXISTS scheduled_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  discord_channel_id TEXT NOT NULL,
+  discord_guild_id TEXT,
+  message_body TEXT NOT NULL,
+  scheduled_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent')),
+  sent_at TEXT,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_due ON scheduled_messages (status, scheduled_at);
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_user ON scheduled_messages (user_id, status);

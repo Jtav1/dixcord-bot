@@ -1,6 +1,6 @@
 {
   "name": "dixcord-bot-webapi",
-  "version": "v2.0",
+  "version": "v2.1",
   "description": "Express.js REST API for the dixcord-bot",
   "type": "module",
   "main": "index.js",

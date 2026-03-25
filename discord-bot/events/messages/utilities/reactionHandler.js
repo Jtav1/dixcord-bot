@@ -43,10 +43,17 @@ export async function handleReactionAdd(reaction, user, options) {
     }
   }
 
-  if (reaction._emoji.id === plusEmoji && user.id !== message.author.id) {
+  if (
+    (reaction.emoji.id === plusEmoji || reaction.emoji.name === plusEmoji) &&
+    user.id !== message.author.id
+  ) {
     await doplus(reaction.message.author.id, "user", user.id);
   }
-  if (reaction._emoji.id === minusEmoji && user.id !== message.author.id) {
+
+  if (
+    (reaction.emoji.id === minusEmoji || reaction.emoji.name === minusEmoji) &&
+    user.id !== message.author.id
+  ) {
     await dominus(reaction.message.author.id, "user", user.id);
   }
 
@@ -81,10 +88,17 @@ export async function handleReactionRemove(reaction, user, options) {
     uncountRepost(message.id, user.id);
   }
 
-  if (reaction._emoji.id === plusEmoji && user.id !== message.author.id) {
+  if (
+    (reaction.emoji.id === plusEmoji || reaction.emoji.name === plusEmoji) &&
+    user.id !== message.author.id
+  ) {
     await dominus(reaction.message.author.id, "user", user.id);
   }
-  if (reaction._emoji.id === minusEmoji && user.id !== message.author.id) {
+
+  if (
+    (reaction.emoji.id === minusEmoji || reaction.emoji.name === minusEmoji) &&
+    user.id !== message.author.id
+  ) {
     await doplus(reaction.message.author.id, "user", user.id);
   }
 }

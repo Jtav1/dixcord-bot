@@ -9,8 +9,9 @@ RUN npm ci
 COPY ./api ./api
 COPY ./commands ./commands
 COPY ./events ./events
+COPY ./scripts ./scripts
 COPY ./delete-all-commands.js ./deploy-commands.js ./
 COPY ./configVars.js ./bot.js ./
 
-CMD ["node", "./bot.js"]
+CMD ["node", "./scripts/start.js"]
 # CMD ["sh", "-c", "node ./delete-all-commands.js && node ./deploy-commands.js && node ./bot.js"]

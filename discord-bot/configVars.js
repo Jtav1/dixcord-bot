@@ -10,7 +10,8 @@ import packageJson from "./package.json" with { type: "json" };
 const version = packageJson.version;
 
 // =========== REQUIRED ============= //
-// DEV_FLAG
+// DEV_FLAG — must be non-empty. isDev is false when the value is loosely == false
+// (e.g. "0"); otherwise treated as development (data paths, announce channel).
 
 let isDev = true;
 let dataDirectory = "";
@@ -28,25 +29,31 @@ if (process.env.DEV_FLAG.length < 1)
 
 const token = process.env.DISCORD_TOKEN;
 const clientId = process.env.DISCORD_CLIENT_ID;
-const guildId = process.env.DISCORD_GUILD_ID; // Eventually this might become dynamic
+const guildId = process.env.DISCORD_GUILD_ID; // Guild targeted by deploy-commands.js and bot context
 
-if (!token || token.length < 1)
-  writeError("config: missing DISCORD_TOKEN env var");
-if (!clientId || clientId.length < 1)
-  writeError("config: missing DISCORD_CLIENT_ID env var");
-if (!guildId || guildId.length < 1)
-  writeError("config: missing DISCORD_GUILD_ID env var");
+/** Channel ID for extra message-author union during user-mapping sync; optional. Must belong to DISCORD_GUILD_ID. */
+const userMappingImportChannelId =
+  process.env.DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID ?? "";
 
-// Web API (optional: set WEBAPI_URL, WEBAPI_USERNAME, WEBAPI_PASSWORD to use API auth)
-const webapiUrl =
-  process.env.WEBAPI_URL?.replace(/\/$/, "") || "http://localhost:3000";
-const webapiUsername = process.env.WEBAPI_USERNAME || "justin";
-const webapiPassword = process.env.WEBAPI_PASSWORD || "password";
+//prettier-ignore
+if (!token || token.length < 1) writeError("config: missing DISCORD_TOKEN env var");
+
+//prettier-ignore
+if (!clientId || clientId.length < 1) writeError("config: missing DISCORD_CLIENT_ID env var");
+
+//prettier-ignore
+if (!guildId || guildId.length < 1) writeError("config: missing DISCORD_GUILD_ID env var");
+
+// Web API — bot expects all three at runtime (no in-code defaults; api/client throws if unset).
+const webapiUrl = process.env.WEBAPI_URL?.replace(/\/$/, "") || null;
+const webapiUsername = process.env.WEBAPI_USERNAME || null;
+const webapiPassword = process.env.WEBAPI_PASSWORD || null;
 
 export {
   token,
   clientId,
   guildId,
+  userMappingImportChannelId,
   dataDirectory,
   isDev,
   version,

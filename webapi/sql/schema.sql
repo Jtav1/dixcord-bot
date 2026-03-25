@@ -10,6 +10,13 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS chat_member_mapping (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  discord_handle VARCHAR(255) NOT NULL UNIQUE,
+  discord_id VARCHAR(255) NOT NULL UNIQUE
+);
+
 -- Bot response tables (shared with dixcord-bot when using same DB)
 CREATE TABLE IF NOT EXISTS configurations (
   config VARCHAR(255) PRIMARY KEY,
@@ -28,9 +35,10 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
   type VARCHAR(10) NOT NULL,
   string VARCHAR(500) DEFAULT NULL,
-  voter VARCHAR(500) DEFAULT NULL,
+  voter INT DEFAULT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-  value VARCHAR(500) DEFAULT NULL
+  value VARCHAR(500) DEFAULT NULL,
+  CONSTRAINT fk_plusplus_voter FOREIGN KEY (voter) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS emoji_frequency (
@@ -54,20 +62,23 @@ CREATE TABLE IF NOT EXISTS pin_history (
 
 CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  userid VARCHAR(500) NOT NULL,
+  userid INT NOT NULL,
   emoid VARCHAR(255) NOT NULL,
   frequency INT DEFAULT 1,
-  UNIQUE KEY unique_user_emoji (userid, emoid)
+  UNIQUE KEY unique_user_emoji (userid, emoid),
+  CONSTRAINT fk_user_emoji_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS user_repost_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  userid VARCHAR(500) NOT NULL,
+  userid INT NOT NULL,
   msgid VARCHAR(500) NOT NULL,
-  accuser VARCHAR(500) NOT NULL,
+  accuser INT NOT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   msgcontents TEXT DEFAULT NULL,
-  UNIQUE KEY unique_repost_accusation (userid, msgid, accuser)
+  UNIQUE KEY unique_repost_accusation (userid, msgid, accuser),
+  CONSTRAINT fk_repost_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  CONSTRAINT fk_repost_accuser FOREIGN KEY (accuser) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS link_replacements (
@@ -117,4 +128,20 @@ CREATE TABLE IF NOT EXISTS trigger_response_state (
   trigger_id INT PRIMARY KEY,
   last_used_response_order INT NULL,
   FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE
+);
+
+-- Scheduled messages (bot polls due rows and posts to channel). Requester is chat_member_mapping.id (per-app user rows).
+CREATE TABLE IF NOT EXISTS scheduled_messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  discord_channel_id VARCHAR(32) NOT NULL,
+  discord_guild_id VARCHAR(32) NULL,
+  message_body TEXT NOT NULL,
+  scheduled_at DATETIME NOT NULL,
+  status ENUM('pending', 'sent') NOT NULL DEFAULT 'pending',
+  sent_at DATETIME NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_scheduled_messages_due (status, scheduled_at),
+  KEY idx_scheduled_messages_user (user_id, status),
+  CONSTRAINT fk_scheduled_messages_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 );

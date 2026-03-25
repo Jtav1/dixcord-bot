@@ -15,6 +15,7 @@ const execute = async (interaction) => {
   let emoStr = "Top 5 most used emojis:\n\n";
   top5.forEach((em, idx) => {
     let num = idx + 1;
+
     //prettier-ignore
     emoStr += '\n\t' + num + ' - ' + em.emoji + ', ' + em.frequency + (em.animated ? ' <a:' : ' <:') + em.emoji + ':' + em.emoid + '>';
   });

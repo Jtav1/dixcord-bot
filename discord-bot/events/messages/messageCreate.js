@@ -9,6 +9,7 @@ import {
   getRandomResponseForTrigger,
 } from "../../api/triggerResponses.js";
 import { getLinkReplacementSourceHosts } from "../../api/linkReplacements.js";
+import { handleRemindMeIfApplicable } from "../../utils/remindMe.js";
 
 //******* UTILITIES FUNCTIONS ********//;
 import { emojiDetector } from "./utilities/emojiDetector.js";
@@ -28,6 +29,10 @@ const execute = async (message) => {
   let response = "";
 
   if (!message.author.bot && !(message.author.id === clientId)) {
+    if (await handleRemindMeIfApplicable(message)) {
+      return;
+    }
+
     // check every message for emojis
     await emojiDetector(message);
     await plusMinusMsg(message);
@@ -39,7 +44,7 @@ const execute = async (message) => {
     // Strip incoming message for comparison
     const contentStripped = message.content
       .toLowerCase()
-      .replace(/[^a-zA-Z0-9!]/g, "")
+      .replace(/[^a-zA-Z0-9!]/g, "");
 
     // If there's a link to fix, do that (using source hosts from DB)
     if (cachedLinkHosts === null) {

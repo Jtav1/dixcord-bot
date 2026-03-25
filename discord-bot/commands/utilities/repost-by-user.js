@@ -10,7 +10,7 @@ const data = new SlashCommandBuilder()
     option
       .setName("user")
       .setDescription("The user you want to query for")
-      .setRequired(true)
+      .setRequired(true),
   );
 
 const execute = async (interaction) => {
