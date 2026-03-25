@@ -1,5 +1,5 @@
 # Build stage: install deps (including optional better-sqlite3)
-FROM node:22-alpine AS builder
+FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Build deps for native optionalDependencies (e.g. better-sqlite3)
