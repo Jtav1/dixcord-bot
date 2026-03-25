@@ -62,21 +62,21 @@ function stripTrailingUtcLabel(t) {
   return t.replace(/\s+(?:UTC|utc)\s*$/, "").trim();
 }
 
-/**
- * MM-DD-YYYY (or M-D-YYYY) with a clock time, optional Z / UTC, then message — no `|` needed.
- * @param {string} raw
- * @returns {{ timePart: string, messagePart: string } | null}
- */
-function trySplitLeadingMdYDateTimeAndMessage(raw) {
-  const re =
-    /^(\d{1,2}-\d{1,2}-\d{4})[T\s]+(\d{1,2}:\d{2}(?::\d{2})?)(?:\s*(?:UTC|utc)|[Zz])?\s+([\s\S]+)$/i;
-  const m = re.exec(raw);
-  if (!m) return null;
-  const messagePart = String(m[3] ?? "").trim();
-  if (!messagePart) return null;
-  const timePart = `${m[1]} ${m[2]}`;
-  return { timePart, messagePart };
-}
+// /**
+//  * MM-DD-YYYY (or M-D-YYYY) with a clock time, optional Z / UTC, then message — no `|` needed.
+//  * @param {string} raw
+//  * @returns {{ timePart: string, messagePart: string } | null}
+//  */
+// function trySplitLeadingMdYDateTimeAndMessage(raw) {
+//   const re =
+//     /^(\d{1,2}-\d{1,2}-\d{4})[T\s]+(\d{1,2}:\d{2}(?::\d{2})?)(?:\s*(?:UTC|utc)|[Zz])?\s+([\s\S]+)$/i;
+//   const m = re.exec(raw);
+//   if (!m) return null;
+//   const messagePart = String(m[3] ?? "").trim();
+//   if (!messagePart) return null;
+//   const timePart = `${m[1]} ${m[2]}`;
+//   return { timePart, messagePart };
+// }
 
 /**
  * Parse a standalone "when" string (slash command `when` option).
@@ -143,7 +143,8 @@ export function parseRemindBody(text) {
 
   if (new RegExp(String.raw`${REL_IN_PREFIX.source}\s*$`, "i").test(raw)) {
     return {
-      error: "Add what to remind you about after the time (e.g. in 5 minutes …).",
+      error:
+        "Add what to remind you about after the time (e.g. in 5 minutes …).",
     };
   }
 
@@ -161,13 +162,43 @@ export function parseRemindBody(text) {
     return { scheduledAt: when.scheduledAt, remainderText };
   }
 
-  const leading = trySplitLeadingMdYDateTimeAndMessage(raw);
-  if (leading) {
-    const when = parseWhen(leading.timePart);
-    if ("error" in when) {
-      return when;
+  // Use moment to find the date/time and separate it from the message remainder.
+  const dateMoment = moment(raw, moment.ISO_8601, true);
+  let scheduledAt = null;
+  let remainderText = null;
+
+  if (dateMoment.isValid()) {
+    // If whole string is a date, user hasn't provided a message
+    return {
+      error: "Add what to remind you about after the date/time.",
+    };
+  } else {
+    // Try to find date/time substring inside input
+    // Try to parse using natural language (moment does a best effort fuzzy parse)
+    const guess = moment(raw, CALENDAR_FORMATS, true);
+
+    if (guess.isValid()) {
+      scheduledAt = guess.toDate();
+      // Find the substring corresponding to the guessed date/time
+      const dateString = guess.creationData().input;
+      const idx = raw.indexOf(dateString);
+      if (idx !== -1) {
+        remainderText = (
+          raw.slice(0, idx) +
+          " " +
+          raw.slice(idx + dateString.length)
+        ).trim();
+      }
+      // If remainder is empty, ask for message
+      if (!remainderText) {
+        return {
+          error: "Add what to remind you about after the date/time.",
+        };
+      }
+
+      console.log({ scheduledAt, remainderText });
+      return { scheduledAt, remainderText };
     }
-    return { scheduledAt: when.scheduledAt, remainderText: leading.messagePart };
   }
 
   const whenOnly = parseWhen(raw);
