@@ -303,17 +303,11 @@ const importLinkReplacements = async () => {
   console.log("db: MySQL link_replacements import complete");
 };
 
-const importUsers = async () => {
-  // user_lookup table removed in v2.0; no-op for backward compatibility with run()
-  console.log("db: user_lookup no longer used (v2.0)");
-};
-
 const run = async () => {
   try {
     await initializeDatabase();
     await importConfigs();
     await importLinkReplacements();
-    // await importUsers();
     await pool.end();
     process.exit(0);
   } catch (err) {
