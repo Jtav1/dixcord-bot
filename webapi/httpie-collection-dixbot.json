@@ -8,7 +8,7 @@
     "source": "HTTPie Desktop 2025.2.0"
   },
   "entry": {
-    "name": "dixbot — 2",
+    "name": "dixbot — 3",
     "icon": {
       "name": "globe",
       "color": "green"
@@ -488,11 +488,17 @@
       },
       {
         "name": "",
-        "url": "{{devUrl}}/api/link-replacements/5",
+        "url": "{{devUrl}}/api/link-replacements/:id",
         "method": "GET",
         "headers": [],
         "queryParams": [],
-        "pathParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "",
+            "enabled": true
+          }
+        ],
         "auth": {
           "type": "inherited"
         },
@@ -546,11 +552,17 @@
       },
       {
         "name": "",
-        "url": "{{devUrl}}/api/link-replacements/6",
+        "url": "{{devUrl}}/api/link-replacements/:id",
         "method": "PUT",
         "headers": [],
         "queryParams": [],
-        "pathParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "",
+            "enabled": true
+          }
+        ],
         "auth": {
           "type": "inherited"
         },
@@ -575,11 +587,17 @@
       },
       {
         "name": "",
-        "url": "{{devUrl}}/api/link-replacements/6",
+        "url": "{{devUrl}}/api/link-replacements/:id",
         "method": "DELETE",
         "headers": [],
         "queryParams": [],
-        "pathParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "",
+            "enabled": true
+          }
+        ],
         "auth": {
           "type": "inherited"
         },
@@ -1786,6 +1804,163 @@
           {
             "name": "id",
             "value": "13",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "((devUrl}}/api/scheduled-messages/due",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "((devUrl}}/api/scheduled-messages",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "((devUrl}}/api/scheduled-messages",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "((devUrl}}/api/scheduled-messages/:id",
+        "method": "PATCH",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "((devUrl}}/api/scheduled-messages/:id",
+        "method": "DELETE",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "",
             "enabled": true
           }
         ],
