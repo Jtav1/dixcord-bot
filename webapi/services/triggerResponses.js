@@ -672,3 +672,44 @@ export async function deleteResponse(responseId) {
   ]);
   return (result?.affectedRows ?? result?.changes ?? 0) > 0;
 }
+
+/**
+ * Delete a trigger and clean up associated data:
+ * - removes trigger_response links for this trigger
+ * - deletes responses that become orphaned after link removal
+ * @param {number} triggerId
+ * @returns {Promise<boolean>}
+ */
+export async function deleteTrigger(triggerId) {
+  const [tRows] = await db.query("SELECT id FROM triggers WHERE id = ?", [
+    triggerId,
+  ]);
+  if (!tRows || tRows.length === 0) return false;
+
+  const [linkedRows] = await db.query(
+    "SELECT DISTINCT response_id FROM trigger_response WHERE trigger_id = ?",
+    [triggerId],
+  );
+  const responseIds = (linkedRows || [])
+    .map((r) => Number(r.response_id))
+    .filter((id) => Number.isInteger(id));
+
+  await db.query("DELETE FROM trigger_response WHERE trigger_id = ?", [triggerId]);
+  await db.query("DELETE FROM triggers WHERE id = ?", [triggerId]);
+
+  if (responseIds.length > 0) {
+    const placeholders = responseIds.map(() => "?").join(", ");
+    await db.query(
+      `DELETE FROM responses
+       WHERE id IN (${placeholders})
+       AND NOT EXISTS (
+         SELECT 1
+         FROM trigger_response tr
+         WHERE tr.response_id = responses.id
+       )`,
+      responseIds,
+    );
+  }
+
+  return true;
+}
