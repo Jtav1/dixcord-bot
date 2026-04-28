@@ -24,9 +24,7 @@ function toSqlDateTime(value) {
     return { ok: false, error: "scheduled_at is required" };
   }
   const d = new Date(
-    typeof value === "string" || typeof value === "number"
-      ? value
-      : String(value),
+    typeof value === "string" || typeof value === "number" ? value : String(value),
   );
   if (Number.isNaN(d.getTime())) {
     return { ok: false, error: "Invalid scheduled_at" };
@@ -91,9 +89,7 @@ router.get("/", authenticate, async (req, res) => {
     res.json({ ok: true, messages: rows });
   } catch (err) {
     console.error("GET /api/scheduled-messages error:", err);
-    res
-      .status(500)
-      .json({ ok: false, error: "Failed to list scheduled messages" });
+    res.status(500).json({ ok: false, error: "Failed to list scheduled messages" });
   }
 });
 
@@ -172,15 +168,13 @@ router.post("/", authenticate, async (req, res) => {
     res.status(201).json({ ok: true, ...row });
   } catch (err) {
     console.error("POST /api/scheduled-messages error:", err);
-    res
-      .status(500)
-      .json({ ok: false, error: "Failed to create scheduled message" });
+    res.status(500).json({ ok: false, error: "Failed to create scheduled message" });
   }
 });
 
 /**
  * PATCH /api/scheduled-messages/:id
- * Body: { status: string (must not be "sent") }
+ * Body: { status: "sent" } — mark sent (bot only)
  */
 router.patch("/:id", authenticate, async (req, res) => {
   try {
@@ -189,10 +183,10 @@ router.patch("/:id", authenticate, async (req, res) => {
       return res.status(400).json({ ok: false, error: "Invalid id" });
     }
     const status = req.body?.status;
-    if (status === "sent") {
+    if (status !== "sent") {
       return res.status(400).json({
         ok: false,
-        error: 'body.status must not be "sent"',
+        error: "body.status must be \"sent\"",
       });
     }
     const updated = await scheduledMessages.markSent(id);
@@ -206,9 +200,7 @@ router.patch("/:id", authenticate, async (req, res) => {
     res.json({ ok: true, ...row });
   } catch (err) {
     console.error("PATCH /api/scheduled-messages/:id error:", err);
-    res
-      .status(500)
-      .json({ ok: false, error: "Failed to update scheduled message" });
+    res.status(500).json({ ok: false, error: "Failed to update scheduled message" });
   }
 });
 
@@ -254,9 +246,7 @@ router.delete("/:id", authenticate, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/scheduled-messages/:id error:", err);
-    res
-      .status(500)
-      .json({ ok: false, error: "Failed to delete scheduled message" });
+    res.status(500).json({ ok: false, error: "Failed to delete scheduled message" });
   }
 });
 
