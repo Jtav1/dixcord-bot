@@ -1,5 +1,9 @@
 import { createScheduledMessage } from "../api/scheduledMessages.js";
 import { syncScheduledMessagesDueFromApi } from "../jobs/scheduledMessageDelivery.js";
+import {
+  scheduledMessageRoutesEnabled,
+  scheduledMessagesDisabledUserMessage,
+} from "../configVars.js";
 import { parseRemindBody } from "./scheduleParse.js";
 
 /** message.id -> first-claim timestamp; prevents duplicate schedules for duplicate MESSAGE_CREATE. */
@@ -43,6 +47,11 @@ export async function handleRemindMeIfApplicable(message) {
     .replace(new RegExp(`^<@!?${botId}>\\s*`), "")
     .trim();
   if (!/^remind me\b/i.test(rest)) return false;
+
+  if (!scheduledMessageRoutesEnabled) {
+    await message.reply(scheduledMessagesDisabledUserMessage);
+    return true;
+  }
 
   const afterRemind = rest.replace(/^remind me\b/i, "").trim();
   const parsed = parseRemindBody(afterRemind);
