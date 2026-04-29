@@ -1919,7 +1919,7 @@
       {
         "name": "",
         "url": "((devUrl}}/api/scheduled-messages/:id",
-        "method": "PATCH",
+        "method": "PUT",
         "headers": [],
         "queryParams": [],
         "pathParams": [

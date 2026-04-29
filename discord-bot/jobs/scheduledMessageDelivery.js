@@ -50,7 +50,7 @@ export function getLastDueScheduledMessagesSnapshot() {
 
 /**
  * Posts Discord messages for each row in the last queried due list, then marks sent.
- * Re-queries the due list at the end so the cache matches the DB after PATCHes.
+ * Re-queries the due list at the end so the cache matches the DB after PUTs.
  * @param {import('discord.js').Client} client
  */
 export async function deliverDueScheduledMessages(client) {

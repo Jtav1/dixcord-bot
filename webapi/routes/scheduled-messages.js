@@ -179,10 +179,10 @@ router.post("/", authenticate, async (req, res) => {
 });
 
 /**
- * PATCH /api/scheduled-messages/:id
+ * PUT /api/scheduled-messages/:id
  * Body: { status: string (must not be "sent") } — mark sent
  */
-router.patch("/:id", authenticate, async (req, res) => {
+router.put("/:id", authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
@@ -205,7 +205,7 @@ router.patch("/:id", authenticate, async (req, res) => {
     const row = await scheduledMessages.getById(id);
     res.json({ ok: true, ...row });
   } catch (err) {
-    console.error("PATCH /api/scheduled-messages/:id error:", err);
+    console.error("PUT /api/scheduled-messages/:id error:", err);
     res
       .status(500)
       .json({ ok: false, error: "Failed to update scheduled message" });
