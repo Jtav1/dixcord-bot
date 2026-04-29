@@ -126,6 +126,15 @@ curl -s -X PUT "${BASE_URL}/api/trigger-responses/triggers/1" \
 
 ---
 
+## Delete a trigger by id (cleans links, deletes orphan responses only)
+
+```bash
+curl -s -X DELETE "${BASE_URL}/api/trigger-responses/triggers/1" \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+---
+
 ## Get one random response for a trigger (bot use)
 
 ```bash

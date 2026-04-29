@@ -20,6 +20,45 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 /**
+ * Whether real scheduled-message routes are mounted (vs 503 stub). When unset, routes are enabled.
+ * Disable with SCHEDULED_MESSAGE_ROUTES_ENABLED set to 0, false, or no (case-insensitive).
+ * @returns {boolean}
+ */
+function isScheduledMessageRoutesEnabled() {
+  const v = process.env.SCHEDULED_MESSAGE_ROUTES_ENABLED;
+  if (v == null || String(v).trim() === "") return true;
+  const s = String(v).trim().toLowerCase();
+  return !(s === "0" || s === "false" || s === "no");
+}
+
+const scheduledMessageRoutesEnabled = isScheduledMessageRoutesEnabled();
+
+const scheduledMessagesDisabledRouter = express.Router();
+scheduledMessagesDisabledRouter.use((req, res) => {
+  res.status(503).json({
+    ok: false,
+    error: "Scheduled messages are temporarily unavailable",
+  });
+});
+
+const scheduledMessagesDiscovery = scheduledMessageRoutesEnabled
+  ? {
+      authRequired: true,
+      routes: [
+        "GET /api/scheduled-messages/due?limit= (bot poll; rows include user_id + discord_user_id from chat_member_mapping)",
+        "GET /api/scheduled-messages?discord_user_id=&app=discord&status=pending|sent",
+        "POST /api/scheduled-messages (body: { discord_user_id, discord_channel_id, discord_guild_id?, message_body, scheduled_at, app? }; stores user_id FK)",
+        'PUT /api/scheduled-messages/:id (body: { status: string, must not be "sent" })',
+        "DELETE /api/scheduled-messages/:id?discord_user_id=&app=discord",
+      ],
+    }
+  : {
+      disabled: true,
+      message:
+        "Scheduled message routes return 503 until SCHEDULED_MESSAGE_ROUTES_ENABLED is enabled.",
+    };
+
+/**
  * Create or update the single admin user from ADMIN_USERNAME and ADMIN_PASSWORD.
  * @returns {Promise<void>}
  */
@@ -82,7 +121,7 @@ app.use(
       if (isAllowedOrigin(origin)) return cb(null, true);
       cb(null, false);
     },
-  })
+  }),
 );
 app.use(express.json({ limit: "100kb" }));
 
@@ -134,12 +173,12 @@ app.get("/", publicLimiter, (req, res) => {
       messageProcessing: {
         authRequired: true,
         routes: [
-          "POST /api/message-processing/emoji-count (body: { app: \"discord\", ... })",
-          "POST /api/message-processing/plusminus (body: { app: \"discord\", ... })",
-          "POST /api/message-processing/count-repost (body: { app: \"discord\", ... })",
+          'POST /api/message-processing/emoji-count (body: { app: "discord", ... })',
+          'POST /api/message-processing/plusminus (body: { app: "discord", ... })',
+          'POST /api/message-processing/count-repost (body: { app: "discord", ... })',
           "POST /api/message-processing/emoji-import",
           "POST /api/message-processing/sticker-import",
-          "POST /api/message-processing/user-mapping-import (body: { app: \"discord\", users: [{ name, discord_handle, discord_id }] })",
+          'POST /api/message-processing/user-mapping-import (body: { app: "discord", users: [{ name, discord_handle, discord_id }] })',
           "POST /api/message-processing/pin-check (body: { messageId })",
           "POST /api/message-processing/pin-log (body: { messageId })",
         ],
@@ -195,25 +234,16 @@ app.get("/", publicLimiter, (req, res) => {
       leaderboards: {
         authRequired: true,
         routes: [
-          "POST /api/leaderboards/plusplus (body: { app: \"discord\", limit? })",
+          'POST /api/leaderboards/plusplus (body: { app: "discord", limit? })',
           "GET /api/leaderboards/plusplus/total?app=discord&string=&type=word|user",
           "GET /api/leaderboards/plusplus/voter/:userId?app=discord",
-          "POST /api/leaderboards/plusplus/top-voters (body: { app: \"discord\", limit? })",
+          'POST /api/leaderboards/plusplus/top-voters (body: { app: "discord", limit? })',
           "POST /api/leaderboards/emoji (body: { limit? })",
-          "POST /api/leaderboards/repost (body: { app: \"discord\", limit? })",
+          'POST /api/leaderboards/repost (body: { app: "discord", limit? })',
           "GET /api/leaderboards/repost/user/:userId?app=discord",
         ],
       },
-      scheduledMessages: {
-        authRequired: true,
-        routes: [
-          "GET /api/scheduled-messages/due?limit= (bot poll; rows include user_id + discord_user_id from chat_member_mapping)",
-          "GET /api/scheduled-messages?discord_user_id=&app=discord&status=pending|sent",
-          "POST /api/scheduled-messages (body: { discord_user_id, discord_channel_id, discord_guild_id?, message_body, scheduled_at, app? }; stores user_id FK)",
-          "PATCH /api/scheduled-messages/:id (body: { status: \"sent\" })",
-          "DELETE /api/scheduled-messages/:id?discord_user_id=&app=discord",
-        ],
-      },
+      scheduledMessages: scheduledMessagesDiscovery,
     },
     auth: "Use header: Authorization: Bearer <token>",
   });
@@ -231,7 +261,12 @@ app.use("/api/link-replacements", linkReplacementsRoutes);
 app.use("/api/pin-quips", pinQuipsRoutes);
 app.use("/api/trigger-responses", triggerResponsesRoutes);
 app.use("/api/leaderboards", leaderboardsRoutes);
-app.use("/api/scheduled-messages", scheduledMessagesRoutes);
+app.use(
+  "/api/scheduled-messages",
+  scheduledMessageRoutesEnabled
+    ? scheduledMessagesRoutes
+    : scheduledMessagesDisabledRouter,
+);
 
 // 404
 app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));

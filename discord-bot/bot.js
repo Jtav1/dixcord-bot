@@ -4,7 +4,13 @@ import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 import fs from "node:fs";
 import path from "node:path";
 
-import { token, guildId, isDev, version } from "./configVars.js";
+import {
+  token,
+  guildId,
+  isDev,
+  version,
+  scheduledMessageRoutesEnabled,
+} from "./configVars.js";
 import { importEmojiList } from "./api/emojis.js";
 import { syncUserMappingFromGuild } from "./api/userMapping.js";
 import { getAllConfigurations } from "./api/configurations.js";
@@ -119,7 +125,13 @@ client.once(Events.ClientReady, async (readyClient) => {
   await importEmojiList(emojis);
   await syncUserMappingFromGuild(readyClient);
 
-  startScheduledMessageDelivery(readyClient);
+  if (scheduledMessageRoutesEnabled) {
+    startScheduledMessageDelivery(readyClient);
+  } else {
+    console.log(
+      "Scheduled message delivery disabled (SCHEDULED_MESSAGE_ROUTES_ENABLED).",
+    );
+  }
 
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });

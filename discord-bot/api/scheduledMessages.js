@@ -44,10 +44,12 @@ export function getDueScheduledMessages(limit = 20) {
 }
 
 /**
+ * Marks a scheduled message as sent in the API. Body must not use status "sent"
+ * (server rejects that value and applies sent in the DB).
  * @param {number} id
  */
 export function markScheduledMessageSent(id) {
-  return api.patch(`/api/scheduled-messages/${id}`, { status: "sent" });
+  return api.put(`/api/scheduled-messages/${id}`, {});
 }
 
 /**

@@ -2,6 +2,10 @@ import { SlashCommandBuilder } from "discord.js";
 import { createScheduledMessage } from "../../api/scheduledMessages.js";
 import { syncScheduledMessagesDueFromApi } from "../../jobs/scheduledMessageDelivery.js";
 import { parseWhen } from "../../utils/scheduleParse.js";
+import {
+  scheduledMessageRoutesEnabled,
+  scheduledMessagesDisabledUserMessage,
+} from "../../configVars.js";
 
 // Guild slash commands: after changing command definitions, run from discord-bot:
 //   node deploy-commands.js
@@ -28,6 +32,14 @@ const data = new SlashCommandBuilder()
 
 /** @param {import("discord.js").ChatInputCommandInteraction} interaction */
 const execute = async (interaction) => {
+  if (!scheduledMessageRoutesEnabled) {
+    await interaction.reply({
+      ephemeral: true,
+      content: scheduledMessagesDisabledUserMessage,
+    });
+    return;
+  }
+
   if (!interaction.guild || !interaction.channel?.isTextBased()) {
     await interaction.reply({
       ephemeral: true,

@@ -169,6 +169,28 @@ router.put("/triggers/:id", authenticate, async (req, res) => {
 });
 
 /**
+ * DELETE /api/trigger-responses/triggers/:id
+ * Delete a trigger and remove orphaned responses that are no longer linked to any trigger.
+ * Auth: required.
+ */
+router.delete("/triggers/:id", authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ ok: false, error: "Invalid trigger id" });
+    }
+    const deleted = await triggerResponses.deleteTrigger(id);
+    if (!deleted) {
+      return res.status(404).json({ ok: false, error: "Trigger not found" });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /api/trigger-responses/triggers/:id error:", err);
+    res.status(500).json({ ok: false, error: "Failed to delete trigger" });
+  }
+});
+
+/**
  * GET /api/trigger-responses/random?trigger=xxx
  * Return one response for the given trigger (selection_mode: random, weighted, or ordered is handled in service).
  * Auth: required.

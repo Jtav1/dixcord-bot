@@ -2,6 +2,7 @@ import {
   getDueScheduledMessages,
   markScheduledMessageSent,
 } from "../api/scheduledMessages.js";
+import { scheduledMessageRoutesEnabled } from "../configVars.js";
 
 /** Max rows returned by GET /due per fetch (cache refresh). */
 const DUE_FETCH_LIMIT = 100;
@@ -26,6 +27,10 @@ export function msUntilNextMinuteMark() {
  * @returns {Promise<Array<Record<string, unknown>>>}
  */
 export async function queryDueScheduledMessages() {
+  if (!scheduledMessageRoutesEnabled) {
+    lastDueScheduledMessages = [];
+    return lastDueScheduledMessages;
+  }
   try {
     const { data } = await getDueScheduledMessages(DUE_FETCH_LIMIT);
     if (data?.ok && Array.isArray(data.messages)) {
@@ -50,10 +55,11 @@ export function getLastDueScheduledMessagesSnapshot() {
 
 /**
  * Posts Discord messages for each row in the last queried due list, then marks sent.
- * Re-queries the due list at the end so the cache matches the DB after PATCHes.
+ * Re-queries the due list at the end so the cache matches the DB after PUTs.
  * @param {import('discord.js').Client} client
  */
 export async function deliverDueScheduledMessages(client) {
+  if (!scheduledMessageRoutesEnabled) return;
   const rows = [...lastDueScheduledMessages];
 
   for (const row of rows) {
@@ -101,6 +107,7 @@ export async function syncScheduledMessagesDueFromApi(
   client,
   { deliver = true } = {},
 ) {
+  if (!scheduledMessageRoutesEnabled) return;
   await queryDueScheduledMessages();
   if (deliver) {
     await deliverDueScheduledMessages(client);
@@ -112,6 +119,8 @@ export async function syncScheduledMessagesDueFromApi(
  * @param {import('discord.js').Client} client
  */
 export function startScheduledMessageDelivery(client) {
+  if (!scheduledMessageRoutesEnabled) return;
+
   const runMinuteWork = async () => {
     await queryDueScheduledMessages();
     await deliverDueScheduledMessages(client);

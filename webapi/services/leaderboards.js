@@ -152,7 +152,7 @@ export async function getPlusPlusTotalByString(string, type = "word", app) {
     if (mid == null) return { string, type, total: 0 };
 
     const [rows] = await db.query(
-      `SELECT SUM(CAST(p.value AS INT)) AS total FROM plusplus_tracking WHERE type = 'user' AND string = ?`,
+      `SELECT SUM(CAST(value AS INT)) AS total FROM plusplus_tracking WHERE type = 'user' AND string = ?`,
       [mid],
     );
     const total = rows?.[0]?.total ?? 0;
@@ -160,7 +160,7 @@ export async function getPlusPlusTotalByString(string, type = "word", app) {
   }
 
   const [rows] = await db.query(
-    `SELECT SUM(CAST(p.value AS INT)) AS total FROM plusplus_tracking WHERE string = ? AND type = 'word'`,
+    `SELECT SUM(CAST(value AS INT)) AS total FROM plusplus_tracking WHERE string = ? AND type = 'word'`,
     [String(string)],
   );
   const total = rows?.[0]?.total ?? 0;
