@@ -85,7 +85,7 @@ export async function handleReactionRemove(reaction, user, options) {
     : reaction.message;
 
   if (reaction._emoji.id === repostEmojiId) {
-    uncountRepost(message.id, user.id);
+    uncountRepost(message.author.id, message.id, user.id);
   }
 
   if (
