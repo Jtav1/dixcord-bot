@@ -49,24 +49,6 @@ const webapiUrl = process.env.WEBAPI_URL?.replace(/\/$/, "") || null;
 const webapiUsername = process.env.WEBAPI_USERNAME || null;
 const webapiPassword = process.env.WEBAPI_PASSWORD || null;
 
-/**
- * Same semantics as webapi SCHEDULED_MESSAGE_ROUTES_ENABLED: unset means enabled;
- * set to 0, false, or no (case-insensitive) to disable scheduled-message routes and bot behavior.
- * @returns {boolean}
- */
-function isScheduledMessageRoutesEnabled() {
-  const v = process.env.SCHEDULED_MESSAGE_ROUTES_ENABLED;
-  if (v == null || String(v).trim() === "") return true;
-  const s = String(v).trim().toLowerCase();
-  return !(s === "0" || s === "false" || s === "no");
-}
-
-const scheduledMessageRoutesEnabled = isScheduledMessageRoutesEnabled();
-
-/** Shown in Discord when scheduled messages are off (SCHEDULED_MESSAGE_ROUTES_ENABLED). */
-const scheduledMessagesDisabledUserMessage =
-  "Scheduled messages are temporarily unavailable.";
-
 export {
   token,
   clientId,
@@ -78,6 +60,4 @@ export {
   webapiUrl,
   webapiUsername,
   webapiPassword,
-  scheduledMessageRoutesEnabled,
-  scheduledMessagesDisabledUserMessage,
 };
