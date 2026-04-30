@@ -28,15 +28,6 @@ export function parseLimit(value, defaultN = 5, max = 50) {
 // --- Plusplus (plusplus_tracking) ---
 
 /**
- * @param {unknown} v
- * @returns {number}
- */
-function parsePlusplusValue(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-/**
  * Load all plusplus rows, aggregate scores, resolve user targets via chat_member_mapping id column for `app`.
  * @param {string} app - e.g. "discord"
  * @returns {Promise<Array<{ string: string, typestr: string, total: number }>>}
@@ -45,72 +36,24 @@ async function aggregatePlusPlusLeaderboard(app) {
   if (!isChatMemberAppSupported(app)) return [];
   const idCol = getChatMemberIdColumn(app);
 
-  const [rows] = await db.query(
-    "SELECT type, string, value FROM plusplus_tracking",
+  let [results] = await db.query(
+    `SELECT
+        pt.type AS typestr,
+        SUM(pt.value) AS total,
+        CASE
+            WHEN pt.type = 'user' THEN (
+                SELECT cmm.\`${idCol}\` 
+                FROM chat_member_mapping cmm
+                WHERE cmm.id = CAST(pt.string AS INTEGER) 
+            )
+            ELSE pt.string
+        END AS string
+      FROM plusplus_tracking pt
+      GROUP BY pt.string, pt.type
+      ORDER BY total DESC`,
   );
-  const list = Array.isArray(rows) ? rows : [];
 
-  const userDiscordIds = [
-    ...new Set(
-      list
-        .filter((r) => r && String(r.type) === "user" && r.string != null)
-        .map((r) => String(r.string).trim())
-        .filter((s) => s.length > 0),
-    ),
-  ];
-
-  /** Resolved platform id from chat_member_mapping (same as key); missing keys fall back to raw string */
-  const resolvedPlatformId = new Map();
-  if (userDiscordIds.length > 0) {
-    const placeholders = userDiscordIds.map(() => "?").join(", ");
-    const [mapRows] = await db.query(
-      `SELECT \`${idCol}\` AS platform_uid FROM chat_member_mapping WHERE \`${idCol}\` IN (${placeholders})`,
-      userDiscordIds,
-    );
-    for (const m of mapRows ?? []) {
-      const id = String(m.platform_uid);
-      resolvedPlatformId.set(id, id);
-    }
-  }
-
-  /** @type {Map<string, { typestr: string, displayString: string, total: number }>} */
-  const groups = new Map();
-
-  for (const r of list) {
-    const type = r && r.type != null ? String(r.type) : "";
-    const val = parsePlusplusValue(r?.value);
-
-    if (type === "word") {
-      const word = String(r.string ?? "");
-      const key = `word:${word}`;
-      const prev = groups.get(key) ?? {
-        typestr: "word",
-        displayString: word,
-        total: 0,
-      };
-      prev.total += val;
-      groups.set(key, prev);
-    } else if (type === "user") {
-      const raw = String(r.string ?? "").trim();
-      if (!raw) continue;
-      const display =
-        resolvedPlatformId.has(raw) ? resolvedPlatformId.get(raw) : raw;
-      const key = `user:${display}`;
-      const prev = groups.get(key) ?? {
-        typestr: "user",
-        displayString: display,
-        total: 0,
-      };
-      prev.total += val;
-      groups.set(key, prev);
-    }
-  }
-
-  return [...groups.values()].map((g) => ({
-    string: g.displayString,
-    typestr: g.typestr,
-    total: g.total,
-  }));
+  return [...results]; // Isnt't this so much fkn easier???
 }
 
 /**
@@ -133,8 +76,8 @@ export async function getPlusPlusTopScores(limit, app) {
 export async function getPlusPlusBottomScores(limit, app) {
   const n = parseLimit(limit, 5, 50);
   const aggregated = await aggregatePlusPlusLeaderboard(app);
-  aggregated.sort((a, b) => a.total - b.total);
-  return aggregated.slice(0, n);
+  // aggregated is already ordered by value (highest first), so take the last n elements for bottom scores
+  return aggregated.slice(-n);
 }
 
 /**
