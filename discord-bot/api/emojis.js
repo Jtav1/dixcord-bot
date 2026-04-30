@@ -70,14 +70,15 @@ export const countRepost = async (userid, msgid, accuserid) => {
 
 /**
  * Withdraw a repost accusation. POST /api/message-processing/count-repost (repost: -1)
+ * @param {string} userid - Message author (accused)
  * @param {string} msgid - Message ID
  * @param {string} accuserid - User who is removing their repost reaction
  */
-export const uncountRepost = async (msgid, accuserid) => {
-  if (!msgid || !accuserid) return;
+export const uncountRepost = async (userid, msgid, accuserid) => {
+  if (!msgid || !userid || !accuserid) return;
   await api.post("/api/message-processing/count-repost", {
     app: "discord",
-    userid: "0",
+    userid,
     msgid,
     accuser: accuserid,
     repost: -1,
