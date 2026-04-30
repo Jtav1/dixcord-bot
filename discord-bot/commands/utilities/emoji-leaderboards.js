@@ -16,8 +16,13 @@ const execute = async (interaction) => {
   top5.forEach((em, idx) => {
     let num = idx + 1;
 
+    const emoIsCustom = !isNaN(Number(em.emoid));
+
     //prettier-ignore
-    emoStr += '\n\t' + num + ' - ' + em.emoji + ', ' + em.frequency + (em.animated ? ' <a:' : ' <:') + em.emoji + ':' + em.emoid + '>';
+    emoStr += '\n\t' + num + ' - ' + 
+    (emoIsCustom ? "\\:" + em.emoji + "\\: " : em.emoji) + ' - ' + 
+    (emoIsCustom ? (em.animated ? ' <a:' : ' <:') + em.emoji + ':' + em.emoid + '> - ' : '' ) +
+    em.frequency;
   });
 
   const emojiEmbed = new EmbedBuilder()
