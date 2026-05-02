@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import * as api from "../../api/client.js";
 import { sendPinAlert } from "../../events/messages/utilities/messagePinner.js";
 
@@ -12,7 +12,9 @@ const cmdName = "pin-message";
 
 const data = new SlashCommandBuilder()
   .setName("pin-message")
-  .setDescription("Send the pin alert for a message in this channel (by message ID)")
+  .setDescription(
+    "Send the pin alert for a message in this channel (by message ID)",
+  )
   .addStringOption((option) =>
     option
       .setName("message_id")
@@ -24,7 +26,7 @@ const data = new SlashCommandBuilder()
 const execute = async (interaction) => {
   if (!interaction.guild || !interaction.channel?.isTextBased()) {
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content: "Use this command in a server text channel.",
     });
     return;
@@ -33,7 +35,7 @@ const execute = async (interaction) => {
   const member = await interaction.guild.members.fetch(interaction.user.id);
   if (!ALLOWED_ROLE_IDS.some((id) => member.roles.cache.has(id))) {
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content: "You don't have permission to use this command.",
     });
     return;
@@ -42,13 +44,13 @@ const execute = async (interaction) => {
   const messageId = interaction.options.getString("message_id", true).trim();
   if (!/^\d{17,20}$/.test(messageId)) {
     await interaction.reply({
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
       content: "That doesn't look like a valid Discord message ID.",
     });
     return;
   }
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   let targetMessage;
   try {
@@ -57,7 +59,8 @@ const execute = async (interaction) => {
     const code = /** @type {{ code?: number }} */ (e).code;
     if (code === 10008) {
       await interaction.editReply({
-        content: "No message with that ID in this channel. Run the command in the channel where the message was sent.",
+        content:
+          "No message with that ID in this channel. Run the command in the channel where the message was sent.",
       });
       return;
     }

@@ -4,21 +4,15 @@ import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 import fs from "node:fs";
 import path from "node:path";
 
-import {
-  token,
-  guildId,
-  isDev,
-  version,
-  scheduledMessageRoutesEnabled,
-} from "./configVars.js";
+import { token, guildId, isDev, version, clientId } from "./configVars.js";
 import { importEmojiList } from "./api/emojis.js";
 import { syncUserMappingFromGuild } from "./api/userMapping.js";
 import { getAllConfigurations } from "./api/configurations.js";
+import { startMessageScheduler } from "./scheduler/messageScheduler.js";
 import {
   handleReactionAdd,
   handleReactionRemove,
 } from "./events/messages/utilities/reactionHandler.js";
-import { startScheduledMessageDelivery } from "./jobs/scheduledMessageDelivery.js";
 
 // Create a new client instance
 const client = new Client({
@@ -124,27 +118,22 @@ client.once(Events.ClientReady, async (readyClient) => {
 
   await importEmojiList(emojis);
   await syncUserMappingFromGuild(readyClient);
-
-  if (scheduledMessageRoutesEnabled) {
-    startScheduledMessageDelivery(readyClient);
-  } else {
-    console.log(
-      "Scheduled message delivery disabled (SCHEDULED_MESSAGE_ROUTES_ENABLED).",
-    );
-  }
+  await startMessageScheduler(readyClient);
 
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });
 
 client.on("messageReactionAdd", async (reaction, user) => {
-  await handleReactionAdd(reaction, user, {
-    client,
-    pinEmoji,
-    pinThreshold,
-    plusEmoji,
-    minusEmoji,
-    repostEmojiId,
-  });
+  if (user.id !== clientId) {
+    await handleReactionAdd(reaction, user, {
+      client,
+      pinEmoji,
+      pinThreshold,
+      plusEmoji,
+      minusEmoji,
+      repostEmojiId,
+    });
+  }
 });
 
 client.on("messageReactionRemove", async (reaction, user) => {

@@ -20,45 +20,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 /**
- * Whether real scheduled-message routes are mounted (vs 503 stub). When unset, routes are enabled.
- * Disable with SCHEDULED_MESSAGE_ROUTES_ENABLED set to 0, false, or no (case-insensitive).
- * @returns {boolean}
- */
-function isScheduledMessageRoutesEnabled() {
-  const v = process.env.SCHEDULED_MESSAGE_ROUTES_ENABLED;
-  if (v == null || String(v).trim() === "") return true;
-  const s = String(v).trim().toLowerCase();
-  return !(s === "0" || s === "false" || s === "no");
-}
-
-const scheduledMessageRoutesEnabled = isScheduledMessageRoutesEnabled();
-
-const scheduledMessagesDisabledRouter = express.Router();
-scheduledMessagesDisabledRouter.use((req, res) => {
-  res.status(503).json({
-    ok: false,
-    error: "Scheduled messages are temporarily unavailable",
-  });
-});
-
-const scheduledMessagesDiscovery = scheduledMessageRoutesEnabled
-  ? {
-      authRequired: true,
-      routes: [
-        "GET /api/scheduled-messages/due?limit= (bot poll; rows include user_id + discord_user_id from chat_member_mapping)",
-        "GET /api/scheduled-messages?discord_user_id=&app=discord&status=pending|sent",
-        "POST /api/scheduled-messages (body: { discord_user_id, discord_channel_id, discord_guild_id?, message_body, scheduled_at, app? }; stores user_id FK)",
-        'PUT /api/scheduled-messages/:id (body: { status: string, must not be "sent" })',
-        "DELETE /api/scheduled-messages/:id?discord_user_id=&app=discord",
-      ],
-    }
-  : {
-      disabled: true,
-      message:
-        "Scheduled message routes return 503 until SCHEDULED_MESSAGE_ROUTES_ENABLED is enabled.",
-    };
-
-/**
  * Create or update the single admin user from ADMIN_USERNAME and ADMIN_PASSWORD.
  * @returns {Promise<void>}
  */
@@ -231,6 +192,17 @@ app.get("/", publicLimiter, (req, res) => {
           "DELETE /api/trigger-responses/:id",
         ],
       },
+      scheduledMessages: {
+        authRequired: true,
+        routes: [
+          "GET /api/scheduled-messages?app=<chatApp>&requesterUserId=... (user upcoming unsent/future)",
+          "GET /api/scheduled-messages?app=<chatApp>&scope=bot (pending rows for that chat app scheduler)",
+          "GET /api/scheduled-messages/:id?app=<chatApp>&requesterUserId=...",
+          "POST /api/scheduled-messages (body: { app, requesterUserId, chat_channel_id, chat_guild_id?, message_body, scheduled_at })",
+          "PUT /api/scheduled-messages/:id (body: { app, requesterUserId, message_body?, scheduled_at? } or { app, scope: bot, status: sent, sent_at? })",
+          "DELETE /api/scheduled-messages/:id?app=<chatApp>&requesterUserId=...",
+        ],
+      },
       leaderboards: {
         authRequired: true,
         routes: [
@@ -243,7 +215,6 @@ app.get("/", publicLimiter, (req, res) => {
           "GET /api/leaderboards/repost/user/:userId?app=discord",
         ],
       },
-      scheduledMessages: scheduledMessagesDiscovery,
     },
     auth: "Use header: Authorization: Bearer <token>",
   });
@@ -260,13 +231,8 @@ app.use("/api/config", configRoutes);
 app.use("/api/link-replacements", linkReplacementsRoutes);
 app.use("/api/pin-quips", pinQuipsRoutes);
 app.use("/api/trigger-responses", triggerResponsesRoutes);
+app.use("/api/scheduled-messages", scheduledMessagesRoutes);
 app.use("/api/leaderboards", leaderboardsRoutes);
-app.use(
-  "/api/scheduled-messages",
-  scheduledMessageRoutesEnabled
-    ? scheduledMessagesRoutes
-    : scheduledMessagesDisabledRouter,
-);
 
 // 404
 app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));

@@ -1,178 +1,173 @@
 import express from "express";
 import { authenticate } from "../middleware/auth.js";
-import * as scheduledMessages from "../services/scheduledMessages.js";
+import {
+  getScheduledMessageById,
+  createScheduledMessage,
+  deletePendingScheduledMessageByIdForUser,
+  getPendingScheduledMessagesForBot,
+  getUpcomingScheduledMessagesByUserId,
+  normalizeUtcIsoString,
+  updateScheduledMessageById,
+} from "../services/scheduledMessages.js";
 import { requireChatMemberMappingId } from "../services/chatMemberMapping.js";
+import {
+  CHAT_APP_PARAM_ERROR,
+  resolveChatAppFromRequest,
+} from "../utils/chatAppHttp.js";
 
 const router = express.Router();
 
 /**
- * @param {unknown} value
- * @returns {string}
+ * Resolve requester platform user id to chat_member_mapping.id.
+ * @param {import("express").Request} req
+ * @returns {Promise<{ ok: true, app: string, userId: number } | { ok: false, status: number, error: string }>}
  */
-function appFromQueryOrBody(value) {
-  if (typeof value === "string" && value.trim()) return value.trim();
-  return "discord";
-}
-
-/**
- * Normalize ISO or date-like string to SQL-friendly UTC datetime (YYYY-MM-DD HH:mm:ss).
- * @param {unknown} value
- * @returns {{ ok: true, sql: string } | { ok: false, error: string }}
- */
-function toSqlDateTime(value) {
-  if (value == null || value === "") {
-    return { ok: false, error: "scheduled_at is required" };
-  }
-  const d = new Date(
-    typeof value === "string" || typeof value === "number"
-      ? value
-      : String(value),
+async function resolveRequesterMapping(req) {
+  const app = resolveChatAppFromRequest(req);
+  if (!app)
+    return { ok: false, status: 400, error: CHAT_APP_PARAM_ERROR.error };
+  const requesterPlatformUserId =
+    req.body?.requesterUserId ?? req.query?.requesterUserId;
+  const requester = await requireChatMemberMappingId(
+    requesterPlatformUserId,
+    app,
   );
-  if (Number.isNaN(d.getTime())) {
-    return { ok: false, error: "Invalid scheduled_at" };
-  }
-  const sql = d.toISOString().slice(0, 19).replace("T", " ");
-  return { ok: true, sql };
+  if (!requester.ok) return { ok: false, status: 400, error: requester.error };
+  return { ok: true, app, userId: requester.id };
 }
-
-/**
- * GET /api/scheduled-messages/due
- * Pending rows with scheduled_at <= now (bot poll).
- * Query: limit? (default 20, max 100)
- */
-router.get("/due", authenticate, async (req, res) => {
-  try {
-    const limit = parseInt(String(req.query.limit ?? "20"), 10);
-    const rows = await scheduledMessages.listDue(new Date(), limit);
-    res.json({ ok: true, messages: rows });
-  } catch (err) {
-    console.error("GET /api/scheduled-messages/due error:", err);
-    res.status(500).json({ ok: false, error: "Failed to list due messages" });
-  }
-});
 
 /**
  * GET /api/scheduled-messages
- * List messages for a chat user (resolved via chat_member_mapping).
- * Query: discord_user_id (platform snowflake; required), app? (default discord), status? (default pending)
+ * List upcoming scheduled messages for requester, or bot scope list of all pending rows.
+ * Query:
+ * - user scope: ?app=<chatApp>&requesterUserId=...
+ * - bot scope:  ?scope=bot
+ * Auth: required.
  */
 router.get("/", authenticate, async (req, res) => {
   try {
-    const discord_user_id = req.query.discord_user_id;
-    if (
-      !discord_user_id ||
-      typeof discord_user_id !== "string" ||
-      !discord_user_id.trim()
-    ) {
-      return res.status(400).json({
-        ok: false,
-        error: "discord_user_id query parameter is required",
-      });
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+
+    if (req.query?.scope === "bot") {
+      const rows = await getPendingScheduledMessagesForBot(app);
+      return res.json({ ok: true, scheduledMessages: rows });
     }
-    const app = appFromQueryOrBody(req.query.app);
-    const resolved = await requireChatMemberMappingId(
-      discord_user_id.trim(),
-      app,
+
+    const requester = await resolveRequesterMapping(req);
+    if (!requester.ok) {
+      return res
+        .status(requester.status)
+        .json({ ok: false, error: requester.error });
+    }
+    const rows = await getUpcomingScheduledMessagesByUserId(
+      requester.app,
+      requester.userId,
     );
-    if (!resolved.ok) {
-      return res.status(400).json({ ok: false, error: resolved.error });
-    }
-    const status =
-      typeof req.query.status === "string" && req.query.status.trim()
-        ? req.query.status.trim()
-        : "pending";
-    if (status !== "pending" && status !== "sent") {
-      return res.status(400).json({
-        ok: false,
-        error: "status must be pending or sent",
-      });
-    }
-    const rows = await scheduledMessages.listForUser(resolved.id, status);
-    res.json({ ok: true, messages: rows });
+    return res.json({ ok: true, scheduledMessages: rows });
   } catch (err) {
     console.error("GET /api/scheduled-messages error:", err);
-    res
+    return res
       .status(500)
       .json({ ok: false, error: "Failed to list scheduled messages" });
   }
 });
 
 /**
+ * GET /api/scheduled-messages/:id
+ * Get a scheduled message by id; requester must own row.
+ * Query: ?app=<chatApp>&requesterUserId=...
+ * Auth: required.
+ */
+router.get("/:id", authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id))
+      return res.status(400).json({ ok: false, error: "Invalid id" });
+
+    const requester = await resolveRequesterMapping(req);
+    if (!requester.ok) {
+      return res
+        .status(requester.status)
+        .json({ ok: false, error: requester.error });
+    }
+
+    const row = await getScheduledMessageById(requester.app, id);
+    if (!row)
+      return res
+        .status(404)
+        .json({ ok: false, error: "Scheduled message not found" });
+    if (row.user_id !== requester.userId) {
+      return res
+        .status(403)
+        .json({ ok: false, error: "Forbidden: not your scheduled message" });
+    }
+    return res.json({ ok: true, scheduledMessage: row });
+  } catch (err) {
+    console.error("GET /api/scheduled-messages/:id error:", err);
+    return res
+      .status(500)
+      .json({ ok: false, error: "Failed to get scheduled message" });
+  }
+});
+
+/**
  * POST /api/scheduled-messages
- * Body: { discord_user_id, discord_channel_id, discord_guild_id?, message_body, scheduled_at, app? }
- * discord_user_id is resolved to chat_member_mapping.id via app (default discord).
+ * Create a scheduled message.
+ * Body: { app, requesterUserId, chat_channel_id, chat_guild_id?, message_body, scheduled_at }
+ * Auth: required.
  */
 router.post("/", authenticate, async (req, res) => {
   try {
-    const body = req.body ?? {};
-    const {
-      discord_user_id,
-      discord_channel_id,
-      discord_guild_id,
-      message_body,
-      scheduled_at,
-    } = body;
-    const app = appFromQueryOrBody(body.app);
-    if (
-      !discord_user_id ||
-      typeof discord_user_id !== "string" ||
-      !discord_user_id.trim()
-    ) {
-      return res.status(400).json({
-        ok: false,
-        error: "discord_user_id is required",
-      });
-    }
-    const resolved = await requireChatMemberMappingId(
-      discord_user_id.trim(),
-      app,
-    );
-    if (!resolved.ok) {
-      return res.status(400).json({ ok: false, error: resolved.error });
-    }
-    if (
-      !discord_channel_id ||
-      typeof discord_channel_id !== "string" ||
-      !discord_channel_id.trim()
-    ) {
-      return res.status(400).json({
-        ok: false,
-        error: "discord_channel_id is required",
-      });
-    }
-    if (
-      message_body == null ||
-      typeof message_body !== "string" ||
-      !String(message_body).trim()
-    ) {
-      return res.status(400).json({
-        ok: false,
-        error: "message_body is required",
-      });
-    }
-    const dt = toSqlDateTime(scheduled_at);
-    if (!dt.ok) {
-      return res.status(400).json({ ok: false, error: dt.error });
+    const requester = await resolveRequesterMapping(req);
+    if (!requester.ok) {
+      return res
+        .status(requester.status)
+        .json({ ok: false, error: requester.error });
     }
 
-    const id = await scheduledMessages.create({
-      user_id: resolved.id,
-      discord_channel_id: discord_channel_id.trim(),
-      discord_guild_id:
-        typeof discord_guild_id === "string" && discord_guild_id.trim()
-          ? discord_guild_id.trim()
-          : null,
-      message_body: String(message_body).trim(),
-      scheduled_at: dt.sql,
+    const channelId = String(req.body?.chat_channel_id ?? "").trim();
+    const guildIdRaw = req.body?.chat_guild_id;
+    const messageBody = String(req.body?.message_body ?? "").trim();
+    const scheduledAt = normalizeUtcIsoString(req.body?.scheduled_at);
+
+    if (!channelId) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "chat_channel_id is required" });
+    }
+    if (!messageBody) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "message_body is required" });
+    }
+    if (!scheduledAt) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "scheduled_at must be a valid datetime" });
+    }
+
+    const id = await createScheduledMessage({
+      userId: requester.userId,
+      app: requester.app,
+      chatChannelId: channelId,
+      chatGuildId:
+        guildIdRaw == null || String(guildIdRaw).trim() === ""
+          ? null
+          : String(guildIdRaw).trim(),
+      messageBody,
+      scheduledAtUtcIso: scheduledAt,
     });
     if (id == null) {
-      return res.status(500).json({ ok: false, error: "Failed to create" });
+      return res
+        .status(500)
+        .json({ ok: false, error: "Failed to create scheduled message" });
     }
-    const row = await scheduledMessages.getById(id);
-    res.status(201).json({ ok: true, ...row });
+    const row = await getScheduledMessageById(requester.app, id);
+    return res.status(201).json({ ok: true, scheduledMessage: row });
   } catch (err) {
     console.error("POST /api/scheduled-messages error:", err);
-    res
+    return res
       .status(500)
       .json({ ok: false, error: "Failed to create scheduled message" });
   }
@@ -180,33 +175,104 @@ router.post("/", authenticate, async (req, res) => {
 
 /**
  * PUT /api/scheduled-messages/:id
- * Body: { status: string (must not be "sent") } — mark sent
+ * Update user-owned message fields OR mark as sent.
+ * Body (user update): { app, requesterUserId, message_body?, scheduled_at? }
+ * Body (bot sent-mark): { scope: "bot", status: "sent", sent_at? }
+ * Auth: required.
  */
 router.put("/:id", authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    if (Number.isNaN(id)) {
+    if (Number.isNaN(id))
       return res.status(400).json({ ok: false, error: "Invalid id" });
+
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+
+    const existing = await getScheduledMessageById(app, id);
+    if (!existing)
+      return res
+        .status(404)
+        .json({ ok: false, error: "Scheduled message not found" });
+
+    // Bot scope update (used by scheduler to mark sent).
+    if (req.body?.scope === "bot") {
+      if (req.body?.status !== "sent") {
+        return res
+          .status(400)
+          .json({ ok: false, error: 'Bot updates only support status "sent"' });
+      }
+      const sentAt = normalizeUtcIsoString(
+        req.body?.sent_at ?? new Date().toISOString(),
+      );
+      const updated = await updateScheduledMessageById(id, {
+        status: "sent",
+        sent_at: sentAt,
+      });
+      if (!updated) {
+        return res.status(500).json({
+          ok: false,
+          error: "Failed to mark scheduled message as sent",
+        });
+      }
+      const row = await getScheduledMessageById(app, id);
+      return res.json({ ok: true, scheduledMessage: row });
     }
-    const status = req.body?.status;
-    if (status == "sent") {
+
+    // User scope update.
+    const requester = await resolveRequesterMapping(req);
+    if (!requester.ok) {
+      return res
+        .status(requester.status)
+        .json({ ok: false, error: requester.error });
+    }
+    if (existing.user_id !== requester.userId) {
+      return res
+        .status(403)
+        .json({ ok: false, error: "Forbidden: not your scheduled message" });
+    }
+    if (existing.status !== "pending") {
+      return res
+        .status(400)
+        .json({ ok: false, error: "Cannot edit a sent scheduled message" });
+    }
+
+    const updates = {};
+
+    if (req.body?.message_body !== undefined) {
+      const body = String(req.body.message_body).trim();
+      if (!body)
+        return res
+          .status(400)
+          .json({ ok: false, error: "message_body cannot be empty" });
+      updates.message_body = body;
+    }
+    if (req.body?.scheduled_at !== undefined) {
+      const scheduledAt = normalizeUtcIsoString(req.body.scheduled_at);
+      if (!scheduledAt) {
+        return res
+          .status(400)
+          .json({ ok: false, error: "scheduled_at must be a valid datetime" });
+      }
+      updates.scheduled_at = scheduledAt;
+    }
+    if (Object.keys(updates).length === 0) {
       return res.status(400).json({
         ok: false,
-        error: 'body.status must not be "sent"',
+        error: "Provide message_body and/or scheduled_at to update",
       });
     }
-    const updated = await scheduledMessages.markSent(id);
-    if (!updated) {
-      return res.status(404).json({
-        ok: false,
-        error: "Message not found or already sent",
-      });
-    }
-    const row = await scheduledMessages.getById(id);
-    res.json({ ok: true, ...row });
+
+    const updated = await updateScheduledMessageById(id, updates);
+    if (!updated)
+      return res
+        .status(500)
+        .json({ ok: false, error: "Failed to update scheduled message" });
+    const row = await getScheduledMessageById(requester.app, id);
+    return res.json({ ok: true, scheduledMessage: row });
   } catch (err) {
     console.error("PUT /api/scheduled-messages/:id error:", err);
-    res
+    return res
       .status(500)
       .json({ ok: false, error: "Failed to update scheduled message" });
   }
@@ -214,47 +280,37 @@ router.put("/:id", authenticate, async (req, res) => {
 
 /**
  * DELETE /api/scheduled-messages/:id
- * Query: discord_user_id (required), app? (default discord) — only pending rows owned by user
+ * Delete pending scheduled message by id when owned by requester.
+ * Body/query: { app, requesterUserId }
+ * Auth: required.
  */
 router.delete("/:id", authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
-    if (Number.isNaN(id)) {
+    if (Number.isNaN(id))
       return res.status(400).json({ ok: false, error: "Invalid id" });
+
+    const requester = await resolveRequesterMapping(req);
+    if (!requester.ok) {
+      return res
+        .status(requester.status)
+        .json({ ok: false, error: requester.error });
     }
-    const discord_user_id = req.query.discord_user_id;
-    if (
-      !discord_user_id ||
-      typeof discord_user_id !== "string" ||
-      !discord_user_id.trim()
-    ) {
-      return res.status(400).json({
-        ok: false,
-        error: "discord_user_id query parameter is required",
-      });
-    }
-    const app = appFromQueryOrBody(req.query.app);
-    const resolved = await requireChatMemberMappingId(
-      discord_user_id.trim(),
-      app,
-    );
-    if (!resolved.ok) {
-      return res.status(400).json({ ok: false, error: resolved.error });
-    }
-    const deleted = await scheduledMessages.removeIfOwnedPending(
+
+    const deleted = await deletePendingScheduledMessageByIdForUser(
       id,
-      resolved.id,
+      requester.userId,
     );
     if (!deleted) {
       return res.status(404).json({
         ok: false,
-        error: "Scheduled message not found or not deletable",
+        error: "Pending scheduled message not found for requester",
       });
     }
-    res.json({ ok: true });
+    return res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/scheduled-messages/:id error:", err);
-    res
+    return res
       .status(500)
       .json({ ok: false, error: "Failed to delete scheduled message" });
   }
