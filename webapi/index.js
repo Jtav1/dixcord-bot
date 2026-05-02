@@ -14,6 +14,7 @@ import linkReplacementsRoutes from "./routes/link-replacements.js";
 import leaderboardsRoutes from "./routes/leaderboards.js";
 import pinQuipsRoutes from "./routes/pin-quips.js";
 import triggerResponsesRoutes from "./routes/trigger-responses.js";
+import scheduledMessagesRoutes from "./routes/scheduled-messages.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -191,6 +192,17 @@ app.get("/", publicLimiter, (req, res) => {
           "DELETE /api/trigger-responses/:id",
         ],
       },
+      scheduledMessages: {
+        authRequired: true,
+        routes: [
+          "GET /api/scheduled-messages?app=<chatApp>&requesterUserId=... (user upcoming unsent/future)",
+          "GET /api/scheduled-messages?app=<chatApp>&scope=bot (pending rows for that chat app scheduler)",
+          "GET /api/scheduled-messages/:id?app=<chatApp>&requesterUserId=...",
+          "POST /api/scheduled-messages (body: { app, requesterUserId, chat_channel_id, chat_guild_id?, message_body, scheduled_at })",
+          "PUT /api/scheduled-messages/:id (body: { app, requesterUserId, message_body?, scheduled_at? } or { app, scope: bot, status: sent, sent_at? })",
+          "DELETE /api/scheduled-messages/:id?app=<chatApp>&requesterUserId=...",
+        ],
+      },
       leaderboards: {
         authRequired: true,
         routes: [
@@ -219,6 +231,7 @@ app.use("/api/config", configRoutes);
 app.use("/api/link-replacements", linkReplacementsRoutes);
 app.use("/api/pin-quips", pinQuipsRoutes);
 app.use("/api/trigger-responses", triggerResponsesRoutes);
+app.use("/api/scheduled-messages", scheduledMessagesRoutes);
 app.use("/api/leaderboards", leaderboardsRoutes);
 
 // 404

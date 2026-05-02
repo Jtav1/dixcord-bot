@@ -9,6 +9,10 @@ import {
   getRandomResponseForTrigger,
 } from "../../api/triggerResponses.js";
 import { getLinkReplacementSourceHosts } from "../../api/linkReplacements.js";
+import { createScheduledMessage } from "../../api/scheduledMessages.js";
+import { refreshScheduledMessagesCache } from "../../scheduler/messageScheduler.js";
+import { parseReminderMessage } from "./utilities/scheduleParser.js";
+import { MessageFlags } from "discord.js";
 
 //******* UTILITIES FUNCTIONS ********//;
 import { emojiDetector } from "./utilities/emojiDetector.js";
@@ -24,17 +28,12 @@ let cachedLinkHosts = null;
 
 const execute = async (message) => {
   //******* INCOMING MESSAGE PROCESSING *******//
-
   let response = "";
 
   if (!message.author.bot && !(message.author.id === clientId)) {
     // check every message for emojis
     await emojiDetector(message);
     await plusMinusMsg(message);
-
-    // Removed
-    //check every message for keywords
-    // keywordDetector(message);
 
     // Strip incoming message for comparison
     const contentStripped = message.content
@@ -68,13 +67,57 @@ const execute = async (message) => {
       response = await getRandomResponseForTrigger(matchedTrigger);
     }
 
-    // If no response yet, check for fortune teller (mention + ?)
-    if (
-      !response &&
-      contentStripped.startsWith(clientId) &&
-      message.content.endsWith("?")
-    ) {
-      response = await getFortuneResponse();
+    // If no response yet, check for fortune teller (mention + ?) and scheduled message (mention + remind me)
+
+    if (message.content.startsWith(`<@${clientId}>`)) {
+      if (message.content.toLowerCase().includes("remind me")) {
+        const parsedReminder = parseReminderMessage({
+          content: message.content,
+          botId: clientId,
+          message: message,
+        });
+
+        if (!parsedReminder.ok) {
+          console.log("scheduler parse failure: full_message", parsedReminder);
+          await message.react("❌").catch(() => null);
+
+          await message.reply(
+            "i can only understand the format '[at/in] [time/length of time] [message]' sorry justin is lazy",
+          );
+
+          return;
+        } else if (parsedReminder.ok === true) {
+          try {
+            console.log({
+              requesterUserId: message.author.id,
+              chatChannelId: message.channelId,
+              chatGuildId: message.guildId,
+              messageBody: parsedReminder.messageContent,
+              scheduledAtUtcIso: parsedReminder.scheduledAt,
+            });
+            const created = await createScheduledMessage({
+              requesterUserId: message.author.id,
+              chatChannelId: message.channelId,
+              chatGuildId: message.guildId,
+              messageBody: parsedReminder.messageContent,
+              scheduledAtUtcIso: parsedReminder.scheduledAt,
+            });
+            if (!created) {
+              console.log("scheduler create failure: no created row returned");
+              await message.react("❌").catch(() => null);
+              return;
+            }
+            await refreshScheduledMessagesCache();
+            await message.react("✅").catch(() => null);
+          } catch (err) {
+            console.log("scheduler create failure:", err);
+            await message.react("❌").catch(() => null);
+            return;
+          }
+        }
+      } else if (!response && message.content.endsWith("?")) {
+        response = await getFortuneResponse();
+      }
     }
 
     // if a reply was generated, send it
