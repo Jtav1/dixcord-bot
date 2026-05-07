@@ -3,6 +3,7 @@ import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
 
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { token, guildId, isDev, version, clientId } from "./configVars.js";
 import { importEmojiList } from "./api/emojis.js";
@@ -63,7 +64,9 @@ for (const category of eventCategories) {
   for (const file of fs
     .readdirSync(eventCategoryPath)
     .filter((file) => file.endsWith(".js"))) {
-    const { event } = await import(path.join(eventCategoryPath, file));
+    const { event } = await import(
+      pathToFileURL(path.join(eventCategoryPath, file))
+    );
 
     if (event.once) {
       client.once(event.name, (...args) => event.execute(...args));
@@ -84,7 +87,9 @@ for (const category of commandsCategories) {
   for (const file of fs
     .readdirSync(commandCategoryPath)
     .filter((file) => file.endsWith(".js"))) {
-    const command = await import(path.join(commandCategoryPath, file));
+    const command = await import(
+      pathToFileURL(path.join(commandCategoryPath, file))
+    );
 
     if ("cmdName" in command && "data" in command && "execute" in command) {
       commands.push(command);
