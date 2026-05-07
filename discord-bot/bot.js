@@ -65,7 +65,7 @@ for (const category of eventCategories) {
     .readdirSync(eventCategoryPath)
     .filter((file) => file.endsWith(".js"))) {
     const { event } = await import(
-      pathToFileURL(path.join(eventCategoryPath, file)),
+      pathToFileURL(path.join(eventCategoryPath, file))
     );
 
     if (event.once) {
@@ -88,7 +88,7 @@ for (const category of commandsCategories) {
     .readdirSync(commandCategoryPath)
     .filter((file) => file.endsWith(".js"))) {
     const command = await import(
-      pathToFileURL(path.join(commandCategoryPath, file)),
+      pathToFileURL(path.join(commandCategoryPath, file))
     );
 
     if ("cmdName" in command && "data" in command && "execute" in command) {

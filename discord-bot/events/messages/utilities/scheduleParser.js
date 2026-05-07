@@ -47,7 +47,9 @@ export function parseReminderMessage(payload) {
     );
 
     messageIdx = afterMention.toLowerCase().indexOf("remind me") + 10;
-    messageContent = afterMention.substring(messageIdx, afterMention.length).trim();
+    messageContent = afterMention
+      .substring(messageIdx, afterMention.length)
+      .trim();
 
     return {
       ok: true,
@@ -76,7 +78,9 @@ export function parseReminderMessage(payload) {
       const firstResult = parseResult[0];
       messageTime = firstResult.start.date();
       messageIdx = firstResult.index + firstResult.text.length;
-      messageContent = postRemindMe.substring(messageIdx, postRemindMe.length).trim();
+      messageContent = postRemindMe
+        .substring(messageIdx, postRemindMe.length)
+        .trim();
 
       if (!messageContent) {
         return {
