@@ -34,6 +34,12 @@ export function parseReminderMessage(payload) {
     afterMention.toLowerCase().startsWith("at") ||
     afterMention.toLowerCase().startsWith("in")
   ) {
+    if (remindMeIdx < 0) {
+      return {
+        ok: false,
+      };
+    }
+
     messageTime = chrono.parseDate(
       afterMention.trim().substring(0, remindMeIdx),
       Date.now(),
@@ -41,32 +47,62 @@ export function parseReminderMessage(payload) {
     );
 
     messageIdx = afterMention.toLowerCase().indexOf("remind me") + 10;
-    messageContent = afterMention.substring(messageIdx, afterMention.length);
+    messageContent = afterMention.substring(messageIdx, afterMention.length).trim();
 
     return {
       ok: true,
       scheduledAt: messageTime,
       messageContent: messageContent,
     };
-  } else if (
-    afterMention.toLowerCase().trim().startsWith("remind me") &&
-    payload.message.type === MessageType.Reply
-  ) {
-    messageTime = chrono.parseDate(
-      afterMention.substring(
-        afterMention.toLowerCase().indexOf("remind me") + 10,
-        afterMention.length,
-      ),
-    );
+  } else if (afterMention.toLowerCase().trim().startsWith("remind me")) {
+    const postRemindMe = afterMention
+      .substring(afterMention.toLowerCase().indexOf("remind me") + 10)
+      .trim();
 
-    const repliedMessageLink = `https://discord.com/channels/${payload.message.reference.guildId}/${payload.message.reference.channelId}/${payload.message.reference.messageId}`;
+    if (
+      postRemindMe.toLowerCase().startsWith("at") ||
+      postRemindMe.toLowerCase().startsWith("in")
+    ) {
+      const parseResult = chrono.parse(postRemindMe, Date.now(), {
+        forwardDate: true,
+      });
 
-    return {
-      ok: true,
-      scheduledAt: messageTime,
-      messageContent:
-        `<@${payload.message.author.id}> reminder: ` + repliedMessageLink,
-    };
+      if (!parseResult?.length) {
+        return {
+          ok: false,
+        };
+      }
+
+      const firstResult = parseResult[0];
+      messageTime = firstResult.start.date();
+      messageIdx = firstResult.index + firstResult.text.length;
+      messageContent = postRemindMe.substring(messageIdx, postRemindMe.length).trim();
+
+      if (!messageContent) {
+        return {
+          ok: false,
+        };
+      }
+
+      return {
+        ok: true,
+        scheduledAt: messageTime,
+        messageContent: messageContent,
+      };
+    }
+
+    if (payload.message.type === MessageType.Reply) {
+      messageTime = chrono.parseDate(postRemindMe);
+
+      const repliedMessageLink = `https://discord.com/channels/${payload.message.reference.guildId}/${payload.message.reference.channelId}/${payload.message.reference.messageId}`;
+
+      return {
+        ok: true,
+        scheduledAt: messageTime,
+        messageContent:
+          `<@${payload.message.author.id}> reminder: ` + repliedMessageLink,
+      };
+    }
   }
 
   return {

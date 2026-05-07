@@ -82,7 +82,7 @@ const execute = async (message) => {
           await message.react("❌").catch(() => null);
 
           await message.reply(
-            "i can only understand the format '[at/in] [time/length of time] [message]' sorry justin is lazy",
+            "i can only understand the format '[at/in] [time/length of time] remind me[message]' sorry justin is lazy",
           );
 
           return;
