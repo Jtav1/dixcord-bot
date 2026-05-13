@@ -1,5 +1,5 @@
 # Build stage: install deps (including optional better-sqlite3)
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 # Build deps for native optionalDependencies (e.g. better-sqlite3)
@@ -9,7 +9,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev
 
 # Production stage
-FROM node:20-alpine
+FROM node:24-alpine
 WORKDIR /app
 
 ENV NODE_ENV=production
