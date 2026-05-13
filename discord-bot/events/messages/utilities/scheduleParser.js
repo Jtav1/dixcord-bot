@@ -88,6 +88,11 @@ export function parseReminderMessage(payload) {
         };
       }
 
+      // STrip leading "to"
+      if (messageContent.toLowerCase().startsWith("to")) {
+        messageContent = messageContent.substring(3).trim();
+      }
+
       return {
         ok: true,
         scheduledAt: messageTime,
