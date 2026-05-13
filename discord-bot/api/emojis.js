@@ -20,14 +20,19 @@ export const importEmojiList = async (emojiObjectList) => {
 };
 
 /**
- * Record emoji usage. POST /api/message-processing/emoji-count
- * @param {string} emojiName - Emoji name
- * @param {string} [emojiId] - Emoji ID (optional for unicode)
+ * Record custom Discord emoji usage. POST /api/message-processing/emoji-count
+ * Unicode and presentation-only emojis are ignored (no API request).
+ * @param {string} emojiName - Custom emoji name
+ * @param {string|undefined|null} emojiId - Custom emoji snowflake; must be numeric or the call is a no-op
  * @param {string|null} [userid] - User who used the emoji (author/reactor)
  */
 export const countEmoji = async (emojiName, emojiId, userid = null) => {
+  const idStr =
+    emojiId != null ? String(emojiId).trim() : "";
+  if (!idStr || !/^\d+$/.test(idStr)) return;
+
   const authorId = userid || undefined;
-  const emojis = [{ name: emojiName, id: emojiId ?? undefined }].filter(
+  const emojis = [{ name: emojiName, id: idStr }].filter(
     (e) => e.name != null && e.name !== "",
   );
   if (emojis.length === 0) return;

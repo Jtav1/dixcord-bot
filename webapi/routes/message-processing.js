@@ -35,10 +35,10 @@ router.post("/emoji-count", authenticate, async (req, res) => {
       return res.status(400).json(CHAT_APP_PARAM_ERROR);
     }
     const result = await countEmoji(req.body);
-    if (result.ok === false && result.error) {
+    if (result.ok === false) {
       return res.status(400).json({ ...result, ok: false });
     }
-    res.json({ ...result, ok: result.ok !== false });
+    res.json({ ...result, ok: true });
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to record emoji count" });

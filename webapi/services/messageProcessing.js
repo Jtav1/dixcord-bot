@@ -30,6 +30,18 @@ function requireChatAppFromPayload(payload) {
 // --- Emoji detector (count emoji usage) ---
 
 /**
+ * Whether a request emoji entry is a Discord custom emoji (numeric snowflake id).
+ * Unicode and emoji-presentation tokens have no id and are not counted.
+ * @param {{ id?: unknown, name?: unknown } | null | undefined} em - Single emoji from the request body
+ * @returns {boolean} True when id is a non-empty string of digits after trim
+ */
+function isDiscordCustomEmojiPayload(em) {
+  if (em == null || em.id == null) return false;
+  const id = String(em.id).trim();
+  return id.length > 0 && /^\d+$/.test(id);
+}
+
+/**
  * Ensure emoji_frequency has a row for this emoji; increment frequency.
  * If no row exists, insert one with frequency 1.
  * @param {string} [emojiType] - Type from request (e.g. 'emoji'); if missing, type is stored as null.
@@ -99,6 +111,7 @@ async function upsertUserEmoji(chatMemberMappingId, emojiId) {
 
 /**
  * Record emoji usage from a message. Optionally records a +/- vote when replying with one plus/minus emoji.
+ * Only custom Discord emojis (entries whose id is a numeric snowflake) update frequency tables; Unicode-only payloads return ok: false with an error and perform no DB writes for emoji counts.
  * @param {object} payload - { app: string, authorId: string (snowflake), emojis: Array<{ name, id? }>, isReply?, repliedUserId? }
  * @returns {Promise<{ ok: boolean, applied?: string, error?: string }>}
  */
@@ -169,12 +182,21 @@ export async function countEmoji(payload) {
     return { ok: true, applied: "minus" };
   }
 
+  const countableEmojis = emojis.filter(isDiscordCustomEmojiPayload);
+  if (countableEmojis.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Only custom Discord emojis with a numeric snowflake id are counted.",
+    };
+  }
+
   const authorMap = await requireChatMemberMappingId(authorId, chatApp);
   if (!authorMap.ok) return { ok: false, error: authorMap.error };
 
-  for (const em of emojis) {
+  for (const em of countableEmojis) {
     const name = String(em.name ?? "?");
-    const id = em.id != null ? String(em.id) : name;
+    const id = String(em.id).trim();
     await ensureAndIncrementEmoji(id, name, em.animated, em.type);
     if (id && authorId) {
       await upsertUserEmoji(authorMap.id, id);
