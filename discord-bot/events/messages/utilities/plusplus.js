@@ -20,6 +20,13 @@ export const dominus = async (string, typestr, voterid) => {
   });
 };
 
+function countPlusMinusStrings(str) {
+  let count = 0;
+  count += [...str].filter((c) => c === "+").length;
+  count += [...str].filter((c) => c === "-").length;
+  return count;
+}
+
 /**
  * Pass message content to the API only if word++/user++ or word--/user-- detected in the message.
  * Parses for any instance of 'word++', 'word--', 'user++', 'user--' (allowing unicode/emoji-style words, not just alnum).
@@ -36,6 +43,11 @@ export const plusMinusMsg = async (rawMessage) => {
   if (plusMinusRegex.test(rawMessage.content)) {
     // If this message is a reply to another message, and that replied message has an author,
     // use doplus/dominus for a user vote on the replied-to user instead of normal plusminus
+
+    if (countPlusMinusStrings(rawMessage.content) > 2) {
+      console.log("Multiple ++/-- detected, skipping parse");
+      return;
+    }
 
     if (
       rawMessage.reference &&
