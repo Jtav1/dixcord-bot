@@ -157,6 +157,8 @@ router.post("/sticker-import", authenticate, async (req, res) => {
 /**
  * POST /api/message-processing/user-mapping-import
  * Upsert Discord users into chat_member_mapping (mirrors bot api/userMapping.js).
+ * For each user, updates name when a row already matches both discord_id and
+ * discord_handle, then inserts or upserts on discord_id; no rows are deleted.
  * Body: { app: "discord", users: Array<{ name, discord_handle, discord_id }> }
  * Response: { ok: true, imported: number }
  * Auth: required.

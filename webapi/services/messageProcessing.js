@@ -427,7 +427,9 @@ export async function importGuildAssetFrequencyList(items, assetKind) {
 export const isChatMemberImportAppSupported = isChatMemberAppSupported;
 
 /**
- * Bulk upsert rows into chat_member_mapping. Conflict target is the app’s id column (unique).
+ * Upsert Discord (or supported app) users into chat_member_mapping.
+ * Before each upsert, runs UPDATE name WHERE the row’s app id column and handle
+ * column exactly match that payload row (existing pair only); no rows are deleted.
  * @param {Array<Record<string, unknown>>} users
  * @param {string} app - e.g. `"discord"` (only supported value today)
  * @returns {Promise<{ ok: boolean, imported?: number, error?: string }>}
@@ -454,6 +456,12 @@ export async function importUserMappingList(users, app) {
     const name = String(u.name ?? "").trim();
     const handle = String(cfg.pickHandle(u) ?? "").trim();
     if (!platformId || !name || !handle) continue;
+
+    await db.query(
+      `UPDATE chat_member_mapping SET name = ?
+       WHERE \`${ic}\` = ? AND \`${hc}\` = ?`,
+      [name, platformId, handle],
+    );
 
     if (isSqlite) {
       await db.query(

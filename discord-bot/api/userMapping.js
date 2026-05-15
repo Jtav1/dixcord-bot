@@ -3,8 +3,12 @@ import { guildId, userMappingImportChannelId } from "../configVars.js";
 
 /**
  * Sync Discord user rows with the web API.
+ * The API updates chat_member_mapping.name when a stored row matches both discord_id and
+ * discord_handle for a user in this payload, then upserts on discord_id; it never deletes rows.
+ *
  * POST /api/message-processing/user-mapping-import
  * @param {Iterable<{ name: string, discord_handle: string, discord_id: string }>} userRows
+ * @returns {Promise<void>}
  */
 export const importUserMappingList = async (userRows) => {
   const list = Array.isArray(userRows) ? userRows : Array.from(userRows ?? []);
@@ -17,8 +21,10 @@ export const importUserMappingList = async (userRows) => {
 
 /**
  * Collect guild members (non-bot) plus any message authors in the channel from
- * DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID, then POST to webapi.
- * @param {import('discord.js').Client} client
+ * DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID, then POST to webapi via importUserMappingList.
+ *
+ * @param {import('discord.js').Client} client - logged-in Discord client
+ * @returns {Promise<void>}
  */
 export async function syncUserMappingFromGuild(client) {
   const oauthGuild = await client.guilds.fetch(guildId);
