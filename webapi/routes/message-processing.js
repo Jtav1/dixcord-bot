@@ -14,6 +14,7 @@ import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
 } from "../utils/chatAppHttp.js";
+import { output } from "../utils/output.js";
 
 const router = express.Router();
 
@@ -40,7 +41,7 @@ router.post("/emoji-count", authenticate, async (req, res) => {
     }
     res.json({ ...result, ok: result.ok !== false });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: "Failed to record emoji count" });
   }
 });
@@ -72,7 +73,7 @@ router.post("/plusminus", authenticate, async (req, res) => {
     }
     res.json({ ...result, ok: true });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: "Failed to record plus/minus" });
   }
 });
@@ -101,7 +102,7 @@ router.post("/count-repost", authenticate, async (req, res) => {
     }
     res.json({ ...result, ok: true });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: "Failed to record repost" });
   }
 });
@@ -125,7 +126,7 @@ router.post("/emoji-import", authenticate, async (req, res) => {
     }
     res.json({ ok: true, imported: result.imported ?? 0 });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: "Failed to import emoji list" });
   }
 });
@@ -149,7 +150,7 @@ router.post("/sticker-import", authenticate, async (req, res) => {
     }
     res.json({ ok: true, imported: result.imported ?? 0 });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: "Failed to import sticker list" });
   }
 });
@@ -173,7 +174,7 @@ router.post("/user-mapping-import", authenticate, async (req, res) => {
     }
     res.json({ ok: true, imported: result.imported ?? 0 });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: "Failed to import user mapping" });
   }
 });
@@ -191,7 +192,7 @@ router.post("/pin-check", authenticate, async (req, res) => {
     const alreadyPinned = await isMessageAlreadyPinned(messageId);
     res.json({ alreadyPinned });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({
       ok: false,
       error: "Failed to check pin status",
@@ -216,7 +217,7 @@ router.post("/pin-log", authenticate, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: "Failed to log pinned message" });
   }
 });

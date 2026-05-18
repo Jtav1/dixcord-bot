@@ -2,6 +2,7 @@ import express from "express";
 import bcrypt from "bcryptjs";
 import db from "../config/db.js";
 import { signToken } from "../middleware/auth.js";
+import { output } from "../utils/output.js";
 
 const router = express.Router();
 
@@ -59,7 +60,7 @@ router.post("/login", async (req, res) => {
       token,
     });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: "Login failed" });
   }
 });

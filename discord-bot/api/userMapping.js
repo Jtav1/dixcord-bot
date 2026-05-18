@@ -1,5 +1,6 @@
 import * as api from "./client.js";
 import { guildId, userMappingImportChannelId } from "../configVars.js";
+import { output } from "../utils/output.js";
 
 /**
  * Sync Discord user rows with the web API.
@@ -12,7 +13,7 @@ export const importUserMappingList = async (userRows) => {
     app: "discord",
     users: list,
   });
-  console.log("db: user mapping import complete (via webapi)");
+  output("db: user mapping import complete (via webapi)");
 };
 
 /**
@@ -28,7 +29,7 @@ export async function syncUserMappingFromGuild(client) {
     .catch(() => null);
 
   if (!channel || channel.guildId !== guild.id) {
-    console.warn(
+    output.warn(
       "user-mapping: DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID not found or not in guild; skipping user mapping sync",
     );
     return;

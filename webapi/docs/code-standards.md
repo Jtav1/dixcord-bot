@@ -104,7 +104,7 @@ export const doSomething = async (foo) => { ... };
 
 ## Error handling
 
-- **Web API route handlers:** wrap async handlers in `try/catch`, `console.error` the error, and return appropriate HTTP status and JSON `{ ok: false, error: "..." }` consistent with neighboring routes.
+- **Web API route handlers:** wrap async handlers in `try/catch`, `output.error` the error, and return appropriate HTTP status and JSON `{ ok: false, error: "..." }` consistent with neighboring routes.
 - **Discord bot / clients:** follow existing patterns in each file (avoid swallowing errors silently unless the codebase already does so intentionally).
 
 ---

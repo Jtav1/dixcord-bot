@@ -3,6 +3,7 @@ import {
   getPendingScheduledMessagesForBot,
   markScheduledMessageSent,
 } from "../api/scheduledMessages.js";
+import { output } from "../utils/output.js";
 
 let scheduler = null;
 let dueMessagesJob = null;
@@ -70,7 +71,7 @@ export async function processDueScheduledMessages() {
         });
         if (marked) sentCount++;
       } catch (err) {
-        console.error(
+        output.error(
           `scheduler: failed to send/mark scheduled message id=${row?.id}:`,
           err,
         );
@@ -104,7 +105,7 @@ export async function startMessageScheduler(client) {
       await processDueScheduledMessages();
     },
     (err) => {
-      console.error("scheduler: recurring due check failed:", err);
+      output.error("scheduler: recurring due check failed:", err);
     },
   );
   dueMessagesJob = new SimpleIntervalJob(

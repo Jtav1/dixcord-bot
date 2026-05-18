@@ -2,6 +2,7 @@ import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { updateScheduledMessageForUser } from "../../api/scheduledMessages.js";
 import { refreshScheduledMessagesCache } from "../../scheduler/messageScheduler.js";
 import * as chrono from "chrono-node";
+import { output } from "../../utils/output.js";
 
 const cmdName = "scheduled-update";
 
@@ -81,7 +82,7 @@ const execute = async (interaction) => {
       flags: MessageFlags.Ephemeral,
     });
   } catch (err) {
-    console.log("scheduled-update command failed:", err);
+    output("scheduled-update command failed:", err);
     await interaction.reply({
       content: "Failed to update scheduled reminder.",
       flags: MessageFlags.Ephemeral,

@@ -1,8 +1,9 @@
 import "dotenv/config";
+import { output } from "./utils/output.js";
 
 // Utility function for killing program if missing setup
 const writeError = (err) => {
-  console.error(err);
+  output.error(err);
   process.exit();
 };
 
@@ -16,11 +17,11 @@ const version = packageJson.version;
 let isDev = true;
 let dataDirectory = "";
 if (process.env.DEV_FLAG == false) {
-  console.log("RUNNING IN PRODUCTION");
+  output("RUNNING IN PRODUCTION");
   isDev = false;
   dataDirectory = "/data";
 } else {
-  console.log("RUNNING IN DEVELOPMENT");
+  output("RUNNING IN DEVELOPMENT");
   dataDirectory = "./data";
 }
 

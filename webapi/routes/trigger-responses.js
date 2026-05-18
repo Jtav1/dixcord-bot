@@ -1,6 +1,7 @@
 import express from "express";
 import { authenticate } from "../middleware/auth.js";
 import * as triggerResponses from "../services/triggerResponses.js";
+import { output } from "../utils/output.js";
 
 const router = express.Router();
 
@@ -14,7 +15,7 @@ router.get("/", authenticate, async (req, res) => {
     const list = await triggerResponses.getAll();
     res.json({ ok: true, triggerResponses: list });
   } catch (err) {
-    console.error("GET /api/trigger-responses error:", err);
+    output.error("GET /api/trigger-responses error:", err);
     res
       .status(500)
       .json({ ok: false, error: "Failed to list trigger-responses" });
@@ -31,7 +32,7 @@ router.get("/triggers", authenticate, async (req, res) => {
     const triggers = await triggerResponses.getTriggerList();
     res.json({ ok: true, triggers });
   } catch (err) {
-    console.error("GET /api/trigger-responses/triggers error:", err);
+    output.error("GET /api/trigger-responses/triggers error:", err);
     res.status(500).json({ ok: false, error: "Failed to list triggers" });
   }
 });
@@ -46,7 +47,7 @@ router.get("/triggers/list", authenticate, async (req, res) => {
     const list = await triggerResponses.getTriggers();
     res.json({ ok: true, triggers: list });
   } catch (err) {
-    console.error("GET /api/trigger-responses/triggers/list error:", err);
+    output.error("GET /api/trigger-responses/triggers/list error:", err);
     res.status(500).json({ ok: false, error: "Failed to list triggers" });
   }
 });
@@ -80,7 +81,7 @@ router.get("/triggers/responses", authenticate, async (req, res) => {
       error: "Query parameter 'trigger' (trigger text) or 'triggerId' (trigger id) is required",
     });
   } catch (err) {
-    console.error("GET /api/trigger-responses/triggers/responses error:", err);
+    output.error("GET /api/trigger-responses/triggers/responses error:", err);
     res.status(500).json({ ok: false, error: "Failed to get responses for trigger" });
   }
 });
@@ -102,7 +103,7 @@ router.get("/triggers/:id", authenticate, async (req, res) => {
     }
     res.json({ ok: true, ...trigger });
   } catch (err) {
-    console.error("GET /api/trigger-responses/triggers/:id error:", err);
+    output.error("GET /api/trigger-responses/triggers/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to get trigger" });
   }
 });
@@ -138,7 +139,7 @@ router.post("/triggers", authenticate, async (req, res) => {
     }
     res.status(201).json({ ok: true, ...trigger });
   } catch (err) {
-    console.error("POST /api/trigger-responses/triggers error:", err);
+    output.error("POST /api/trigger-responses/triggers error:", err);
     res.status(500).json({ ok: false, error: "Failed to create trigger" });
   }
 });
@@ -163,7 +164,7 @@ router.put("/triggers/:id", authenticate, async (req, res) => {
     const trigger = await triggerResponses.getTriggerById(id);
     res.json({ ok: true, ...trigger });
   } catch (err) {
-    console.error("PUT /api/trigger-responses/triggers/:id error:", err);
+    output.error("PUT /api/trigger-responses/triggers/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to update trigger" });
   }
 });
@@ -185,7 +186,7 @@ router.delete("/triggers/:id", authenticate, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error("DELETE /api/trigger-responses/triggers/:id error:", err);
+    output.error("DELETE /api/trigger-responses/triggers/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to delete trigger" });
   }
 });
@@ -212,7 +213,7 @@ router.get("/random", authenticate, async (req, res) => {
     }
     res.json({ ok: true, response: row.response_string, id: row.id });
   } catch (err) {
-    console.error("GET /api/trigger-responses/random error:", err);
+    output.error("GET /api/trigger-responses/random error:", err);
     res.status(500).json({ ok: false, error: "Failed to get random response" });
   }
 });
@@ -234,7 +235,7 @@ router.get("/responses/:id", authenticate, async (req, res) => {
     }
     res.json({ ok: true, ...response });
   } catch (err) {
-    console.error("GET /api/trigger-responses/responses/:id error:", err);
+    output.error("GET /api/trigger-responses/responses/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to get response" });
   }
 });
@@ -261,7 +262,7 @@ router.put("/responses/:id", authenticate, async (req, res) => {
     const response = await triggerResponses.getResponseById(id);
     res.json({ ok: true, ...response });
   } catch (err) {
-    console.error("PUT /api/trigger-responses/responses/:id error:", err);
+    output.error("PUT /api/trigger-responses/responses/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to update response" });
   }
 });
@@ -283,7 +284,7 @@ router.delete("/responses/:id", authenticate, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error("DELETE /api/trigger-responses/responses/:id error:", err);
+    output.error("DELETE /api/trigger-responses/responses/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to delete response" });
   }
 });
@@ -307,7 +308,7 @@ router.get("/:id", authenticate, async (req, res) => {
     }
     res.json({ ok: true, ...row });
   } catch (err) {
-    console.error("GET /api/trigger-responses/:id error:", err);
+    output.error("GET /api/trigger-responses/:id error:", err);
     res
       .status(500)
       .json({ ok: false, error: "Failed to get trigger-response" });
@@ -353,7 +354,7 @@ router.post("/", authenticate, async (req, res) => {
     const row = await triggerResponses.getById(id);
     res.status(201).json({ ok: true, ...row });
   } catch (err) {
-    console.error("POST /api/trigger-responses error:", err);
+    output.error("POST /api/trigger-responses error:", err);
     res
       .status(500)
       .json({ ok: false, error: "Failed to create trigger-response" });
@@ -403,7 +404,7 @@ router.put("/:id", authenticate, async (req, res) => {
     const row = await triggerResponses.getById(id);
     res.json({ ok: true, ...row });
   } catch (err) {
-    console.error("PUT /api/trigger-responses/:id error:", err);
+    output.error("PUT /api/trigger-responses/:id error:", err);
     res
       .status(500)
       .json({ ok: false, error: "Failed to update trigger-response" });
@@ -429,7 +430,7 @@ router.delete("/:id", authenticate, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error("DELETE /api/trigger-responses/:id error:", err);
+    output.error("DELETE /api/trigger-responses/:id error:", err);
     res
       .status(500)
       .json({ ok: false, error: "Failed to delete trigger-response" });

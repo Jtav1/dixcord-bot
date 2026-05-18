@@ -5,6 +5,7 @@
  */
 
 import db from "../config/db.js";
+import { output } from "../utils/output.js";
 
 const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
 const orderByResponseOrderClause = isSqlite
@@ -182,8 +183,8 @@ async function getWeightedResponseForTrigger(triggerId) {
       ? normalized.filter((r) => r.weight >= maxWeight)
       : normalized.filter((r) => r.weight < maxWeight);
 
-  console.log(roll);
-  console.log(candidates.length);
+  output(roll);
+  output(candidates.length);
 
   if (candidates.length === 0) {
     candidates = normalized.filter((r) => r.weight >= maxWeight);

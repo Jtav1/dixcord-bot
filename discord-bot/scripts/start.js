@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { waitForWebapi } from "./wait-for-webapi.js";
+import { output } from "../utils/output.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.join(__dirname, "..");
@@ -18,7 +19,7 @@ function deploySlashCommandsEnabled() {
 await waitForWebapi();
 
 if (deploySlashCommandsEnabled()) {
-  console.log(
+  output(
     "start: DEPLOY_SLASH_COMMANDS is set; clearing guild commands then registering …",
   );
   const del = spawnSync("node", ["delete-all-commands.js"], {

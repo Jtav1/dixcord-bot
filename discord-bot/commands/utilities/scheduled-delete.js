@@ -1,6 +1,7 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { deleteScheduledMessageForUser } from "../../api/scheduledMessages.js";
 import { refreshScheduledMessagesCache } from "../../scheduler/messageScheduler.js";
+import { output } from "../../utils/output.js";
 
 const cmdName = "scheduled-delete";
 
@@ -41,7 +42,7 @@ const execute = async (interaction) => {
       flags: MessageFlags.Ephemeral,
     });
   } catch (err) {
-    console.log("scheduled-delete command failed:", err);
+    output("scheduled-delete command failed:", err);
     await interaction.reply({
       content: "Failed to delete scheduled reminder.",
       flags: MessageFlags.Ephemeral,

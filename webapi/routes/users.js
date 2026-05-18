@@ -2,6 +2,7 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import db from '../config/db.js';
 import { authenticate } from '../middleware/auth.js';
+import { output } from '../utils/output.js';
 
 const router = express.Router();
 router.use(authenticate);
@@ -42,7 +43,7 @@ router.put('/me', async (req, res) => {
     const [rows] = await db.query('SELECT id, email, name, created_at FROM users WHERE id = ?', [req.user.id]);
     res.json({ ok: true, user: rows[0] });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: 'Update failed' });
   }
 });
@@ -57,7 +58,7 @@ router.delete('/me', async (req, res) => {
     await db.query('DELETE FROM users WHERE id = ?', [req.user.id]);
     res.json({ ok: true });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: 'Delete failed' });
   }
 });

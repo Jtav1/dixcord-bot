@@ -1,6 +1,7 @@
 import express from "express";
 import { authenticate } from "../middleware/auth.js";
 import db from "../config/db.js";
+import { output } from "../utils/output.js";
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ router.get("/", authenticate, async (req, res) => {
     );
     res.json({ ok: true, config, entries });
   } catch (err) {
-    console.error("GET /api/config error:", err);
+    output.error("GET /api/config error:", err);
     res.status(500).json({ ok: false, error: "Failed to load configuration" });
   }
 });
@@ -53,7 +54,7 @@ router.put("/", authenticate, async (req, res) => {
     }
     res.json({ ok: true, config: String(configName), value: value ?? "" });
   } catch (err) {
-    console.error("PUT /api/config error:", err);
+    output.error("PUT /api/config error:", err);
     res
       .status(500)
       .json({ ok: false, error: "Failed to update configuration" });

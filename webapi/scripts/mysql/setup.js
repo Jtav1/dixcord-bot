@@ -8,6 +8,7 @@
  */
 import "dotenv/config";
 import mysql from "mysql2/promise";
+import { output } from "../../utils/output.js";
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
@@ -24,8 +25,8 @@ const execQuery = async (query, params = []) => {
     const [rows] = await pool.query(query, params);
     return rows;
   } catch (err) {
-    console.error("db: query error", err.message);
-    if (params.length === 0) console.error(query);
+    output.error("db: query error", err.message);
+    if (params.length === 0) output.error(query);
     throw err;
   }
 };
@@ -245,10 +246,10 @@ const initializeDatabase = async () => {
     for (const quip of defaultPinQuips) {
       await pool.query("INSERT INTO pin_quips (quip) VALUES (?)", [quip]);
     }
-    console.log("db: MySQL pin_quips seed complete");
+    output("db: MySQL pin_quips seed complete");
   }
 
-  console.log("db: MySQL table initialization complete");
+  output("db: MySQL table initialization complete");
 };
 
 const importConfigs = async () => {
@@ -282,7 +283,7 @@ const importConfigs = async () => {
     values,
   );
 
-  console.log("db: MySQL configuration import complete");
+  output("db: MySQL configuration import complete");
 };
 
 const defaultLinkReplacements = [
@@ -300,7 +301,7 @@ const importLinkReplacements = async () => {
       [source_host, target_host],
     );
   }
-  console.log("db: MySQL link_replacements import complete");
+  output("db: MySQL link_replacements import complete");
 };
 
 const run = async () => {
@@ -311,7 +312,7 @@ const run = async () => {
     await pool.end();
     process.exit(0);
   } catch (err) {
-    console.error(err);
+    output.error(err);
     await pool.end();
     process.exit(1);
   }

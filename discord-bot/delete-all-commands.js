@@ -1,5 +1,6 @@
 import { REST, Routes } from "discord.js";
 import { clientId, guildId, token } from "./configVars.js";
+import { output } from "./utils/output.js";
 
 const rest = new REST().setToken(token);
 
@@ -9,9 +10,9 @@ const rest = new REST().setToken(token);
     await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
       body: [],
     });
-    console.log("Successfully deleted all guild commands.");
+    output("Successfully deleted all guild commands.");
   } catch (error) {
-    console.error(error);
+    output.error(error);
     process.exit(1);
   }
 })();

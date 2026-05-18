@@ -1,4 +1,5 @@
 import * as api from "./client.js";
+import { output } from "../utils/output.js";
 
 /**
  * Sync server emoji list with the web API.
@@ -16,7 +17,7 @@ export const importEmojiList = async (emojiObjectList) => {
     type: "emoji",
   }));
   await api.post("/api/message-processing/emoji-import", { emojis });
-  console.log("db: emoji import complete (via webapi)");
+  output("db: emoji import complete (via webapi)");
 };
 
 /**

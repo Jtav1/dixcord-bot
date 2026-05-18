@@ -11,6 +11,7 @@ COPY ./commands ./commands
 COPY ./events ./events
 COPY ./scheduler ./scheduler
 COPY ./scripts ./scripts
+COPY ./utils ./utils
 COPY ./delete-all-commands.js ./deploy-commands.js ./
 COPY ./configVars.js ./bot.js ./
 

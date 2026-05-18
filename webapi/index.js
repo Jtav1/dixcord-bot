@@ -15,6 +15,7 @@ import leaderboardsRoutes from "./routes/leaderboards.js";
 import pinQuipsRoutes from "./routes/pin-quips.js";
 import triggerResponsesRoutes from "./routes/trigger-responses.js";
 import scheduledMessagesRoutes from "./routes/scheduled-messages.js";
+import { output } from "./utils/output.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,7 +28,7 @@ async function ensureAdminUser() {
   const username = process.env.ADMIN_USERNAME;
   const password = process.env.ADMIN_PASSWORD;
   if (!username || !password) {
-    console.warn(
+    output.warn(
       "ADMIN_USERNAME and ADMIN_PASSWORD must be set; no admin user created.",
     );
     return;
@@ -43,16 +44,16 @@ async function ensureAdminUser() {
         hash,
         username,
       ]);
-      console.log("Admin user password updated.");
+      output("Admin user password updated.");
     } else {
       await db.query(
         "INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)",
         [username, hash, "Admin"],
       );
-      console.log("Admin user created.");
+      output("Admin user created.");
     }
   } catch (err) {
-    console.error("Failed to ensure admin user:", err);
+    output.error("Failed to ensure admin user:", err);
     throw err;
   }
 }
@@ -239,11 +240,11 @@ app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error(err);
+  output.error(err);
   res.status(500).json({ ok: false, error: "Internal server error" });
 });
 
 await ensureAdminUser();
 app.listen(PORT, () => {
-  console.log(`API running at http://localhost:${PORT}`);
+  output(`API running at http://localhost:${PORT}`);
 });

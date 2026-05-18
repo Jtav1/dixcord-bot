@@ -10,6 +10,7 @@ import "dotenv/config";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { output } from "../../utils/output.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -18,7 +19,7 @@ try {
   const betterSqlite3 = await import("better-sqlite3");
   Database = betterSqlite3.default;
 } catch (e) {
-  console.error(
+  output.error(
     "better-sqlite3 is not installed. Run: npm install better-sqlite3",
   );
   process.exit(1);
@@ -31,7 +32,7 @@ const dataDir = path.dirname(dbPath);
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
-console.log("db: SQLite database path:", dbPath);
+output("db: SQLite database path:", dbPath);
 
 const db = new Database(dbPath);
 
@@ -40,7 +41,7 @@ const exec = (sql) => {
   try {
     db.exec(sql);
   } catch (err) {
-    console.error("db: exec error", err.message);
+    output.error("db: exec error", err.message);
     throw err;
   }
 };
@@ -230,7 +231,7 @@ const initializeDatabase = () => {
     "CREATE INDEX IF NOT EXISTS idx_scheduled_messages_user ON scheduled_messages (user_id, status)",
   );
 
-  console.log("db: SQLite table initialization complete");
+  output("db: SQLite table initialization complete");
 };
 
 // --- Import (seed default configs) ---
@@ -286,7 +287,7 @@ const importConfigs = () => {
   });
   insertMany(configArray);
 
-  console.log("db: SQLite configuration import complete");
+  output("db: SQLite configuration import complete");
 };
 
 const DEFAULT_PIN_QUIPS = [
@@ -312,7 +313,7 @@ const importPinQuips = () => {
     }
   });
   insertMany(DEFAULT_PIN_QUIPS);
-  console.log("db: SQLite pin_quips seed complete");
+  output("db: SQLite pin_quips seed complete");
 };
 
 const importLinkReplacements = () => {
@@ -332,7 +333,7 @@ const importLinkReplacements = () => {
     }
   });
   insertMany(defaultLinkReplacements);
-  console.log("db: SQLite link_replacements import complete");
+  output("db: SQLite link_replacements import complete");
 };
 
 // --- Run ---
@@ -344,7 +345,7 @@ try {
   db.close();
   process.exit(0);
 } catch (err) {
-  console.error(err);
+  output.error(err);
   db.close();
   process.exit(1);
 }

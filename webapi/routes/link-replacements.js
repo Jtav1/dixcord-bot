@@ -1,6 +1,7 @@
 import express from "express";
 import { authenticate } from "../middleware/auth.js";
 import * as linkReplacements from "../services/linkReplacements.js";
+import { output } from "../utils/output.js";
 
 const router = express.Router();
 
@@ -14,7 +15,7 @@ router.get("/", authenticate, async (req, res) => {
     const list = await linkReplacements.getAll();
     res.json({ ok: true, linkReplacements: list });
   } catch (err) {
-    console.error("GET /api/link-replacements error:", err);
+    output.error("GET /api/link-replacements error:", err);
     res.status(500).json({ ok: false, error: "Failed to list link replacements" });
   }
 });
@@ -36,7 +37,7 @@ router.get("/:id", authenticate, async (req, res) => {
     }
     res.json({ ok: true, ...row });
   } catch (err) {
-    console.error("GET /api/link-replacements/:id error:", err);
+    output.error("GET /api/link-replacements/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to get link replacement" });
   }
 });
@@ -66,7 +67,7 @@ router.post("/", authenticate, async (req, res) => {
     const row = await linkReplacements.getById(id);
     res.status(201).json({ ok: true, ...row });
   } catch (err) {
-    console.error("POST /api/link-replacements error:", err);
+    output.error("POST /api/link-replacements error:", err);
     if (err.code === "ER_DUP_ENTRY" || err.message?.includes("UNIQUE")) {
       return res.status(409).json({ ok: false, error: "A replacement for this source_host already exists" });
     }
@@ -100,7 +101,7 @@ router.put("/:id", authenticate, async (req, res) => {
     const row = await linkReplacements.getById(id);
     res.json({ ok: true, ...row });
   } catch (err) {
-    console.error("PUT /api/link-replacements/:id error:", err);
+    output.error("PUT /api/link-replacements/:id error:", err);
     if (err.code === "ER_DUP_ENTRY" || err.message?.includes("UNIQUE")) {
       return res.status(409).json({ ok: false, error: "A replacement for this source_host already exists" });
     }
@@ -125,7 +126,7 @@ router.delete("/:id", authenticate, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error("DELETE /api/link-replacements/:id error:", err);
+    output.error("DELETE /api/link-replacements/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to delete link replacement" });
   }
 });

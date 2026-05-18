@@ -1,6 +1,7 @@
 import express from "express";
 import { authenticate } from "../middleware/auth.js";
 import { fortuneTeller, twitterFixer } from "../services/botResponses.js";
+import { output } from "../utils/output.js";
 
 const router = express.Router();
 
@@ -14,7 +15,7 @@ router.post("/fortune", authenticate, async (req, res) => {
     const { response } = await fortuneTeller();
     res.json({ ok: true, response });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: "Failed to get fortune" });
   }
 });
@@ -31,7 +32,7 @@ router.post("/link-fixer", authenticate, async (req, res) => {
     const { response } = await twitterFixer(message);
     res.json({ ok: true, response });
   } catch (err) {
-    console.error(err);
+    output.error(err);
     res.status(500).json({ ok: false, error: "Failed to fix link" });
   }
 });

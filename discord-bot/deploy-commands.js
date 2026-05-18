@@ -3,6 +3,7 @@ import { clientId, guildId, token } from "./configVars.js";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { output } from "./utils/output.js";
 
 const commands = [];
 const foldersPath = path.join(process.cwd(), "commands");
@@ -17,10 +18,10 @@ for (const folder of commandFolders) {
     const filePath = path.join(commandsPath, file);
     const command = await import(pathToFileURL(filePath));
     if ("data" in command && "execute" in command) {
-      console.log("Found command, adding...");
+      output("Found command, adding...");
       commands.push(command.data.toJSON());
     } else {
-      console.log(
+      output(
         `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`,
       );
     }
@@ -35,18 +36,18 @@ const rest = new REST().setToken(token);
 
 (async () => {
   try {
-    console.log(
+    output(
       `Started refreshing ${commands.length} application (/) commands.`,
     );
     const data = await rest.put(
       Routes.applicationGuildCommands(clientId, guildId),
       { body: commands },
     );
-    console.log(
+    output(
       `Successfully reloaded ${data.length} application (/) commands.`,
     );
   } catch (error) {
-    console.error(error);
+    output.error(error);
     process.exit(1);
   }
 })();

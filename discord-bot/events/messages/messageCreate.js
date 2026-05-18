@@ -17,6 +17,7 @@ import { MessageFlags } from "discord.js";
 //******* UTILITIES FUNCTIONS ********//;
 import { emojiDetector } from "./utilities/emojiDetector.js";
 import { plusMinusMsg } from "./utilities/plusplus.js";
+import { output } from "../../utils/output.js";
 
 const name = "messageCreate";
 
@@ -78,7 +79,7 @@ const execute = async (message) => {
         });
 
         if (!parsedReminder.ok) {
-          console.log("scheduler parse failure: full_message", parsedReminder);
+          output("scheduler parse failure: full_message", parsedReminder);
           await message.react("❌").catch(() => null);
 
           await message.reply(
@@ -88,7 +89,7 @@ const execute = async (message) => {
           return;
         } else if (parsedReminder.ok === true) {
           try {
-            console.log({
+            output({
               requesterUserId: message.author.id,
               chatChannelId: message.channelId,
               chatGuildId: message.guildId,
@@ -103,14 +104,14 @@ const execute = async (message) => {
               scheduledAtUtcIso: parsedReminder.scheduledAt,
             });
             if (!created) {
-              console.log("scheduler create failure: no created row returned");
+              output("scheduler create failure: no created row returned");
               await message.react("❌").catch(() => null);
               return;
             }
             await refreshScheduledMessagesCache();
             await message.react("✅").catch(() => null);
           } catch (err) {
-            console.log("scheduler create failure:", err);
+            output("scheduler create failure:", err);
             await message.react("❌").catch(() => null);
             return;
           }

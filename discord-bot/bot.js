@@ -14,6 +14,7 @@ import {
   handleReactionAdd,
   handleReactionRemove,
 } from "./events/messages/utilities/reactionHandler.js";
+import { output } from "./utils/output.js";
 
 // Create a new client instance
 const client = new Client({
@@ -94,7 +95,7 @@ for (const category of commandsCategories) {
     if ("cmdName" in command && "data" in command && "execute" in command) {
       commands.push(command);
     } else {
-      console.log(
+      output(
         `[WARNING] Command ${commandCategoryPath} is missing a required "cmdName" or "data" or "execute" property.`,
       );
     }
@@ -111,7 +112,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   try {
     await runCommand.execute(interaction);
   } catch (e) {
-    console.log("command execution error");
+    output("command execution error");
   }
 });
 
@@ -125,7 +126,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   await syncUserMappingFromGuild(readyClient);
   await startMessageScheduler(readyClient);
 
-  console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+  output(`Ready! Logged in as ${readyClient.user.tag}`);
 });
 
 client.on("messageReactionAdd", async (reaction, user) => {
@@ -150,7 +151,7 @@ client.on("messageReactionRemove", async (reaction, user) => {
 });
 
 client.on(Events.Error, async (error) => {
-  console.error("Discord Client Error: ", error);
+  output.error("Discord Client Error: ", error);
 });
 
 // Login to Discord with your client's token
@@ -160,7 +161,7 @@ if (announceChannelId.length > 0) {
   const announceChannel = await client.channels.fetch(announceChannelId);
 
   if (isDev) {
-    console.log(`Dixbot ${version}-dev online`);
+    output(`Dixbot ${version}-dev online`);
     //await announceChannel.send(`Dixbot ${version}-dev online`);
   } else {
     await announceChannel.send(`Dixbot ${version}-prod online`);

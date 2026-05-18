@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { output } from "../utils/output.js";
 
 const INTERVAL_MS = 2000;
 const MAX_ATTEMPTS = 30;
@@ -27,14 +28,14 @@ export async function waitForWebapi() {
       if (res.ok) {
         const data = await res.json().catch(() => null);
         if (data && data.status === "ok") {
-          console.log(
+          output(
             `wait-for-webapi: ${healthUrl} ready (attempt ${attempt}/${MAX_ATTEMPTS}).`,
           );
           return;
         }
       }
     } catch (err) {
-      console.log(
+      output(
         `wait-for-webapi: attempt ${attempt}/${MAX_ATTEMPTS} failed (${err?.message ?? err}).`,
       );
     }

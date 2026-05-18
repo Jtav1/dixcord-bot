@@ -5,6 +5,7 @@ import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
 } from "../utils/chatAppHttp.js";
+import { output } from "../utils/output.js";
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.post("/plusplus", authenticate, async (req, res) => {
     ]);
     res.json({ ok: true, app, limit, top, bottom });
   } catch (err) {
-    console.error("POST /api/leaderboards/plusplus error:", err);
+    output.error("POST /api/leaderboards/plusplus error:", err);
     res.status(500).json({ ok: false, error: "Failed to get plusplus leaderboard" });
   }
 });
@@ -51,7 +52,7 @@ router.get("/plusplus/total", authenticate, async (req, res) => {
     }
     res.json({ ok: true, app, ...result });
   } catch (err) {
-    console.error("GET /api/leaderboards/plusplus/total error:", err);
+    output.error("GET /api/leaderboards/plusplus/total error:", err);
     res.status(500).json({ ok: false, error: "Failed to get plusplus total" });
   }
 });
@@ -72,7 +73,7 @@ router.get("/plusplus/voter/:userId", authenticate, async (req, res) => {
     }
     res.json({ ok: true, app, ...result });
   } catch (err) {
-    console.error("GET /api/leaderboards/plusplus/voter/:userId error:", err);
+    output.error("GET /api/leaderboards/plusplus/voter/:userId error:", err);
     res.status(500).json({ ok: false, error: "Failed to get voter count" });
   }
 });
@@ -91,7 +92,7 @@ router.post("/plusplus/top-voters", authenticate, async (req, res) => {
     const topVoters = await leaderboards.getPlusPlusTopVoters(limit, app);
     res.json({ ok: true, app, limit, topVoters });
   } catch (err) {
-    console.error("POST /api/leaderboards/plusplus/top-voters error:", err);
+    output.error("POST /api/leaderboards/plusplus/top-voters error:", err);
     res.status(500).json({ ok: false, error: "Failed to get top voters" });
   }
 });
@@ -108,7 +109,7 @@ router.post("/emoji", authenticate, async (req, res) => {
     const top = await leaderboards.getTopEmoji(limit);
     res.json({ ok: true, limit, top });
   } catch (err) {
-    console.error("POST /api/leaderboards/emoji error:", err);
+    output.error("POST /api/leaderboards/emoji error:", err);
     res.status(500).json({ ok: false, error: "Failed to get emoji leaderboard" });
   }
 });
@@ -127,7 +128,7 @@ router.post("/repost", authenticate, async (req, res) => {
     const top = await leaderboards.getTopReposters(limit, app);
     res.json({ ok: true, app, limit, top });
   } catch (err) {
-    console.error("POST /api/leaderboards/repost error:", err);
+    output.error("POST /api/leaderboards/repost error:", err);
     res.status(500).json({ ok: false, error: "Failed to get repost leaderboard" });
   }
 });
@@ -148,7 +149,7 @@ router.get("/repost/user/:userId", authenticate, async (req, res) => {
     }
     res.json({ ok: true, app, ...result });
   } catch (err) {
-    console.error("GET /api/leaderboards/repost/user/:userId error:", err);
+    output.error("GET /api/leaderboards/repost/user/:userId error:", err);
     res.status(500).json({ ok: false, error: "Failed to get reposts for user" });
   }
 });

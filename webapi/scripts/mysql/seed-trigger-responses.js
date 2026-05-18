@@ -12,6 +12,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import mysql from "mysql2/promise";
+import { output } from "../../utils/output.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -20,11 +21,11 @@ const triggersPath = path.join(repoRoot, "triggers.txt");
 const responsesPath = path.join(repoRoot, "responses.txt");
 
 if (!fs.existsSync(triggersPath)) {
-  console.error("Missing file:", triggersPath);
+  output.error("Missing file:", triggersPath);
   process.exit(1);
 }
 if (!fs.existsSync(responsesPath)) {
-  console.error("Missing file:", responsesPath);
+  output.error("Missing file:", responsesPath);
   process.exit(1);
 }
 
@@ -58,11 +59,11 @@ const triggers = parseTriggers(triggersRaw);
 const responses = parseResponses(responsesRaw);
 
 if (triggers.length === 0) {
-  console.error("No triggers found in", triggersPath);
+  output.error("No triggers found in", triggersPath);
   process.exit(1);
 }
 if (responses.length === 0) {
-  console.error("No responses found in", responsesPath);
+  output.error("No responses found in", responsesPath);
   process.exit(1);
 }
 
@@ -114,14 +115,14 @@ async function seed() {
 
 seed()
   .then((result) => {
-    console.log(
+    output(
       `Seed complete: ${result.triggers} triggers, ${result.responses} responses, ${result.links} trigger_response links.`,
     );
     pool.end();
     process.exit(0);
   })
   .catch((err) => {
-    console.error(err);
+    output.error(err);
     pool.end();
     process.exit(1);
   });

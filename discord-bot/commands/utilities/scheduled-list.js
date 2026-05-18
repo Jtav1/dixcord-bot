@@ -1,5 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { getUpcomingScheduledMessagesForUser } from "../../api/scheduledMessages.js";
+import { output } from "../../utils/output.js";
 
 const cmdName = "scheduled-list";
 
@@ -31,7 +32,7 @@ const execute = async (interaction) => {
       flags: MessageFlags.Ephemeral,
     });
   } catch (err) {
-    console.log("scheduled-list command failed:", err);
+    output("scheduled-list command failed:", err);
     await interaction.reply({
       content: "Failed to list scheduled reminders.",
       flags: MessageFlags.Ephemeral,

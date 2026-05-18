@@ -1,6 +1,7 @@
 import express from "express";
 import { authenticate } from "../middleware/auth.js";
 import * as pinQuips from "../services/pinQuips.js";
+import { output } from "../utils/output.js";
 
 const router = express.Router();
 
@@ -14,7 +15,7 @@ router.get("/", authenticate, async (req, res) => {
     const list = await pinQuips.getAll();
     res.json({ ok: true, pinQuips: list });
   } catch (err) {
-    console.error("GET /api/pin-quips error:", err);
+    output.error("GET /api/pin-quips error:", err);
     res.status(500).json({ ok: false, error: "Failed to list pin quips" });
   }
 });
@@ -34,7 +35,7 @@ router.get("/random", authenticate, async (req, res) => {
     }
     res.json({ ok: true, quip: row.quip, id: row.id });
   } catch (err) {
-    console.error("GET /api/pin-quips/random error:", err);
+    output.error("GET /api/pin-quips/random error:", err);
     res.status(500).json({ ok: false, error: "Failed to get random pin quip" });
   }
 });
@@ -56,7 +57,7 @@ router.get("/:id", authenticate, async (req, res) => {
     }
     res.json({ ok: true, ...row });
   } catch (err) {
-    console.error("GET /api/pin-quips/:id error:", err);
+    output.error("GET /api/pin-quips/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to get pin quip" });
   }
 });
@@ -89,7 +90,7 @@ router.post("/", authenticate, async (req, res) => {
     const row = await pinQuips.getById(id);
     res.status(201).json({ ok: true, ...row });
   } catch (err) {
-    console.error("POST /api/pin-quips error:", err);
+    output.error("POST /api/pin-quips error:", err);
     res.status(500).json({ ok: false, error: "Failed to create pin quip" });
   }
 });
@@ -120,7 +121,7 @@ router.put("/:id", authenticate, async (req, res) => {
     const row = await pinQuips.getById(id);
     res.json({ ok: true, ...row });
   } catch (err) {
-    console.error("PUT /api/pin-quips/:id error:", err);
+    output.error("PUT /api/pin-quips/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to update pin quip" });
   }
 });
@@ -142,7 +143,7 @@ router.delete("/:id", authenticate, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error("DELETE /api/pin-quips/:id error:", err);
+    output.error("DELETE /api/pin-quips/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to delete pin quip" });
   }
 });

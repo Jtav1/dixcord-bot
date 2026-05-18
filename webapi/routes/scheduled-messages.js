@@ -14,6 +14,7 @@ import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
 } from "../utils/chatAppHttp.js";
+import { output } from "../utils/output.js";
 
 const router = express.Router();
 
@@ -66,7 +67,7 @@ router.get("/", authenticate, async (req, res) => {
     );
     return res.json({ ok: true, scheduledMessages: rows });
   } catch (err) {
-    console.error("GET /api/scheduled-messages error:", err);
+    output.error("GET /api/scheduled-messages error:", err);
     return res
       .status(500)
       .json({ ok: false, error: "Failed to list scheduled messages" });
@@ -104,7 +105,7 @@ router.get("/:id", authenticate, async (req, res) => {
     }
     return res.json({ ok: true, scheduledMessage: row });
   } catch (err) {
-    console.error("GET /api/scheduled-messages/:id error:", err);
+    output.error("GET /api/scheduled-messages/:id error:", err);
     return res
       .status(500)
       .json({ ok: false, error: "Failed to get scheduled message" });
@@ -166,7 +167,7 @@ router.post("/", authenticate, async (req, res) => {
     const row = await getScheduledMessageById(requester.app, id);
     return res.status(201).json({ ok: true, scheduledMessage: row });
   } catch (err) {
-    console.error("POST /api/scheduled-messages error:", err);
+    output.error("POST /api/scheduled-messages error:", err);
     return res
       .status(500)
       .json({ ok: false, error: "Failed to create scheduled message" });
@@ -271,7 +272,7 @@ router.put("/:id", authenticate, async (req, res) => {
     const row = await getScheduledMessageById(requester.app, id);
     return res.json({ ok: true, scheduledMessage: row });
   } catch (err) {
-    console.error("PUT /api/scheduled-messages/:id error:", err);
+    output.error("PUT /api/scheduled-messages/:id error:", err);
     return res
       .status(500)
       .json({ ok: false, error: "Failed to update scheduled message" });
@@ -309,7 +310,7 @@ router.delete("/:id", authenticate, async (req, res) => {
     }
     return res.json({ ok: true });
   } catch (err) {
-    console.error("DELETE /api/scheduled-messages/:id error:", err);
+    output.error("DELETE /api/scheduled-messages/:id error:", err);
     return res
       .status(500)
       .json({ ok: false, error: "Failed to delete scheduled message" });
