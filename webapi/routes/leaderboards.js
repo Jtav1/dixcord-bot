@@ -1,12 +1,25 @@
 import express from "express";
 import { authenticate } from "../middleware/auth.js";
 import * as leaderboards from "../services/leaderboards.js";
+import { getEmojiStatsForUser } from "../services/events.js";
 import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
 } from "../utils/chatAppHttp.js";
 
 const router = express.Router();
+
+/**
+ * Parse optional from/to time range from body or query.
+ * @param {import('express').Request} req
+ * @returns {{ from?: string, to?: string }}
+ */
+function parseRangeFromRequest(req) {
+  return {
+    from: req.body?.from ?? req.query?.from,
+    to: req.body?.to ?? req.query?.to,
+  };
+}
 
 /**
  * POST /api/leaderboards/plusplus
@@ -19,11 +32,12 @@ router.post("/plusplus", authenticate, async (req, res) => {
     const app = resolveChatAppFromRequest(req);
     if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
     const limit = leaderboards.parseLimit(req.body?.limit, 5, 50);
+    const range = parseRangeFromRequest(req);
     const [top, bottom] = await Promise.all([
-      leaderboards.getPlusPlusTopScores(limit, app),
-      leaderboards.getPlusPlusBottomScores(limit, app),
+      leaderboards.getPlusPlusTopScores(limit, app, range),
+      leaderboards.getPlusPlusBottomScores(limit, app, range),
     ]);
-    res.json({ ok: true, app, limit, top, bottom });
+    res.json({ ok: true, app, limit, from: range.from ?? null, to: range.to ?? null, top, bottom });
   } catch (err) {
     console.error("POST /api/leaderboards/plusplus error:", err);
     res.status(500).json({ ok: false, error: "Failed to get plusplus leaderboard" });
@@ -124,8 +138,9 @@ router.post("/repost", authenticate, async (req, res) => {
     const app = resolveChatAppFromRequest(req);
     if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
     const limit = leaderboards.parseLimit(req.body?.limit, 5, 50);
-    const top = await leaderboards.getTopReposters(limit, app);
-    res.json({ ok: true, app, limit, top });
+    const range = parseRangeFromRequest(req);
+    const top = await leaderboards.getTopReposters(limit, app, range);
+    res.json({ ok: true, app, limit, from: range.from ?? null, to: range.to ?? null, top });
   } catch (err) {
     console.error("POST /api/leaderboards/repost error:", err);
     res.status(500).json({ ok: false, error: "Failed to get repost leaderboard" });
@@ -150,6 +165,25 @@ router.get("/repost/user/:userId", authenticate, async (req, res) => {
   } catch (err) {
     console.error("GET /api/leaderboards/repost/user/:userId error:", err);
     res.status(500).json({ ok: false, error: "Failed to get reposts for user" });
+  }
+});
+
+/**
+ * GET /api/leaderboards/emoji/user/:userId
+ * Per-user emoji usage stats.
+ * Query: app=discord required, limit optional
+ * Auth: required.
+ */
+router.get("/emoji/user/:userId", authenticate, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    const limit = leaderboards.parseLimit(req.query.limit, 50, 200);
+    const stats = await getEmojiStatsForUser(req.params.userId, app, limit);
+    res.json({ ok: true, app, userId: req.params.userId, stats });
+  } catch (err) {
+    console.error("GET /api/leaderboards/emoji/user/:userId error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get user emoji stats" });
   }
 });
 

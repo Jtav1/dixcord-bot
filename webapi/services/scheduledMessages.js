@@ -233,3 +233,61 @@ export async function deletePendingScheduledMessageByIdForUser(id, userId) {
   );
   return (result?.affectedRows ?? result?.changes ?? 0) > 0;
 }
+
+/**
+ * List scheduled messages for admin with optional status filter.
+ * @param {string} app - Chat app key.
+ * @param {"pending"|"sent"|"all"} [status="all"]
+ * @param {{ limit?: number, offset?: number }} [opts]
+ * @returns {Promise<{ rows: Array<ReturnType<typeof serializeScheduledMessageRow>>, total: number }>}
+ */
+export async function getScheduledMessagesForAdmin(app, status = "all", opts = {}) {
+  const cfg = getScheduledMessageAppConfig(app);
+  if (!cfg) return { rows: [], total: 0 };
+
+  const limit = Math.min(Math.max(1, opts.limit ?? 50), 200);
+  const offset = Math.max(0, opts.offset ?? 0);
+
+  const where = [" `" + cfg.channelIdColumn + "` IS NOT NULL"];
+  const params = [];
+
+  if (status === "pending" || status === "sent") {
+    where.push("status = ?");
+    params.push(status);
+  }
+
+  const whereClause = where.length ? ` WHERE ${where.join(" AND ")}` : "";
+
+  const [countRows] = await db.query(
+    `SELECT COUNT(*) AS total FROM scheduled_messages${whereClause}`,
+    params,
+  );
+  const total = Number(countRows?.[0]?.total ?? 0);
+
+  const [rows] = await db.query(
+    `SELECT * FROM scheduled_messages${whereClause}
+     ORDER BY scheduled_at DESC, id DESC
+     LIMIT ? OFFSET ?`,
+    [...params, limit, offset],
+  );
+
+  return {
+    rows: Array.isArray(rows)
+      ? rows.map((row) => serializeScheduledMessageRow(row, app))
+      : [],
+    total,
+  };
+}
+
+/**
+ * Delete a scheduled message by id (admin; any status).
+ * @param {number} id
+ * @returns {Promise<boolean>}
+ */
+export async function deleteScheduledMessageByIdAdmin(id) {
+  const [result] = await db.query(
+    "DELETE FROM scheduled_messages WHERE id = ?",
+    [id],
+  );
+  return (result?.affectedRows ?? result?.changes ?? 0) > 0;
+}

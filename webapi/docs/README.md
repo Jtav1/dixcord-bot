@@ -22,8 +22,10 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/message-processing/sticker-import` | ✓ | Sync server sticker list |
 | POST | `/api/message-processing/pin-check` | ✓ | Check if message already pinned (body: `{ messageId }`) |
 | POST | `/api/message-processing/pin-log` | ✓ | Log message as pinned (body: `{ messageId }`) |
-| GET | `/api/config` | ✓ | All configuration entries |
-| PUT | `/api/config` | ✓ | Update one config (body: `{ config, value }`) |
+| GET | `/api/config` | ✓ | All configuration entries (includes `entriesWithMeta`) |
+| POST | `/api/config` | admin | Create config key (body: `{ config, value }`) |
+| PUT | `/api/config` | admin | Update one config (body: `{ config, value }`) |
+| DELETE | `/api/config/:key` | admin | Delete config key |
 | GET | `/api/link-replacements` | ✓ | List all link replacements |
 | GET | `/api/link-replacements/:id` | ✓ | Get one link replacement |
 | POST | `/api/link-replacements` | ✓ | Create (body: `{ source_host, target_host }`) |
@@ -57,6 +59,32 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/leaderboards/emoji` | ✓ | Top emojis (body: `{ limit? }`) |
 | POST | `/api/leaderboards/repost` | ✓ | Top reposters (body: `{ limit? }`) |
 | GET | `/api/leaderboards/repost/user/:userId` | ✓ | Repost count for user |
+| GET | `/api/leaderboards/emoji/user/:userId?app=discord` | ✓ | Per-user emoji stats |
+| GET | `/api/eight-ball-responses` | admin | List eight-ball responses |
+| POST | `/api/eight-ball-responses` | admin | Create eight-ball response |
+| GET | `/api/user-mappings?app=discord` | admin | List user mappings |
+| GET | `/api/pin-history` | admin | Pin history log |
+| GET | `/api/system/status` | admin | System and bot status |
+| GET | `/api/system/cache-version` | ✓ | Cache version for bot polling |
+| POST | `/api/system/invalidate-cache` | admin | Bump cache version |
+| POST | `/api/system/heartbeat` | ✓ | Bot heartbeat |
+| GET | `/api/events/plusplus` | admin | Raw plusplus events |
+| GET | `/api/events/reposts` | admin | Raw repost events |
+| GET | `/api/audit-log` | admin | Audit log |
+| GET | `/api/scheduled-messages?scope=admin` | admin | All scheduled messages |
+
+See [admin-backend-api.md](admin-backend-api.md) for full admin route documentation.
+
+## Scheduled messages
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/scheduled-messages?app=discord&scope=bot` | ✓ | Pending rows for bot scheduler |
+| GET | `/api/scheduled-messages?app=discord&scope=admin&status=` | admin | Admin list (pending/sent/all) |
+| GET | `/api/scheduled-messages/:id` | ✓ | Get one (requester-owned) |
+| POST | `/api/scheduled-messages` | ✓ | Create scheduled message |
+| PUT | `/api/scheduled-messages/:id` | ✓ | User/bot/admin update |
+| DELETE | `/api/scheduled-messages/:id` | ✓ | User or admin delete |
 
 ## Response examples by route category
 
@@ -74,6 +102,7 @@ Example JSON responses for each API route category:
 | **Pin Quips** | [pin-quips-response-examples.md](pin-quips-response-examples.md) | List, random, CRUD |
 | **Trigger-Responses** | [trigger-responses-response-examples.md](trigger-responses-response-examples.md) | Triggers, responses, links, random |
 | **Leaderboards** | [leaderboards-response-examples.md](leaderboards-response-examples.md) | Plusplus, emoji, repost |
+| **Admin backend** | [admin-backend-api.md](admin-backend-api.md) | New admin-panel backend routes |
 
 ## Request examples (cURL)
 

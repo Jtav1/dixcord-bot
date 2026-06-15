@@ -1,9 +1,7 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import * as api from "../../api/client.js";
 import { sendPinAlert } from "../../events/messages/utilities/messagePinner.js";
-
-/** Discord role IDs allowed to use this command (fill with real IDs). */
-const ALLOWED_ROLE_IDS = ["612842488302141441"];
+import { getPinMessageRoleIds } from "../../configStore.js";
 
 // Guild slash commands: after changing command definitions, run from discord-bot:
 //   node deploy-commands.js
@@ -33,7 +31,11 @@ const execute = async (interaction) => {
   }
 
   const member = await interaction.guild.members.fetch(interaction.user.id);
-  if (!ALLOWED_ROLE_IDS.some((id) => member.roles.cache.has(id))) {
+  const allowedRoleIds = getPinMessageRoleIds();
+  if (
+    allowedRoleIds.length > 0 &&
+    !allowedRoleIds.some((id) => member.roles.cache.has(id))
+  ) {
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
       content: "You don't have permission to use this command.",

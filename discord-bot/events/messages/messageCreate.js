@@ -4,49 +4,40 @@ import {
   getLinkFixerResponse,
   getFortuneResponse,
 } from "../../api/responses.js";
-import {
-  getTriggersList,
-  getRandomResponseForTrigger,
-} from "../../api/triggerResponses.js";
-import { getLinkReplacementSourceHosts } from "../../api/linkReplacements.js";
+import { getRandomResponseForTrigger } from "../../api/triggerResponses.js";
 import { createScheduledMessage } from "../../api/scheduledMessages.js";
 import { refreshScheduledMessagesCache } from "../../scheduler/messageScheduler.js";
 import { parseReminderMessage } from "./utilities/scheduleParser.js";
-import { MessageFlags } from "discord.js";
+import {
+  getCachedLinkHosts,
+  getCachedTriggers,
+  refreshContentCaches,
+} from "../../api/cacheRefresh.js";
 
-//******* UTILITIES FUNCTIONS ********//;
 import { emojiDetector } from "./utilities/emojiDetector.js";
 import { plusMinusMsg } from "./utilities/plusplus.js";
 
 const name = "messageCreate";
 
-/** Cached triggers (with selection_mode) from API; loaded on first message. */
-let cachedTriggers = null;
-
-/** Cached link-replacement source hosts from API; loaded on first message. */
-let cachedLinkHosts = null;
-
 const execute = async (message) => {
-  //******* INCOMING MESSAGE PROCESSING *******//
   let response = "";
 
   if (!message.author.bot && !(message.author.id === clientId)) {
-    // check every message for emojis
     await emojiDetector(message);
     await plusMinusMsg(message);
 
-    // Strip incoming message for comparison
     const contentStripped = message.content
       .toLowerCase()
       .replace(/[^a-zA-Z0-9!]/g, "");
 
-    // If there's a link to fix, do that (using source hosts from DB)
-    if (cachedLinkHosts === null) {
-      cachedLinkHosts = await getLinkReplacementSourceHosts();
+    let linkHosts = getCachedLinkHosts();
+    if (linkHosts === null) {
+      await refreshContentCaches();
+      linkHosts = getCachedLinkHosts() ?? [];
     }
     const twitCheck = message.content.split(" ").filter((word) => {
       const tmpWord = word.replace(/[<>]/g, "");
-      return cachedLinkHosts.some((host) => tmpWord.includes(host));
+      return linkHosts.some((host) => tmpWord.includes(host));
     });
 
     if (twitCheck.length > 0) {
@@ -56,18 +47,17 @@ const execute = async (message) => {
       }
     }
 
-    // Then, if message matches a trigger from the DB, get a random response for it
-    if (cachedTriggers === null) {
-      cachedTriggers = await getTriggersList();
+    let triggers = getCachedTriggers();
+    if (triggers === null) {
+      await refreshContentCaches();
+      triggers = getCachedTriggers() ?? [];
     }
-    const matchedTrigger = cachedTriggers.find((t) =>
+    const matchedTrigger = triggers.find((t) =>
       contentStripped.includes(t.trigger_string),
     );
     if (matchedTrigger) {
       response = await getRandomResponseForTrigger(matchedTrigger);
     }
-
-    // If no response yet, check for fortune teller (mention + ?) and scheduled message (mention + remind me)
 
     if (message.content.startsWith(`<@${clientId}>`)) {
       if (message.content.toLowerCase().includes("remind me")) {
@@ -88,13 +78,6 @@ const execute = async (message) => {
           return;
         } else if (parsedReminder.ok === true) {
           try {
-            console.log({
-              requesterUserId: message.author.id,
-              chatChannelId: message.channelId,
-              chatGuildId: message.guildId,
-              messageBody: parsedReminder.messageContent,
-              scheduledAtUtcIso: parsedReminder.scheduledAt,
-            });
             const created = await createScheduledMessage({
               requesterUserId: message.author.id,
               chatChannelId: message.channelId,
@@ -120,7 +103,6 @@ const execute = async (message) => {
       }
     }
 
-    // if a reply was generated, send it
     if (response.length > 0) {
       message.reply(response);
     }

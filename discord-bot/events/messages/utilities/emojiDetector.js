@@ -1,18 +1,8 @@
 import { parseEmoji } from "discord.js";
 
 import { countEmoji } from "../../../api/emojis.js";
-import { getAllConfigurations } from "../../../api/configurations.js";
+import { getMinusEmoji, getPlusEmoji } from "../../../configStore.js";
 import { doplus, dominus } from "./plusplus.js";
-
-const configs = await getAllConfigurations();
-
-const plusEmoji = configs.filter(
-  (config_entry) => config_entry.config === "plusplus_emoji",
-)[0].value;
-
-const minusEmoji = configs.filter(
-  (config_entry) => config_entry.config === "minusminus_emoji",
-)[0].value;
 
 // emojiDetector
 //  logs instances of each emojis in the message
@@ -30,6 +20,8 @@ export const emojiDetector = async (rawMessage) => {
     let messageType = rawMessage.reference ? "reply" : "msg";
 
     let doPlusMinus = false;
+    const plusEmoji = getPlusEmoji();
+    const minusEmoji = getMinusEmoji();
     const plusEmojiCount = mapEmoAry.filter((emo) => emo.id === plusEmoji).length;
     const minusEmojiCount = mapEmoAry.filter( (emo) => emo.id === minusEmoji).length;
 
