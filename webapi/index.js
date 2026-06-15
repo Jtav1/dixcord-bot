@@ -207,9 +207,11 @@ app.get("/", publicLimiter, (req, res) => {
       },
       eightBallResponses: {
         authRequired: true,
-        adminRoutes: [
+        routes: [
           "GET /api/eight-ball-responses",
           "GET /api/eight-ball-responses/:id",
+        ],
+        adminRoutes: [
           "POST /api/eight-ball-responses",
           "PUT /api/eight-ball-responses/:id",
           "DELETE /api/eight-ball-responses/:id",
@@ -217,9 +219,11 @@ app.get("/", publicLimiter, (req, res) => {
       },
       userMappings: {
         authRequired: true,
-        adminRoutes: [
+        routes: [
           "GET /api/user-mappings?app=discord",
           "GET /api/user-mappings/:id?app=discord",
+        ],
+        adminRoutes: [
           "POST /api/user-mappings",
           "PUT /api/user-mappings/:id",
           "DELETE /api/user-mappings/:id?app=discord",
@@ -227,7 +231,7 @@ app.get("/", publicLimiter, (req, res) => {
       },
       pinHistory: {
         authRequired: true,
-        adminRoutes: ["GET /api/pin-history?limit=&offset="],
+        routes: ["GET /api/pin-history?limit=&offset="],
       },
       system: {
         authRequired: true,
@@ -240,11 +244,11 @@ app.get("/", publicLimiter, (req, res) => {
       },
       events: {
         authRequired: true,
-        adminRoutes: [
+        routes: [
           "GET /api/events/plusplus?app=discord&from=&to=",
           "GET /api/events/reposts?app=discord&userId=",
-          "GET /api/events/stickers",
         ],
+        adminRoutes: ["GET /api/events/stickers"],
       },
       auditLog: {
         authRequired: true,

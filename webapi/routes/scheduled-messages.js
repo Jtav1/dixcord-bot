@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate, requireAdmin } from "../middleware/auth.js";
+import { authenticate, isAdminRole } from "../middleware/auth.js";
 import {
   getScheduledMessageById,
   createScheduledMessage,
@@ -58,7 +58,7 @@ router.get("/", authenticate, async (req, res) => {
     }
 
     if (req.query?.scope === "admin") {
-      if (req.user?.role !== "admin") {
+      if (!isAdminRole(req.user?.role)) {
         return res.status(403).json({ ok: false, error: "Admin access required" });
       }
       const status = req.query.status ?? "all";
@@ -245,7 +245,7 @@ router.put("/:id", authenticate, async (req, res) => {
 
     // Admin scope update.
     if (req.body?.scope === "admin") {
-      if (req.user?.role !== "admin") {
+      if (!isAdminRole(req.user?.role)) {
         return res.status(403).json({ ok: false, error: "Admin access required" });
       }
       const updates = {};
@@ -353,7 +353,7 @@ router.delete("/:id", authenticate, async (req, res) => {
       return res.status(400).json({ ok: false, error: "Invalid id" });
 
     if (req.body?.scope === "admin" || req.query?.scope === "admin") {
-      if (req.user?.role !== "admin") {
+      if (!isAdminRole(req.user?.role)) {
         return res.status(403).json({ ok: false, error: "Admin access required" });
       }
       const deleted = await deleteScheduledMessageByIdAdmin(id);

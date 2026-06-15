@@ -1,26 +1,26 @@
 # Admin Backend API Routes
 
-Routes added for admin panel backend preparation. Unless noted, **admin role required** (bot service account receives 403).
+Routes added for admin panel backend preparation. **Write** routes require admin role unless noted; **read** routes require any authenticated account (`admin` or `bot`).
 
 ## Eight-ball responses
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/eight-ball-responses` | List all fortune responses |
-| GET | `/api/eight-ball-responses/:id` | Get one |
-| POST | `/api/eight-ball-responses` | Create `{ response_string, sentiment }` |
-| PUT | `/api/eight-ball-responses/:id` | Update |
-| DELETE | `/api/eight-ball-responses/:id` | Delete |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/eight-ball-responses` | admin or bot | List all fortune responses |
+| GET | `/api/eight-ball-responses/:id` | admin or bot | Get one |
+| POST | `/api/eight-ball-responses` | admin | Create `{ response_string, sentiment }` |
+| PUT | `/api/eight-ball-responses/:id` | admin | Update |
+| DELETE | `/api/eight-ball-responses/:id` | admin | Delete |
 
 ## User mappings
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/user-mappings?app=discord&limit=&offset=&search=` | Paginated list |
-| GET | `/api/user-mappings/:id?app=discord` | Get one |
-| POST | `/api/user-mappings` | Create `{ app, name, handle, platformUserId }` |
-| PUT | `/api/user-mappings/:id` | Update |
-| DELETE | `/api/user-mappings/:id?app=discord` | Delete |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/user-mappings?app=discord&limit=&offset=&search=` | admin or bot | Paginated list |
+| GET | `/api/user-mappings/:id?app=discord` | admin or bot | Get one |
+| POST | `/api/user-mappings` | admin | Create `{ app, name, handle, platformUserId }` |
+| PUT | `/api/user-mappings/:id` | admin | Update |
+| DELETE | `/api/user-mappings/:id?app=discord` | admin | Delete |
 
 ## Config (extended)
 
@@ -33,9 +33,9 @@ Routes added for admin panel backend preparation. Unless noted, **admin role req
 
 ## Pin history
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/pin-history?limit=&offset=` | Paginated pin log |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/pin-history?limit=&offset=` | admin or bot | Paginated pin log |
 
 ## System
 
@@ -56,11 +56,11 @@ Routes added for admin panel backend preparation. Unless noted, **admin role req
 
 ## Events (analytics)
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/events/plusplus?app=discord&from=&to=&limit=&offset=` | Raw plusplus events |
-| GET | `/api/events/reposts?app=discord&userId=&from=&to=` | Raw repost events |
-| GET | `/api/events/stickers?limit=` | Sticker catalog |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/events/plusplus?app=discord&from=&to=&limit=&offset=` | admin or bot | Raw plusplus events |
+| GET | `/api/events/reposts?app=discord&userId=&from=&to=` | admin or bot | Raw repost events |
+| GET | `/api/events/stickers?limit=` | admin | Sticker catalog |
 
 ## Leaderboards (extended)
 

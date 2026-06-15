@@ -19,9 +19,9 @@ const router = express.Router();
  * GET /api/user-mappings
  * List user mappings with pagination.
  * Query: ?app=discord&limit=&offset=&search=
- * Auth: admin required.
+ * Auth: required (admin or bot).
  */
-router.get("/", authenticate, requireAdmin, async (req, res) => {
+router.get("/", authenticate, async (req, res) => {
   try {
     const app = resolveChatAppFromRequest(req);
     if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
@@ -42,9 +42,9 @@ router.get("/", authenticate, requireAdmin, async (req, res) => {
  * GET /api/user-mappings/:id
  * Get one user mapping by id.
  * Query: ?app=discord
- * Auth: admin required.
+ * Auth: required (admin or bot).
  */
-router.get("/:id", authenticate, requireAdmin, async (req, res) => {
+router.get("/:id", authenticate, async (req, res) => {
   try {
     const app = resolveChatAppFromRequest(req);
     if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);

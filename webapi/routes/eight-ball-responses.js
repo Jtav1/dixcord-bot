@@ -8,9 +8,9 @@ const router = express.Router();
 /**
  * GET /api/eight-ball-responses
  * List all eight-ball responses.
- * Auth: admin required.
+ * Auth: required (admin or bot).
  */
-router.get("/", authenticate, requireAdmin, async (req, res) => {
+router.get("/", authenticate, async (req, res) => {
   try {
     const list = await eightBall.getAll();
     res.json({ ok: true, eightBallResponses: list });
@@ -25,9 +25,9 @@ router.get("/", authenticate, requireAdmin, async (req, res) => {
 /**
  * GET /api/eight-ball-responses/:id
  * Get one eight-ball response by id.
- * Auth: admin required.
+ * Auth: required (admin or bot).
  */
-router.get("/:id", authenticate, requireAdmin, async (req, res) => {
+router.get("/:id", authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {

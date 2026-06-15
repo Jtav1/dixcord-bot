@@ -1,7 +1,7 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import db from "../config/db.js";
-import { signToken, normalizeUserRole } from "../middleware/auth.js";
+import { signToken } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -60,7 +60,10 @@ router.post("/login", async (req, res) => {
         .json({ ok: false, error: "Invalid email or password" });
     }
 
-    const role = normalizeUserRole(user.role);
+    const role =
+      user.role != null && String(user.role).trim() !== ""
+        ? String(user.role).trim()
+        : null;
     const token = signToken(user.id, role);
     delete user.password_hash;
     res.json({

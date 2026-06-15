@@ -10,9 +10,25 @@ if (!process.env.JWT_SECRET || String(process.env.JWT_SECRET).trim() === "") {
 const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
- * Load user row and attach role. Falls back to "NO_ROLE" for legacy rows without role.
+ * @param {unknown} role
+ * @returns {boolean} True when role is admin or bot (null/unknown roles are false).
+ */
+export function isAllowedAuthenticatedRole(role) {
+  return role === "admin" || role === "bot";
+}
+
+/**
+ * @param {unknown} role
+ * @returns {boolean} True only when role is exactly admin.
+ */
+export function isAdminRole(role) {
+  return role === "admin";
+}
+
+/**
+ * Load user row and attach role. Empty DB role values remain null.
  * @param {number|string} userId
- * @returns {Promise<{ id: number, email: string, name: string, created_at: string, role: string }|null>}
+ * @returns {Promise<{ id: number, email: string, name: string, created_at: string, role: string|null }|null>}
  */
 async function loadUserWithRole(userId) {
   const [rows] = await db.query(
@@ -23,7 +39,10 @@ async function loadUserWithRole(userId) {
   const user = rows[0];
   return {
     ...user,
-    role: user.role ?? "NO_ROLE",
+    role:
+      user.role != null && String(user.role).trim() !== ""
+        ? String(user.role).trim()
+        : null,
   };
 }
 
@@ -47,8 +66,7 @@ export async function authenticate(req, res, next) {
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
-    const allowedRoles = new Set(["admin", "bot"]);
-    if (!allowedRoles.has(user.role)) {
+    if (!isAllowedAuthenticatedRole(user.role)) {
       return res.status(403).json({ error: "Forbidden: invalid account role" });
     }
     req.user = user;
@@ -68,7 +86,7 @@ export async function authenticate(req, res, next) {
  * @param {import('express').NextFunction} next
  */
 export function requireAdmin(req, res, next) {
-  if (req.user?.role !== "admin") {
+  if (!isAdminRole(req.user?.role)) {
     return res.status(403).json({ error: "Admin access required" });
   }
   next();
@@ -97,10 +115,10 @@ export async function optionalAuth(req, res, next) {
 /**
  * Sign a JWT for the given user id and role.
  * @param {number|string} userId
- * @param {string} [role='admin']
+ * @param {string|null} [role=null]
  * @returns {string}
  */
-export function signToken(userId, role = "admin") {
+export function signToken(userId, role = null) {
   return jwt.sign({ userId, role }, JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   });

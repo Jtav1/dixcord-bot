@@ -13,9 +13,9 @@ const router = express.Router();
  * GET /api/events/plusplus
  * Raw plusplus tracking events.
  * Query: ?app=discord&from=&to=&limit=&offset=
- * Auth: admin required.
+ * Auth: required (admin or bot).
  */
-router.get("/plusplus", authenticate, requireAdmin, async (req, res) => {
+router.get("/plusplus", authenticate, async (req, res) => {
   try {
     const app = resolveChatAppFromRequest(req) ?? "discord";
     const { events, total } = await listPlusplusEvents({
@@ -38,9 +38,9 @@ router.get("/plusplus", authenticate, requireAdmin, async (req, res) => {
  * GET /api/events/reposts
  * Raw repost tracking events.
  * Query: ?app=discord&userId=&from=&to=&limit=&offset=
- * Auth: admin required.
+ * Auth: required (admin or bot).
  */
-router.get("/reposts", authenticate, requireAdmin, async (req, res) => {
+router.get("/reposts", authenticate, async (req, res) => {
   try {
     const app = resolveChatAppFromRequest(req) ?? "discord";
     const { events, total } = await listRepostEvents({

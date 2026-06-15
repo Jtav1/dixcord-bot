@@ -60,16 +60,17 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/leaderboards/repost` | ✓ | Top reposters (body: `{ limit? }`) |
 | GET | `/api/leaderboards/repost/user/:userId` | ✓ | Repost count for user |
 | GET | `/api/leaderboards/emoji/user/:userId?app=discord` | ✓ | Per-user emoji stats |
-| GET | `/api/eight-ball-responses` | admin | List eight-ball responses |
+| GET | `/api/eight-ball-responses` | ✓ | List eight-ball responses |
 | POST | `/api/eight-ball-responses` | admin | Create eight-ball response |
-| GET | `/api/user-mappings?app=discord` | admin | List user mappings |
-| GET | `/api/pin-history` | admin | Pin history log |
+| GET | `/api/user-mappings?app=discord` | ✓ | List user mappings |
+| GET | `/api/pin-history` | ✓ | Pin history log |
 | GET | `/api/system/status` | admin | System and bot status |
 | GET | `/api/system/cache-version` | ✓ | Cache version for bot polling |
 | POST | `/api/system/invalidate-cache` | admin | Bump cache version |
 | POST | `/api/system/heartbeat` | ✓ | Bot heartbeat |
-| GET | `/api/events/plusplus` | admin | Raw plusplus events |
-| GET | `/api/events/reposts` | admin | Raw repost events |
+| GET | `/api/events/plusplus` | ✓ | Raw plusplus events |
+| GET | `/api/events/reposts` | ✓ | Raw repost events |
+| GET | `/api/audit-log` | admin | Audit log |
 | GET | `/api/audit-log` | admin | Audit log |
 | GET | `/api/scheduled-messages?scope=admin` | admin | All scheduled messages |
 
