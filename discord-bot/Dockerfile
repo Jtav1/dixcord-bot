@@ -5,14 +5,8 @@ WORKDIR /usr/src/app
 COPY package.json package-lock.json* ./
 RUN npm ci
 
-# Application code
-COPY ./api ./api
-COPY ./commands ./commands
-COPY ./events ./events
-COPY ./scheduler ./scheduler
-COPY ./scripts ./scripts
-COPY ./delete-all-commands.js ./deploy-commands.js ./
-COPY ./configVars.js ./bot.js ./
+# Application code (everything not excluded by .dockerignore)
+COPY . .
 
 CMD ["node", "./scripts/start.js"]
 # CMD ["sh", "-c", "node ./delete-all-commands.js && node ./deploy-commands.js && node ./bot.js"]
