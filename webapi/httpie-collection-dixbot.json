@@ -1828,6 +1828,1228 @@
             "variables": ""
           }
         }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/config",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"config\": \"new_config_key\",\n  \"value\": \"some value\"\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/config/:key",
+        "method": "DELETE",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "key",
+            "value": "new_config_key",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/leaderboards/emoji/user/:userId",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          },
+          {
+            "name": "limit",
+            "value": "50",
+            "enabled": true
+          }
+        ],
+        "pathParams": [
+          {
+            "name": "userId",
+            "value": "164208106291724298",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/scheduled-messages",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          },
+          {
+            "name": "requesterUserId",
+            "value": "164208106291724298",
+            "enabled": true
+          }
+        ],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/scheduled-messages",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          },
+          {
+            "name": "scope",
+            "value": "bot",
+            "enabled": true
+          }
+        ],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/scheduled-messages",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          },
+          {
+            "name": "scope",
+            "value": "admin",
+            "enabled": true
+          },
+          {
+            "name": "status",
+            "value": "all",
+            "enabled": true
+          },
+          {
+            "name": "limit",
+            "value": "50",
+            "enabled": true
+          },
+          {
+            "name": "offset",
+            "value": "0",
+            "enabled": true
+          }
+        ],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/scheduled-messages/:id",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          },
+          {
+            "name": "requesterUserId",
+            "value": "164208106291724298",
+            "enabled": true
+          }
+        ],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/scheduled-messages",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"app\": \"discord\",\n  \"requesterUserId\": \"164208106291724298\",\n  \"chat_channel_id\": \"123456789012345678\",\n  \"chat_guild_id\": \"987654321098765432\",\n  \"message_body\": \"Scheduled hello!\",\n  \"scheduled_at\": \"2026-12-31T23:59:00Z\"\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/scheduled-messages/:id",
+        "method": "PUT",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"app\": \"discord\",\n  \"requesterUserId\": \"164208106291724298\",\n  \"message_body\": \"Updated scheduled message\",\n  \"scheduled_at\": \"2027-01-01T12:00:00Z\"\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/scheduled-messages/:id",
+        "method": "PUT",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"scope\": \"bot\",\n  \"status\": \"sent\"\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/scheduled-messages/:id",
+        "method": "PUT",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"scope\": \"admin\",\n  \"app\": \"discord\",\n  \"message_body\": \"Admin-edited message\",\n  \"scheduled_at\": \"2027-02-01T08:30:00Z\"\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/scheduled-messages/:id",
+        "method": "DELETE",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          },
+          {
+            "name": "requesterUserId",
+            "value": "164208106291724298",
+            "enabled": true
+          }
+        ],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/scheduled-messages/:id",
+        "method": "DELETE",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "scope",
+            "value": "admin",
+            "enabled": true
+          },
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          }
+        ],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/eight-ball-responses",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/eight-ball-responses/:id",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/eight-ball-responses",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"response_string\": \"It is certain.\",\n  \"sentiment\": \"positive\"\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/eight-ball-responses/:id",
+        "method": "PUT",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"response_string\": \"Reply hazy, try again.\",\n  \"sentiment\": \"neutral\"\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/eight-ball-responses/:id",
+        "method": "DELETE",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/user-mappings",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          },
+          {
+            "name": "limit",
+            "value": "50",
+            "enabled": true
+          },
+          {
+            "name": "offset",
+            "value": "0",
+            "enabled": true
+          },
+          {
+            "name": "search",
+            "value": "",
+            "enabled": false
+          }
+        ],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/user-mappings/:id",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          }
+        ],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/user-mappings",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"app\": \"discord\",\n  \"name\": \"Display Name\",\n  \"handle\": \"discord_handle\",\n  \"platformUserId\": \"164208106291724298\"\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/user-mappings/:id",
+        "method": "PUT",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"app\": \"discord\",\n  \"name\": \"Updated Name\",\n  \"handle\": \"updated_handle\",\n  \"platformUserId\": \"164208106291724298\"\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/user-mappings/:id",
+        "method": "DELETE",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          }
+        ],
+        "pathParams": [
+          {
+            "name": "id",
+            "value": "1",
+            "enabled": true
+          }
+        ],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/pin-history",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "limit",
+            "value": "50",
+            "enabled": true
+          },
+          {
+            "name": "offset",
+            "value": "0",
+            "enabled": true
+          }
+        ],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/system/status",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/system/cache-version",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/system/invalidate-cache",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/system/heartbeat",
+        "method": "POST",
+        "headers": [],
+        "queryParams": [],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "text",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "{\n  \"guildId\": \"987654321098765432\",\n  \"version\": \"2.2.0\",\n  \"lastReadyAt\": \"2026-06-29T12:00:00Z\"\n}",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/events/plusplus",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          },
+          {
+            "name": "from",
+            "value": "",
+            "enabled": false
+          },
+          {
+            "name": "to",
+            "value": "",
+            "enabled": false
+          },
+          {
+            "name": "limit",
+            "value": "50",
+            "enabled": true
+          },
+          {
+            "name": "offset",
+            "value": "0",
+            "enabled": true
+          }
+        ],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/events/reposts",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "app",
+            "value": "discord",
+            "enabled": true
+          },
+          {
+            "name": "userId",
+            "value": "",
+            "enabled": false
+          },
+          {
+            "name": "from",
+            "value": "",
+            "enabled": false
+          },
+          {
+            "name": "to",
+            "value": "",
+            "enabled": false
+          },
+          {
+            "name": "limit",
+            "value": "50",
+            "enabled": true
+          },
+          {
+            "name": "offset",
+            "value": "0",
+            "enabled": true
+          }
+        ],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/events/stickers",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "limit",
+            "value": "50",
+            "enabled": true
+          }
+        ],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
+      },
+      {
+        "name": "",
+        "url": "{{devUrl}}/api/audit-log",
+        "method": "GET",
+        "headers": [],
+        "queryParams": [
+          {
+            "name": "limit",
+            "value": "50",
+            "enabled": true
+          },
+          {
+            "name": "offset",
+            "value": "0",
+            "enabled": true
+          }
+        ],
+        "pathParams": [],
+        "auth": {
+          "type": "inherited"
+        },
+        "body": {
+          "type": "none",
+          "file": {
+            "name": ""
+          },
+          "text": {
+            "value": "",
+            "format": "application/json"
+          },
+          "form": {
+            "isMultipart": false,
+            "fields": []
+          },
+          "graphql": {
+            "query": "",
+            "variables": ""
+          }
+        }
       }
     ]
   }

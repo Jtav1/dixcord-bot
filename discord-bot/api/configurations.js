@@ -14,13 +14,24 @@ export const getAllConfigurations = async () => {
 };
 
 /**
- * Add configuration. Not supported by the web API (read-only config endpoint).
- * @throws {Error}
+ * Add configuration via POST /api/config.
+ * @param {string} config - Configuration item name
+ * @param {string} value - Value
+ * @returns {Promise<void>}
  */
-export const addConfiguration = async () => {
-  throw new Error(
-    "addConfiguration is not supported when using the web API (config is read-only)",
-  );
+export const addConfiguration = async (config, value) => {
+  try {
+    const { data } = await api.post("/api/config", {
+      config,
+      value: value ?? "",
+    });
+    if (!data?.ok) {
+      throw new Error(data?.error || "Failed to create configuration");
+    }
+  } catch (err) {
+    const message = err.response?.data?.error || err.message;
+    throw new Error(message);
+  }
 };
 
 /**

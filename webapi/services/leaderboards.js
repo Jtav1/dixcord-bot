@@ -25,6 +25,42 @@ export function parseLimit(value, defaultN = 5, max = 50) {
   return Math.min(Math.max(1, Number.isNaN(n) ? defaultN : n), max);
 }
 
+/**
+ * Parse optional ISO datetime to SQL datetime string for WHERE clauses.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+export function parseTimeFilter(value) {
+  if (value == null || value === "") return null;
+  const d = new Date(String(value));
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 19).replace("T", " ");
+}
+
+/**
+ * Build SQL time-range clause for plusplus_tracking.
+ * @param {{ from?: unknown, to?: unknown }} range
+ * @returns {{ clause: string, params: Array<string> }}
+ */
+function buildPlusplusTimeClause(range = {}) {
+  const parts = [];
+  const params = [];
+  const from = parseTimeFilter(range.from);
+  const to = parseTimeFilter(range.to);
+  if (from) {
+    parts.push("pt.timestamp >= ?");
+    params.push(from);
+  }
+  if (to) {
+    parts.push("pt.timestamp <= ?");
+    params.push(to);
+  }
+  return {
+    clause: parts.length ? ` AND ${parts.join(" AND ")}` : "",
+    params,
+  };
+}
+
 // --- Plusplus (plusplus_tracking) ---
 
 /**
@@ -32,9 +68,10 @@ export function parseLimit(value, defaultN = 5, max = 50) {
  * @param {string} app - e.g. "discord"
  * @returns {Promise<Array<{ string: string, typestr: string, total: number }>>}
  */
-async function aggregatePlusPlusLeaderboard(app) {
+async function aggregatePlusPlusLeaderboard(app, range = {}) {
   if (!isChatMemberAppSupported(app)) return [];
   const idCol = getChatMemberIdColumn(app);
+  const { clause, params } = buildPlusplusTimeClause(range);
 
   let [results] = await db.query(
     `SELECT
@@ -49,11 +86,13 @@ async function aggregatePlusPlusLeaderboard(app) {
             ELSE pt.string
         END AS string
       FROM plusplus_tracking pt
+      WHERE 1=1${clause}
       GROUP BY pt.string, pt.type
       ORDER BY total DESC`,
+    params,
   );
 
-  return [...results]; // Isnt't this so much fkn easier???
+  return [...results];
 }
 
 /**
@@ -61,9 +100,9 @@ async function aggregatePlusPlusLeaderboard(app) {
  * @param {string} app - chat app id (e.g. "discord")
  * @returns {Promise<Array<{ string, typestr, total }>>}
  */
-export async function getPlusPlusTopScores(limit, app) {
+export async function getPlusPlusTopScores(limit, app, range = {}) {
   const n = parseLimit(limit, 5, 50);
-  const aggregated = await aggregatePlusPlusLeaderboard(app);
+  const aggregated = await aggregatePlusPlusLeaderboard(app, range);
   aggregated.sort((a, b) => b.total - a.total);
   return aggregated.slice(0, n);
 }
@@ -73,10 +112,9 @@ export async function getPlusPlusTopScores(limit, app) {
  * @param {string} app - chat app id (e.g. "discord")
  * @returns {Promise<Array<{ string, typestr, total }>>}
  */
-export async function getPlusPlusBottomScores(limit, app) {
+export async function getPlusPlusBottomScores(limit, app, range = {}) {
   const n = parseLimit(limit, 5, 50);
-  const aggregated = await aggregatePlusPlusLeaderboard(app);
-  // aggregated is already ordered by value (highest first), so take the last n elements for bottom scores
+  const aggregated = await aggregatePlusPlusLeaderboard(app, range);
   return aggregated.slice(-n);
 }
 
@@ -173,18 +211,33 @@ export async function getTopEmoji(limit) {
  * @param {string} app - e.g. "discord"
  * @returns {Promise<Array<{ userid: string, count: number }>>} userid is platform id from id column
  */
-export async function getTopReposters(limit, app) {
+export async function getTopReposters(limit, app, range = {}) {
   if (!isChatMemberAppSupported(app)) return [];
   const idCol = getChatMemberIdColumn(app);
   const n = parseLimit(limit, 5, 50);
+  const parts = [];
+  const params = [];
+  const from = parseTimeFilter(range.from);
+  const to = parseTimeFilter(range.to);
+  if (from) {
+    parts.push("r.timestamp >= ?");
+    params.push(from);
+  }
+  if (to) {
+    parts.push("r.timestamp <= ?");
+    params.push(to);
+  }
+  const where = parts.length ? ` WHERE ${parts.join(" AND ")}` : "";
+  params.push(n);
   const [rows] = await db.query(
     `SELECT cm.\`${idCol}\` AS userid, COUNT(*) AS count
      FROM user_repost_tracking r
      INNER JOIN chat_member_mapping cm ON r.userid = cm.id
+     ${where}
      GROUP BY cm.\`${idCol}\`, cm.id
      ORDER BY count DESC
      LIMIT ?`,
-    [n],
+    params,
   );
   return Array.isArray(rows) ? rows : [];
 }

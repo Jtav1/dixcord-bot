@@ -1,18 +1,6 @@
 import { EmbedBuilder } from "discord.js";
 import * as api from "../../../api/client.js";
-
-import { getAllConfigurations } from "../../../api/configurations.js";
-
-const configs = await getAllConfigurations();
-const filteredConfigs = configs.filter(
-  (config_entry) => config_entry.config === "pin_channel_id",
-);
-
-if (filteredConfigs.length === 0 || !filteredConfigs[0].value) {
-  throw new Error("pin_channel_id configuration not found or has empty value.");
-}
-
-const pinChannelId = filteredConfigs[0].value;
+import { getPinChannelId } from "../../../configStore.js";
 
 /**
  * Check whether a message was already logged as pinned.
@@ -78,7 +66,7 @@ async function logAndSendPinEmbed(message, client, pinnedByMentions) {
     pinEmbed.setImage(attachment.url);
   });
 
-  const channel = await client.channels.fetch(pinChannelId);
+  const channel = await client.channels.fetch(getPinChannelId());
   await channel.send({ embeds: [pinEmbed] });
 
   return true;

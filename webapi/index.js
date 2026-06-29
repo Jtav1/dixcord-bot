@@ -5,6 +5,7 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
 import db from "./config/db.js";
+import { ensureSchemaMigrations } from "./scripts/ensureSchema.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import botResponsesRoutes from "./routes/bot-responses.js";
@@ -15,12 +16,19 @@ import leaderboardsRoutes from "./routes/leaderboards.js";
 import pinQuipsRoutes from "./routes/pin-quips.js";
 import triggerResponsesRoutes from "./routes/trigger-responses.js";
 import scheduledMessagesRoutes from "./routes/scheduled-messages.js";
+import eightBallResponsesRoutes from "./routes/eight-ball-responses.js";
+import userMappingsRoutes from "./routes/user-mappings.js";
+import pinHistoryRoutes from "./routes/pin-history.js";
+import systemRoutes from "./routes/system.js";
+import eventsRoutes from "./routes/events.js";
+import auditLogRoutes from "./routes/audit-log.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const API_VERSION = "2.2.0";
 
 /**
- * Create or update the single admin user from ADMIN_USERNAME and ADMIN_PASSWORD.
+ * Create or update the admin user from ADMIN_USERNAME and ADMIN_PASSWORD.
  * @returns {Promise<void>}
  */
 async function ensureAdminUser() {
@@ -39,14 +47,14 @@ async function ensureAdminUser() {
     );
     const hash = await bcrypt.hash(password, 10);
     if (rows && rows.length > 0) {
-      await db.query("UPDATE users SET password_hash = ? WHERE email = ?", [
-        hash,
-        username,
-      ]);
+      await db.query(
+        "UPDATE users SET password_hash = ?, role = 'admin' WHERE email = ?",
+        [hash, username],
+      );
       console.log("Admin user password updated.");
     } else {
       await db.query(
-        "INSERT INTO users (email, password_hash, name) VALUES (?, ?, ?)",
+        "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'admin')",
         [username, hash, "Admin"],
       );
       console.log("Admin user created.");
@@ -57,13 +65,75 @@ async function ensureAdminUser() {
   }
 }
 
-// CORS: allow only frontend/admin origins (192.168.0.2 and Docker bridge 172.17.0.0/16)
-function isAllowedOrigin(origin) {
-  if (!origin) return true; // same-origin or non-browser
+/**
+ * Create or update the bot service account from BOT_USERNAME and BOT_PASSWORD.
+ * @returns {Promise<void>}
+ */
+async function ensureBotUser() {
+  const username = process.env.BOT_USERNAME;
+  const password = process.env.BOT_PASSWORD;
+  if (!username || !password) {
+    console.warn(
+      "BOT_USERNAME and BOT_PASSWORD not set; bot service account not created.",
+    );
+    return;
+  }
   try {
-    const host = new URL(origin).hostname;
-    if (host === "192.168.0.2") return true;
-    if (host === "dixbot-discord") return true;
+    const [rows] = await db.query(
+      "SELECT id, password_hash FROM users WHERE email = ?",
+      [username],
+    );
+    const hash = await bcrypt.hash(password, 10);
+    if (rows && rows.length > 0) {
+      await db.query(
+        "UPDATE users SET password_hash = ?, role = 'bot' WHERE email = ?",
+        [hash, username],
+      );
+      console.log("Bot service account password updated.");
+    } else {
+      await db.query(
+        "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'bot')",
+        [username, hash, "Bot"],
+      );
+      console.log("Bot service account created.");
+    }
+  } catch (err) {
+    console.error("Failed to ensure bot user:", err);
+    throw err;
+  }
+}
+
+/**
+ * Parse CORS_ORIGINS env (comma-separated) or fall back to legacy defaults.
+ * @returns {Set<string>}
+ */
+function parseCorsOrigins() {
+  const envOrigins = process.env.CORS_ORIGINS;
+  if (envOrigins && envOrigins.trim()) {
+    return new Set(
+      envOrigins
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean),
+    );
+  }
+  return new Set(["192.168.0.2", "dixbot-discord"]);
+}
+
+const corsOrigins = parseCorsOrigins();
+
+/**
+ * Check whether an origin is allowed for CORS.
+ * @param {string|undefined} origin
+ * @returns {boolean}
+ */
+function isAllowedOrigin(origin) {
+  if (!origin) return true;
+  try {
+    const url = new URL(origin);
+    const host = url.hostname;
+    if (corsOrigins.has(host) || corsOrigins.has(origin)) return true;
+    if (corsOrigins.has("*")) return true;
     const m = host.match(/^172\.21\.(\d{1,3})\.(\d{1,3})$/);
     if (m) {
       const a = parseInt(m[1], 10);
@@ -75,6 +145,7 @@ function isAllowedOrigin(origin) {
     return false;
   }
 }
+
 app.use(helmet());
 app.use(
   cors({
@@ -86,7 +157,6 @@ app.use(
 );
 app.use(express.json({ limit: "100kb" }));
 
-// Rate limit: public routes (/, /health) — reduce abuse
 const publicLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 60,
@@ -95,7 +165,6 @@ const publicLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Rate limit: auth (login/register) — reduce brute-force
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -104,25 +173,86 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Health check (no auth)
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: parseInt(process.env.API_RATE_LIMIT_MAX || "300", 10),
+  message: { ok: false, error: "Too many requests, try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.get("/", publicLimiter, (req, res) => {
   res.json({
-    name: "js-express-api-template",
-    version: "1.0.0",
+    name: "dixcord-webapi",
+    version: API_VERSION,
     endpoints: {
       auth: {
         public: [
-          "POST /api/auth/login (admin only; returns JWT)",
+          "POST /api/auth/login (admin or bot service account; returns JWT)",
           "POST /api/auth/register (disabled; returns 403)",
         ],
       },
       users: {
         authRequired: true,
-        routes: [
-          "GET /api/users/me",
-          "PUT /api/users/me",
-          "DELETE /api/users/me",
+        routes: ["GET /api/users/me", "PUT /api/users/me", "DELETE /api/users/me"],
+      },
+      config: {
+        authRequired: true,
+        adminRoutes: [
+          "GET /api/config (includes entriesWithMeta)",
+          "POST /api/config (body: { config, value })",
+          "PUT /api/config (body: { config, value })",
+          "DELETE /api/config/:key",
         ],
+      },
+      eightBallResponses: {
+        authRequired: true,
+        routes: [
+          "GET /api/eight-ball-responses",
+          "GET /api/eight-ball-responses/:id",
+        ],
+        adminRoutes: [
+          "POST /api/eight-ball-responses",
+          "PUT /api/eight-ball-responses/:id",
+          "DELETE /api/eight-ball-responses/:id",
+        ],
+      },
+      userMappings: {
+        authRequired: true,
+        routes: [
+          "GET /api/user-mappings?app=discord",
+          "GET /api/user-mappings/:id?app=discord",
+        ],
+        adminRoutes: [
+          "POST /api/user-mappings",
+          "PUT /api/user-mappings/:id",
+          "DELETE /api/user-mappings/:id?app=discord",
+        ],
+      },
+      pinHistory: {
+        authRequired: true,
+        routes: ["GET /api/pin-history?limit=&offset="],
+      },
+      system: {
+        authRequired: true,
+        routes: [
+          "GET /api/system/status (admin)",
+          "GET /api/system/cache-version",
+          "POST /api/system/invalidate-cache (admin)",
+          "POST /api/system/heartbeat (body: { guildId, version })",
+        ],
+      },
+      events: {
+        authRequired: true,
+        routes: [
+          "GET /api/events/plusplus?app=discord&from=&to=",
+          "GET /api/events/reposts?app=discord&userId=",
+        ],
+        adminRoutes: ["GET /api/events/stickers"],
+      },
+      auditLog: {
+        authRequired: true,
+        adminRoutes: ["GET /api/audit-log?limit=&offset="],
       },
       botResponses: {
         authRequired: true,
@@ -134,85 +264,33 @@ app.get("/", publicLimiter, (req, res) => {
       messageProcessing: {
         authRequired: true,
         routes: [
-          'POST /api/message-processing/emoji-count (body: { app: "discord", ... })',
-          'POST /api/message-processing/plusminus (body: { app: "discord", ... })',
-          'POST /api/message-processing/count-repost (body: { app: "discord", ... })',
+          'POST /api/message-processing/emoji-count',
+          'POST /api/message-processing/plusminus',
+          'POST /api/message-processing/count-repost',
           "POST /api/message-processing/emoji-import",
           "POST /api/message-processing/sticker-import",
-          'POST /api/message-processing/user-mapping-import (body: { app: "discord", users: [{ name, discord_handle, discord_id }] })',
-          "POST /api/message-processing/pin-check (body: { messageId })",
-          "POST /api/message-processing/pin-log (body: { messageId })",
+          "POST /api/message-processing/user-mapping-import",
+          "POST /api/message-processing/pin-check",
+          "POST /api/message-processing/pin-log",
         ],
       },
-      config: {
-        authRequired: true,
-        routes: [
-          "GET /api/config",
-          "PUT /api/config (body: { config, value }; updates value if item exists)",
-        ],
-      },
-      linkReplacements: {
-        authRequired: true,
-        routes: [
-          "GET /api/link-replacements",
-          "GET /api/link-replacements/:id",
-          "POST /api/link-replacements (body: { source_host, target_host })",
-          "PUT /api/link-replacements/:id",
-          "DELETE /api/link-replacements/:id",
-        ],
-      },
-      pinQuips: {
-        authRequired: true,
-        routes: [
-          "GET /api/pin-quips",
-          "GET /api/pin-quips/random",
-          "GET /api/pin-quips/:id",
-          "POST /api/pin-quips (body: { quip })",
-          "PUT /api/pin-quips/:id (body: { quip })",
-          "DELETE /api/pin-quips/:id",
-        ],
-      },
-      triggerResponses: {
-        authRequired: true,
-        routes: [
-          "GET /api/trigger-responses",
-          "GET /api/trigger-responses/triggers",
-          "GET /api/trigger-responses/triggers/list",
-          "GET /api/trigger-responses/triggers/responses?trigger= | ?triggerId= (all responses for trigger)",
-          "GET /api/trigger-responses/triggers/:id",
-          "POST /api/trigger-responses/triggers (body: { trigger_string, selection_mode?, responses: [{ response_string, order?, weight? }] })",
-          "PUT /api/trigger-responses/triggers/:id (body: { selection_mode?, responses?: [{ id?: linkId, order?, weight? } | { response_string, order?, weight? }] })",
-          "GET /api/trigger-responses/random?trigger=xxx",
-          "GET /api/trigger-responses/responses/:id",
-          "PUT /api/trigger-responses/responses/:id (body: { response_string })",
-          "DELETE /api/trigger-responses/responses/:id",
-          "GET /api/trigger-responses/:id",
-          "POST /api/trigger-responses (body: { trigger_string, response_string, response_order?, selection_mode?, weight? })",
-          "PUT /api/trigger-responses/:id (body: { trigger_string?, response_string?, response_order?, selection_mode?, weight? })",
-          "DELETE /api/trigger-responses/:id",
-        ],
-      },
+      linkReplacements: { authRequired: true, routes: ["GET/POST/PUT/DELETE /api/link-replacements"] },
+      pinQuips: { authRequired: true, routes: ["GET/POST/PUT/DELETE /api/pin-quips", "GET /api/pin-quips/random"] },
+      triggerResponses: { authRequired: true, routes: ["Full CRUD under /api/trigger-responses/*"] },
       scheduledMessages: {
         authRequired: true,
         routes: [
-          "GET /api/scheduled-messages?app=<chatApp>&requesterUserId=... (user upcoming unsent/future)",
-          "GET /api/scheduled-messages?app=<chatApp>&scope=bot (pending rows for that chat app scheduler)",
-          "GET /api/scheduled-messages/:id?app=<chatApp>&requesterUserId=...",
-          "POST /api/scheduled-messages (body: { app, requesterUserId, chat_channel_id, chat_guild_id?, message_body, scheduled_at })",
-          "PUT /api/scheduled-messages/:id (body: { app, requesterUserId, message_body?, scheduled_at? } or { app, scope: bot, status: sent, sent_at? })",
-          "DELETE /api/scheduled-messages/:id?app=<chatApp>&requesterUserId=...",
+          "GET /api/scheduled-messages?app=discord&scope=bot|admin&status=",
+          "GET/POST/PUT/DELETE /api/scheduled-messages/:id",
         ],
       },
       leaderboards: {
         authRequired: true,
         routes: [
-          'POST /api/leaderboards/plusplus (body: { app: "discord", limit? })',
-          "GET /api/leaderboards/plusplus/total?app=discord&string=&type=word|user",
-          "GET /api/leaderboards/plusplus/voter/:userId?app=discord",
-          'POST /api/leaderboards/plusplus/top-voters (body: { app: "discord", limit? })',
-          "POST /api/leaderboards/emoji (body: { limit? })",
-          'POST /api/leaderboards/repost (body: { app: "discord", limit? })',
-          "GET /api/leaderboards/repost/user/:userId?app=discord",
+          "POST /api/leaderboards/plusplus (optional from/to)",
+          "POST /api/leaderboards/repost (optional from/to)",
+          "GET /api/leaderboards/emoji/user/:userId?app=discord",
+          "Other plusplus/emoji/repost routes",
         ],
       },
     },
@@ -222,8 +300,8 @@ app.get("/", publicLimiter, (req, res) => {
 
 app.get("/health", publicLimiter, (req, res) => res.json({ status: "ok" }));
 
-// Only /api/auth is public (login/register). All other /api/* routes require Authorization: Bearer <token>.
 app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api", apiLimiter);
 app.use("/api/users", userRoutes);
 app.use("/api/bot-responses", botResponsesRoutes);
 app.use("/api/message-processing", messageProcessingRoutes);
@@ -233,17 +311,23 @@ app.use("/api/pin-quips", pinQuipsRoutes);
 app.use("/api/trigger-responses", triggerResponsesRoutes);
 app.use("/api/scheduled-messages", scheduledMessagesRoutes);
 app.use("/api/leaderboards", leaderboardsRoutes);
+app.use("/api/eight-ball-responses", eightBallResponsesRoutes);
+app.use("/api/user-mappings", userMappingsRoutes);
+app.use("/api/pin-history", pinHistoryRoutes);
+app.use("/api/system", systemRoutes);
+app.use("/api/events", eventsRoutes);
+app.use("/api/audit-log", auditLogRoutes);
 
-// 404
 app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 
-// Error handler
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ ok: false, error: "Internal server error" });
 });
 
+await ensureSchemaMigrations();
 await ensureAdminUser();
+await ensureBotUser();
 app.listen(PORT, () => {
   console.log(`API running at http://localhost:${PORT}`);
 });

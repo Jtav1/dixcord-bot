@@ -1,46 +1,95 @@
-import jwt from 'jsonwebtoken';
-import db from '../config/db.js';
+import jwt from "jsonwebtoken";
+import db from "../config/db.js";
 
-if (!process.env.JWT_SECRET || String(process.env.JWT_SECRET).trim() === '') {
-  console.error('Fatal: JWT_SECRET must be set in .env or system environment. The webapi will not start without it.');
+if (!process.env.JWT_SECRET || String(process.env.JWT_SECRET).trim() === "") {
+  console.error(
+    "Fatal: JWT_SECRET must be set in .env or system environment. The webapi will not start without it.",
+  );
   process.exit(1);
 }
 const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
- * Verify JWT and attach user to req.user. Only the admin user (ADMIN_USERNAME) may access.
+ * @param {unknown} role
+ * @returns {boolean} True when role is admin or bot (null/unknown roles are false).
+ */
+export function isAllowedAuthenticatedRole(role) {
+  return role === "admin" || role === "bot";
+}
+
+/**
+ * @param {unknown} role
+ * @returns {boolean} True only when role is exactly admin.
+ */
+export function isAdminRole(role) {
+  return role === "admin";
+}
+
+/**
+ * Load user row and attach role. Empty DB role values remain null.
+ * @param {number|string} userId
+ * @returns {Promise<{ id: number, email: string, name: string, created_at: string, role: string|null }|null>}
+ */
+async function loadUserWithRole(userId) {
+  const [rows] = await db.query(
+    "SELECT id, email, name, created_at, role FROM users WHERE id = ?",
+    [userId],
+  );
+  if (!rows || rows.length === 0) return null;
+  const user = rows[0];
+  return {
+    ...user,
+    role:
+      user.role != null && String(user.role).trim() !== ""
+        ? String(user.role).trim()
+        : null,
+  };
+}
+
+/**
+ * Verify JWT and attach user to req.user. Allows admin and bot service accounts.
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next
  */
 export async function authenticate(req, res, next) {
-  const adminUsername = process.env.ADMIN_USERNAME;
-  if (!adminUsername) {
-    return res.status(503).json({ error: 'Admin not configured (set ADMIN_USERNAME and ADMIN_PASSWORD)' });
-  }
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid Authorization header' });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res
+      .status(401)
+      .json({ error: "Missing or invalid Authorization header" });
   }
   const token = authHeader.slice(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const [rows] = await db.query('SELECT id, email, name, created_at FROM users WHERE id = ?', [decoded.userId]);
-    if (!rows || rows.length === 0) {
-      return res.status(401).json({ error: 'User not found' });
+    const user = await loadUserWithRole(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
     }
-    const user = rows[0];
-    if (user.email !== adminUsername) {
-      return res.status(403).json({ error: 'Forbidden: only the configured admin user may access this API' });
+    if (!isAllowedAuthenticatedRole(user.role)) {
+      return res.status(403).json({ error: "Forbidden: invalid account role" });
     }
     req.user = user;
     next();
   } catch (err) {
-    if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expired' });
+    if (err.name === "TokenExpiredError") {
+      return res.status(401).json({ error: "Token expired" });
     }
-    return res.status(401).json({ error: 'Invalid token' });
+    return res.status(401).json({ error: "Invalid token" });
   }
+}
+
+/**
+ * Require admin role after authenticate.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
+export function requireAdmin(req, res, next) {
+  if (!isAdminRole(req.user?.role)) {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  next();
 }
 
 /**
@@ -51,29 +100,28 @@ export async function authenticate(req, res, next) {
  */
 export async function optionalAuth(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return next();
   }
   const token = authHeader.slice(7);
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const [rows] = await db.query('SELECT id, email, name, created_at FROM users WHERE id = ?', [decoded.userId]);
-    if (rows && rows.length > 0) req.user = rows[0];
+    const user = await loadUserWithRole(decoded.userId);
+    if (user) req.user = user;
   } catch (_) {}
   next();
 }
 
 /**
- * Sign a JWT for the given user id.
+ * Sign a JWT for the given user id and role.
  * @param {number|string} userId
+ * @param {string|null} [role=null]
  * @returns {string}
  */
-export function signToken(userId) {
-  return jwt.sign(
-    { userId },
-    JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-  );
+export function signToken(userId, role = null) {
+  return jwt.sign({ userId, role }, JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN || "7d",
+  });
 }
 
 export { JWT_SECRET };

@@ -1,10 +1,12 @@
 import express from "express";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, isAdminRole } from "../middleware/auth.js";
 import {
   getScheduledMessageById,
   createScheduledMessage,
   deletePendingScheduledMessageByIdForUser,
+  deleteScheduledMessageByIdAdmin,
   getPendingScheduledMessagesForBot,
+  getScheduledMessagesForAdmin,
   getUpcomingScheduledMessagesByUserId,
   normalizeUtcIsoString,
   updateScheduledMessageById,
@@ -42,6 +44,7 @@ async function resolveRequesterMapping(req) {
  * Query:
  * - user scope: ?app=<chatApp>&requesterUserId=...
  * - bot scope:  ?scope=bot
+ * - admin scope: ?scope=admin&status=pending|sent|all
  * Auth: required.
  */
 router.get("/", authenticate, async (req, res) => {
@@ -52,6 +55,26 @@ router.get("/", authenticate, async (req, res) => {
     if (req.query?.scope === "bot") {
       const rows = await getPendingScheduledMessagesForBot(app);
       return res.json({ ok: true, scheduledMessages: rows });
+    }
+
+    if (req.query?.scope === "admin") {
+      if (!isAdminRole(req.user?.role)) {
+        return res.status(403).json({ ok: false, error: "Admin access required" });
+      }
+      const status = req.query.status ?? "all";
+      if (!["pending", "sent", "all"].includes(String(status))) {
+        return res.status(400).json({
+          ok: false,
+          error: 'status must be "pending", "sent", or "all"',
+        });
+      }
+      const limit = req.query.limit != null ? parseInt(req.query.limit, 10) : 50;
+      const offset = req.query.offset != null ? parseInt(req.query.offset, 10) : 0;
+      const { rows, total } = await getScheduledMessagesForAdmin(app, status, {
+        limit,
+        offset,
+      });
+      return res.json({ ok: true, scheduledMessages: rows, total, limit, offset });
     }
 
     const requester = await resolveRequesterMapping(req);
@@ -175,9 +198,10 @@ router.post("/", authenticate, async (req, res) => {
 
 /**
  * PUT /api/scheduled-messages/:id
- * Update user-owned message fields OR mark as sent.
+ * Update user-owned message fields, admin override, OR mark as sent.
  * Body (user update): { app, requesterUserId, message_body?, scheduled_at? }
  * Body (bot sent-mark): { scope: "bot", status: "sent", sent_at? }
+ * Body (admin update): { scope: "admin", app, message_body?, scheduled_at? }
  * Auth: required.
  */
 router.put("/:id", authenticate, async (req, res) => {
@@ -215,6 +239,44 @@ router.put("/:id", authenticate, async (req, res) => {
           error: "Failed to mark scheduled message as sent",
         });
       }
+      const row = await getScheduledMessageById(app, id);
+      return res.json({ ok: true, scheduledMessage: row });
+    }
+
+    // Admin scope update.
+    if (req.body?.scope === "admin") {
+      if (!isAdminRole(req.user?.role)) {
+        return res.status(403).json({ ok: false, error: "Admin access required" });
+      }
+      const updates = {};
+      if (req.body?.message_body !== undefined) {
+        const body = String(req.body.message_body).trim();
+        if (!body)
+          return res
+            .status(400)
+            .json({ ok: false, error: "message_body cannot be empty" });
+        updates.message_body = body;
+      }
+      if (req.body?.scheduled_at !== undefined) {
+        const scheduledAt = normalizeUtcIsoString(req.body.scheduled_at);
+        if (!scheduledAt) {
+          return res
+            .status(400)
+            .json({ ok: false, error: "scheduled_at must be a valid datetime" });
+        }
+        updates.scheduled_at = scheduledAt;
+      }
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({
+          ok: false,
+          error: "Provide message_body and/or scheduled_at to update",
+        });
+      }
+      const updated = await updateScheduledMessageById(id, updates);
+      if (!updated)
+        return res
+          .status(500)
+          .json({ ok: false, error: "Failed to update scheduled message" });
       const row = await getScheduledMessageById(app, id);
       return res.json({ ok: true, scheduledMessage: row });
     }
@@ -280,8 +342,8 @@ router.put("/:id", authenticate, async (req, res) => {
 
 /**
  * DELETE /api/scheduled-messages/:id
- * Delete pending scheduled message by id when owned by requester.
- * Body/query: { app, requesterUserId }
+ * Delete pending scheduled message by id when owned by requester, or admin scope.
+ * Body/query: { app, requesterUserId } or { scope: "admin", app }
  * Auth: required.
  */
 router.delete("/:id", authenticate, async (req, res) => {
@@ -289,6 +351,20 @@ router.delete("/:id", authenticate, async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id))
       return res.status(400).json({ ok: false, error: "Invalid id" });
+
+    if (req.body?.scope === "admin" || req.query?.scope === "admin") {
+      if (!isAdminRole(req.user?.role)) {
+        return res.status(403).json({ ok: false, error: "Admin access required" });
+      }
+      const deleted = await deleteScheduledMessageByIdAdmin(id);
+      if (!deleted) {
+        return res.status(404).json({
+          ok: false,
+          error: "Scheduled message not found",
+        });
+      }
+      return res.json({ ok: true });
+    }
 
     const requester = await resolveRequesterMapping(req);
     if (!requester.ok) {
