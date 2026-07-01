@@ -16,7 +16,7 @@ export const importEmojiList = async (emojiObjectList) => {
     type: "emoji",
   }));
   await api.post("/api/message-processing/emoji-import", { emojis });
-  console.log("db: emoji import via webapi complete");
+  console.log("bot: emoji import via webapi complete");
 };
 
 /**
