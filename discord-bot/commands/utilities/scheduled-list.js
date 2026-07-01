@@ -31,7 +31,7 @@ const execute = async (interaction) => {
       flags: MessageFlags.Ephemeral,
     });
   } catch (err) {
-    console.log("scheduled-list command failed:", err);
+    console.log("command: scheduled-list command failed:", err);
     await interaction.reply({
       content: "Failed to list scheduled reminders.",
       flags: MessageFlags.Ephemeral,
@@ -40,4 +40,3 @@ const execute = async (interaction) => {
 };
 
 export { cmdName, data, execute };
-
