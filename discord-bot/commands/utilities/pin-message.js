@@ -70,7 +70,7 @@ const execute = async (interaction) => {
   }
 
   const sent = await sendPinAlert(targetMessage, interaction.client, [
-    "<@" + interaction.user.id + ">",
+    interaction.user.id,
   ]);
 
   if (sent) {

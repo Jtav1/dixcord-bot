@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import { token, guildId, isDev, version, clientId } from "./configVars.js";
 import { importEmojiList } from "./api/emojis.js";
 import { syncUserMappingFromGuild } from "./api/userMapping.js";
+import { hydratePinHistory } from "./events/messages/utilities/pinHistoryHydration.js";
 import {
   getAnnounceChannelId,
   getMinusEmoji,
@@ -101,6 +102,9 @@ client.once(Events.ClientReady, async (readyClient) => {
 
   await importEmojiList(emojis);
   await syncUserMappingFromGuild(readyClient);
+  await hydratePinHistory(readyClient).catch((err) => {
+    console.error("pin-history hydration error:", err);
+  });
   await startMessageScheduler(readyClient);
   startCacheVersionPoller();
   startHeartbeat();

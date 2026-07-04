@@ -107,6 +107,12 @@ dist
 
 config.ignore
 /data
+/files/images/*
+!/files/images/.gitkeep
+/files/videos/*
+!/files/videos/.gitkeep
+/files/other/*
+!/files/other/.gitkeep
 .DS_Store
 .vscode
 /.cursor

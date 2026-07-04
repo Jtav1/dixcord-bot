@@ -57,8 +57,17 @@ CREATE TABLE IF NOT EXISTS sticker_frequency (
 );
 
 CREATE TABLE IF NOT EXISTS pin_history (
-  msgid VARCHAR(255) PRIMARY KEY,
-  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  msgid VARCHAR(255) NOT NULL UNIQUE,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+  author INT NULL,
+  contents VARCHAR(5000) NULL,
+  attachments TEXT NULL,
+  channel_id VARCHAR(32) NULL,
+  channel_name VARCHAR(100) NULL,
+  pinners TEXT NULL,
+  hydrated TINYINT(1) NOT NULL DEFAULT 1,
+  CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS user_emoji_tracking (

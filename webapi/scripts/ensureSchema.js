@@ -139,6 +139,110 @@ export async function ensureSchemaMigrations() {
     }
   }
 
+  // pin_history expanded metadata (author, message snapshot, pinners)
+  const pinHistoryColumns = isSqlite
+    ? [
+        {
+          name: "author",
+          sql: "author INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL",
+        },
+        { name: "contents", sql: "contents TEXT NULL" },
+        { name: "attachments", sql: "attachments TEXT NULL" },
+        { name: "channel_id", sql: "channel_id TEXT NULL" },
+        { name: "channel_name", sql: "channel_name TEXT NULL" },
+        { name: "pinners", sql: "pinners TEXT NULL" },
+      ]
+    : [
+        { name: "author", sql: "author INT NULL" },
+        { name: "contents", sql: "contents VARCHAR(5000) NULL" },
+        { name: "attachments", sql: "attachments TEXT NULL" },
+        { name: "channel_id", sql: "channel_id VARCHAR(32) NULL" },
+        { name: "channel_name", sql: "channel_name VARCHAR(100) NULL" },
+        { name: "pinners", sql: "pinners TEXT NULL" },
+      ];
+
+  for (const col of pinHistoryColumns) {
+    if (isSqlite) {
+      if (!(await sqliteColumnExists("pin_history", col.name))) {
+        await db.query(`ALTER TABLE pin_history ADD COLUMN ${col.sql}`);
+      }
+    } else {
+      try {
+        await db.query(`ALTER TABLE pin_history ADD COLUMN ${col.sql}`);
+      } catch (err) {
+        if (err.code !== "ER_DUP_FIELDNAME") throw err;
+      }
+    }
+  }
+
+  if (!isSqlite) {
+    try {
+      await db.query(
+        "ALTER TABLE pin_history ADD CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL",
+      );
+    } catch (err) {
+      if (err.code !== "ER_FK_DUP_NAME") throw err;
+    }
+  }
+
+  // pin_history: surrogate autoincrement id as primary key (msgid stays unique)
+  if (await tableExists("pin_history")) {
+    if (isSqlite) {
+      if (!(await sqliteColumnExists("pin_history", "id"))) {
+        await db.query(`
+          CREATE TABLE pin_history_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            msgid TEXT NOT NULL UNIQUE,
+            timestamp TEXT DEFAULT (datetime('now')),
+            author INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+            contents TEXT NULL,
+            attachments TEXT NULL,
+            channel_id TEXT NULL,
+            channel_name TEXT NULL,
+            pinners TEXT NULL,
+            hydrated INTEGER NOT NULL DEFAULT 0
+          )
+        `);
+        await db.query(`
+          INSERT INTO pin_history_new (
+            msgid, timestamp, author, contents, attachments, channel_id, channel_name, pinners, hydrated
+          )
+          SELECT msgid, timestamp, author, contents, attachments, channel_id, channel_name, pinners, 0
+          FROM pin_history
+        `);
+        await db.query("DROP TABLE pin_history");
+        await db.query("ALTER TABLE pin_history_new RENAME TO pin_history");
+      }
+    } else if (!(await sqliteColumnExists("pin_history", "id"))) {
+      // sqliteColumnExists uses SELECT column LIMIT 0; works for MySQL too
+      await db.query(`
+        ALTER TABLE pin_history
+          DROP PRIMARY KEY,
+          ADD COLUMN id INT AUTO_INCREMENT PRIMARY KEY FIRST,
+          ADD UNIQUE KEY unique_pin_history_msgid (msgid)
+      `);
+    }
+  }
+
+  // pin_history.hydrated flag (false for existing rows, true default for new inserts)
+  if (await tableExists("pin_history")) {
+    if (isSqlite) {
+      if (!(await sqliteColumnExists("pin_history", "hydrated"))) {
+        await db.query(
+          "ALTER TABLE pin_history ADD COLUMN hydrated INTEGER NOT NULL DEFAULT 0",
+        );
+      }
+    } else {
+      try {
+        await db.query(
+          "ALTER TABLE pin_history ADD COLUMN hydrated TINYINT(1) NOT NULL DEFAULT 0",
+        );
+      } catch (err) {
+        if (err.code !== "ER_DUP_FIELDNAME") throw err;
+      }
+    }
+  }
+
   // Seed pin_message_role_ids if missing
   const [pinRoleRows] = await db.query(
     "SELECT config FROM configurations WHERE config = 'pin_message_role_ids'",
