@@ -202,17 +202,27 @@ router.post("/pin-check", authenticate, async (req, res) => {
 /**
  * POST /api/message-processing/pin-log
  * Log a message as pinned (idempotent; no-op if already logged).
- * Body: { messageId: string }
+ * Body: {
+ *   app: "discord",
+ *   messageId: string,
+ *   authorId?: string,
+ *   contents?: string,
+ *   attachments?: string | string[],
+ *   channelId?: string,
+ *   channelName?: string,
+ *   pinnerIds?: string[]
+ * }
  * Response: { ok: true }
  * Auth: required.
  */
 router.post("/pin-log", authenticate, async (req, res) => {
   try {
-    const result = await logPinnedMessage(req.body?.messageId);
+    const result = await logPinnedMessage(req.body ?? {});
     if (!result.ok) {
-      return res
-        .status(400)
-        .json({ ...result, error: "messageId is required" });
+      return res.status(400).json({
+        ok: false,
+        error: result.error ?? "messageId is required",
+      });
     }
     res.json({ ok: true });
   } catch (err) {

@@ -231,7 +231,12 @@ app.get("/", publicLimiter, (req, res) => {
       },
       pinHistory: {
         authRequired: true,
-        routes: ["GET /api/pin-history?limit=&offset="],
+        routes: [
+          "GET /api/pin-history?limit=&offset=",
+          "GET /api/pin-history/incomplete?limit=&offset=",
+          "GET /api/pin-history/:id",
+          "PUT /api/pin-history/:id",
+        ],
       },
       system: {
         authRequired: true,
