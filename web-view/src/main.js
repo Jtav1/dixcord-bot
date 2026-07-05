@@ -1,14 +1,15 @@
+import { createApp } from "vue";
+import App from "./App.vue";
+import router from "./router/index.js";
+import vuetify from "./plugins/vuetify.js";
 import "./style.css";
 
 /**
- * Application entry point (placeholder).
+ * Application entry point.
  * @returns {void}
  */
 function main() {
-  const root = document.getElementById("app");
-  if (root) {
-    root.textContent = "web-view scaffold";
-  }
+  createApp(App).use(vuetify).use(router).mount("#app");
 }
 
 main();

@@ -1,4 +1,6 @@
+import vue from "@vitejs/plugin-vue";
 import { defineConfig, loadEnv } from "vite";
+import vuetify from "vite-plugin-vuetify";
 
 /**
  * Vite configuration for local development and production builds.
@@ -17,6 +19,10 @@ export default defineConfig(({ mode }) => {
   };
 
   return {
+    plugins: [
+      vue(),
+      vuetify({ autoImport: true }),
+    ],
     server: {
       port,
       proxy: apiProxy,
