@@ -1,0 +1,85 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "DM Sans", system-ui, sans-serif;
+}
+
+/* Let fixed background layers show through Vuetify surfaces */
+.app-shell.v-application {
+  background: transparent !important;
+}
+
+.app-shell .v-main {
+  background: transparent !important;
+}
+
+/* Merrick Butte background layers */
+.app-background {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(
+      rgba(250, 247, 242, 0.72),
+      rgba(250, 247, 242, 0.72)
+    ),
+    url("/merrick-butte-bg.webp");
+  background-size: cover;
+  background-position: center 60%;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.v-theme--dark .app-background {
+  background-image:
+    linear-gradient(rgba(26, 29, 35, 0.8), rgba(26, 29, 35, 0.8)),
+    url("/merrick-butte-bg.webp");
+}
+
+.app-background-scrim {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(250, 247, 242, 0.15) 0%,
+    rgba(250, 247, 242, 0.45) 50%,
+    rgba(250, 247, 242, 0.65) 100%
+  );
+}
+
+.v-theme--dark .app-background-scrim {
+  background: linear-gradient(
+    180deg,
+    rgba(26, 29, 35, 0.2) 0%,
+    rgba(26, 29, 35, 0.5) 50%,
+    rgba(26, 29, 35, 0.7) 100%
+  );
+}
+
+/* Glass card treatment for content panels */
+.glass-card {
+  background: rgba(var(--v-theme-surface), 0.85) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(var(--v-border-color), calc(var(--v-border-opacity) * 1.5));
+}
+
+.view-page {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.view-page--wide {
+  max-width: 1280px;
+}
+
+.view-header {
+  padding-bottom: 0.5rem;
+}

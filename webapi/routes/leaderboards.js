@@ -45,6 +45,33 @@ router.post("/plusplus", authenticate, async (req, res) => {
 });
 
 /**
+ * GET /api/leaderboards/plusplus/history/:rowId
+ * Full plus/minus vote history for one leaderboard row (word or user).
+ * Path: rowId = platform user id (user) or word text (word), as returned on the leaderboard.
+ * Query: type=word|user (default word), app=discord required
+ * Auth: required.
+ */
+router.get("/plusplus/history/:rowId", authenticate, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    const rowId = req.params.rowId;
+    const type = req.query.type === "user" ? "user" : "word";
+    if (!rowId) {
+      return res.status(400).json({ ok: false, error: "rowId is required" });
+    }
+    const result = await leaderboards.getPlusPlusVoteHistoryByRowId(rowId, type, app);
+    if (!result) {
+      return res.status(400).json({ ok: false, error: "Invalid type; use 'word' or 'user'" });
+    }
+    res.json({ ok: true, app, ...result, count: result.votes.length });
+  } catch (err) {
+    console.error("GET /api/leaderboards/plusplus/history/:rowId error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get plusplus vote history" });
+  }
+});
+
+/**
  * GET /api/leaderboards/plusplus/total
  * Total score for a word or user (mirrors plusplus-total command).
  * Query: string= required, type=word|user (default word), app=discord required

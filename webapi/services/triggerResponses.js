@@ -182,9 +182,6 @@ async function getWeightedResponseForTrigger(triggerId) {
       ? normalized.filter((r) => r.weight >= maxWeight)
       : normalized.filter((r) => r.weight < maxWeight);
 
-  console.log(roll);
-  console.log(candidates.length);
-
   if (candidates.length === 0) {
     candidates = normalized.filter((r) => r.weight >= maxWeight);
   }
@@ -694,7 +691,9 @@ export async function deleteTrigger(triggerId) {
     .map((r) => Number(r.response_id))
     .filter((id) => Number.isInteger(id));
 
-  await db.query("DELETE FROM trigger_response WHERE trigger_id = ?", [triggerId]);
+  await db.query("DELETE FROM trigger_response WHERE trigger_id = ?", [
+    triggerId,
+  ]);
   await db.query("DELETE FROM triggers WHERE id = ?", [triggerId]);
 
   if (responseIds.length > 0) {

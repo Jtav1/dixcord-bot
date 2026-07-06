@@ -68,7 +68,10 @@ const execute = async (message) => {
         });
 
         if (!parsedReminder.ok) {
-          console.log("scheduler parse failure: full_message", parsedReminder);
+          console.log(
+            "bot: scheduler parse failure: full_message",
+            parsedReminder,
+          );
           await message.react("❌").catch(() => null);
 
           await message.reply(
@@ -86,14 +89,16 @@ const execute = async (message) => {
               scheduledAtUtcIso: parsedReminder.scheduledAt,
             });
             if (!created) {
-              console.log("scheduler create failure: no created row returned");
+              console.log(
+                "bot: scheduler create failure: no created row returned",
+              );
               await message.react("❌").catch(() => null);
               return;
             }
             await refreshScheduledMessagesCache();
             await message.react("✅").catch(() => null);
           } catch (err) {
-            console.log("scheduler create failure:", err);
+            console.log("bot: scheduler create failure:", err);
             await message.react("❌").catch(() => null);
             return;
           }

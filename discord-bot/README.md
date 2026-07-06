@@ -26,17 +26,17 @@ The bot logs in via `POST /api/auth/login` with `email` and `password`, stores t
 
 ### Container startup (Docker)
 
-The Discord bot image runs [`scripts/start.js`](scripts/start.js) instead of `bot.js` directly. On every start it:
+The Discord bot image runs `[scripts/start.js](scripts/start.js)` instead of `bot.js` directly. On every start it:
 
-1. **Waits for the web API** — polls `GET ${WEBAPI_URL}/health` (no auth) every 2 seconds, up to 30 attempts, until the response is `200` with `{ "status": "ok" }`. If the API never becomes ready, the process exits with an error so the bot does not crash immediately on `getAllConfigurations()`.
-2. **Optionally deploys slash commands** — if `DEPLOY_SLASH_COMMANDS` is set to a truthy value (`1`, `true`, or `yes`, case-insensitive), it runs `node delete-all-commands.js` (clears all guild slash commands on Discord), then `node deploy-commands.js`, then starts the bot. If either step fails, the container exits without starting the bot.
-3. **Starts the bot** — `node bot.js` with inherited stdio.
+1. **Waits for the web API**: polls `GET ${WEBAPI_URL}/health` (no auth) every 2 seconds, up to 30 attempts, until the response is `200` with `{ "status": "ok" }`. If the API never becomes ready, the process exits with an error so the bot does not crash immediately on `getAllConfigurations()`.
+2. **Optionally deploys slash commands**: if `DEPLOY_SLASH_COMMANDS` is set to a truthy value (`1`, `true`, or `yes`, case-insensitive), it runs `node delete-all-commands.js` (clears all guild slash commands on Discord), then `node deploy-commands.js`, then starts the bot. If either step fails, the container exits without starting the bot.
+3. **Starts the bot**: `node bot.js` with inherited stdio.
 
 When running under **docker compose** at the repo root, `discord-bot` depends on `webapi` with `condition: service_healthy`, and the web API service defines a health check against `/health`. Point `WEBAPI_URL` at the API service from the bot container, e.g. `http://webapi:3000`.
 
-| Variable                  | Description                                                                                                                                                    |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DEPLOY_SLASH_COMMANDS`   | Optional. When unset, empty, or falsy (`0`, `false`, etc.), only the health wait runs, then the bot starts. Set to `true` or `1` to clear all guild `/` commands, then re-register from `commands/` on each container start. |
+| Variable                | Description                                                                                                                                                                                                                  |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEPLOY_SLASH_COMMANDS` | Optional. When unset, empty, or falsy (`0`, `false`, etc.), only the health wait runs, then the bot starts. Set to `true` or `1` to clear all guild `/` commands, then re-register from `commands/` on each container start. |
 
 ---
 

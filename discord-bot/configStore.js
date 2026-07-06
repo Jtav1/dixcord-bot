@@ -12,11 +12,22 @@ let configMap = {};
  * @returns {Promise<Record<string, string>>}
  */
 export async function loadConfig() {
-  const entries = await getAllConfigurations();
-  configMap = Object.fromEntries(
-    entries.map((row) => [row.config, row.value ?? ""]),
-  );
-  return configMap;
+  try {
+    const entries = await getAllConfigurations();
+    configMap = Object.fromEntries(
+      entries.map((row) => [row.config, row.value ?? ""]),
+    );
+    const numWithValue = entries.filter(
+      (row) => row.value !== null && row.value !== "",
+    ).length;
+    console.log(
+      `config: loaded ${numWithValue} / ${entries.length} configs from webapi successfully`,
+    );
+    return configMap;
+  } catch (error) {
+    console.log("config: failed to load configurations from webapi", error);
+    throw error;
+  }
 }
 
 /**
@@ -27,8 +38,17 @@ export async function loadConfig() {
  */
 export function getConfigValue(key, defaultValue = null) {
   if (Object.prototype.hasOwnProperty.call(configMap, key)) {
-    return configMap[key];
+    const value = configMap[key];
+    if (value === null || value === undefined || value === "") {
+      console.log(
+        `config: key "${key}" does not have a value (got: ${JSON.stringify(value)})`,
+      );
+    }
+    return value;
   }
+  console.log(
+    `config: key "${key}" not found; using default value (${JSON.stringify(defaultValue)})`,
+  );
   return defaultValue;
 }
 
@@ -80,7 +100,9 @@ export function getMinusEmoji() {
 export function getPinChannelId() {
   const id = getConfigValue("pin_channel_id");
   if (!id) {
-    throw new Error("pin_channel_id configuration not found or has empty value.");
+    throw new Error(
+      "pin_channel_id configuration not found or has empty value.",
+    );
   }
   return id;
 }

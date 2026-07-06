@@ -59,12 +59,14 @@ export function startCacheVersionPoller() {
     try {
       const version = await getCacheVersion();
       if (lastCacheVersion != null && version !== lastCacheVersion) {
-        console.log(`Cache version changed (${lastCacheVersion} -> ${version}); reloading`);
+        console.log(
+          `cache: Cache version changed (${lastCacheVersion} -> ${version}); reloading`,
+        );
         await reloadAllCaches();
       }
       lastCacheVersion = version;
     } catch (err) {
-      console.error("Cache version poll error:", err);
+      console.error("cache: version poll error:", err);
     }
   }, POLL_INTERVAL_MS);
 }
