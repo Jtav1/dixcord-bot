@@ -99,8 +99,6 @@ export function serializeScheduledMessageRow(row, app) {
  * @returns {Promise<number|null>} Inserted row id.
  */
 export async function createScheduledMessage(payload) {
-  console.log(payload);
-
   const cfg = getScheduledMessageAppConfig(payload.app);
   if (!cfg) return null;
   const scheduledAtSql = utcIsoToSqlDatetime(payload.scheduledAtUtcIso);
@@ -181,8 +179,6 @@ export async function getPendingScheduledMessagesForBot(app) {
  * @returns {Promise<boolean>} True when a row was updated.
  */
 export async function updateScheduledMessageById(id, updates) {
-  console.log(id);
-  console.log(updates);
   const setParts = [];
   const values = [];
 
@@ -241,7 +237,11 @@ export async function deletePendingScheduledMessageByIdForUser(id, userId) {
  * @param {{ limit?: number, offset?: number }} [opts]
  * @returns {Promise<{ rows: Array<ReturnType<typeof serializeScheduledMessageRow>>, total: number }>}
  */
-export async function getScheduledMessagesForAdmin(app, status = "all", opts = {}) {
+export async function getScheduledMessagesForAdmin(
+  app,
+  status = "all",
+  opts = {},
+) {
   const cfg = getScheduledMessageAppConfig(app);
   if (!cfg) return { rows: [], total: 0 };
 

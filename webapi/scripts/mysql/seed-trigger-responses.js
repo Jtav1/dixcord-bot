@@ -67,6 +67,7 @@ if (responses.length === 0) {
 }
 
 async function seed() {
+  console.log("db: seeding triggers/responses...");
   const connection = await pool.getConnection();
   try {
     await connection.beginTransaction();
@@ -115,7 +116,7 @@ async function seed() {
 seed()
   .then((result) => {
     console.log(
-      `Seed complete: ${result.triggers} triggers, ${result.responses} responses, ${result.links} trigger_response links.`,
+      `db: Seed complete: ${result.triggers} triggers, ${result.responses} responses, ${result.links} trigger_response links.`,
     );
     pool.end();
     process.exit(0);

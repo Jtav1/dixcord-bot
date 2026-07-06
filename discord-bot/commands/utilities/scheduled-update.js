@@ -81,7 +81,7 @@ const execute = async (interaction) => {
       flags: MessageFlags.Ephemeral,
     });
   } catch (err) {
-    console.log("scheduled-update command failed:", err);
+    console.log("command: scheduled-update command failed:", err);
     await interaction.reply({
       content: "Failed to update scheduled reminder.",
       flags: MessageFlags.Ephemeral,

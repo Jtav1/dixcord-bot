@@ -102,12 +102,16 @@ const seed = db.transaction(() => {
     }
   }
 
-  return { triggers: triggerIds.length, responses: responseIds.length, links: triggerIds.length * responseIds.length };
+  return {
+    triggers: triggerIds.length,
+    responses: responseIds.length,
+    links: triggerIds.length * responseIds.length,
+  };
 });
 
 const result = seed();
 console.log(
-  `Seed complete: ${result.triggers} triggers, ${result.responses} responses, ${result.links} trigger_response links.`,
+  `db: Seed complete: ${result.triggers} triggers, ${result.responses} responses, ${result.links} trigger_response links.`,
 );
 db.close();
 process.exit(0);

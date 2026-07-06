@@ -18,6 +18,9 @@ const isSqlite = isSqliteDb();
  * @returns {Promise<void>}
  */
 export async function ensureSchemaMigrations() {
+  console.log("db: checking schema migrations");
+  const applied = [];
+
   // users.role column
   if (await tableExists(db, "users", isSqlite)) {
     if (!(await columnExists(db, "users", "role", isSqlite))) {
@@ -26,6 +29,10 @@ export async function ensureSchemaMigrations() {
           ? "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'"
           : "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin'",
       );
+      applied.push("users.role column");
+      console.log("db: migration applied: added users.role column");
+    } else {
+      console.log("db: schema ok: users.role column already exists");
     }
   }
 
@@ -57,6 +64,10 @@ export async function ensureSchemaMigrations() {
         )
       `);
     }
+    applied.push("audit_log table");
+    console.log("db: migration applied: created audit_log table");
+  } else {
+    console.log("db: schema ok: audit_log table already exists");
   }
 
   // bot_status table
@@ -80,6 +91,10 @@ export async function ensureSchemaMigrations() {
         )
       `);
     }
+    applied.push("bot_status table");
+    console.log("db: migration applied: created bot_status table");
+  } else {
+    console.log("db: schema ok: bot_status table already exists");
   }
 
   // system_state table
@@ -101,6 +116,10 @@ export async function ensureSchemaMigrations() {
         )
       `);
     }
+    applied.push("system_state table");
+    console.log("db: migration applied: created system_state table");
+  } else {
+    console.log("db: schema ok: system_state table already exists");
   }
 
   // pin_history expanded metadata (author, message snapshot, pinners)
@@ -200,6 +219,22 @@ export async function ensureSchemaMigrations() {
     await db.query(
       "INSERT INTO configurations (config, value) VALUES (?, ?)",
       ["pin_message_role_ids", '["612842488302141441"]'],
+    );
+    applied.push("pin_message_role_ids configuration seed");
+    console.log(
+      "db: migration applied: seeded pin_message_role_ids configuration",
+    );
+  } else {
+    console.log(
+      "db: schema ok: pin_message_role_ids configuration already exists",
+    );
+  }
+
+  if (applied.length === 0) {
+    console.log("db: schema valid; no migrations applied");
+  } else {
+    console.log(
+      `db: schema updated; ${applied.length} migration(s) applied: ${applied.join(", ")}`,
     );
   }
 }

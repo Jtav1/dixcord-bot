@@ -8,7 +8,7 @@ import {
 export const doplus = async (string, typestr, voterid) => {
   if (typestr !== "user" || string === voterid) return;
   plusplus(string, typestr, voterid).catch((err) => {
-    console.log("plusplus error", err);
+    console.log("bot: plusplus error", err);
   });
 };
 
@@ -16,7 +16,7 @@ export const doplus = async (string, typestr, voterid) => {
 export const dominus = async (string, typestr, voterid) => {
   if (typestr !== "user" || string === voterid) return;
   minusminus(string, typestr, voterid).catch((err) => {
-    console.log("minusminus error", err);
+    console.log("bot: minusminus error", err);
   });
 };
 
@@ -45,7 +45,7 @@ export const plusMinusMsg = async (rawMessage) => {
     // use doplus/dominus for a user vote on the replied-to user instead of normal plusminus
 
     if (countPlusMinusStrings(rawMessage.content) > 2) {
-      console.log("Multiple ++/-- detected, skipping parse");
+      // console.log("bot: Multiple ++/-- detected, skipping parse");
       return;
     }
 
@@ -87,7 +87,7 @@ export const plusMinusMsg = async (rawMessage) => {
         }
       } catch (err) {
         // Fallback to normal message parsing if any error occurs fetching replied message
-        console.warn("plusMinusMsg: Could not fetch replied message", err);
+        console.log("bot: plusMinusMsg Could not fetch replied message", err);
       }
     }
 

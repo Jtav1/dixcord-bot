@@ -17,17 +17,12 @@ for (const folder of commandFolders) {
     const filePath = path.join(commandsPath, file);
     const command = await import(pathToFileURL(filePath));
     if ("data" in command && "execute" in command) {
-      console.log("Found command, adding...");
       commands.push(command.data.toJSON());
     } else {
       console.log(
-        `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`,
+        `bot: WARNING Command at ${filePath} is missing "data" or "execute" property`,
       );
     }
-
-    // if(command.data && command.execute){
-    // 	console.log("use this other format 0000000");
-    // }
   }
 }
 
@@ -36,14 +31,14 @@ const rest = new REST().setToken(token);
 (async () => {
   try {
     console.log(
-      `Started refreshing ${commands.length} application (/) commands.`,
+      `bot: Refreshing ${commands.length} application (/) commands...`,
     );
     const data = await rest.put(
       Routes.applicationGuildCommands(clientId, guildId),
       { body: commands },
     );
     console.log(
-      `Successfully reloaded ${data.length} application (/) commands.`,
+      `bot: Successfully reloaded ${data.length} application (/) commands!`,
     );
   } catch (error) {
     console.error(error);

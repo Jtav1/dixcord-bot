@@ -35,8 +35,8 @@ async function ensureAdminUser() {
   const username = process.env.ADMIN_USERNAME;
   const password = process.env.ADMIN_PASSWORD;
   if (!username || !password) {
-    console.warn(
-      "ADMIN_USERNAME and ADMIN_PASSWORD must be set; no admin user created.",
+    console.log(
+      "webapi: ADMIN_USERNAME and ADMIN_PASSWORD must be set; no admin user created.",
     );
     return;
   }
@@ -51,13 +51,13 @@ async function ensureAdminUser() {
         "UPDATE users SET password_hash = ?, role = 'admin' WHERE email = ?",
         [hash, username],
       );
-      console.log("Admin user password updated.");
+      console.log("webapi: Admin user password updated.");
     } else {
       await db.query(
         "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'admin')",
         [username, hash, "Admin"],
       );
-      console.log("Admin user created.");
+      console.log("webapi: Admin user created.");
     }
   } catch (err) {
     console.error("Failed to ensure admin user:", err);
@@ -73,8 +73,8 @@ async function ensureBotUser() {
   const username = process.env.BOT_USERNAME;
   const password = process.env.BOT_PASSWORD;
   if (!username || !password) {
-    console.warn(
-      "BOT_USERNAME and BOT_PASSWORD not set; bot service account not created.",
+    console.log(
+      "webapi: BOT_USERNAME and BOT_PASSWORD not set; bot service account not created.",
     );
     return;
   }
@@ -89,16 +89,16 @@ async function ensureBotUser() {
         "UPDATE users SET password_hash = ?, role = 'bot' WHERE email = ?",
         [hash, username],
       );
-      console.log("Bot service account password updated.");
+      console.log("webapi: Bot service account password updated.");
     } else {
       await db.query(
         "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'bot')",
         [username, hash, "Bot"],
       );
-      console.log("Bot service account created.");
+      console.log("webapi: Bot service account created.");
     }
   } catch (err) {
-    console.error("Failed to ensure bot user:", err);
+    console.error("webapi: Failed to ensure bot user:", err);
     throw err;
   }
 }
@@ -232,7 +232,11 @@ app.get("/", publicLimiter, (req, res) => {
       },
       users: {
         authRequired: true,
-        routes: ["GET /api/users/me", "PUT /api/users/me", "DELETE /api/users/me"],
+        routes: [
+          "GET /api/users/me",
+          "PUT /api/users/me",
+          "DELETE /api/users/me",
+        ],
       },
       config: {
         authRequired: true,
@@ -307,9 +311,9 @@ app.get("/", publicLimiter, (req, res) => {
       messageProcessing: {
         authRequired: true,
         routes: [
-          'POST /api/message-processing/emoji-count',
-          'POST /api/message-processing/plusminus',
-          'POST /api/message-processing/count-repost',
+          "POST /api/message-processing/emoji-count",
+          "POST /api/message-processing/plusminus",
+          "POST /api/message-processing/count-repost",
           "POST /api/message-processing/emoji-import",
           "POST /api/message-processing/sticker-import",
           "POST /api/message-processing/user-mapping-import",
@@ -317,9 +321,21 @@ app.get("/", publicLimiter, (req, res) => {
           "POST /api/message-processing/pin-log",
         ],
       },
-      linkReplacements: { authRequired: true, routes: ["GET/POST/PUT/DELETE /api/link-replacements"] },
-      pinQuips: { authRequired: true, routes: ["GET/POST/PUT/DELETE /api/pin-quips", "GET /api/pin-quips/random"] },
-      triggerResponses: { authRequired: true, routes: ["Full CRUD under /api/trigger-responses/*"] },
+      linkReplacements: {
+        authRequired: true,
+        routes: ["GET/POST/PUT/DELETE /api/link-replacements"],
+      },
+      pinQuips: {
+        authRequired: true,
+        routes: [
+          "GET/POST/PUT/DELETE /api/pin-quips",
+          "GET /api/pin-quips/random",
+        ],
+      },
+      triggerResponses: {
+        authRequired: true,
+        routes: ["Full CRUD under /api/trigger-responses/*"],
+      },
       scheduledMessages: {
         authRequired: true,
         routes: [
@@ -373,5 +389,5 @@ await ensureAdminUser();
 await ensureBotUser();
 await ensureWebViewUser();
 app.listen(PORT, () => {
-  console.log(`API running at http://localhost:${PORT}`);
+  console.log(`webapi: API running at http://localhost:${PORT}`);
 });
