@@ -104,6 +104,44 @@ async function ensureBotUser() {
 }
 
 /**
+ * Create or update the web-view service account from WEBVIEW_USERNAME and WEBVIEW_PASSWORD.
+ * @returns {Promise<void>}
+ */
+async function ensureWebViewUser() {
+  const username = process.env.WEBVIEW_USERNAME;
+  const password = process.env.WEBVIEW_PASSWORD;
+  if (!username || !password) {
+    console.warn(
+      "WEBVIEW_USERNAME and WEBVIEW_PASSWORD not set; web-view service account not created.",
+    );
+    return;
+  }
+  try {
+    const [rows] = await db.query(
+      "SELECT id, password_hash FROM users WHERE email = ?",
+      [username],
+    );
+    const hash = await bcrypt.hash(password, 10);
+    if (rows && rows.length > 0) {
+      await db.query(
+        "UPDATE users SET password_hash = ?, role = 'webview' WHERE email = ?",
+        [hash, username],
+      );
+      console.log("Web-view service account password updated.");
+    } else {
+      await db.query(
+        "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'webview')",
+        [username, hash, "webview"],
+      );
+      console.log("Web-view service account created.");
+    }
+  } catch (err) {
+    console.error("Failed to ensure web-view user:", err);
+    throw err;
+  }
+}
+
+/**
  * Parse CORS_ORIGINS env (comma-separated) or fall back to legacy defaults.
  * @returns {Set<string>}
  */
@@ -188,7 +226,7 @@ app.get("/", publicLimiter, (req, res) => {
     endpoints: {
       auth: {
         public: [
-          "POST /api/auth/login (admin or bot service account; returns JWT)",
+          "POST /api/auth/login (admin, bot, or webview service account; returns JWT)",
           "POST /api/auth/register (disabled; returns 403)",
         ],
       },
@@ -241,7 +279,7 @@ app.get("/", publicLimiter, (req, res) => {
       system: {
         authRequired: true,
         routes: [
-          "GET /api/system/status (admin)",
+          "GET /api/system/status (admin, bot, or webview)",
           "GET /api/system/cache-version",
           "POST /api/system/invalidate-cache (admin)",
           "POST /api/system/heartbeat (body: { guildId, version })",
@@ -333,6 +371,7 @@ app.use((err, req, res, next) => {
 await ensureSchemaMigrations();
 await ensureAdminUser();
 await ensureBotUser();
+await ensureWebViewUser();
 app.listen(PORT, () => {
   console.log(`API running at http://localhost:${PORT}`);
 });

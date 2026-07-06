@@ -10,7 +10,7 @@ import packageJson from "./package.json" with { type: "json" };
 const version = packageJson.version;
 
 // =========== REQUIRED ============= //
-// DEV_FLAG — must be non-empty. isDev is false when the value is loosely == false
+// DEV_FLAG must be non-empty. isDev is false when the value is loosely == false
 // (e.g. "0"); otherwise treated as development (data paths, announce channel).
 
 let isDev = true;
@@ -44,7 +44,7 @@ if (!clientId || clientId.length < 1) writeError("config: missing DISCORD_CLIENT
 //prettier-ignore
 if (!guildId || guildId.length < 1) writeError("config: missing DISCORD_GUILD_ID env var");
 
-// Web API — bot expects all three at runtime (no in-code defaults; api/client throws if unset).
+// bot expects all three at runtime (no in-code defaults; api/client throws if unset).
 const webapiUrl = process.env.WEBAPI_URL?.replace(/\/$/, "") || null;
 const webapiUsername = process.env.WEBAPI_USERNAME || null;
 const webapiPassword = process.env.WEBAPI_PASSWORD || null;

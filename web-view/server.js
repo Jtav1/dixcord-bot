@@ -3,6 +3,11 @@ import express from "express";
 import { createProxyMiddleware } from "http-proxy-middleware";
 import path from "path";
 import { fileURLToPath } from "url";
+import {
+  attachCachedWebapiAuthHeader,
+  warmWebapiAuth,
+  webapiAuthProxyMiddleware,
+} from "./lib/webapiAuth.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || "3002", 10);
@@ -22,11 +27,20 @@ function healthHandler(_req, res) {
 }
 
 app.get("/health", healthHandler);
+app.use("/api", (req, res, next) => {
+  void webapiAuthProxyMiddleware(req, res, next);
+});
 app.use(
   "/api",
   createProxyMiddleware({
     target: WEBAPI_URL,
     changeOrigin: true,
+    pathRewrite: (path) => `/api${path}`,
+    on: {
+      proxyReq: (proxyReq) => {
+        attachCachedWebapiAuthHeader(proxyReq);
+      },
+    },
   }),
 );
 app.use(express.static(distDir));
@@ -34,6 +48,7 @@ app.use((_req, res) => {
   res.sendFile(path.join(distDir, "index.html"));
 });
 
+await warmWebapiAuth();
 app.listen(PORT, () => {
   console.log(`web-view listening on http://localhost:${PORT}`);
   console.log(`webapi proxy target: ${WEBAPI_URL}`);

@@ -9,12 +9,30 @@ if (!process.env.JWT_SECRET || String(process.env.JWT_SECRET).trim() === "") {
 }
 const JWT_SECRET = process.env.JWT_SECRET;
 
+/** Routes the webview service account may access (exact path match). */
+export const WEBVIEW_ALLOWED_ROUTES = [
+  { method: "POST", path: "/api/leaderboards/plusplus" },
+  { method: "POST", path: "/api/leaderboards/plusplus/top-voters" },
+  { method: "POST", path: "/api/leaderboards/emoji" },
+  { method: "POST", path: "/api/leaderboards/repost" },
+  { method: "GET", path: "/api/pin-history" },
+  { method: "GET", path: "/api/system/status" },
+];
+
 /**
  * @param {unknown} role
- * @returns {boolean} True when role is admin or bot (null/unknown roles are false).
+ * @returns {boolean} True when role is exactly webview.
+ */
+export function isWebviewRole(role) {
+  return role === "webview";
+}
+
+/**
+ * @param {unknown} role
+ * @returns {boolean} True when role is admin, bot, or webview (null/unknown roles are false).
  */
 export function isAllowedAuthenticatedRole(role) {
-  return role === "admin" || role === "bot";
+  return role === "admin" || role === "bot" || role === "webview";
 }
 
 /**
@@ -23,6 +41,32 @@ export function isAllowedAuthenticatedRole(role) {
  */
 export function isAdminRole(role) {
   return role === "admin";
+}
+
+/**
+ * Normalize a request pathname for allowlist matching.
+ * @param {string} pathname Raw path (may include query string or trailing slash).
+ * @returns {string} Normalized path without query or trailing slash.
+ */
+export function normalizeRoutePath(pathname) {
+  const withoutQuery = pathname.split("?")[0];
+  const trimmed = withoutQuery.replace(/\/+$/, "");
+  return trimmed || "/";
+}
+
+/**
+ * Check whether a method + path is allowed for the webview service account.
+ * @param {string} method HTTP method.
+ * @param {string} pathname Request path (e.g. req.originalUrl).
+ * @returns {boolean}
+ */
+export function isWebviewAllowedRoute(method, pathname) {
+  const normalizedPath = normalizeRoutePath(pathname);
+  const normalizedMethod = method.toUpperCase();
+  return WEBVIEW_ALLOWED_ROUTES.some(
+    (route) =>
+      route.method === normalizedMethod && route.path === normalizedPath,
+  );
 }
 
 /**
@@ -47,7 +91,8 @@ async function loadUserWithRole(userId) {
 }
 
 /**
- * Verify JWT and attach user to req.user. Allows admin and bot service accounts.
+ * Verify JWT and attach user to req.user. Allows admin, bot, and webview service accounts.
+ * Webview accounts are restricted to WEBVIEW_ALLOWED_ROUTES.
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next
@@ -68,6 +113,14 @@ export async function authenticate(req, res, next) {
     }
     if (!isAllowedAuthenticatedRole(user.role)) {
       return res.status(403).json({ error: "Forbidden: invalid account role" });
+    }
+    if (
+      isWebviewRole(user.role) &&
+      !isWebviewAllowedRoute(req.method, req.originalUrl)
+    ) {
+      return res
+        .status(403)
+        .json({ error: "Forbidden: route not allowed for webview account" });
     }
     req.user = user;
     next();

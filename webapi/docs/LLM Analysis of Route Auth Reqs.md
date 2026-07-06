@@ -2,9 +2,9 @@ Here is a full pass over the webapi routes, grouped by how auth is applied.
 
 **Auth model (short):**
 
-- **Public** — no JWT
-- **`authenticate` only** — JWT required; role must be `admin` **or** `bot` (`NO_ROLE` is rejected)
-- **`requireAdmin`** (or an inline `req.user.role !== "admin"` check) — admin only
+- \*_Public_: no JWT
+- **`authenticate` only**: JWT required; role must be `admin` **or** `bot` (`NO_ROLE` is rejected)
+- **`requireAdmin`** (or an inline `req.user.role !== "admin"` check): admin only
 
 ---
 
@@ -57,7 +57,7 @@ These use `authenticate` only (or only enforce admin for a specific mode). **Bot
 | POST   | `/api/message-processing/pin-check`           |
 | POST   | `/api/message-processing/pin-log`             |
 
-### Link replacements (full CRUD — no `requireAdmin`)
+### Link replacements (full CRUno `requireAdmin`)
 
 | Method | Path                         |
 | ------ | ---------------------------- |

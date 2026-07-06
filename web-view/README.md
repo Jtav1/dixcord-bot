@@ -49,5 +49,9 @@ docker compose up web-view
 | -------- | ------- | ----------- |
 | `PORT` | `3002` | Dev server and production server port |
 | `WEBAPI_URL` | `http://localhost:3000` | webapi base URL; proxied at `/api` |
+| `WEBVIEW_USERNAME` | — | Service account email for webapi login (server-side only) |
+| `WEBVIEW_PASSWORD` | — | Service account password for webapi login (server-side only) |
+
+The dev and production servers log in to webapi with `WEBVIEW_USERNAME` / `WEBVIEW_PASSWORD` and attach the JWT to proxied `/api` requests. Credentials are never sent to the browser.
 
 Client code should call `/api/...` (see `src/lib/api.js`). No build-time API URL is required.
