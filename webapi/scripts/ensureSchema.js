@@ -4,44 +4,14 @@
  */
 
 import db from "../config/db.js";
+import {
+  columnExists,
+  constraintExists,
+  isSqliteDb,
+  tableExists,
+} from "./schemaUtils.js";
 
-const DB_TYPE = (process.env.DB_TYPE || "mysql").toLowerCase();
-const isSqlite = DB_TYPE === "sqlite";
-
-/**
- * Check if a column exists on a table (SQLite).
- * @param {string} table
- * @param {string} column
- * @returns {Promise<boolean>}
- */
-async function sqliteColumnExists(table, column) {
-  try {
-    await db.query(`SELECT "${column}" FROM ${table} LIMIT 0`);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Check if a table exists.
- * @param {string} table
- * @returns {Promise<boolean>}
- */
-async function tableExists(table) {
-  if (isSqlite) {
-    const [rows] = await db.query(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
-      [table],
-    );
-    return Array.isArray(rows) && rows.length > 0;
-  }
-  const [rows] = await db.query(
-    "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
-    [table],
-  );
-  return Array.isArray(rows) && rows.length > 0;
-}
+const isSqlite = isSqliteDb();
 
 /**
  * Run all pending migrations.
@@ -49,24 +19,18 @@ async function tableExists(table) {
  */
 export async function ensureSchemaMigrations() {
   // users.role column
-  if (isSqlite) {
-    if (!(await sqliteColumnExists("users", "role"))) {
+  if (await tableExists(db, "users", isSqlite)) {
+    if (!(await columnExists(db, "users", "role", isSqlite))) {
       await db.query(
-        "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'",
+        isSqlite
+          ? "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'"
+          : "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin'",
       );
-    }
-  } else {
-    try {
-      await db.query(
-        "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin'",
-      );
-    } catch (err) {
-      if (err.code !== "ER_DUP_FIELDNAME") throw err;
     }
   }
 
   // audit_log table
-  if (!(await tableExists("audit_log"))) {
+  if (!(await tableExists(db, "audit_log", isSqlite))) {
     if (isSqlite) {
       await db.query(`
         CREATE TABLE audit_log (
@@ -96,7 +60,7 @@ export async function ensureSchemaMigrations() {
   }
 
   // bot_status table
-  if (!(await tableExists("bot_status"))) {
+  if (!(await tableExists(db, "bot_status", isSqlite))) {
     if (isSqlite) {
       await db.query(`
         CREATE TABLE bot_status (
@@ -119,7 +83,7 @@ export async function ensureSchemaMigrations() {
   }
 
   // system_state table
-  if (!(await tableExists("system_state"))) {
+  if (!(await tableExists(db, "system_state", isSqlite))) {
     if (isSqlite) {
       await db.query(`
         CREATE TABLE system_state (
@@ -140,55 +104,51 @@ export async function ensureSchemaMigrations() {
   }
 
   // pin_history expanded metadata (author, message snapshot, pinners)
-  const pinHistoryColumns = isSqlite
-    ? [
-        {
-          name: "author",
-          sql: "author INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL",
-        },
-        { name: "contents", sql: "contents TEXT NULL" },
-        { name: "attachments", sql: "attachments TEXT NULL" },
-        { name: "channel_id", sql: "channel_id TEXT NULL" },
-        { name: "channel_name", sql: "channel_name TEXT NULL" },
-        { name: "pinners", sql: "pinners TEXT NULL" },
-      ]
-    : [
-        { name: "author", sql: "author INT NULL" },
-        { name: "contents", sql: "contents VARCHAR(5000) NULL" },
-        { name: "attachments", sql: "attachments TEXT NULL" },
-        { name: "channel_id", sql: "channel_id VARCHAR(32) NULL" },
-        { name: "channel_name", sql: "channel_name VARCHAR(100) NULL" },
-        { name: "pinners", sql: "pinners TEXT NULL" },
-      ];
+  if (await tableExists(db, "pin_history", isSqlite)) {
+    const pinHistoryColumns = isSqlite
+      ? [
+          {
+            name: "author",
+            sql: "author INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL",
+          },
+          { name: "contents", sql: "contents TEXT NULL" },
+          { name: "attachments", sql: "attachments TEXT NULL" },
+          { name: "channel_id", sql: "channel_id TEXT NULL" },
+          { name: "channel_name", sql: "channel_name TEXT NULL" },
+          { name: "pinners", sql: "pinners TEXT NULL" },
+        ]
+      : [
+          { name: "author", sql: "author INT NULL" },
+          { name: "contents", sql: "contents VARCHAR(5000) NULL" },
+          { name: "attachments", sql: "attachments TEXT NULL" },
+          { name: "channel_id", sql: "channel_id VARCHAR(32) NULL" },
+          { name: "channel_name", sql: "channel_name VARCHAR(100) NULL" },
+          { name: "pinners", sql: "pinners TEXT NULL" },
+        ];
 
-  for (const col of pinHistoryColumns) {
-    if (isSqlite) {
-      if (!(await sqliteColumnExists("pin_history", col.name))) {
+    for (const col of pinHistoryColumns) {
+      if (!(await columnExists(db, "pin_history", col.name, isSqlite))) {
         await db.query(`ALTER TABLE pin_history ADD COLUMN ${col.sql}`);
-      }
-    } else {
-      try {
-        await db.query(`ALTER TABLE pin_history ADD COLUMN ${col.sql}`);
-      } catch (err) {
-        if (err.code !== "ER_DUP_FIELDNAME") throw err;
       }
     }
-  }
 
-  if (!isSqlite) {
-    try {
+    if (
+      !isSqlite &&
+      !(await constraintExists(
+        db,
+        "pin_history",
+        "fk_pin_history_author",
+        isSqlite,
+      ))
+    ) {
       await db.query(
         "ALTER TABLE pin_history ADD CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL",
       );
-    } catch (err) {
-      if (err.code !== "ER_FK_DUP_NAME") throw err;
     }
-  }
 
-  // pin_history: surrogate autoincrement id as primary key (msgid stays unique)
-  if (await tableExists("pin_history")) {
+    // pin_history: surrogate autoincrement id as primary key (msgid stays unique)
     if (isSqlite) {
-      if (!(await sqliteColumnExists("pin_history", "id"))) {
+      if (!(await columnExists(db, "pin_history", "id", isSqlite))) {
         await db.query(`
           CREATE TABLE pin_history_new (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -213,8 +173,7 @@ export async function ensureSchemaMigrations() {
         await db.query("DROP TABLE pin_history");
         await db.query("ALTER TABLE pin_history_new RENAME TO pin_history");
       }
-    } else if (!(await sqliteColumnExists("pin_history", "id"))) {
-      // sqliteColumnExists uses SELECT column LIMIT 0; works for MySQL too
+    } else if (!(await columnExists(db, "pin_history", "id", isSqlite))) {
       await db.query(`
         ALTER TABLE pin_history
           DROP PRIMARY KEY,
@@ -222,24 +181,14 @@ export async function ensureSchemaMigrations() {
           ADD UNIQUE KEY unique_pin_history_msgid (msgid)
       `);
     }
-  }
 
-  // pin_history.hydrated flag (false for existing rows, true default for new inserts)
-  if (await tableExists("pin_history")) {
-    if (isSqlite) {
-      if (!(await sqliteColumnExists("pin_history", "hydrated"))) {
-        await db.query(
-          "ALTER TABLE pin_history ADD COLUMN hydrated INTEGER NOT NULL DEFAULT 0",
-        );
-      }
-    } else {
-      try {
-        await db.query(
-          "ALTER TABLE pin_history ADD COLUMN hydrated TINYINT(1) NOT NULL DEFAULT 0",
-        );
-      } catch (err) {
-        if (err.code !== "ER_DUP_FIELDNAME") throw err;
-      }
+    // pin_history.hydrated flag (false for existing rows, true default for new inserts)
+    if (!(await columnExists(db, "pin_history", "hydrated", isSqlite))) {
+      await db.query(
+        isSqlite
+          ? "ALTER TABLE pin_history ADD COLUMN hydrated INTEGER NOT NULL DEFAULT 0"
+          : "ALTER TABLE pin_history ADD COLUMN hydrated TINYINT(1) NOT NULL DEFAULT 0",
+      );
     }
   }
 
