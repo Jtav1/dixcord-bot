@@ -20,6 +20,11 @@ export const WEBVIEW_ALLOWED_ROUTES = [
   { method: "GET", path: "/api/user-mappings" },
 ];
 
+/** GET path prefixes the webview service account may access. */
+export const WEBVIEW_ALLOWED_ROUTE_PREFIXES = [
+  "/api/leaderboards/plusplus/history/",
+];
+
 /**
  * @param {unknown} role
  * @returns {boolean} True when role is exactly webview.
@@ -64,10 +69,20 @@ export function normalizeRoutePath(pathname) {
 export function isWebviewAllowedRoute(method, pathname) {
   const normalizedPath = normalizeRoutePath(pathname);
   const normalizedMethod = method.toUpperCase();
-  return WEBVIEW_ALLOWED_ROUTES.some(
-    (route) =>
-      route.method === normalizedMethod && route.path === normalizedPath,
-  );
+  if (
+    WEBVIEW_ALLOWED_ROUTES.some(
+      (route) =>
+        route.method === normalizedMethod && route.path === normalizedPath,
+    )
+  ) {
+    return true;
+  }
+  if (normalizedMethod === "GET") {
+    return WEBVIEW_ALLOWED_ROUTE_PREFIXES.some((prefix) =>
+      normalizedPath.startsWith(prefix),
+    );
+  }
+  return false;
 }
 
 /**

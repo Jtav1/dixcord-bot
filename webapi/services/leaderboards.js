@@ -149,6 +149,56 @@ export async function getPlusPlusTotalByString(string, type = "word", app) {
 }
 
 /**
+ * @param {string} rowId - platform user id (user) or word text (word), as shown on the leaderboard
+ * @param {string} [type='word'] - `word` or `user`
+ * @param {string} app - e.g. "discord"
+ * @returns {Promise<{ string: string, type: string, total: number, votes: Array<{ id: number, value: number, voterPlatformId: string|null, timestamp: string }> }|null>}
+ */
+export async function getPlusPlusVoteHistoryByRowId(rowId, type = "word", app) {
+  if (!rowId || (type !== "word" && type !== "user")) return null;
+  if (!isChatMemberAppSupported(app)) return null;
+
+  const idCol = getChatMemberIdColumn(app);
+  const typestr = type === "user" ? "user" : "word";
+  let stringKey;
+
+  if (type === "user") {
+    const mid = await getChatMemberMappingIdByPlatformUserId(rowId, app);
+    if (mid == null) {
+      return { string: String(rowId), type, total: 0, votes: [] };
+    }
+    stringKey = String(mid);
+  } else {
+    stringKey = String(rowId);
+  }
+
+  const [rows] = await db.query(
+    `SELECT pt.id, pt.value, pt.timestamp, cm_v.\`${idCol}\` AS voter_platform_id
+     FROM plusplus_tracking pt
+     LEFT JOIN chat_member_mapping cm_v ON pt.voter = cm_v.id
+     WHERE pt.type = ? AND pt.string = ?
+     ORDER BY pt.timestamp ASC, pt.id ASC`,
+    [typestr, stringKey],
+  );
+
+  const votes = (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: Number(row.id),
+    value: Number(row.value),
+    voterPlatformId: row.voter_platform_id ?? null,
+    timestamp: row.timestamp,
+  }));
+
+  const total = votes.reduce((sum, vote) => sum + vote.value, 0);
+
+  return {
+    string: String(rowId),
+    type,
+    total,
+    votes,
+  };
+}
+
+/**
  * @param {string} voterId - platform user id (e.g. Discord snowflake)
  * @param {string} app - e.g. "discord"
  * @returns {Promise<{ voterId: string, total: number }|null>}

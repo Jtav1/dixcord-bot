@@ -1,5 +1,5 @@
 <template>
-  <div class="view-page">
+  <div class="view-page view-page--wide">
     <header class="view-header mb-6">
       <h1 class="text-h4 font-weight-bold mb-2">PlusPlus Rankings</h1>
       <p class="text-body-1 text-medium-emphasis">
@@ -23,38 +23,13 @@
             Top Scores
           </v-card-title>
           <v-card-text class="pa-0">
-            <template v-if="loading">
-              <v-skeleton-loader
-                v-for="n in LEADERBOARD_LIMIT"
-                :key="`top-skeleton-${n}`"
-                type="list-item-two-line"
-                class="mb-2"
-              />
-            </template>
-            <template v-else-if="top.length === 0">
-              <p class="text-body-2 text-medium-emphasis text-center py-8">
-                No scores yet.
-              </p>
-            </template>
-            <v-list v-else class="pa-0 bg-transparent" density="comfortable">
-              <v-list-item
-                v-for="(entry, index) in top"
-                :key="`top-${entry.string}-${entry.typestr}`"
-                class="px-0"
-              >
-                <template #prepend>
-                  <span class="rank-badge text-medium-emphasis mr-3">
-                    {{ index + 1 }}
-                  </span>
-                </template>
-                <v-list-item-title>
-                  {{ resolveEntryLabel(entry, nameMap) }}
-                </v-list-item-title>
-                <template #append>
-                  <span class="font-weight-bold">{{ entry.total }}</span>
-                </template>
-              </v-list-item>
-            </v-list>
+            <PlusPlusLeaderboardPanels
+              list-key="top"
+              :entries="top"
+              :name-map="nameMap"
+              :loading="loading"
+              :skeleton-count="LEADERBOARD_LIMIT"
+            />
           </v-card-text>
         </v-card>
       </v-col>
@@ -66,38 +41,13 @@
             Bottom Scores
           </v-card-title>
           <v-card-text class="pa-0">
-            <template v-if="loading">
-              <v-skeleton-loader
-                v-for="n in LEADERBOARD_LIMIT"
-                :key="`bottom-skeleton-${n}`"
-                type="list-item-two-line"
-                class="mb-2"
-              />
-            </template>
-            <template v-else-if="bottom.length === 0">
-              <p class="text-body-2 text-medium-emphasis text-center py-8">
-                No scores yet.
-              </p>
-            </template>
-            <v-list v-else class="pa-0 bg-transparent" density="comfortable">
-              <v-list-item
-                v-for="(entry, index) in bottom"
-                :key="`bottom-${entry.string}-${entry.typestr}`"
-                class="px-0"
-              >
-                <template #prepend>
-                  <span class="rank-badge text-medium-emphasis mr-3">
-                    {{ index + 1 }}
-                  </span>
-                </template>
-                <v-list-item-title>
-                  {{ resolveEntryLabel(entry, nameMap) }}
-                </v-list-item-title>
-                <template #append>
-                  <span class="font-weight-bold">{{ entry.total }}</span>
-                </template>
-              </v-list-item>
-            </v-list>
+            <PlusPlusLeaderboardPanels
+              list-key="bottom"
+              :entries="bottom"
+              :name-map="nameMap"
+              :loading="loading"
+              :skeleton-count="LEADERBOARD_LIMIT"
+            />
           </v-card-text>
         </v-card>
       </v-col>
@@ -114,12 +64,12 @@
 
 <script setup>
 import { onMounted, ref } from "vue";
+import PlusPlusLeaderboardPanels from "../components/PlusPlusLeaderboardPanels.vue";
 import {
   LEADERBOARD_LIMIT,
   buildUserNameMap,
   fetchAllUserMappings,
   fetchPlusPlusLeaderboard,
-  resolveEntryLabel,
 } from "../lib/plusplusRankings.js";
 
 const loading = ref(true);
@@ -157,12 +107,3 @@ async function loadRankings() {
 
 onMounted(loadRankings);
 </script>
-
-<style scoped>
-.rank-badge {
-  display: inline-block;
-  min-width: 1.5rem;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-</style>

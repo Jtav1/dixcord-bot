@@ -53,7 +53,8 @@ app.use(
 );
 app.use(express.static(distDir));
 app.use((req, res) => {
-  if (req.path.startsWith("/api")) {
+  const url = req.originalUrl || req.url || "";
+  if (url.startsWith("/api")) {
     res.status(502).json({ ok: false, error: "API proxy unavailable" });
     return;
   }

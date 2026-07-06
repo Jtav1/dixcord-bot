@@ -11,14 +11,19 @@ const REFRESH_BUFFER_MS = 5 * 60 * 1000;
  * @returns {{ webapiUrl: string, username: string|undefined, password: string|undefined }}
  */
 function getConfig() {
-  const webapiUrl = (process.env.WEBAPI_URL || "http://localhost:3000").replace(
-    /\/+$/,
-    "",
-  );
+  const webapiUrl = (
+    process.env["WEBAPI_URL"] ||
+    process.env["VITE_WEBAPI_URL"] ||
+    "http://localhost:3000"
+  ).replace(/\/+$/, "");
   return {
     webapiUrl,
-    username: process.env.WEBVIEW_USERNAME,
-    password: process.env.WEBVIEW_PASSWORD,
+    username:
+      process.env["WEBVIEW_USERNAME"] ||
+      process.env["VITE_WEBVIEW_USERNAME"],
+    password:
+      process.env["WEBVIEW_PASSWORD"] ||
+      process.env["VITE_WEBVIEW_PASSWORD"],
   };
 }
 

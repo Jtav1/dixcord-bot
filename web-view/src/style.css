@@ -76,6 +76,10 @@ body {
   margin: 0 auto;
 }
 
+.view-page--wide {
+  max-width: 1280px;
+}
+
 .view-header {
   padding-bottom: 0.5rem;
 }

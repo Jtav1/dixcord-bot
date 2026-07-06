@@ -20,6 +20,7 @@ RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 COPY server.js ./
+COPY lib ./lib
 
 RUN addgroup -g 1001 -S app && adduser -u 1001 -S app -G app
 USER app
