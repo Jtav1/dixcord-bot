@@ -11,6 +11,7 @@ import {
   requireChatMemberMappingId,
   UNKNOWN_CHAT_MEMBER_ERROR,
 } from "./chatMemberMapping.js";
+import { normalizePinLogPayload } from "./pinHistory.js";
 
 /**
  * @param {Record<string, unknown> | null | undefined} payload
@@ -495,16 +496,35 @@ export async function isMessageAlreadyPinned(messageId) {
 
 /**
  * Log a message as pinned (idempotent: no-op if already logged).
- * @param {string} messageId - Discord message ID (snowflake)
- * @returns {Promise<{ ok: boolean }>}
+ * @param {{ messageId?: string, app?: string, authorId?: string, contents?: string, attachments?: unknown, channelId?: string, channelName?: string, pinnerIds?: string[] }} payload
+ * @returns {Promise<{ ok: boolean, error?: string }>}
  */
-export async function logPinnedMessage(messageId) {
+export async function logPinnedMessage(payload) {
+  const messageId =
+    typeof payload === "string" ? payload : payload?.messageId;
   if (!messageId || String(messageId).trim() === "") {
     return { ok: false };
   }
   const id = String(messageId).trim();
   const already = await isMessageAlreadyPinned(id);
   if (already) return { ok: true };
-  await db.query("INSERT INTO pin_history (msgid) VALUES (?)", [id]);
+
+  const appCheck = requireChatAppFromPayload(
+    typeof payload === "object" && payload != null ? payload : {},
+  );
+  if (!appCheck.ok) return appCheck;
+
+  const normalized = await normalizePinLogPayload(payload, appCheck.app);
+  if (!normalized.ok) return normalized;
+
+  const { author, contents, attachments, channelId, channelName, pinners } =
+    normalized.row;
+
+  await db.query(
+    `INSERT INTO pin_history (
+      msgid, author, contents, attachments, channel_id, channel_name, pinners, hydrated
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, author, contents, attachments, channelId, channelName, pinners, 1],
+  );
   return { ok: true };
 }

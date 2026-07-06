@@ -80,8 +80,16 @@ CREATE TABLE IF NOT EXISTS user_repost_tracking (
 );
 
 CREATE TABLE IF NOT EXISTS pin_history (
-  msgid TEXT PRIMARY KEY,
-  timestamp TEXT DEFAULT (datetime('now'))
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  msgid TEXT NOT NULL UNIQUE,
+  timestamp TEXT DEFAULT (datetime('now')),
+  author INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+  contents TEXT NULL,
+  attachments TEXT NULL,
+  channel_id TEXT NULL,
+  channel_name TEXT NULL,
+  pinners TEXT NULL,
+  hydrated INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS link_replacements (
