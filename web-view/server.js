@@ -33,18 +33,30 @@ app.use("/api", (req, res, next) => {
 app.use(
   "/api",
   createProxyMiddleware({
-    target: WEBAPI_URL,
+    target: `${WEBAPI_URL.replace(/\/+$/, "")}/api`,
     changeOrigin: true,
-    pathRewrite: (path) => `/api${path}`,
     on: {
       proxyReq: (proxyReq) => {
         attachCachedWebapiAuthHeader(proxyReq);
+      },
+      error: (err, req, res) => {
+        console.error("web-view API proxy error:", err.message);
+        if (!res.headersSent) {
+          res.status(502).json({
+            ok: false,
+            error: "Failed to reach webapi",
+          });
+        }
       },
     },
   }),
 );
 app.use(express.static(distDir));
-app.use((_req, res) => {
+app.use((req, res) => {
+  if (req.path.startsWith("/api")) {
+    res.status(502).json({ ok: false, error: "API proxy unavailable" });
+    return;
+  }
   res.sendFile(path.join(distDir, "index.html"));
 });
 

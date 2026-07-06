@@ -26,6 +26,15 @@ export default defineConfig(({ mode }) => {
         proxy.on("proxyReq", (proxyReq) => {
           attachCachedWebapiAuthHeader(proxyReq);
         });
+        proxy.on("error", (err, req, res) => {
+          console.error("web-view dev API proxy error:", err.message);
+          if (res.writeHead && !res.headersSent) {
+            res.writeHead(502, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({ ok: false, error: "Failed to reach webapi" }),
+            );
+          }
+        });
       },
     },
   };
@@ -38,10 +47,12 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       port,
+      strictPort: true,
       proxy: apiProxy,
     },
     preview: {
       port,
+      strictPort: true,
       proxy: apiProxy,
     },
   };

@@ -119,7 +119,8 @@ export function getCachedWebapiAuthHeaderSync() {
  * @returns {Promise<void>}
  */
 export async function webapiAuthProxyMiddleware(req, res, next) {
-  if (!req.url?.startsWith("/api")) {
+  const url = req.originalUrl || req.url || "";
+  if (!url.startsWith("/api")) {
     next();
     return;
   }

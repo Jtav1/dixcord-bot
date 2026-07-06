@@ -16,7 +16,7 @@ Routes added for admin panel backend preparation. **Write** routes require admin
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/user-mappings?app=discord&limit=&offset=&search=` | admin or bot | Paginated list |
+| GET | `/api/user-mappings?app=discord&limit=&offset=&search=` | admin, bot, or webview | Paginated list |
 | GET | `/api/user-mappings/:id?app=discord` | admin or bot | Get one |
 | POST | `/api/user-mappings` | admin | Create `{ app, name, handle, platformUserId }` |
 | PUT | `/api/user-mappings/:id` | admin | Update |
@@ -97,3 +97,4 @@ The `webview` role may only access these routes:
 | POST | `/api/leaderboards/repost` |
 | GET | `/api/pin-history` |
 | GET | `/api/system/status` |
+| GET | `/api/user-mappings` |

@@ -17,6 +17,7 @@ export const WEBVIEW_ALLOWED_ROUTES = [
   { method: "POST", path: "/api/leaderboards/repost" },
   { method: "GET", path: "/api/pin-history" },
   { method: "GET", path: "/api/system/status" },
+  { method: "GET", path: "/api/user-mappings" },
 ];
 
 /**
