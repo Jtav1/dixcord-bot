@@ -35,8 +35,8 @@ async function ensureAdminUser() {
   const username = process.env.ADMIN_USERNAME;
   const password = process.env.ADMIN_PASSWORD;
   if (!username || !password) {
-    console.warn(
-      "ADMIN_USERNAME and ADMIN_PASSWORD must be set; no admin user created.",
+    console.log(
+      "webapi: ADMIN_USERNAME and ADMIN_PASSWORD must be set; no admin user created.",
     );
     return;
   }
@@ -51,13 +51,13 @@ async function ensureAdminUser() {
         "UPDATE users SET password_hash = ?, role = 'admin' WHERE email = ?",
         [hash, username],
       );
-      console.log("Admin user password updated.");
+      console.log("webapi: Admin user password updated.");
     } else {
       await db.query(
         "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'admin')",
         [username, hash, "Admin"],
       );
-      console.log("Admin user created.");
+      console.log("webapi: Admin user created.");
     }
   } catch (err) {
     console.error("Failed to ensure admin user:", err);
@@ -73,8 +73,8 @@ async function ensureBotUser() {
   const username = process.env.BOT_USERNAME;
   const password = process.env.BOT_PASSWORD;
   if (!username || !password) {
-    console.warn(
-      "BOT_USERNAME and BOT_PASSWORD not set; bot service account not created.",
+    console.log(
+      "webapi: BOT_USERNAME and BOT_PASSWORD not set; bot service account not created.",
     );
     return;
   }
@@ -89,16 +89,54 @@ async function ensureBotUser() {
         "UPDATE users SET password_hash = ?, role = 'bot' WHERE email = ?",
         [hash, username],
       );
-      console.log("Bot service account password updated.");
+      console.log("webapi: Bot service account password updated.");
     } else {
       await db.query(
         "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'bot')",
         [username, hash, "Bot"],
       );
-      console.log("Bot service account created.");
+      console.log("webapi: Bot service account created.");
     }
   } catch (err) {
-    console.error("Failed to ensure bot user:", err);
+    console.error("webapi: Failed to ensure bot user:", err);
+    throw err;
+  }
+}
+
+/**
+ * Create or update the web-view service account from WEBVIEW_USERNAME and WEBVIEW_PASSWORD.
+ * @returns {Promise<void>}
+ */
+async function ensureWebViewUser() {
+  const username = process.env.WEBVIEW_USERNAME;
+  const password = process.env.WEBVIEW_PASSWORD;
+  if (!username || !password) {
+    console.warn(
+      "WEBVIEW_USERNAME and WEBVIEW_PASSWORD not set; web-view service account not created.",
+    );
+    return;
+  }
+  try {
+    const [rows] = await db.query(
+      "SELECT id, password_hash FROM users WHERE email = ?",
+      [username],
+    );
+    const hash = await bcrypt.hash(password, 10);
+    if (rows && rows.length > 0) {
+      await db.query(
+        "UPDATE users SET password_hash = ?, role = 'webview' WHERE email = ?",
+        [hash, username],
+      );
+      console.log("Web-view service account password updated.");
+    } else {
+      await db.query(
+        "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'webview')",
+        [username, hash, "webview"],
+      );
+      console.log("Web-view service account created.");
+    }
+  } catch (err) {
+    console.error("Failed to ensure web-view user:", err);
     throw err;
   }
 }
@@ -188,13 +226,17 @@ app.get("/", publicLimiter, (req, res) => {
     endpoints: {
       auth: {
         public: [
-          "POST /api/auth/login (admin or bot service account; returns JWT)",
+          "POST /api/auth/login (admin, bot, or webview service account; returns JWT)",
           "POST /api/auth/register (disabled; returns 403)",
         ],
       },
       users: {
         authRequired: true,
-        routes: ["GET /api/users/me", "PUT /api/users/me", "DELETE /api/users/me"],
+        routes: [
+          "GET /api/users/me",
+          "PUT /api/users/me",
+          "DELETE /api/users/me",
+        ],
       },
       config: {
         authRequired: true,
@@ -231,12 +273,17 @@ app.get("/", publicLimiter, (req, res) => {
       },
       pinHistory: {
         authRequired: true,
-        routes: ["GET /api/pin-history?limit=&offset="],
+        routes: [
+          "GET /api/pin-history?limit=&offset=",
+          "GET /api/pin-history/incomplete?limit=&offset=",
+          "GET /api/pin-history/:id",
+          "PUT /api/pin-history/:id",
+        ],
       },
       system: {
         authRequired: true,
         routes: [
-          "GET /api/system/status (admin)",
+          "GET /api/system/status (admin, bot, or webview)",
           "GET /api/system/cache-version",
           "POST /api/system/invalidate-cache (admin)",
           "POST /api/system/heartbeat (body: { guildId, version })",
@@ -264,9 +311,9 @@ app.get("/", publicLimiter, (req, res) => {
       messageProcessing: {
         authRequired: true,
         routes: [
-          'POST /api/message-processing/emoji-count',
-          'POST /api/message-processing/plusminus',
-          'POST /api/message-processing/count-repost',
+          "POST /api/message-processing/emoji-count",
+          "POST /api/message-processing/plusminus",
+          "POST /api/message-processing/count-repost",
           "POST /api/message-processing/emoji-import",
           "POST /api/message-processing/sticker-import",
           "POST /api/message-processing/user-mapping-import",
@@ -274,9 +321,21 @@ app.get("/", publicLimiter, (req, res) => {
           "POST /api/message-processing/pin-log",
         ],
       },
-      linkReplacements: { authRequired: true, routes: ["GET/POST/PUT/DELETE /api/link-replacements"] },
-      pinQuips: { authRequired: true, routes: ["GET/POST/PUT/DELETE /api/pin-quips", "GET /api/pin-quips/random"] },
-      triggerResponses: { authRequired: true, routes: ["Full CRUD under /api/trigger-responses/*"] },
+      linkReplacements: {
+        authRequired: true,
+        routes: ["GET/POST/PUT/DELETE /api/link-replacements"],
+      },
+      pinQuips: {
+        authRequired: true,
+        routes: [
+          "GET/POST/PUT/DELETE /api/pin-quips",
+          "GET /api/pin-quips/random",
+        ],
+      },
+      triggerResponses: {
+        authRequired: true,
+        routes: ["Full CRUD under /api/trigger-responses/*"],
+      },
       scheduledMessages: {
         authRequired: true,
         routes: [
@@ -328,6 +387,7 @@ app.use((err, req, res, next) => {
 await ensureSchemaMigrations();
 await ensureAdminUser();
 await ensureBotUser();
+await ensureWebViewUser();
 app.listen(PORT, () => {
-  console.log(`API running at http://localhost:${PORT}`);
+  console.log(`webapi: API running at http://localhost:${PORT}`);
 });

@@ -12,7 +12,7 @@ export const importUserMappingList = async (userRows) => {
     app: "discord",
     users: list,
   });
-  console.log("db: user mapping import complete (via webapi)");
+  console.log("bot: user mapping import via webapi complete ");
 };
 
 /**
@@ -28,8 +28,8 @@ export async function syncUserMappingFromGuild(client) {
     .catch(() => null);
 
   if (!channel || channel.guildId !== guild.id) {
-    console.warn(
-      "user-mapping: DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID not found or not in guild; skipping user mapping sync",
+    console.log(
+      "bot: DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID not found or not in guild; skipping user mapping sync",
     );
     return;
   }

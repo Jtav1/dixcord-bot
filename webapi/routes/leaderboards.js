@@ -45,6 +45,33 @@ router.post("/plusplus", authenticate, async (req, res) => {
 });
 
 /**
+ * GET /api/leaderboards/plusplus/history/:rowId
+ * Full plus/minus vote history for one leaderboard row (word or user).
+ * Path: rowId = platform user id (user) or word text (word), as returned on the leaderboard.
+ * Query: type=word|user (default word), app=discord required
+ * Auth: required.
+ */
+router.get("/plusplus/history/:rowId", authenticate, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    const rowId = req.params.rowId;
+    const type = req.query.type === "user" ? "user" : "word";
+    if (!rowId) {
+      return res.status(400).json({ ok: false, error: "rowId is required" });
+    }
+    const result = await leaderboards.getPlusPlusVoteHistoryByRowId(rowId, type, app);
+    if (!result) {
+      return res.status(400).json({ ok: false, error: "Invalid type; use 'word' or 'user'" });
+    }
+    res.json({ ok: true, app, ...result, count: result.votes.length });
+  } catch (err) {
+    console.error("GET /api/leaderboards/plusplus/history/:rowId error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get plusplus vote history" });
+  }
+});
+
+/**
  * GET /api/leaderboards/plusplus/total
  * Total score for a word or user (mirrors plusplus-total command).
  * Query: string= required, type=word|user (default word), app=discord required
@@ -113,17 +140,44 @@ router.post("/plusplus/top-voters", authenticate, async (req, res) => {
 /**
  * POST /api/leaderboards/emoji
  * Top used emojis (mirrors top-emojis command).
- * Body: { limit?: number } (optional, default 5, max 50)
+ * Body: { limit?: number, offset?: number } (optional; default limit 5, max 50; default offset 0)
  * Auth: required.
  */
 router.post("/emoji", authenticate, async (req, res) => {
   try {
     const limit = leaderboards.parseLimit(req.body?.limit, 5, 50);
-    const top = await leaderboards.getTopEmoji(limit);
-    res.json({ ok: true, limit, top });
+    const offset =
+      req.body?.offset != null ? Math.max(0, parseInt(req.body.offset, 10) || 0) : 0;
+    const { rows, total } = await leaderboards.listEmojiFrequency(limit, offset);
+    res.json({ ok: true, limit, offset, total, top: rows });
   } catch (err) {
     console.error("POST /api/leaderboards/emoji error:", err);
     res.status(500).json({ ok: false, error: "Failed to get emoji leaderboard" });
+  }
+});
+
+/**
+ * POST /api/leaderboards/emoji/users
+ * Top users by total emoji usage (paginated).
+ * Body: { app: "discord", limit?: number, offset?: number } (default limit 50, max 50; default offset 0)
+ * Auth: required.
+ */
+router.post("/emoji/users", authenticate, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    const limit = leaderboards.parseLimit(req.body?.limit, 50, 50);
+    const offset =
+      req.body?.offset != null ? Math.max(0, parseInt(req.body.offset, 10) || 0) : 0;
+    const { rows, total } = await leaderboards.listEmojiUsersByTotalUsage(
+      limit,
+      offset,
+      app,
+    );
+    res.json({ ok: true, app, limit, offset, total, users: rows });
+  } catch (err) {
+    console.error("POST /api/leaderboards/emoji/users error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get emoji user leaderboard" });
   }
 });
 
@@ -178,7 +232,10 @@ router.get("/emoji/user/:userId", authenticate, async (req, res) => {
   try {
     const app = resolveChatAppFromRequest(req);
     if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
-    const limit = leaderboards.parseLimit(req.query.limit, 50, 200);
+    const limit =
+      req.query.limit != null
+        ? leaderboards.parseLimit(req.query.limit, 50, 200)
+        : undefined;
     const stats = await getEmojiStatsForUser(req.params.userId, app, limit);
     res.json({ ok: true, app, userId: req.params.userId, stats });
   } catch (err) {

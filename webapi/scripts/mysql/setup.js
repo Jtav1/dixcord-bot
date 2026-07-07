@@ -8,6 +8,12 @@
  */
 import "dotenv/config";
 import mysql from "mysql2/promise";
+import {
+  columnExists,
+  constraintExists,
+  foreignKeyExists,
+  tableExists,
+} from "../schemaUtils.js";
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
@@ -83,10 +89,11 @@ const initializeDatabase = async () => {
     )
   `);
 
-  // Pinned message table
+  // Pinned message table (base columns; FK and later columns applied in migrateTables)
   await execQuery(`
     CREATE TABLE IF NOT EXISTS pin_history (
-      msgid VARCHAR(255) PRIMARY KEY,
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      msgid VARCHAR(255) NOT NULL UNIQUE,
       timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
@@ -128,16 +135,14 @@ const initializeDatabase = async () => {
   `);
 
   // Migration: add msgcontents if table existed before this column was added
-  try {
-    const [cols] = await pool.query(
-      "SELECT COUNT(*) as c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user_repost_tracking' AND COLUMN_NAME = 'msgcontents'",
+  if (
+    (await tableExists(pool, "user_repost_tracking", false)) &&
+    !(await columnExists(pool, "user_repost_tracking", "msgcontents", false))
+  ) {
+    await execQuery(
+      "ALTER TABLE user_repost_tracking ADD COLUMN msgcontents TEXT",
     );
-    if (cols && cols[0]?.c === 0) {
-      await execQuery(
-        "ALTER TABLE user_repost_tracking ADD COLUMN msgcontents TEXT",
-      );
-    }
-  } catch (_) {}
+  }
 
   // PlusPlus tracking table
   await execQuery(`
@@ -225,6 +230,8 @@ const initializeDatabase = async () => {
     )
   `);
 
+  await migrateTables();
+
   const defaultPinQuips = [
     "lmao saving this shit for later",
     "PINNED",
@@ -249,6 +256,127 @@ const initializeDatabase = async () => {
   }
 
   console.log("db: MySQL table initialization complete");
+};
+
+/**
+ * Apply incremental column, constraint, and table migrations idempotently.
+ * @returns {Promise<void>}
+ */
+const migrateTables = async () => {
+  const isSqlite = false;
+
+  if (
+    (await tableExists(pool, "users", isSqlite)) &&
+    !(await columnExists(pool, "users", "role", isSqlite))
+  ) {
+    await execQuery(
+      "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin'",
+    );
+  }
+
+  if (!(await tableExists(pool, "audit_log", isSqlite))) {
+    await execQuery(`
+      CREATE TABLE audit_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        action VARCHAR(50) NOT NULL,
+        resource VARCHAR(100) NOT NULL,
+        resource_id VARCHAR(255) NULL,
+        details TEXT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+  }
+
+  if (!(await tableExists(pool, "bot_status", isSqlite))) {
+    await execQuery(`
+      CREATE TABLE bot_status (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        guild_id VARCHAR(32) NOT NULL UNIQUE,
+        version VARCHAR(50) NOT NULL,
+        last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+  }
+
+  if (!(await tableExists(pool, "system_state", isSqlite))) {
+    await execQuery(`
+      CREATE TABLE system_state (
+        state_key VARCHAR(100) PRIMARY KEY,
+        state_value VARCHAR(255) NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+  }
+
+  if (await tableExists(pool, "pin_history", isSqlite)) {
+    const pinHistoryColumns = [
+      { name: "author", sql: "author INT NULL" },
+      { name: "contents", sql: "contents VARCHAR(5000) NULL" },
+      { name: "attachments", sql: "attachments TEXT NULL" },
+      { name: "channel_id", sql: "channel_id VARCHAR(32) NULL" },
+      { name: "channel_name", sql: "channel_name VARCHAR(100) NULL" },
+      { name: "pinners", sql: "pinners TEXT NULL" },
+      { name: "hydrated", sql: "hydrated TINYINT(1) NOT NULL DEFAULT 1" },
+    ];
+
+    for (const col of pinHistoryColumns) {
+      if (!(await columnExists(pool, "pin_history", col.name, isSqlite))) {
+        await execQuery(`ALTER TABLE pin_history ADD COLUMN ${col.sql}`);
+      }
+    }
+
+    if (
+      !(await constraintExists(
+        pool,
+        "pin_history",
+        "fk_pin_history_author",
+        isSqlite,
+      )) &&
+      !(await foreignKeyExists(
+        pool,
+        "pin_history",
+        "author",
+        "chat_member_mapping",
+        isSqlite,
+      ))
+    ) {
+      await execQuery(
+        "ALTER TABLE pin_history ADD CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL",
+      );
+    }
+
+    if (!(await columnExists(pool, "pin_history", "id", isSqlite))) {
+      await execQuery(`
+        ALTER TABLE pin_history
+          DROP PRIMARY KEY,
+          ADD COLUMN id INT AUTO_INCREMENT PRIMARY KEY FIRST,
+          ADD UNIQUE KEY unique_pin_history_msgid (msgid)
+      `);
+    }
+  }
+
+  if (
+    (await tableExists(pool, "scheduled_messages", isSqlite)) &&
+    !(await constraintExists(
+      pool,
+      "scheduled_messages",
+      "fk_scheduled_messages_user",
+      isSqlite,
+    )) &&
+    !(await foreignKeyExists(
+      pool,
+      "scheduled_messages",
+      "user_id",
+      "chat_member_mapping",
+      isSqlite,
+    ))
+  ) {
+    await execQuery(
+      "ALTER TABLE scheduled_messages ADD CONSTRAINT fk_scheduled_messages_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE",
+    );
+  }
 };
 
 const importConfigs = async () => {

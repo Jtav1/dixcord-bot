@@ -13,9 +13,9 @@ const router = express.Router();
 /**
  * GET /api/system/status
  * System and bot health status.
- * Auth: admin required.
+ * Auth: required (admin, bot, or webview).
  */
-router.get("/status", authenticate, requireAdmin, async (req, res) => {
+router.get("/status", authenticate, async (req, res) => {
   try {
     const status = await getSystemStatus();
     res.json({ ok: true, status });

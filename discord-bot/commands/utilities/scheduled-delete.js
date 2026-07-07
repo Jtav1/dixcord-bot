@@ -41,7 +41,7 @@ const execute = async (interaction) => {
       flags: MessageFlags.Ephemeral,
     });
   } catch (err) {
-    console.log("scheduled-delete command failed:", err);
+    console.log("command: scheduled-delete command failed:", err);
     await interaction.reply({
       content: "Failed to delete scheduled reminder.",
       flags: MessageFlags.Ephemeral,
@@ -50,4 +50,3 @@ const execute = async (interaction) => {
 };
 
 export { cmdName, data, execute };
-

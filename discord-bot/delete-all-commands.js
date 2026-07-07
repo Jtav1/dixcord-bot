@@ -9,7 +9,7 @@ const rest = new REST().setToken(token);
     await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
       body: [],
     });
-    console.log("Successfully deleted all guild commands.");
+    console.log("bot: Successfully deleted all guild commands");
   } catch (error) {
     console.error(error);
     process.exit(1);

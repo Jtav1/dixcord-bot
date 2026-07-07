@@ -19,7 +19,7 @@ router.post("/register", (req, res) => {
 
 /**
  * POST /api/auth/login
- * Login for admin (ADMIN_USERNAME) or bot service account (BOT_USERNAME).
+ * Login for admin (ADMIN_USERNAME), bot (BOT_USERNAME), or web-view (WEBVIEW_USERNAME).
  * Body: { email, password }
  * Response: { ok, user, token, role }
  * Auth: none.
@@ -35,7 +35,10 @@ router.post("/login", async (req, res) => {
 
     const adminUsername = process.env.ADMIN_USERNAME;
     const botUsername = process.env.BOT_USERNAME;
-    const allowedEmails = [adminUsername, botUsername].filter(Boolean);
+    const webviewUsername = process.env.WEBVIEW_USERNAME;
+    const allowedEmails = [adminUsername, botUsername, webviewUsername].filter(
+      Boolean,
+    );
 
     if (allowedEmails.length > 0 && !allowedEmails.includes(email)) {
       return res

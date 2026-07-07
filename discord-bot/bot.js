@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import { token, guildId, isDev, version, clientId } from "./configVars.js";
 import { importEmojiList } from "./api/emojis.js";
 import { syncUserMappingFromGuild } from "./api/userMapping.js";
+import { hydratePinHistory } from "./events/messages/utilities/pinHistoryHydration.js";
 import {
   getAnnounceChannelId,
   getMinusEmoji,
@@ -75,7 +76,7 @@ for (const category of commandsCategories) {
       commands.push(command);
     } else {
       console.log(
-        `[WARNING] Command ${commandCategoryPath} is missing a required "cmdName" or "data" or "execute" property.`,
+        `bot: [WARNING] Command ${commandCategoryPath} is missing a required "cmdName" or "data" or "execute" property.`,
       );
     }
   }
@@ -90,7 +91,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   try {
     await runCommand.execute(interaction);
   } catch (e) {
-    console.log("command execution error");
+    console.log("bot: command execution error");
   }
 });
 
@@ -101,11 +102,16 @@ client.once(Events.ClientReady, async (readyClient) => {
 
   await importEmojiList(emojis);
   await syncUserMappingFromGuild(readyClient);
+  await hydratePinHistory(readyClient).catch((err) => {
+    console.error("pin-history hydration error:", err);
+  });
   await startMessageScheduler(readyClient);
   startCacheVersionPoller();
   startHeartbeat();
 
-  console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+  console.log(
+    `bot: Ready! Logged in as ${readyClient.user.tag} at ${new Date().toLocaleString()}`,
+  );
 });
 
 client.on("messageReactionAdd", async (reaction, user) => {
@@ -133,14 +139,16 @@ client.on(Events.Error, async (error) => {
   console.error("Discord Client Error: ", error);
 });
 
-await client.login(token);
+await client.login(token).then(() => {
+  console.log("bot: client.login() completed successfully");
+});
 
 const announceChannelId = getAnnounceChannelId();
 if (announceChannelId.length > 0) {
   const announceChannel = await client.channels.fetch(announceChannelId);
 
   if (isDev) {
-    console.log(`Dixbot ${version}-dev online`);
+    console.log(`=======Dixbot ${version}-dev online========`);
   } else {
     await announceChannel.send(`Dixbot ${version}-prod online`);
   }

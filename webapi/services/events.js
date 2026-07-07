@@ -144,11 +144,13 @@ export async function listRepostEvents(opts = {}) {
   return { events, total };
 }
 
+const EMOJI_FREQUENCY_WHERE = "ef.type = 'emoji' OR ef.type IS NULL";
+
 /**
- * Per-user emoji usage stats.
+ * Per-user emoji usage stats (emojis only, excludes stickers).
  * @param {string} userId - platform user id
  * @param {string} app
- * @param {number} [limit]
+ * @param {number} [limit] When omitted, returns all rows.
  * @returns {Promise<Array<{ emoid: string, emoji: string, frequency: number, animated: boolean }>>}
  */
 export async function getEmojiStatsForUser(userId, app, limit) {
@@ -156,15 +158,20 @@ export async function getEmojiStatsForUser(userId, app, limit) {
   const mid = await getChatMemberMappingIdByPlatformUserId(userId, app);
   if (mid == null) return [];
 
-  const n = parseLimit(limit, 50, 200);
-  const [rows] = await db.query(
-    `SELECT uet.emoid, ef.emoji, uet.frequency, ef.animated
+  const sql = `SELECT uet.emoid, ef.emoji, uet.frequency, ef.animated
      FROM user_emoji_tracking uet
      INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
-     WHERE uet.userid = ?
-     ORDER BY uet.frequency DESC
-     LIMIT ?`,
-    [mid, n],
+     WHERE uet.userid = ? AND (${EMOJI_FREQUENCY_WHERE})
+     ORDER BY uet.frequency DESC`;
+
+  const params = [mid];
+  if (limit != null) {
+    params.push(parseLimit(limit, 50, 200));
+  }
+
+  const [rows] = await db.query(
+    limit != null ? `${sql} LIMIT ?` : sql,
+    params,
   );
 
   return (Array.isArray(rows) ? rows : []).map((row) => ({

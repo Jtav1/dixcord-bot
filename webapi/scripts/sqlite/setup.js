@@ -10,6 +10,11 @@ import "dotenv/config";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import {
+  columnExistsSync,
+  indexExistsSync,
+  tableExistsSync,
+} from "../schemaUtils.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -101,8 +106,16 @@ const initializeDatabase = () => {
 
   exec(`
     CREATE TABLE IF NOT EXISTS pin_history (
-      msgid TEXT PRIMARY KEY,
-      timestamp TEXT DEFAULT (datetime('now'))
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      msgid TEXT NOT NULL UNIQUE,
+      timestamp TEXT DEFAULT (datetime('now')),
+      author INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+      contents TEXT NULL,
+      attachments TEXT NULL,
+      channel_id TEXT NULL,
+      channel_name TEXT NULL,
+      pinners TEXT NULL,
+      hydrated INTEGER NOT NULL DEFAULT 1
     )
   `);
 
@@ -138,14 +151,6 @@ const initializeDatabase = () => {
       UNIQUE (userid, msgid, accuser)
     )
   `);
-
-  // Migration: add msgcontents if table existed before this column was added
-  try {
-    const info = db.prepare("PRAGMA table_info(user_repost_tracking)").all();
-    if (info && !info.some((c) => c.name === "msgcontents")) {
-      db.exec("ALTER TABLE user_repost_tracking ADD COLUMN msgcontents TEXT");
-    }
-  } catch (_) {}
 
   exec(`
     CREATE TABLE IF NOT EXISTS plusplus_tracking (
@@ -230,7 +235,102 @@ const initializeDatabase = () => {
     "CREATE INDEX IF NOT EXISTS idx_scheduled_messages_user ON scheduled_messages (user_id, status)",
   );
 
+  migrateTables();
+
   console.log("db: SQLite table initialization complete");
+};
+
+/**
+ * Apply incremental column and table migrations idempotently.
+ */
+const migrateTables = () => {
+  if (
+    tableExistsSync(db, "users") &&
+    !columnExistsSync(db, "users", "role")
+  ) {
+    db.exec(
+      "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'",
+    );
+  }
+
+  if (!tableExistsSync(db, "audit_log")) {
+    exec(`
+      CREATE TABLE audit_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        action TEXT NOT NULL,
+        resource TEXT NOT NULL,
+        resource_id TEXT,
+        details TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
+
+  if (!tableExistsSync(db, "bot_status")) {
+    exec(`
+      CREATE TABLE bot_status (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        guild_id TEXT NOT NULL UNIQUE,
+        version TEXT NOT NULL,
+        last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
+
+  if (!tableExistsSync(db, "system_state")) {
+    exec(`
+      CREATE TABLE system_state (
+        state_key TEXT PRIMARY KEY,
+        state_value TEXT NOT NULL,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+  }
+
+  if (tableExistsSync(db, "user_repost_tracking")) {
+    if (!columnExistsSync(db, "user_repost_tracking", "msgcontents")) {
+      db.exec("ALTER TABLE user_repost_tracking ADD COLUMN msgcontents TEXT");
+    }
+  }
+
+  if (tableExistsSync(db, "pin_history")) {
+    const pinHistoryColumns = [
+      {
+        name: "author",
+        sql: "author INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL",
+      },
+      { name: "contents", sql: "contents TEXT NULL" },
+      { name: "attachments", sql: "attachments TEXT NULL" },
+      { name: "channel_id", sql: "channel_id TEXT NULL" },
+      { name: "channel_name", sql: "channel_name TEXT NULL" },
+      { name: "pinners", sql: "pinners TEXT NULL" },
+      { name: "hydrated", sql: "hydrated INTEGER NOT NULL DEFAULT 1" },
+    ];
+
+    for (const col of pinHistoryColumns) {
+      if (!columnExistsSync(db, "pin_history", col.name)) {
+        db.exec(`ALTER TABLE pin_history ADD COLUMN ${col.sql}`);
+      }
+    }
+  }
+
+  if (
+    tableExistsSync(db, "scheduled_messages") &&
+    !indexExistsSync(db, "scheduled_messages", "idx_scheduled_messages_due")
+  ) {
+    db.exec(
+      "CREATE INDEX idx_scheduled_messages_due ON scheduled_messages (status, scheduled_at)",
+    );
+  }
+  if (
+    tableExistsSync(db, "scheduled_messages") &&
+    !indexExistsSync(db, "scheduled_messages", "idx_scheduled_messages_user")
+  ) {
+    db.exec(
+      "CREATE INDEX idx_scheduled_messages_user ON scheduled_messages (user_id, status)",
+    );
+  }
 };
 
 // --- Import (seed default configs) ---

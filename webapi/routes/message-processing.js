@@ -48,9 +48,9 @@ router.post("/emoji-count", authenticate, async (req, res) => {
 /**
  * POST /api/message-processing/plusminus
  * Two modes (use type to choose):
- * - type: "message" — Parse message for word++ / user++ / -- and record votes (filter list applied).
+ * - type: "message": Parse message for word++ / user++ / -- and record votes (filter list applied).
  *   Body: { app: "discord", type: "message", message: { content: string, author: { id: string } }, voterId: string }
- * - type: "reaction" — Record a single +/- from a reaction (e.g. emoji on a message).
+ * - type: "reaction": Record a single +/- from a reaction (e.g. emoji on a message).
  *   Body: { app: "discord", type: "reaction", targetUserId: string, reactorId: string, value: 1 | -1 }
  * Auth: required.
  */
@@ -202,17 +202,27 @@ router.post("/pin-check", authenticate, async (req, res) => {
 /**
  * POST /api/message-processing/pin-log
  * Log a message as pinned (idempotent; no-op if already logged).
- * Body: { messageId: string }
+ * Body: {
+ *   app: "discord",
+ *   messageId: string,
+ *   authorId?: string,
+ *   contents?: string,
+ *   attachments?: string | string[],
+ *   channelId?: string,
+ *   channelName?: string,
+ *   pinnerIds?: string[]
+ * }
  * Response: { ok: true }
  * Auth: required.
  */
 router.post("/pin-log", authenticate, async (req, res) => {
   try {
-    const result = await logPinnedMessage(req.body?.messageId);
+    const result = await logPinnedMessage(req.body ?? {});
     if (!result.ok) {
-      return res
-        .status(400)
-        .json({ ...result, error: "messageId is required" });
+      return res.status(400).json({
+        ok: false,
+        error: result.error ?? "messageId is required",
+      });
     }
     res.json({ ok: true });
   } catch (err) {

@@ -9,3 +9,7 @@ data/
 .env.test
 .env.prod
 .env.dev
+
+# Keep files/ subdirectories in repo; ignore runtime contents
+/files/**/*
+!/files/**/.gitkeep

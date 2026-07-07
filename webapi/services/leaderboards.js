@@ -149,6 +149,56 @@ export async function getPlusPlusTotalByString(string, type = "word", app) {
 }
 
 /**
+ * @param {string} rowId - platform user id (user) or word text (word), as shown on the leaderboard
+ * @param {string} [type='word'] - `word` or `user`
+ * @param {string} app - e.g. "discord"
+ * @returns {Promise<{ string: string, type: string, total: number, votes: Array<{ id: number, value: number, voterPlatformId: string|null, timestamp: string }> }|null>}
+ */
+export async function getPlusPlusVoteHistoryByRowId(rowId, type = "word", app) {
+  if (!rowId || (type !== "word" && type !== "user")) return null;
+  if (!isChatMemberAppSupported(app)) return null;
+
+  const idCol = getChatMemberIdColumn(app);
+  const typestr = type === "user" ? "user" : "word";
+  let stringKey;
+
+  if (type === "user") {
+    const mid = await getChatMemberMappingIdByPlatformUserId(rowId, app);
+    if (mid == null) {
+      return { string: String(rowId), type, total: 0, votes: [] };
+    }
+    stringKey = String(mid);
+  } else {
+    stringKey = String(rowId);
+  }
+
+  const [rows] = await db.query(
+    `SELECT pt.id, pt.value, pt.timestamp, cm_v.\`${idCol}\` AS voter_platform_id
+     FROM plusplus_tracking pt
+     LEFT JOIN chat_member_mapping cm_v ON pt.voter = cm_v.id
+     WHERE pt.type = ? AND pt.string = ?
+     ORDER BY pt.timestamp ASC, pt.id ASC`,
+    [typestr, stringKey],
+  );
+
+  const votes = (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: Number(row.id),
+    value: Number(row.value),
+    voterPlatformId: row.voter_platform_id ?? null,
+    timestamp: row.timestamp,
+  }));
+
+  const total = votes.reduce((sum, vote) => sum + vote.value, 0);
+
+  return {
+    string: String(rowId),
+    type,
+    total,
+    votes,
+  };
+}
+
+/**
  * @param {string} voterId - platform user id (e.g. Discord snowflake)
  * @param {string} app - e.g. "discord"
  * @returns {Promise<{ voterId: string, total: number }|null>}
@@ -189,19 +239,88 @@ export async function getPlusPlusTopVoters(limit, app) {
 
 // --- Emoji (emoji_frequency) ---
 
+const EMOJI_FREQUENCY_WHERE = "type = 'emoji' OR type IS NULL";
+
 /**
+ * Paginated emoji usage leaderboard from emoji_frequency (emojis only, excludes stickers).
+ * @param {number} [limit] Max rows per page (default 5, max 50).
+ * @param {number} [offset] Rows to skip (default 0).
+ * @returns {Promise<{ rows: Array<{ emoji: string, frequency: number, emoid: string, animated: number }>, total: number }>}
+ */
+export async function listEmojiFrequency(limit, offset = 0) {
+  const n = parseLimit(limit, 5, 50);
+  const off = Math.max(0, parseInt(offset, 10) || 0);
+
+  const [countRows] = await db.query(
+    `SELECT COUNT(*) AS total FROM emoji_frequency WHERE ${EMOJI_FREQUENCY_WHERE}`,
+  );
+  const total = Number(countRows?.[0]?.total ?? 0);
+
+  const [rows] = await db.query(
+    `SELECT emoji, frequency, emoid, animated FROM emoji_frequency
+     WHERE ${EMOJI_FREQUENCY_WHERE}
+     ORDER BY frequency DESC LIMIT ? OFFSET ?`,
+    [n, off],
+  );
+
+  return {
+    rows: Array.isArray(rows) ? rows : [],
+    total,
+  };
+}
+
+/**
+ * Top used emojis (backward-compatible wrapper for Discord bot).
  * @param {number} [limit]
  * @returns {Promise<Array<{ emoji, frequency, emoid, animated }>>}
  */
 export async function getTopEmoji(limit) {
-  const n = parseLimit(limit, 5, 50);
-  const [rows] = await db.query(
-    `SELECT emoji, frequency, emoid, animated FROM emoji_frequency
-     WHERE type = 'emoji' OR type IS NULL
-     ORDER BY frequency DESC LIMIT ?`,
-    [n],
+  const { rows } = await listEmojiFrequency(limit, 0);
+  return rows;
+}
+
+/**
+ * Paginated per-user emoji usage totals from user_emoji_tracking (emojis only, excludes stickers).
+ * @param {number} [limit] Max rows per page (default 50, max 50).
+ * @param {number} [offset] Rows to skip (default 0).
+ * @param {string} app - e.g. "discord"
+ * @returns {Promise<{ rows: Array<{ userid: string, name: string, total: number }>, total: number }>}
+ */
+export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
+  if (!isChatMemberAppSupported(app)) return { rows: [], total: 0 };
+
+  const idCol = getChatMemberIdColumn(app);
+  const n = parseLimit(limit, 50, 50);
+  const off = Math.max(0, parseInt(offset, 10) || 0);
+
+  const [countRows] = await db.query(
+    `SELECT COUNT(DISTINCT uet.userid) AS total
+     FROM user_emoji_tracking uet
+     INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
+     WHERE ${EMOJI_FREQUENCY_WHERE}`,
   );
-  return Array.isArray(rows) ? rows : [];
+  const total = Number(countRows?.[0]?.total ?? 0);
+
+  const [rows] = await db.query(
+    `SELECT cm.\`${idCol}\` AS userid, cm.name, SUM(uet.frequency) AS total
+     FROM user_emoji_tracking uet
+     INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
+     INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
+     WHERE ${EMOJI_FREQUENCY_WHERE}
+     GROUP BY cm.\`${idCol}\`, cm.id, cm.name
+     ORDER BY total DESC
+     LIMIT ? OFFSET ?`,
+    [n, off],
+  );
+
+  return {
+    rows: (Array.isArray(rows) ? rows : []).map((row) => ({
+      userid: String(row.userid),
+      name: String(row.name ?? ""),
+      total: Number(row.total),
+    })),
+    total,
+  };
 }
 
 // --- Repost (user_repost_tracking) ---
