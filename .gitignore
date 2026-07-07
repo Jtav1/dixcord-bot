@@ -112,6 +112,3 @@ config.ignore
 *.txt
 
 dump*.sql
-web-view/files/Emojis/
-
-web-view/files/Stickers/

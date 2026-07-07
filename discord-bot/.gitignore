@@ -107,12 +107,9 @@ dist
 
 config.ignore
 /data
-/files/images/*
-!/files/images/.gitkeep
-/files/videos/*
-!/files/videos/.gitkeep
-/files/other/*
-!/files/other/.gitkeep
+# Keep files/ subdirectories in repo; ignore runtime contents
+/files/**/*
+!/files/**/.gitkeep
 .DS_Store
 .vscode
 /.cursor
