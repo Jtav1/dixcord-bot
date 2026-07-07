@@ -14,6 +14,7 @@ export const WEBVIEW_ALLOWED_ROUTES = [
   { method: "POST", path: "/api/leaderboards/plusplus" },
   { method: "POST", path: "/api/leaderboards/plusplus/top-voters" },
   { method: "POST", path: "/api/leaderboards/emoji" },
+  { method: "POST", path: "/api/leaderboards/emoji/users" },
   { method: "POST", path: "/api/leaderboards/repost" },
   { method: "GET", path: "/api/pin-history" },
   { method: "GET", path: "/api/system/status" },
@@ -23,6 +24,7 @@ export const WEBVIEW_ALLOWED_ROUTES = [
 /** GET path prefixes the webview service account may access. */
 export const WEBVIEW_ALLOWED_ROUTE_PREFIXES = [
   "/api/leaderboards/plusplus/history/",
+  "/api/leaderboards/emoji/user/",
 ];
 
 /**

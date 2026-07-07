@@ -279,6 +279,50 @@ export async function getTopEmoji(limit) {
   return rows;
 }
 
+/**
+ * Paginated per-user emoji usage totals from user_emoji_tracking (emojis only, excludes stickers).
+ * @param {number} [limit] Max rows per page (default 50, max 50).
+ * @param {number} [offset] Rows to skip (default 0).
+ * @param {string} app - e.g. "discord"
+ * @returns {Promise<{ rows: Array<{ userid: string, name: string, total: number }>, total: number }>}
+ */
+export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
+  if (!isChatMemberAppSupported(app)) return { rows: [], total: 0 };
+
+  const idCol = getChatMemberIdColumn(app);
+  const n = parseLimit(limit, 50, 50);
+  const off = Math.max(0, parseInt(offset, 10) || 0);
+
+  const [countRows] = await db.query(
+    `SELECT COUNT(DISTINCT uet.userid) AS total
+     FROM user_emoji_tracking uet
+     INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
+     WHERE ${EMOJI_FREQUENCY_WHERE}`,
+  );
+  const total = Number(countRows?.[0]?.total ?? 0);
+
+  const [rows] = await db.query(
+    `SELECT cm.\`${idCol}\` AS userid, cm.name, SUM(uet.frequency) AS total
+     FROM user_emoji_tracking uet
+     INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
+     INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
+     WHERE ${EMOJI_FREQUENCY_WHERE}
+     GROUP BY cm.\`${idCol}\`, cm.id, cm.name
+     ORDER BY total DESC
+     LIMIT ? OFFSET ?`,
+    [n, off],
+  );
+
+  return {
+    rows: (Array.isArray(rows) ? rows : []).map((row) => ({
+      userid: String(row.userid),
+      name: String(row.name ?? ""),
+      total: Number(row.total),
+    })),
+    total,
+  };
+}
+
 // --- Repost (user_repost_tracking) ---
 
 /**
