@@ -80,6 +80,10 @@ body {
   max-width: 1280px;
 }
 
+.view-page--narrow {
+  max-width: 720px;
+}
+
 .view-header {
   padding-bottom: 0.5rem;
 }

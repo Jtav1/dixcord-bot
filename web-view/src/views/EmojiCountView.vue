@@ -1,5 +1,5 @@
 <template>
-  <div class="view-page view-page--wide">
+  <div class="view-page view-page--narrow">
     <header class="view-header mb-6">
       <h1 class="text-h4 font-weight-bold mb-2">Emoji Count</h1>
       <p class="text-body-1 text-medium-emphasis">

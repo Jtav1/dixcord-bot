@@ -29,7 +29,7 @@
         </thead>
         <tbody>
           <tr v-for="(entry, index) in entries" :key="entry.emoid">
-            <td class="text-body-2 text-medium-emphasis rank-col">
+            <td class="text-body-2 rank-col">
               {{ offset + index + 1 }}
             </td>
             <td class="sample-col">
@@ -63,7 +63,7 @@
               </div>
             </td>
             <td class="text-body-2">{{ emojiDisplayName(entry) }}</td>
-            <td class="text-body-2 text-right font-weight-medium frequency-col">
+            <td class="text-body-2 text-right frequency-col">
               {{ formatFrequency(entry.frequency) }}
             </td>
           </tr>
@@ -175,6 +175,11 @@ function isImageMissing(entry) {
 </script>
 
 <style scoped>
+.emoji-leaderboard-table :deep(th),
+.emoji-leaderboard-table :deep(td) {
+  font-weight: 700;
+}
+
 .emoji-leaderboard-table .rank-col {
   width: 4.5rem;
 }
