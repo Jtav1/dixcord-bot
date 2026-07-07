@@ -84,6 +84,8 @@ services:
     depends_on:
       webapi:
         condition: service_healthy
+    volumes:
+      - ./web-view/files:/app/files:ro
     healthcheck:
       test:
         [

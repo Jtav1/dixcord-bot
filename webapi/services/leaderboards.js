@@ -239,19 +239,44 @@ export async function getPlusPlusTopVoters(limit, app) {
 
 // --- Emoji (emoji_frequency) ---
 
+const EMOJI_FREQUENCY_WHERE = "type = 'emoji' OR type IS NULL";
+
 /**
+ * Paginated emoji usage leaderboard from emoji_frequency (emojis only, excludes stickers).
+ * @param {number} [limit] Max rows per page (default 5, max 50).
+ * @param {number} [offset] Rows to skip (default 0).
+ * @returns {Promise<{ rows: Array<{ emoji: string, frequency: number, emoid: string, animated: number }>, total: number }>}
+ */
+export async function listEmojiFrequency(limit, offset = 0) {
+  const n = parseLimit(limit, 5, 50);
+  const off = Math.max(0, parseInt(offset, 10) || 0);
+
+  const [countRows] = await db.query(
+    `SELECT COUNT(*) AS total FROM emoji_frequency WHERE ${EMOJI_FREQUENCY_WHERE}`,
+  );
+  const total = Number(countRows?.[0]?.total ?? 0);
+
+  const [rows] = await db.query(
+    `SELECT emoji, frequency, emoid, animated FROM emoji_frequency
+     WHERE ${EMOJI_FREQUENCY_WHERE}
+     ORDER BY frequency DESC LIMIT ? OFFSET ?`,
+    [n, off],
+  );
+
+  return {
+    rows: Array.isArray(rows) ? rows : [],
+    total,
+  };
+}
+
+/**
+ * Top used emojis (backward-compatible wrapper for Discord bot).
  * @param {number} [limit]
  * @returns {Promise<Array<{ emoji, frequency, emoid, animated }>>}
  */
 export async function getTopEmoji(limit) {
-  const n = parseLimit(limit, 5, 50);
-  const [rows] = await db.query(
-    `SELECT emoji, frequency, emoid, animated FROM emoji_frequency
-     WHERE type = 'emoji' OR type IS NULL
-     ORDER BY frequency DESC LIMIT ?`,
-    [n],
-  );
-  return Array.isArray(rows) ? rows : [];
+  const { rows } = await listEmojiFrequency(limit, 0);
+  return rows;
 }
 
 // --- Repost (user_repost_tracking) ---

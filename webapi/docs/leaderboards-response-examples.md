@@ -136,7 +136,9 @@
 ```json
 {
   "ok": true,
-  "limit": 5,
+  "limit": 50,
+  "offset": 0,
+  "total": 237,
   "top": [
     { "emoji": "👍", "frequency": 100, "emoid": "123", "animated": 0 },
     { "emoji": "😂", "frequency": 85, "emoid": "456", "animated": 0 }

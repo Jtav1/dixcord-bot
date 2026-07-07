@@ -1,8 +1,31 @@
 import vue from "@vitejs/plugin-vue";
+import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import { defineConfig, loadEnv } from "vite";
 import vuetify from "vite-plugin-vuetify";
 import { attachCachedWebapiAuthHeader } from "./lib/webapiAuth.js";
 import { webapiAuthProxyPlugin } from "./lib/webapiAuthProxyPlugin.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const filesDir = path.join(__dirname, "files");
+
+/**
+ * Serve local emoji/sticker image assets at /files during Vite dev and preview.
+ * @returns {import('vite').Plugin}
+ */
+function filesStaticPlugin() {
+  const staticMiddleware = express.static(filesDir);
+  return {
+    name: "files-static",
+    configureServer(server) {
+      server.middlewares.use("/files", staticMiddleware);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use("/files", staticMiddleware);
+    },
+  };
+}
 
 /**
  * Apply web-view server env from Vite loadEnv (supports legacy VITE_* names).
@@ -59,6 +82,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       webapiAuthProxyPlugin(),
+      filesStaticPlugin(),
       vue(),
       vuetify({ autoImport: true }),
     ],

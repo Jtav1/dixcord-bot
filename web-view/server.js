@@ -51,6 +51,7 @@ app.use(
     },
   }),
 );
+app.use("/files", express.static(path.join(__dirname, "files")));
 app.use(express.static(distDir));
 app.use((req, res) => {
   const url = req.originalUrl || req.url || "";

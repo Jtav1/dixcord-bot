@@ -140,14 +140,16 @@ router.post("/plusplus/top-voters", authenticate, async (req, res) => {
 /**
  * POST /api/leaderboards/emoji
  * Top used emojis (mirrors top-emojis command).
- * Body: { limit?: number } (optional, default 5, max 50)
+ * Body: { limit?: number, offset?: number } (optional; default limit 5, max 50; default offset 0)
  * Auth: required.
  */
 router.post("/emoji", authenticate, async (req, res) => {
   try {
     const limit = leaderboards.parseLimit(req.body?.limit, 5, 50);
-    const top = await leaderboards.getTopEmoji(limit);
-    res.json({ ok: true, limit, top });
+    const offset =
+      req.body?.offset != null ? Math.max(0, parseInt(req.body.offset, 10) || 0) : 0;
+    const { rows, total } = await leaderboards.listEmojiFrequency(limit, offset);
+    res.json({ ok: true, limit, offset, total, top: rows });
   } catch (err) {
     console.error("POST /api/leaderboards/emoji error:", err);
     res.status(500).json({ ok: false, error: "Failed to get emoji leaderboard" });
