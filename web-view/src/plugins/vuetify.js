@@ -30,22 +30,22 @@ export default createVuetify({
     themes: {
       light: {
         colors: {
-          primary: "#B45309",
-          secondary: "#6B7F5E",
-          background: "#FAF7F2",
-          surface: "#FFFCF8",
-          "on-surface": "#2C2419",
-          "on-background": "#2C2419",
+          primary: "#C75B12",
+          secondary: "#A0623A",
+          background: "#F3E4CE",
+          surface: "#FFF5E8",
+          "on-surface": "#4A2E1A",
+          "on-background": "#4A2E1A",
         },
       },
       dark: {
         colors: {
           primary: "#F59E0B",
-          secondary: "#8FA882",
-          background: "#1A1D23",
-          surface: "#242830",
-          "on-surface": "#E8E4DE",
-          "on-background": "#E8E4DE",
+          secondary: "#6E7A88",
+          background: "#1A1E24",
+          surface: "#252A32",
+          "on-surface": "#D6DAE1",
+          "on-background": "#D6DAE1",
         },
       },
     },

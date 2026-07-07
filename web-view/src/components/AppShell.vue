@@ -1,6 +1,7 @@
 <template>
   <v-app class="app-shell">
-    <div class="app-background" aria-hidden="true" />
+    <div class="app-background-sky" aria-hidden="true" />
+    <div class="app-background-landscape" aria-hidden="true" />
     <div class="app-background-scrim" aria-hidden="true" />
 
     <v-app-bar class="app-bar" sticky flat>
