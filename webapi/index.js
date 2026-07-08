@@ -26,7 +26,7 @@ import statisticsRoutes from "./routes/statistics.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const API_VERSION = "2.2.0";
+const API_VERSION = "v2.2";
 const syncServicePasswords =
   String(process.env.SYNC_SERVICE_PASSWORDS || "").toLowerCase() === "true";
 
@@ -55,7 +55,10 @@ async function ensureServiceUser(email, password, name, role, label) {
       );
       console.log(`webapi: ${label} password updated.`);
     } else {
-      await db.query("UPDATE users SET role = ? WHERE email = ?", [role, email]);
+      await db.query("UPDATE users SET role = ? WHERE email = ?", [
+        role,
+        email,
+      ]);
     }
     return;
   }
@@ -103,7 +106,13 @@ async function ensureBotUser() {
     return;
   }
   try {
-    await ensureServiceUser(username, password, "Bot", "bot", "Bot service account");
+    await ensureServiceUser(
+      username,
+      password,
+      "Bot",
+      "bot",
+      "Bot service account",
+    );
   } catch (err) {
     console.error("webapi: Failed to ensure bot user:", err);
     throw err;
@@ -162,7 +171,11 @@ if (corsOrigins.has("*")) {
   );
 }
 
-if (!process.env.ADMIN_USERNAME || !process.env.BOT_USERNAME || !process.env.WEBVIEW_USERNAME) {
+if (
+  !process.env.ADMIN_USERNAME ||
+  !process.env.BOT_USERNAME ||
+  !process.env.WEBVIEW_USERNAME
+) {
   console.warn(
     "webapi: One or more service account usernames are unset; login allowlist may reject all requests.",
   );
