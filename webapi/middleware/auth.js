@@ -61,6 +61,14 @@ export function isAdminRole(role) {
 }
 
 /**
+ * @param {unknown} role
+ * @returns {boolean} True when role is bot or admin.
+ */
+export function isBotOrAdminRole(role) {
+  return role === "bot" || role === "admin";
+}
+
+/**
  * Normalize a request pathname for allowlist matching.
  * @param {string} pathname Raw path (may include query string or trailing slash).
  * @returns {string} Normalized path without query or trailing slash.
@@ -168,6 +176,22 @@ export async function authenticate(req, res, next) {
 export function requireAdmin(req, res, next) {
   if (!isAdminRole(req.user?.role)) {
     return res.status(403).json({ error: "Admin access required" });
+  }
+  next();
+}
+
+/**
+ * Require bot or admin role after authenticate.
+ * User-scoped routes use this because only the bot (or admin panel) calls the API today.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
+export function requireBotOrAdmin(req, res, next) {
+  if (!isBotOrAdminRole(req.user?.role)) {
+    return res
+      .status(403)
+      .json({ ok: false, error: "Bot or admin access required" });
   }
   next();
 }

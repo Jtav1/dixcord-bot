@@ -1,5 +1,10 @@
 import express from "express";
-import { authenticate, isAdminRole, isBotRole } from "../middleware/auth.js";
+import {
+  authenticate,
+  isAdminRole,
+  isBotOrAdminRole,
+  isBotRole,
+} from "../middleware/auth.js";
 import {
   getScheduledMessageById,
   createScheduledMessage,
@@ -39,10 +44,27 @@ async function resolveRequesterMapping(req) {
 }
 
 /**
+ * Reject callers that cannot use requester-scoped scheduled-message routes.
+ * No end users call the API directly; the bot acts on their behalf via requesterUserId.
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ * @returns {boolean} True when the response was sent (caller denied).
+ */
+function denyUnlessBotOrAdmin(req, res) {
+  if (!isBotOrAdminRole(req.user?.role)) {
+    res
+      .status(403)
+      .json({ ok: false, error: "Bot or admin access required" });
+    return true;
+  }
+  return false;
+}
+
+/**
  * GET /api/scheduled-messages
  * List upcoming scheduled messages for requester, or bot scope list of all pending rows.
  * Query:
- * - user scope: ?app=<chatApp>&requesterUserId=...
+ * - requester scope: ?app=<chatApp>&requesterUserId=... (bot or admin; bot on behalf of user)
  * - bot scope:  ?scope=bot
  * - admin scope: ?scope=admin&status=pending|sent|all
  * Auth: required.
@@ -80,6 +102,8 @@ router.get("/", authenticate, async (req, res) => {
       return res.json({ ok: true, scheduledMessages: rows, total, limit, offset });
     }
 
+    if (denyUnlessBotOrAdmin(req, res)) return;
+
     const requester = await resolveRequesterMapping(req);
     if (!requester.ok) {
       return res
@@ -103,13 +127,15 @@ router.get("/", authenticate, async (req, res) => {
  * GET /api/scheduled-messages/:id
  * Get a scheduled message by id; requester must own row.
  * Query: ?app=<chatApp>&requesterUserId=...
- * Auth: required.
+ * Auth: required (bot or admin; bot supplies requesterUserId on behalf of user).
  */
 router.get("/:id", authenticate, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id))
       return res.status(400).json({ ok: false, error: "Invalid id" });
+
+    if (denyUnlessBotOrAdmin(req, res)) return;
 
     const requester = await resolveRequesterMapping(req);
     if (!requester.ok) {
@@ -141,10 +167,12 @@ router.get("/:id", authenticate, async (req, res) => {
  * POST /api/scheduled-messages
  * Create a scheduled message.
  * Body: { app, requesterUserId, chat_channel_id, chat_guild_id?, message_body, scheduled_at }
- * Auth: required.
+ * Auth: required (bot or admin; bot supplies requesterUserId on behalf of user).
  */
 router.post("/", authenticate, async (req, res) => {
   try {
+    if (denyUnlessBotOrAdmin(req, res)) return;
+
     const requester = await resolveRequesterMapping(req);
     if (!requester.ok) {
       return res
@@ -202,10 +230,10 @@ router.post("/", authenticate, async (req, res) => {
 /**
  * PUT /api/scheduled-messages/:id
  * Update user-owned message fields, admin override, OR mark as sent.
- * Body (user update): { app, requesterUserId, message_body?, scheduled_at? }
+ * Body (requester update): { app, requesterUserId, message_body?, scheduled_at? }
  * Body (bot sent-mark): { scope: "bot", status: "sent", sent_at? }
  * Body (admin update): { scope: "admin", app, message_body?, scheduled_at? }
- * Auth: required.
+ * Auth: required (requester updates: bot or admin).
  */
 router.put("/:id", authenticate, async (req, res) => {
   try {
@@ -287,7 +315,9 @@ router.put("/:id", authenticate, async (req, res) => {
       return res.json({ ok: true, scheduledMessage: row });
     }
 
-    // User scope update.
+    // Requester scope update (bot on behalf of user, or admin panel).
+    if (denyUnlessBotOrAdmin(req, res)) return;
+
     const requester = await resolveRequesterMapping(req);
     if (!requester.ok) {
       return res
@@ -350,7 +380,7 @@ router.put("/:id", authenticate, async (req, res) => {
  * DELETE /api/scheduled-messages/:id
  * Delete pending scheduled message by id when owned by requester, or admin scope.
  * Body/query: { app, requesterUserId } or { scope: "admin", app }
- * Auth: required.
+ * Auth: required (requester delete: bot or admin).
  */
 router.delete("/:id", authenticate, async (req, res) => {
   try {
@@ -371,6 +401,8 @@ router.delete("/:id", authenticate, async (req, res) => {
       }
       return res.json({ ok: true });
     }
+
+    if (denyUnlessBotOrAdmin(req, res)) return;
 
     const requester = await resolveRequesterMapping(req);
     if (!requester.ok) {

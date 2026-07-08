@@ -1,6 +1,6 @@
 {
   "name": "dixcord-bot-web-view",
-  "version": "2.2",
+  "version": "2.2.1",
   "description": "Public view frontend for dixcord-bot",
   "type": "module",
   "scripts": {
