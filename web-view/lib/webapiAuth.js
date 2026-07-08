@@ -16,15 +16,39 @@ function getConfig() {
     process.env["VITE_WEBAPI_URL"] ||
     "http://localhost:3000"
   ).replace(/\/+$/, "");
-  return {
-    webapiUrl,
-    username:
-      process.env["WEBVIEW_USERNAME"] ||
-      process.env["VITE_WEBVIEW_USERNAME"],
-    password:
-      process.env["WEBVIEW_PASSWORD"] ||
-      process.env["VITE_WEBVIEW_PASSWORD"],
-  };
+
+  let username = process.env["WEBVIEW_USERNAME"];
+  let password = process.env["WEBVIEW_PASSWORD"];
+
+  if (!username && process.env["VITE_WEBVIEW_USERNAME"]) {
+    console.warn(
+      "VITE_WEBVIEW_USERNAME is deprecated; use WEBVIEW_USERNAME (server-only).",
+    );
+    username = process.env["VITE_WEBVIEW_USERNAME"];
+  }
+  if (!password && process.env["VITE_WEBVIEW_PASSWORD"]) {
+    console.warn(
+      "VITE_WEBVIEW_PASSWORD is deprecated; use WEBVIEW_PASSWORD (server-only).",
+    );
+    password = process.env["VITE_WEBVIEW_PASSWORD"];
+  }
+
+  return { webapiUrl, username, password };
+}
+
+/**
+ * Ensure web-view service account credentials are configured.
+ * @returns {{ webapiUrl: string, username: string, password: string }}
+ * @throws {Error} When credentials are missing.
+ */
+export function requireWebviewCredentials() {
+  const { webapiUrl, username, password } = getConfig();
+  if (!username || !password) {
+    throw new Error(
+      "WEBVIEW_USERNAME and WEBVIEW_PASSWORD must be set for the API proxy.",
+    );
+  }
+  return { webapiUrl, username, password };
 }
 
 /**
@@ -57,10 +81,7 @@ function isTokenValid() {
  * @returns {Promise<string>} JWT string (without Bearer prefix).
  */
 async function loginForToken() {
-  const { webapiUrl, username, password } = getConfig();
-  if (!username || !password) {
-    throw new Error("WEBVIEW_USERNAME and WEBVIEW_PASSWORD must be set");
-  }
+  const { webapiUrl, username, password } = requireWebviewCredentials();
 
   const res = await fetch(`${webapiUrl}/api/auth/login`, {
     method: "POST",
@@ -94,16 +115,9 @@ export async function getWebapiToken() {
 
 /**
  * Build Authorization header value for proxied webapi requests.
- * @returns {Promise<string|null>} `Bearer <token>`, or null when credentials are unset.
+ * @returns {Promise<string>} `Bearer <token>`.
  */
 export async function getWebapiAuthHeader() {
-  const { username, password } = getConfig();
-  if (!username || !password) {
-    console.warn(
-      "WEBVIEW_USERNAME and WEBVIEW_PASSWORD not set; API proxy will not authenticate.",
-    );
-    return null;
-  }
   const token = await getWebapiToken();
   return `Bearer ${token}`;
 }
@@ -155,21 +169,11 @@ export function attachCachedWebapiAuthHeader(proxyReq) {
 }
 
 /**
- * Warm cached token at server startup (logs warning on failure).
+ * Warm cached token at server startup; fail when credentials are missing.
  * @returns {Promise<void>}
  */
 export async function warmWebapiAuth() {
-  const { username, password } = getConfig();
-  if (!username || !password) {
-    console.warn(
-      "WEBVIEW_USERNAME and WEBVIEW_PASSWORD not set; web-view API proxy is unauthenticated.",
-    );
-    return;
-  }
-  try {
-    await getWebapiToken();
-    console.log("web-view webapi auth token ready");
-  } catch (err) {
-    console.error("Failed to authenticate web-view proxy with webapi:", err.message);
-  }
+  requireWebviewCredentials();
+  await getWebapiToken();
+  console.log("web-view webapi auth token ready");
 }

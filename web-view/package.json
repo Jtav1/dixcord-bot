@@ -1,6 +1,6 @@
 {
   "name": "dixcord-bot-web-view",
-  "version": "0.0.1",
+  "version": "2.2",
   "description": "Public view frontend for dixcord-bot",
   "type": "module",
   "scripts": {
@@ -14,6 +14,8 @@
     "@mdi/font": "^7.4.47",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.2.0",
     "http-proxy-middleware": "^3.0.5",
     "vue": "^3.5.39",
     "vue-router": "^4.6.4",

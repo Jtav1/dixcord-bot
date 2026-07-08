@@ -18,6 +18,7 @@ export const WEBVIEW_ALLOWED_ROUTES = [
   { method: "POST", path: "/api/leaderboards/repost" },
   { method: "GET", path: "/api/pin-history" },
   { method: "GET", path: "/api/system/status" },
+  { method: "GET", path: "/api/statistics" },
   { method: "GET", path: "/api/user-mappings" },
 ];
 
@@ -41,6 +42,14 @@ export function isWebviewRole(role) {
  */
 export function isAllowedAuthenticatedRole(role) {
   return role === "admin" || role === "bot" || role === "webview";
+}
+
+/**
+ * @param {unknown} role
+ * @returns {boolean} True only when role is exactly bot.
+ */
+export function isBotRole(role) {
+  return role === "bot";
 }
 
 /**
@@ -178,7 +187,9 @@ export async function optionalAuth(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await loadUserWithRole(decoded.userId);
-    if (user) req.user = user;
+    if (user && isAllowedAuthenticatedRole(user.role)) {
+      req.user = user;
+    }
   } catch (_) {}
   next();
 }
@@ -195,4 +206,3 @@ export function signToken(userId, role = null) {
   });
 }
 
-export { JWT_SECRET };

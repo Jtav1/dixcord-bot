@@ -117,6 +117,7 @@ import {
   attachmentFileName,
   attachmentKind,
   formatPinTimestamp,
+  isValidAttachmentPath,
   pinAttachmentUrl,
   resolveChannelLabel,
   resolveMappingLabel,
@@ -187,7 +188,9 @@ watch(
  * @returns {boolean}
  */
 function isAttachmentUnavailable(path) {
-  return unavailablePaths.value.has(String(path ?? ""));
+  const key = String(path ?? "");
+  if (!key || !isValidAttachmentPath(key)) return true;
+  return unavailablePaths.value.has(key);
 }
 
 /**

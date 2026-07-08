@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate, isAdminRole } from "../middleware/auth.js";
+import { authenticate, isAdminRole, isBotRole } from "../middleware/auth.js";
 import {
   getScheduledMessageById,
   createScheduledMessage,
@@ -53,6 +53,9 @@ router.get("/", authenticate, async (req, res) => {
     if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
 
     if (req.query?.scope === "bot") {
+      if (!isBotRole(req.user?.role)) {
+        return res.status(403).json({ ok: false, error: "Bot access required" });
+      }
       const rows = await getPendingScheduledMessagesForBot(app);
       return res.json({ ok: true, scheduledMessages: rows });
     }
@@ -221,6 +224,9 @@ router.put("/:id", authenticate, async (req, res) => {
 
     // Bot scope update (used by scheduler to mark sent).
     if (req.body?.scope === "bot") {
+      if (!isBotRole(req.user?.role)) {
+        return res.status(403).json({ ok: false, error: "Bot access required" });
+      }
       if (req.body?.status !== "sent") {
         return res
           .status(400)

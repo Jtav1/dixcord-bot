@@ -1,8 +1,31 @@
 import express from "express";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, requireAdmin } from "../middleware/auth.js";
 import * as linkReplacements from "../services/linkReplacements.js";
 
 const router = express.Router();
+
+/**
+ * Validate source/target hosts for create or update.
+ * @param {{ source_host?: string, target_host?: string }} fields
+ * @returns {string|null} Error message, or null when valid.
+ */
+function validateLinkReplacementFields(fields) {
+  if (fields.source_host !== undefined) {
+    const err = linkReplacements.validateLinkReplacementHost(
+      fields.source_host,
+      "source",
+    );
+    if (err) return err;
+  }
+  if (fields.target_host !== undefined) {
+    const err = linkReplacements.validateLinkReplacementHost(
+      fields.target_host,
+      "target",
+    );
+    if (err) return err;
+  }
+  return null;
+}
 
 /**
  * GET /api/link-replacements
@@ -47,7 +70,7 @@ router.get("/:id", authenticate, async (req, res) => {
  * Body: { source_host, target_host }
  * Auth: required.
  */
-router.post("/", authenticate, async (req, res) => {
+router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
     const { source_host, target_host } = req.body ?? {};
     if (!source_host || !target_host || typeof source_host !== "string" || typeof target_host !== "string") {
@@ -55,6 +78,13 @@ router.post("/", authenticate, async (req, res) => {
         ok: false,
         error: "source_host and target_host (non-empty strings) are required",
       });
+    }
+    const validationError = validateLinkReplacementFields({
+      source_host: source_host.trim(),
+      target_host: target_host.trim(),
+    });
+    if (validationError) {
+      return res.status(400).json({ ok: false, error: validationError });
     }
     const id = await linkReplacements.create(
       source_host.trim(),
@@ -80,7 +110,7 @@ router.post("/", authenticate, async (req, res) => {
  * Body: { source_host?, target_host? }
  * Auth: required.
  */
-router.put("/:id", authenticate, async (req, res) => {
+router.put("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
@@ -92,6 +122,10 @@ router.put("/:id", authenticate, async (req, res) => {
     if (typeof target_host === "string" && target_host.trim()) updates.target_host = target_host.trim();
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ ok: false, error: "Provide at least one of source_host or target_host to update" });
+    }
+    const validationError = validateLinkReplacementFields(updates);
+    if (validationError) {
+      return res.status(400).json({ ok: false, error: validationError });
     }
     const updated = await linkReplacements.update(id, updates);
     if (!updated) {
@@ -113,7 +147,7 @@ router.put("/:id", authenticate, async (req, res) => {
  * Delete a link replacement.
  * Auth: required.
  */
-router.delete("/:id", authenticate, async (req, res) => {
+router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
