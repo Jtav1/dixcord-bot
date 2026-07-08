@@ -77,8 +77,9 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=webapi-${{ hashFiles('webapi/package-lock.json') }}
-          cache-to: type=gha,mode=max,scope=webapi-${{ hashFiles('webapi/package-lock.json') }}
+          no-cache: ${{ github.ref_type == 'tag' }}
+          cache-from: type=gha,scope=webapi-${{ github.ref_type == 'tag' && github.ref_name || hashFiles('webapi/package-lock.json') }}
+          cache-to: type=gha,mode=max,scope=webapi-${{ github.ref_type == 'tag' && github.ref_name || hashFiles('webapi/package-lock.json') }}
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker

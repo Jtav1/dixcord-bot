@@ -78,8 +78,9 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=discord-bot-${{ hashFiles('discord-bot/package-lock.json') }}
-          cache-to: type=gha,mode=max,scope=discord-bot-${{ hashFiles('discord-bot/package-lock.json') }}
+          no-cache: ${{ github.ref_type == 'tag' }}
+          cache-from: type=gha,scope=discord-bot-${{ github.ref_type == 'tag' && github.ref_name || hashFiles('discord-bot/package-lock.json') }}
+          cache-to: type=gha,mode=max,scope=discord-bot-${{ github.ref_type == 'tag' && github.ref_name || hashFiles('discord-bot/package-lock.json') }}
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker
