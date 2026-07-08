@@ -46,6 +46,24 @@ Routes added for admin panel backend preparation. **Write** routes require admin
 | POST | `/api/system/invalidate-cache` | admin | Bump cache version |
 | POST | `/api/system/heartbeat` | admin or bot | `{ guildId, version, lastReadyAt? }` |
 
+## Statistics
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/statistics` | admin, bot, or webview | Aggregate row counts and usage totals across core tracking tables |
+
+Response `statistics` object fields:
+
+- `chatMemberMappings` — row count in `chat_member_mapping`
+- `emojiCatalog` — `{ emojis, stickers, total }` from `emoji_frequency` row counts by type
+- `emojiUsage` — `{ emojis, stickers, total }` from `emoji_frequency` frequency sums by type
+- `pinHistory` — row count in `pin_history`
+- `plusplusTracking` — row count in `plusplus_tracking`
+- `triggers` — row count in `triggers`
+- `responses` — row count in `responses`
+- `triggerResponseFrequencySum` — sum of `frequency` in `trigger_response`
+- `repostTracking` — row count in `user_repost_tracking`
+
 ## Scheduled messages (admin scope)
 
 | Method | Path | Description |
@@ -97,4 +115,5 @@ The `webview` role may only access these routes:
 | POST | `/api/leaderboards/repost` |
 | GET | `/api/pin-history` |
 | GET | `/api/system/status` |
+| GET | `/api/statistics` |
 | GET | `/api/user-mappings` |

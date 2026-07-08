@@ -46,9 +46,12 @@ import ThemeToggle from "./ThemeToggle.vue";
 
 /** @type {{ label: string, route: string }[]} */
 const tabs = [
+  { label: "System Status", route: "/system-status" },
   { label: "Pin Archive", route: "/pin-archive" },
   { label: "Emoji Count", route: "/emoji-count" },
+  { label: "Sticker Count", route: "/sticker-count" },
   { label: "PlusPlus Rankings", route: "/plusplus-rankings" },
+  { label: "Statistics", route: "/statistics" },
 ];
 
 const route = useRoute();

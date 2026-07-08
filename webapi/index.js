@@ -22,6 +22,7 @@ import pinHistoryRoutes from "./routes/pin-history.js";
 import systemRoutes from "./routes/system.js";
 import eventsRoutes from "./routes/events.js";
 import auditLogRoutes from "./routes/audit-log.js";
+import statisticsRoutes from "./routes/statistics.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -289,6 +290,10 @@ app.get("/", publicLimiter, (req, res) => {
           "POST /api/system/heartbeat (body: { guildId, version })",
         ],
       },
+      statistics: {
+        authRequired: true,
+        routes: ["GET /api/statistics (admin, bot, or webview)"],
+      },
       events: {
         authRequired: true,
         routes: [
@@ -376,6 +381,7 @@ app.use("/api/pin-history", pinHistoryRoutes);
 app.use("/api/system", systemRoutes);
 app.use("/api/events", eventsRoutes);
 app.use("/api/audit-log", auditLogRoutes);
+app.use("/api/statistics", statisticsRoutes);
 
 app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 

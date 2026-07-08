@@ -1,7 +1,10 @@
 import { createRouter, createWebHistory } from "vue-router";
 import PinArchiveView from "../views/PinArchiveView.vue";
 import EmojiCountView from "../views/EmojiCountView.vue";
+import StickerCountView from "../views/StickerCountView.vue";
 import PlusPlusRankingsView from "../views/PlusPlusRankingsView.vue";
+import StatisticsView from "../views/StatisticsView.vue";
+import SystemStatusView from "../views/SystemStatusView.vue";
 
 /**
  * Application route table.
@@ -10,7 +13,7 @@ import PlusPlusRankingsView from "../views/PlusPlusRankingsView.vue";
 const routes = [
   {
     path: "/",
-    redirect: "/pin-archive",
+    redirect: "/system-status",
   },
   {
     path: "/pin-archive",
@@ -25,10 +28,28 @@ const routes = [
     meta: { title: "Emoji Count" },
   },
   {
+    path: "/sticker-count",
+    name: "sticker-count",
+    component: StickerCountView,
+    meta: { title: "Sticker Count" },
+  },
+  {
     path: "/plusplus-rankings",
     name: "plusplus-rankings",
     component: PlusPlusRankingsView,
     meta: { title: "PlusPlus Rankings" },
+  },
+  {
+    path: "/statistics",
+    name: "statistics",
+    component: StatisticsView,
+    meta: { title: "Statistics" },
+  },
+  {
+    path: "/system-status",
+    name: "system-status",
+    component: SystemStatusView,
+    meta: { title: "System Status" },
   },
 ];
 
