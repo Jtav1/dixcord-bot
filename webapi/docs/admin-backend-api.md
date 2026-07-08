@@ -2,6 +2,34 @@
 
 Routes added for admin panel backend preparation. **Write** routes require admin role unless noted; **read** routes require any authenticated account (`admin` or `bot`).
 
+## Link replacements
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/link-replacements` | admin or bot | List all |
+| GET | `/api/link-replacements/:id` | admin or bot | Get one |
+| POST | `/api/link-replacements` | admin | Create `{ source_host, target_host }` |
+| PUT | `/api/link-replacements/:id` | admin | Update |
+| DELETE | `/api/link-replacements/:id` | admin | Delete |
+
+## Pin quips
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/pin-quips` | admin or bot | List all |
+| GET | `/api/pin-quips/random` | admin or bot | Random quip for bot |
+| GET | `/api/pin-quips/:id` | admin or bot | Get one |
+| POST | `/api/pin-quips` | admin | Create `{ quip }` |
+| PUT | `/api/pin-quips/:id` | admin | Update |
+| DELETE | `/api/pin-quips/:id` | admin | Delete |
+
+## Trigger responses
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/trigger-responses/*` | admin or bot | List, random, triggers (bot read) |
+| POST/PUT/DELETE | `/api/trigger-responses/*` | admin | CRUD on triggers, responses, pairs |
+
 ## Eight-ball responses
 
 | Method | Path | Auth | Description |
@@ -99,9 +127,17 @@ Response `statistics` object fields:
 ## Authentication
 
 - **Admin:** `ADMIN_USERNAME` / `ADMIN_PASSWORD` → JWT with `role: "admin"` (full API access)
-- **Bot service account:** `BOT_USERNAME` / `BOT_PASSWORD` → JWT with `role: "bot"` (full API access)
+- **Bot service account:** `BOT_USERNAME` / `BOT_PASSWORD` → JWT with `role: "bot"` (read content config; write Discord/usage data routes)
 - **Web-view service account:** `WEBVIEW_USERNAME` / `WEBVIEW_PASSWORD` → JWT with `role: "webview"` (allowlisted routes only)
 - Bot credentials should be used for `WEBAPI_USERNAME` / `WEBAPI_PASSWORD` in discord-bot
+- Service accounts cannot `PUT` or `DELETE /api/users/me`; profiles are env-managed
+- Login is rejected when no service-account usernames are configured in env
+
+### Deployment
+
+- **webapi** and **discord-bot** run on the internal Docker network only
+- **web-view** is the sole external entry point (reverse proxy); it proxies `/api` with the webview service JWT
+- CORS on webapi applies to internal browser clients (e.g. web-panel), not public internet traffic
 
 ### Web-view allowlist
 

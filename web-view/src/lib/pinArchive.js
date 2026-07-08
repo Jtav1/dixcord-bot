@@ -56,13 +56,37 @@ export async function fetchPinHistoryPage(offset = 0, limit = PIN_PAGE_SIZE) {
   };
 }
 
+/** Allowed attachment subdirectory prefixes under the files root. */
+const ATTACHMENT_PREFIXES = ["images/", "videos/", "other/"];
+
+/**
+ * Normalize a stored attachment path for validation.
+ * @param {string} relativePath Path from pin_history.attachments.
+ * @returns {string}
+ */
+function normalizeAttachmentPath(relativePath) {
+  return String(relativePath ?? "").trim().replace(/^\/+/, "");
+}
+
+/**
+ * Whether a stored attachment path is safe to serve from /files.
+ * @param {string} relativePath Path from pin_history.attachments.
+ * @returns {boolean}
+ */
+export function isValidAttachmentPath(relativePath) {
+  const rel = normalizeAttachmentPath(relativePath);
+  if (!rel || rel.includes("..") || rel.includes("\\")) return false;
+  return ATTACHMENT_PREFIXES.some((prefix) => rel.startsWith(prefix));
+}
+
 /**
  * Public URL for a pin attachment stored relative to the files directory.
  * @param {string} relativePath Path from pin_history.attachments (e.g. `images/123-0.png`).
- * @returns {string}
+ * @returns {string} URL under /files, or empty string when path is invalid.
  */
 export function pinAttachmentUrl(relativePath) {
-  const rel = String(relativePath ?? "").trim().replace(/^\/+/, "");
+  const rel = normalizeAttachmentPath(relativePath);
+  if (!isValidAttachmentPath(rel)) return "";
   return `/files/${rel}`;
 }
 

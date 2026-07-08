@@ -5,6 +5,31 @@
 
 import db from "../config/db.js";
 
+/** Hostname pattern for link replacement hosts (no scheme, path, or port). */
+const LINK_HOST_RE =
+  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i;
+
+/**
+ * Validate a link replacement hostname.
+ * @param {string} host Hostname string.
+ * @param {"source"|"target"} kind Which field is being validated.
+ * @returns {string|null} Error message, or null when valid.
+ */
+export function validateLinkReplacementHost(host, kind) {
+  const value = String(host ?? "").trim().toLowerCase();
+  if (!value) return `${kind}_host is required`;
+  if (value.includes("://") || value.includes("/") || value.includes(":")) {
+    return `${kind}_host must be a hostname without scheme, path, or port`;
+  }
+  if (!LINK_HOST_RE.test(value)) {
+    return `${kind}_host is not a valid hostname`;
+  }
+  if (kind === "target" && (value === "localhost" || /^\d{1,3}(\.\d{1,3}){3}$/.test(value))) {
+    return "target_host cannot be localhost or an IP address";
+  }
+  return null;
+}
+
 /**
  * @returns {Promise<Array<{ id: number, source_host: string, target_host: string }>>}
  */

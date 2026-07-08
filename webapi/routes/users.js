@@ -6,6 +6,18 @@ import { authenticate } from '../middleware/auth.js';
 const router = express.Router();
 router.use(authenticate);
 
+/** Roles managed via env; profile mutations are not allowed. */
+const SERVICE_ROLES = new Set(['admin', 'bot', 'webview']);
+
+/**
+ * Whether the current user is a service account (admin, bot, or webview).
+ * @param {import('express').Request} req
+ * @returns {boolean}
+ */
+function isServiceAccount(req) {
+  return SERVICE_ROLES.has(req.user?.role);
+}
+
 /**
  * GET /api/users/me
  * Current user profile (from JWT).
@@ -19,9 +31,15 @@ router.get('/me', async (req, res) => {
  * PUT /api/users/me
  * Update current user profile (name and/or password).
  * Body: { name?, password? }
- * Auth: required.
+ * Auth: required. Service accounts cannot self-update.
  */
 router.put('/me', async (req, res) => {
+  if (isServiceAccount(req)) {
+    return res.status(403).json({
+      ok: false,
+      error: 'Service account profiles are managed via environment configuration',
+    });
+  }
   try {
     const { name, password } = req.body;
     const updates = [];
@@ -50,9 +68,15 @@ router.put('/me', async (req, res) => {
 /**
  * DELETE /api/users/me
  * Delete current user account.
- * Auth: required.
+ * Auth: required. Service accounts cannot self-delete.
  */
 router.delete('/me', async (req, res) => {
+  if (isServiceAccount(req)) {
+    return res.status(403).json({
+      ok: false,
+      error: 'Service accounts cannot be deleted via the API',
+    });
+  }
   try {
     await db.query('DELETE FROM users WHERE id = ?', [req.user.id]);
     res.json({ ok: true });

@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, requireAdmin } from "../middleware/auth.js";
 import * as triggerResponses from "../services/triggerResponses.js";
 
 const router = express.Router();
@@ -113,7 +113,7 @@ router.get("/triggers/:id", authenticate, async (req, res) => {
  * Body: { trigger_string, selection_mode?, responses: [ { response_string, order?, weight? } ] }
  * Auth: required.
  */
-router.post("/triggers", authenticate, async (req, res) => {
+router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
   try {
     const { trigger_string, selection_mode, responses } = req.body ?? {};
     if (!trigger_string || typeof trigger_string !== "string" || !trigger_string.trim()) {
@@ -149,7 +149,7 @@ router.post("/triggers", authenticate, async (req, res) => {
  * Body: { selection_mode?, responses?: [ { id: linkId, order?, weight? } | { response_string, order?, weight? } ] }
  * Auth: required.
  */
-router.put("/triggers/:id", authenticate, async (req, res) => {
+router.put("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
@@ -173,7 +173,7 @@ router.put("/triggers/:id", authenticate, async (req, res) => {
  * Delete a trigger and remove orphaned responses that are no longer linked to any trigger.
  * Auth: required.
  */
-router.delete("/triggers/:id", authenticate, async (req, res) => {
+router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
@@ -244,7 +244,7 @@ router.get("/responses/:id", authenticate, async (req, res) => {
  * Update a response's text. Body: { response_string }
  * Auth: required.
  */
-router.put("/responses/:id", authenticate, async (req, res) => {
+router.put("/responses/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
@@ -271,7 +271,7 @@ router.put("/responses/:id", authenticate, async (req, res) => {
  * Delete a response (removes from all triggers via cascade).
  * Auth: required.
  */
-router.delete("/responses/:id", authenticate, async (req, res) => {
+router.delete("/responses/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
@@ -320,7 +320,7 @@ router.get("/:id", authenticate, async (req, res) => {
  * Body: { trigger_string, response_string, response_order?, selection_mode?, weight? }
  * Auth: required.
  */
-router.post("/", authenticate, async (req, res) => {
+router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
     const { trigger_string, response_string, response_order, selection_mode, weight } =
       req.body ?? {};
@@ -366,7 +366,7 @@ router.post("/", authenticate, async (req, res) => {
  * Body: { trigger_string?, response_string?, response_order?, selection_mode?, weight? }
  * Auth: required.
  */
-router.put("/:id", authenticate, async (req, res) => {
+router.put("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
@@ -415,7 +415,7 @@ router.put("/:id", authenticate, async (req, res) => {
  * Delete a trigger-response pair.
  * Auth: required.
  */
-router.delete("/:id", authenticate, async (req, res) => {
+router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {

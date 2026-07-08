@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, requireAdmin } from "../middleware/auth.js";
 import * as pinQuips from "../services/pinQuips.js";
 
 const router = express.Router();
@@ -67,7 +67,7 @@ router.get("/:id", authenticate, async (req, res) => {
  * Body: { quip: string }
  * Auth: required.
  */
-router.post("/", authenticate, async (req, res) => {
+router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
     const quip = req.body?.quip;
     if (
@@ -100,7 +100,7 @@ router.post("/", authenticate, async (req, res) => {
  * Body: { quip: string }
  * Auth: required.
  */
-router.put("/:id", authenticate, async (req, res) => {
+router.put("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {
@@ -130,7 +130,7 @@ router.put("/:id", authenticate, async (req, res) => {
  * Delete a pin quip.
  * Auth: required.
  */
-router.delete("/:id", authenticate, async (req, res) => {
+router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {

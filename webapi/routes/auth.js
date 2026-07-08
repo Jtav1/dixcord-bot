@@ -40,7 +40,13 @@ router.post("/login", async (req, res) => {
       Boolean,
     );
 
-    if (allowedEmails.length > 0 && !allowedEmails.includes(email)) {
+    if (allowedEmails.length === 0) {
+      return res
+        .status(503)
+        .json({ ok: false, error: "Login not configured" });
+    }
+
+    if (!allowedEmails.includes(email)) {
       return res
         .status(401)
         .json({ ok: false, error: "Invalid email or password" });

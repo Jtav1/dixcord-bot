@@ -27,6 +27,46 @@ import statisticsRoutes from "./routes/statistics.js";
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_VERSION = "2.2.0";
+const syncServicePasswords =
+  String(process.env.SYNC_SERVICE_PASSWORDS || "").toLowerCase() === "true";
+
+/**
+ * Create or update a service account user row.
+ * Password is set on create; existing rows only sync password when SYNC_SERVICE_PASSWORDS=true.
+ * Role is always enforced on existing rows.
+ * @param {string} email Service account email.
+ * @param {string} password Plain-text password from env.
+ * @param {string} name Display name.
+ * @param {string} role Account role.
+ * @param {string} label Log label (e.g. "Admin user").
+ * @returns {Promise<void>}
+ */
+async function ensureServiceUser(email, password, name, role, label) {
+  const [rows] = await db.query(
+    "SELECT id, password_hash FROM users WHERE email = ?",
+    [email],
+  );
+  if (rows && rows.length > 0) {
+    if (syncServicePasswords) {
+      const hash = await bcrypt.hash(password, 10);
+      await db.query(
+        "UPDATE users SET password_hash = ?, role = ? WHERE email = ?",
+        [hash, role, email],
+      );
+      console.log(`webapi: ${label} password updated.`);
+    } else {
+      await db.query("UPDATE users SET role = ? WHERE email = ?", [role, email]);
+    }
+    return;
+  }
+
+  const hash = await bcrypt.hash(password, 10);
+  await db.query(
+    "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, ?)",
+    [email, hash, name, role],
+  );
+  console.log(`webapi: ${label} created.`);
+}
 
 /**
  * Create or update the admin user from ADMIN_USERNAME and ADMIN_PASSWORD.
@@ -42,24 +82,7 @@ async function ensureAdminUser() {
     return;
   }
   try {
-    const [rows] = await db.query(
-      "SELECT id, password_hash FROM users WHERE email = ?",
-      [username],
-    );
-    const hash = await bcrypt.hash(password, 10);
-    if (rows && rows.length > 0) {
-      await db.query(
-        "UPDATE users SET password_hash = ?, role = 'admin' WHERE email = ?",
-        [hash, username],
-      );
-      console.log("webapi: Admin user password updated.");
-    } else {
-      await db.query(
-        "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'admin')",
-        [username, hash, "Admin"],
-      );
-      console.log("webapi: Admin user created.");
-    }
+    await ensureServiceUser(username, password, "Admin", "admin", "Admin user");
   } catch (err) {
     console.error("Failed to ensure admin user:", err);
     throw err;
@@ -80,24 +103,7 @@ async function ensureBotUser() {
     return;
   }
   try {
-    const [rows] = await db.query(
-      "SELECT id, password_hash FROM users WHERE email = ?",
-      [username],
-    );
-    const hash = await bcrypt.hash(password, 10);
-    if (rows && rows.length > 0) {
-      await db.query(
-        "UPDATE users SET password_hash = ?, role = 'bot' WHERE email = ?",
-        [hash, username],
-      );
-      console.log("webapi: Bot service account password updated.");
-    } else {
-      await db.query(
-        "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'bot')",
-        [username, hash, "Bot"],
-      );
-      console.log("webapi: Bot service account created.");
-    }
+    await ensureServiceUser(username, password, "Bot", "bot", "Bot service account");
   } catch (err) {
     console.error("webapi: Failed to ensure bot user:", err);
     throw err;
@@ -118,24 +124,13 @@ async function ensureWebViewUser() {
     return;
   }
   try {
-    const [rows] = await db.query(
-      "SELECT id, password_hash FROM users WHERE email = ?",
-      [username],
+    await ensureServiceUser(
+      username,
+      password,
+      "webview",
+      "webview",
+      "Web-view service account",
     );
-    const hash = await bcrypt.hash(password, 10);
-    if (rows && rows.length > 0) {
-      await db.query(
-        "UPDATE users SET password_hash = ?, role = 'webview' WHERE email = ?",
-        [hash, username],
-      );
-      console.log("Web-view service account password updated.");
-    } else {
-      await db.query(
-        "INSERT INTO users (email, password_hash, name, role) VALUES (?, ?, ?, 'webview')",
-        [username, hash, "webview"],
-      );
-      console.log("Web-view service account created.");
-    }
   } catch (err) {
     console.error("Failed to ensure web-view user:", err);
     throw err;
@@ -160,6 +155,18 @@ function parseCorsOrigins() {
 }
 
 const corsOrigins = parseCorsOrigins();
+
+if (corsOrigins.has("*")) {
+  console.warn(
+    "webapi: CORS_ORIGINS includes '*'; restrict origins in production deployments.",
+  );
+}
+
+if (!process.env.ADMIN_USERNAME || !process.env.BOT_USERNAME || !process.env.WEBVIEW_USERNAME) {
+  console.warn(
+    "webapi: One or more service account usernames are unset; login allowlist may reject all requests.",
+  );
+}
 
 /**
  * Check whether an origin is allowed for CORS.
