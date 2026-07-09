@@ -6,7 +6,7 @@ import path from "path";
  * @param {string} filesRoot Absolute path to the files directory.
  * @returns {string|null} Absolute path to the emoji directory, or null when missing.
  */
-export function resolveEmojisDir(filesRoot) {
+function resolveEmojisDir(filesRoot) {
   try {
     const entries = fs.readdirSync(filesRoot, { withFileTypes: true });
     const match = entries.find(
@@ -24,7 +24,7 @@ export function resolveEmojisDir(filesRoot) {
  * @param {string} filesRoot Absolute path to the files directory.
  * @returns {{ dirName: string, index: Map<string, string> }}
  */
-export function buildEmojiFileIndex(filesRoot) {
+function buildEmojiFileIndex(filesRoot) {
   const emojisDir = resolveEmojisDir(filesRoot);
   if (!emojisDir) {
     return { dirName: "Emojis", index: new Map() };

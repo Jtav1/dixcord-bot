@@ -12,7 +12,6 @@ import {
   webapiAuthProxyMiddleware,
 } from "./lib/webapiAuth.js";
 import { createCaseInsensitiveEmojiFilesMiddleware } from "./lib/emojiFilesMiddleware.js";
-import { logEmojiFileInventory } from "./lib/emojiFileInventory.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || "3002", 10);
@@ -107,7 +106,6 @@ app.use((req, res) => {
 });
 
 await warmWebapiAuth();
-await logEmojiFileInventory(filesDir);
 app.listen(PORT, () => {
   console.log(`web-view listening on http://localhost:${PORT}`);
   console.log(`webapi proxy target: ${WEBAPI_URL}`);
