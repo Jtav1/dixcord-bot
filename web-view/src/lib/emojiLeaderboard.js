@@ -158,6 +158,30 @@ export function emojiImageUrl(row) {
 }
 
 /**
+ * Log whether a custom emoji image loaded or fell back to the placeholder.
+ * @param {"loaded"|"missing"} outcome Image load result.
+ * @param {{ emoji?: string, emoid?: string|number, animated?: number|boolean }} row Emoji leaderboard row.
+ * @returns {void}
+ */
+export function logEmojiImageOutcome(outcome, row) {
+  const url = emojiImageUrl(row);
+  const label = emojiDisplayName(row);
+
+  if (outcome === "loaded") {
+    console.log(
+      `[emoji-leaderboard] image loaded: ${label} (${url})`,
+      { emoid: row?.emoid, animated: row?.animated, url },
+    );
+    return;
+  }
+
+  console.log(
+    `[emoji-leaderboard] placeholder shown (image not found): ${label} (${url})`,
+    { emoid: row?.emoid, animated: row?.animated, url },
+  );
+}
+
+/**
  * Human-readable emoji label for the name column.
  * @param {{ emoji?: string, emoid?: string|number }} row Emoji leaderboard row.
  * @returns {string}
