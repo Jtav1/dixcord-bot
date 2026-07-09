@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS pin_quips (
 CREATE TABLE IF NOT EXISTS triggers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   trigger_string VARCHAR(255) NOT NULL UNIQUE,
-  selection_mode VARCHAR(10) NOT NULL DEFAULT 'random',
+  selection_mode VARCHAR(10) NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered', 'weighted', 'lotto')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   frequency INT DEFAULT 0
 );
@@ -127,10 +127,18 @@ CREATE TABLE IF NOT EXISTS trigger_response (
   response_id INT NOT NULL,
   response_order INT NULL,
   weight INT NULL DEFAULT NULL,
+  lotto_prize VARCHAR(255) NULL,
   frequency INT DEFAULT 0,
   FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE,
   FOREIGN KEY (response_id) REFERENCES responses(id) ON DELETE CASCADE,
   UNIQUE KEY unique_trigger_response (trigger_id, response_id)
+);
+
+-- Catalog of lotto prize keys (matched by trigger_response.lotto_prize)
+CREATE TABLE IF NOT EXISTS trigger_lotto_prizes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  prize_string VARCHAR(255) NOT NULL UNIQUE,
+  frequency INT DEFAULT 0
 );
 
 -- Round-robin state: last-used response_order per trigger (for ordered selection)

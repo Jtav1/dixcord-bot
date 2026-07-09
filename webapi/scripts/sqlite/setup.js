@@ -184,7 +184,7 @@ const initializeDatabase = () => {
     CREATE TABLE IF NOT EXISTS triggers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trigger_string TEXT NOT NULL UNIQUE,
-      selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered')),
+      selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered', 'weighted', 'lotto')),
       created_at TEXT DEFAULT (datetime('now')),
       frequency INTEGER DEFAULT 0
     )
@@ -204,8 +204,16 @@ const initializeDatabase = () => {
       response_id INTEGER NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
       response_order INTEGER NULL,
       weight INTEGER NULL DEFAULT NULL CHECK (weight IS NULL OR (weight >= 0 AND weight <= 100)),
+      lotto_prize TEXT NULL,
       frequency INTEGER DEFAULT 0,
       UNIQUE (trigger_id, response_id)
+    )
+  `);
+  exec(`
+    CREATE TABLE IF NOT EXISTS trigger_lotto_prizes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      prize_string TEXT NOT NULL UNIQUE,
+      frequency INTEGER DEFAULT 0
     )
   `);
   exec(`
@@ -244,13 +252,8 @@ const initializeDatabase = () => {
  * Apply incremental column and table migrations idempotently.
  */
 const migrateTables = () => {
-  if (
-    tableExistsSync(db, "users") &&
-    !columnExistsSync(db, "users", "role")
-  ) {
-    db.exec(
-      "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'",
-    );
+  if (tableExistsSync(db, "users") && !columnExistsSync(db, "users", "role")) {
+    db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
   }
 
   if (!tableExistsSync(db, "audit_log")) {
