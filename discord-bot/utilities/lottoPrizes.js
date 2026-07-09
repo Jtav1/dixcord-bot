@@ -11,31 +11,7 @@ const defaultPlaceholderFn = async () => {};
 
 /** @type {Record<string, (context: LottoPrizeContext) => Promise<void>>} */
 const PLACEHOLDER_FNS = {
-  TAL_timeout: async ({ message }) => {
-    // Pick a random integer between 1 and 1000. If it's 1000, timeout user for 2 minutes.
-    const roll = Math.floor(Math.random() * 1000) + 1;
-    if (roll === 1000) {
-      if (typeof message.member?.timeout === "function") {
-        try {
-          await message.member.timeout(
-            2 * 60 * 1000,
-            "Lotto prize: Timeout for 2 minutes",
-          );
-          await message.reply(
-            "WOW! You rolled a 1000 and got timed out for 2 minutes 😈",
-          );
-        } catch (err) {
-          await message.reply(
-            "I tried to timeout you but you're an admin or something",
-          );
-        }
-      } else {
-        await message.reply("Timeout not supported in this context!");
-      }
-    } else {
-      await message.reply(`You rolled a ${roll}. No timeout this time!`);
-    }
-  },
+  placeholder_timeout: async () => {},
   placeholder_message: async () => {},
 };
 
