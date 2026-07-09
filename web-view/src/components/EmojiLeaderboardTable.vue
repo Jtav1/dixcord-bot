@@ -58,7 +58,6 @@
                   class="emoji-sample emoji-sample--image"
                   width="32"
                   height="32"
-                  @load="markImageLoaded(entry)"
                   @error="markImageMissing(entry)"
                 />
               </div>
@@ -94,7 +93,6 @@ import {
   emojiDisplayName,
   emojiImageUrl,
   isCustomDiscordEmoji,
-  logEmojiImageOutcome,
 } from "../lib/emojiLeaderboard.js";
 
 const props = defineProps({
@@ -154,15 +152,6 @@ function formatFrequency(value) {
 }
 
 /**
- * Record a successful image load for a custom emoji row.
- * @param {{ emoid?: string|number }} entry Emoji leaderboard row.
- * @returns {void}
- */
-function markImageLoaded(entry) {
-  logEmojiImageOutcome("loaded", entry);
-}
-
-/**
  * Record a failed image load for a custom emoji row.
  * @param {{ emoid?: string|number }} entry Emoji leaderboard row.
  * @returns {void}
@@ -170,7 +159,6 @@ function markImageLoaded(entry) {
 function markImageMissing(entry) {
   const id = String(entry.emoid ?? "");
   if (!id) return;
-  logEmojiImageOutcome("missing", entry);
   const next = new Set(missingImageIds.value);
   next.add(id);
   missingImageIds.value = next;

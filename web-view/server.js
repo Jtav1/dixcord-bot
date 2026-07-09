@@ -11,11 +11,14 @@ import {
   warmWebapiAuth,
   webapiAuthProxyMiddleware,
 } from "./lib/webapiAuth.js";
+import { createCaseInsensitiveEmojiFilesMiddleware } from "./lib/emojiFilesMiddleware.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || "3002", 10);
 const WEBAPI_URL = process.env.WEBAPI_URL || "http://localhost:3000";
 const distDir = path.join(__dirname, "dist");
+const filesDir = path.join(__dirname, "files");
+const filesStatic = express.static(filesDir);
 
 try {
   requireWebviewCredentials();
@@ -88,7 +91,10 @@ app.use(
     },
   }),
 );
-app.use("/files", express.static(path.join(__dirname, "files")));
+app.use(
+  "/files",
+  createCaseInsensitiveEmojiFilesMiddleware(filesDir, filesStatic),
+);
 app.use(express.static(distDir));
 app.use((req, res) => {
   const url = req.originalUrl || req.url || "";

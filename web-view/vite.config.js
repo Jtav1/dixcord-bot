@@ -5,6 +5,7 @@ import { fileURLToPath } from "url";
 import { defineConfig, loadEnv } from "vite";
 import vuetify from "vite-plugin-vuetify";
 import { attachCachedWebapiAuthHeader } from "./lib/webapiAuth.js";
+import { createCaseInsensitiveEmojiFilesMiddleware } from "./lib/emojiFilesMiddleware.js";
 import { webapiAuthProxyPlugin } from "./lib/webapiAuthProxyPlugin.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -16,13 +17,17 @@ const filesDir = path.join(__dirname, "files");
  */
 function filesStaticPlugin() {
   const staticMiddleware = express.static(filesDir);
+  const emojiFilesMiddleware = createCaseInsensitiveEmojiFilesMiddleware(
+    filesDir,
+    staticMiddleware,
+  );
   return {
     name: "files-static",
     configureServer(server) {
-      server.middlewares.use("/files", staticMiddleware);
+      server.middlewares.use("/files", emojiFilesMiddleware);
     },
     configurePreviewServer(server) {
-      server.middlewares.use("/files", staticMiddleware);
+      server.middlewares.use("/files", emojiFilesMiddleware);
     },
   };
 }
