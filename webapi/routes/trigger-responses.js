@@ -1,6 +1,7 @@
 import express from "express";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 import * as triggerResponses from "../services/triggerResponses.js";
+import * as triggerLottoPrizes from "../services/triggerLottoPrizes.js";
 
 const router = express.Router();
 
@@ -192,7 +193,7 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
 
 /**
  * GET /api/trigger-responses/random?trigger=xxx
- * Return one response for the given trigger (selection_mode: random, weighted, or ordered is handled in service).
+ * Return one response for the given trigger (selection_mode: random, weighted, ordered, or lotto is handled in service).
  * Auth: required.
  */
 router.get("/random", authenticate, async (req, res) => {
@@ -210,7 +211,12 @@ router.get("/random", authenticate, async (req, res) => {
         .status(404)
         .json({ ok: false, error: "No responses found for this trigger" });
     }
-    res.json({ ok: true, response: row.response_string, id: row.id });
+    res.json({
+      ok: true,
+      response: row.response_string,
+      id: row.id,
+      ...(row.lotto_prize ? { lotto_prize: row.lotto_prize } : {}),
+    });
   } catch (err) {
     console.error("GET /api/trigger-responses/random error:", err);
     res.status(500).json({ ok: false, error: "Failed to get random response" });
@@ -289,6 +295,21 @@ router.delete("/responses/:id", authenticate, requireAdmin, async (req, res) => 
 });
 
 /**
+ * GET /api/trigger-responses/lotto-prizes
+ * List lotto prize catalog rows (id, prize_string, frequency).
+ * Auth: required.
+ */
+router.get("/lotto-prizes", authenticate, async (req, res) => {
+  try {
+    const lottoPrizes = await triggerLottoPrizes.getAll();
+    res.json({ ok: true, lottoPrizes });
+  } catch (err) {
+    console.error("GET /api/trigger-responses/lotto-prizes error:", err);
+    res.status(500).json({ ok: false, error: "Failed to list lotto prizes" });
+  }
+});
+
+/**
  * GET /api/trigger-responses/:id
  * Get one trigger-response link (junction) by id.
  * Auth: required.
@@ -317,13 +338,19 @@ router.get("/:id", authenticate, async (req, res) => {
 /**
  * POST /api/trigger-responses
  * Create a trigger-response pair.
- * Body: { trigger_string, response_string, response_order?, selection_mode?, weight? }
+ * Body: { trigger_string, response_string, response_order?, selection_mode?, weight?, lotto_prize? }
  * Auth: required.
  */
 router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
-    const { trigger_string, response_string, response_order, selection_mode, weight } =
-      req.body ?? {};
+    const {
+      trigger_string,
+      response_string,
+      response_order,
+      selection_mode,
+      weight,
+      lotto_prize,
+    } = req.body ?? {};
     if (
       trigger_string == null ||
       response_string == null ||
@@ -344,6 +371,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
       response_order,
       selection_mode,
       weight,
+      lotto_prize,
     );
     if (id == null) {
       return res
@@ -363,7 +391,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
 /**
  * PUT /api/trigger-responses/:id
  * Update a trigger-response pair.
- * Body: { trigger_string?, response_string?, response_order?, selection_mode?, weight? }
+ * Body: { trigger_string?, response_string?, response_order?, selection_mode?, weight?, lotto_prize? }
  * Auth: required.
  */
 router.put("/:id", authenticate, requireAdmin, async (req, res) => {
@@ -372,8 +400,14 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
     if (Number.isNaN(id)) {
       return res.status(400).json({ ok: false, error: "Invalid id" });
     }
-    const { trigger_string, response_string, response_order, selection_mode, weight } =
-      req.body ?? {};
+    const {
+      trigger_string,
+      response_string,
+      response_order,
+      selection_mode,
+      weight,
+      lotto_prize,
+    } = req.body ?? {};
     const updates = {};
     if (typeof trigger_string === "string" && trigger_string.trim())
       updates.trigger_string = trigger_string.trim();
@@ -387,11 +421,12 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
     if (typeof selection_mode === "string" && selection_mode.trim())
       updates.selection_mode = selection_mode.trim();
     if (weight !== undefined) updates.weight = weight;
+    if (lotto_prize !== undefined) updates.lotto_prize = lotto_prize;
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({
         ok: false,
         error:
-          "Provide at least one of trigger_string, response_string, response_order, selection_mode, or weight to update",
+          "Provide at least one of trigger_string, response_string, response_order, selection_mode, weight, or lotto_prize to update",
       });
     }
     const updated = await triggerResponses.update(id, updates);

@@ -5,6 +5,7 @@ import {
   getFortuneResponse,
 } from "../../api/responses.js";
 import { getRandomResponseForTrigger } from "../../api/triggerResponses.js";
+import { executeLottoPrize } from "../../utilities/lottoPrizes.js";
 import { createScheduledMessage } from "../../api/scheduledMessages.js";
 import { refreshScheduledMessagesCache } from "../../scheduler/messageScheduler.js";
 import { parseReminderMessage } from "./utilities/scheduleParser.js";
@@ -56,7 +57,23 @@ const execute = async (message) => {
       contentStripped.includes(t.trigger_string),
     );
     if (matchedTrigger) {
-      response = await getRandomResponseForTrigger(matchedTrigger);
+      const { response: triggerResponse, lotto_prize } =
+        await getRandomResponseForTrigger(matchedTrigger);
+      if (triggerResponse.length > 0) {
+        await message.reply(triggerResponse);
+        if (
+          matchedTrigger.selection_mode === "lotto" &&
+          lotto_prize
+        ) {
+          await executeLottoPrize(lotto_prize, {
+            message,
+            client: message.client,
+          });
+        }
+        response = "";
+      } else {
+        response = triggerResponse;
+      }
     }
 
     if (message.content.startsWith(`<@${clientId}>`)) {

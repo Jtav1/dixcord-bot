@@ -144,6 +144,33 @@ curl -s -X GET "${BASE_URL}/api/trigger-responses/random?trigger=takealookatthis
 
 ---
 
+## List lotto prize catalog (bot hydrates prize handlers)
+
+```bash
+curl -s -X GET "${BASE_URL}/api/trigger-responses/lotto-prizes" \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+---
+
+## Create a lotto trigger with weighted responses and prizes
+
+```bash
+curl -s -X POST "${BASE_URL}/api/trigger-responses/triggers" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "trigger_string": "lotto",
+    "selection_mode": "lotto",
+    "responses": [
+      { "response_string": "You won!", "weight": 10, "lotto_prize": "placeholder_timeout" },
+      { "response_string": "Try again.", "weight": 90 }
+    ]
+  }'
+```
+
+---
+
 ## Get one response by id (responses table)
 
 ```bash

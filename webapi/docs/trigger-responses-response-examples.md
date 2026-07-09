@@ -183,13 +183,40 @@ See also [trigger-responses-examples.md](trigger-responses-examples.md) for samp
 
 ## GET /api/trigger-responses/random?trigger=xxx
 
-**200 OK**
+**200 OK** (random / ordered / weighted)
 
 ```json
 {
   "ok": true,
   "response": "https://example.com/image.png",
   "id": 1
+}
+```
+
+**200 OK** (lotto mode, when selected link has `lotto_prize`)
+
+```json
+{
+  "ok": true,
+  "response": "You won!",
+  "id": 1,
+  "lotto_prize": "placeholder_timeout"
+}
+```
+
+---
+
+## GET /api/trigger-responses/lotto-prizes
+
+**200 OK**
+
+```json
+{
+  "ok": true,
+  "lottoPrizes": [
+    { "id": 1, "prize_string": "placeholder_timeout", "frequency": 0 },
+    { "id": 2, "prize_string": "placeholder_message", "frequency": 0 }
+  ]
 }
 ```
 

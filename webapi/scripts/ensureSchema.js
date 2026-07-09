@@ -216,10 +216,10 @@ export async function ensureSchemaMigrations() {
     "SELECT config FROM configurations WHERE config = 'pin_message_role_ids'",
   );
   if (!pinRoleRows || pinRoleRows.length === 0) {
-    await db.query(
-      "INSERT INTO configurations (config, value) VALUES (?, ?)",
-      ["pin_message_role_ids", '["612842488302141441"]'],
-    );
+    await db.query("INSERT INTO configurations (config, value) VALUES (?, ?)", [
+      "pin_message_role_ids",
+      '["612842488302141441"]',
+    ]);
     applied.push("pin_message_role_ids configuration seed");
     console.log(
       "db: migration applied: seeded pin_message_role_ids configuration",
@@ -228,6 +228,65 @@ export async function ensureSchemaMigrations() {
     console.log(
       "db: schema ok: pin_message_role_ids configuration already exists",
     );
+  }
+
+  // trigger_lotto_prizes catalog table
+  if (!(await tableExists(db, "trigger_lotto_prizes", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE trigger_lotto_prizes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          prize_string TEXT NOT NULL UNIQUE,
+          frequency INTEGER DEFAULT 0
+        )
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE trigger_lotto_prizes (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          prize_string VARCHAR(255) NOT NULL UNIQUE,
+          frequency INT DEFAULT 0
+        )
+      `);
+    }
+    applied.push("trigger_lotto_prizes table");
+    console.log("db: migration applied: created trigger_lotto_prizes table");
+  } else {
+    console.log("db: schema ok: trigger_lotto_prizes table already exists");
+  }
+
+  const [lottoPrizeCountRows] = await db.query(
+    "SELECT COUNT(*) AS cnt FROM trigger_lotto_prizes",
+  );
+  const lottoPrizeCount = Number(lottoPrizeCountRows?.[0]?.cnt ?? 0);
+  if (lottoPrizeCount === 0) {
+    await db.query(
+      "INSERT INTO trigger_lotto_prizes (prize_string) VALUES (?), (?)",
+      ["placeholder_timeout", "placeholder_message"],
+    );
+    applied.push("trigger_lotto_prizes seed rows");
+    console.log("db: migration applied: seeded trigger_lotto_prizes rows");
+  }
+
+  // trigger_response.lotto_prize column
+  if (await tableExists(db, "trigger_response", isSqlite)) {
+    if (
+      !(await columnExists(db, "trigger_response", "lotto_prize", isSqlite))
+    ) {
+      await db.query(
+        isSqlite
+          ? "ALTER TABLE trigger_response ADD COLUMN lotto_prize TEXT NULL"
+          : "ALTER TABLE trigger_response ADD COLUMN lotto_prize VARCHAR(255) NULL",
+      );
+      applied.push("trigger_response.lotto_prize column");
+      console.log(
+        "db: migration applied: added trigger_response.lotto_prize column",
+      );
+    } else {
+      console.log(
+        "db: schema ok: trigger_response.lotto_prize column already exists",
+      );
+    }
   }
 
   if (applied.length === 0) {

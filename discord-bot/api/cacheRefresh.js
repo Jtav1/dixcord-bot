@@ -4,8 +4,9 @@
 
 import { getCacheVersion } from "./system.js";
 import { loadConfig } from "../configStore.js";
-import { getTriggersList } from "./triggerResponses.js";
+import { getTriggersList, getLottoPrizesList } from "./triggerResponses.js";
 import { getLinkReplacementSourceHosts } from "./linkReplacements.js";
+import { rebuildLottoPrizeHandlers } from "../utilities/lottoPrizes.js";
 
 /** @type {Array<{ trigger_string: string, selection_mode?: string }>|null} */
 let cachedTriggers = null;
@@ -25,6 +26,8 @@ const POLL_INTERVAL_MS = 30_000;
 export async function refreshContentCaches() {
   cachedTriggers = await getTriggersList();
   cachedLinkHosts = await getLinkReplacementSourceHosts();
+  const lottoPrizes = await getLottoPrizesList();
+  rebuildLottoPrizeHandlers(lottoPrizes);
 }
 
 /**

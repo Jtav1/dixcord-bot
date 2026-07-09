@@ -5,6 +5,7 @@
  */
 
 import db from "../config/db.js";
+import { incrementFrequency as incrementLottoPrizeFrequency } from "./triggerLottoPrizes.js";
 
 const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
 const orderByResponseOrderClause = isSqlite
@@ -24,6 +25,18 @@ function clampWeight(value) {
 }
 
 /**
+ * Normalize lotto_prize junction value to trimmed string or null.
+ * @param {unknown} value
+ * @returns {string|null}
+ */
+function normalizeLottoPrize(value) {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
  * @returns {Promise<Array<{ id: number, trigger_string: string, response_string: string, response_order: number|null, weight: number, selection_mode: string, created_at: string, trigger_id: number, response_id: number }>>}
  */
 export async function getAll() {
@@ -31,7 +44,7 @@ export async function getAll() {
     ? "tr.response_order IS NULL"
     : "ISNULL(tr.response_order)";
   const [rows] = await db.query(
-    `SELECT tr.id, t.trigger_string, r.response_string, tr.response_order, tr.weight, t.selection_mode, t.created_at, t.id AS trigger_id, r.id AS response_id
+    `SELECT tr.id, t.trigger_string, r.response_string, tr.response_order, tr.weight, tr.lotto_prize, t.selection_mode, t.created_at, t.id AS trigger_id, r.id AS response_id
      FROM trigger_response tr
      JOIN triggers t ON t.id = tr.trigger_id
      JOIN responses r ON r.id = tr.response_id
@@ -46,7 +59,7 @@ export async function getAll() {
  */
 export async function getById(id) {
   const [rows] = await db.query(
-    `SELECT tr.id, t.trigger_string, r.response_string, tr.response_order, tr.weight, t.selection_mode, t.created_at, t.id AS trigger_id, r.id AS response_id
+    `SELECT tr.id, t.trigger_string, r.response_string, tr.response_order, tr.weight, tr.lotto_prize, t.selection_mode, t.created_at, t.id AS trigger_id, r.id AS response_id
      FROM trigger_response tr
      JOIN triggers t ON t.id = tr.trigger_id
      JOIN responses r ON r.id = tr.response_id
@@ -196,6 +209,51 @@ async function getWeightedResponseForTrigger(triggerId) {
 }
 
 /**
+ * Lotto selection: same weighted roll as weighted mode, also returns lotto_prize.
+ * @param {number} triggerId
+ * @returns {Promise<{ id: number, response_string: string, lotto_prize: string|null }|null>}
+ */
+async function getLottoResponseForTrigger(triggerId) {
+  const [weightRows] = await db.query(
+    `SELECT r.id, r.response_string, COALESCE(tr.weight, 0) AS weight, tr.lotto_prize, tr.id AS trigger_response_id
+     FROM trigger_response tr
+     JOIN responses r ON r.id = tr.response_id
+     WHERE tr.trigger_id = ?`,
+    [triggerId],
+  );
+  if (!weightRows || weightRows.length === 0) return null;
+  const normalized = weightRows.map((row) => ({
+    ...row,
+    weight: clampWeight(row.weight),
+    lotto_prize: normalizeLottoPrize(row.lotto_prize),
+  }));
+  const maxWeight = Math.max(...normalized.map((r) => r.weight));
+
+  const roll = 100 - (Math.floor(Math.random() * 100) + 1);
+
+  let candidates =
+    roll < maxWeight
+      ? normalized.filter((r) => r.weight >= maxWeight)
+      : normalized.filter((r) => r.weight < maxWeight);
+
+  if (candidates.length === 0) {
+    candidates = normalized.filter((r) => r.weight >= maxWeight);
+  }
+  const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+  if (!chosen) return null;
+  await incrementSelectionFrequencies(
+    triggerId,
+    chosen.id,
+    chosen.trigger_response_id,
+  );
+  return {
+    id: chosen.id,
+    response_string: chosen.response_string,
+    lotto_prize: chosen.lotto_prize,
+  };
+}
+
+/**
  * One response for the given trigger: random, or next in round-robin order.
  * @param {string} trigger
  * @returns {Promise<{ id: number, response_string: string }|null>} id is responses.id
@@ -245,6 +303,14 @@ export async function getRandomResponse(trigger) {
     return getWeightedResponseForTrigger(triggerId);
   }
 
+  if (selection_mode === "lotto") {
+    const result = await getLottoResponseForTrigger(triggerId);
+    if (result?.lotto_prize) {
+      await incrementLottoPrizeFrequency(result.lotto_prize);
+    }
+    return result;
+  }
+
   const result = await getRandomResponseByRandomSelection(triggerId);
   if (!result) return null;
   await incrementSelectionFrequencies(
@@ -255,7 +321,7 @@ export async function getRandomResponse(trigger) {
   return { id: result.id, response_string: result.response_string };
 }
 
-const VALID_MODES = ["random", "ordered", "weighted"];
+const VALID_MODES = ["random", "ordered", "weighted", "lotto"];
 
 /** Get or create trigger by trigger_string; return trigger id. */
 async function getOrCreateTriggerId(trigger_string, selection_mode) {
@@ -304,6 +370,7 @@ async function getOrCreateResponseId(response_string) {
  * @param {number|null} [response_order]
  * @param {string} [selection_mode]
  * @param {number} [weight]
+ * @param {string|null} [lotto_prize]
  * @returns {Promise<number|null>} Junction (trigger_response) insert id
  */
 export async function create(
@@ -312,6 +379,7 @@ export async function create(
   response_order = null,
   selection_mode = "random",
   weight,
+  lotto_prize,
 ) {
   const triggerId = await getOrCreateTriggerId(
     trigger_string.trim(),
@@ -320,9 +388,10 @@ export async function create(
   const responseId = await getOrCreateResponseId(response_string.trim());
   if (triggerId == null || responseId == null) return null;
   const w = weight == null || weight === "" ? null : clampWeight(weight);
+  const prize = normalizeLottoPrize(lotto_prize);
   const [result] = await db.query(
-    "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight) VALUES (?, ?, ?, ?)",
-    [triggerId, responseId, response_order ?? null, w],
+    "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight, lotto_prize) VALUES (?, ?, ?, ?, ?)",
+    [triggerId, responseId, response_order ?? null, w, prize],
   );
   await db.query("DELETE FROM trigger_response_state WHERE trigger_id = ?", [
     triggerId,
@@ -333,12 +402,12 @@ export async function create(
 
 /**
  * @param {number} id - Junction (trigger_response) id
- * @param {{ trigger_string?: string, response_string?: string, response_order?: number|null, selection_mode?: string, weight?: number }} updates
+ * @param {{ trigger_string?: string, response_string?: string, response_order?: number|null, selection_mode?: string, weight?: number, lotto_prize?: string|null }} updates
  * @returns {Promise<boolean>}
  */
 export async function update(
   id,
-  { trigger_string, response_string, response_order, selection_mode, weight },
+  { trigger_string, response_string, response_order, selection_mode, weight, lotto_prize },
 ) {
   const [juncRows] = await db.query(
     "SELECT trigger_id, response_id FROM trigger_response WHERE id = ?",
@@ -396,6 +465,10 @@ export async function update(
   if (weight !== undefined) {
     updates.push("weight = ?");
     values.push(weight === null ? null : clampWeight(weight));
+  }
+  if (lotto_prize !== undefined) {
+    updates.push("lotto_prize = ?");
+    values.push(normalizeLottoPrize(lotto_prize));
   }
   values.push(id);
   const [result] = await db.query(
@@ -464,7 +537,7 @@ export async function getTriggerById(triggerId) {
   if (!tRows || tRows.length === 0) return null;
   const trigger = tRows[0];
   const [linkRows] = await db.query(
-    `SELECT tr.id AS linkId, tr.response_order AS response_order_val, tr.weight, r.id, r.response_string
+    `SELECT tr.id AS linkId, tr.response_order AS response_order_val, tr.weight, tr.lotto_prize, r.id, r.response_string
      FROM trigger_response tr
      JOIN responses r ON r.id = tr.response_id
      WHERE tr.trigger_id = ?
@@ -476,6 +549,7 @@ export async function getTriggerById(triggerId) {
     response_string: r.response_string,
     order: r.response_order_val ?? null,
     weight: r.weight != null ? Number(r.weight) : null,
+    lotto_prize: normalizeLottoPrize(r.lotto_prize),
     linkId: r.linkId,
   }));
   return {
@@ -490,7 +564,7 @@ export async function getTriggerById(triggerId) {
 /**
  * Create a trigger (if not exists) with selection_mode and an array of responses.
  * Each response can have response_string and optional order (used when trigger is ordered) and weight.
- * @param {{ trigger_string: string, selection_mode?: string, responses: Array<{ response_string: string, order?: number|null, weight?: number }> }} params
+ * @param {{ trigger_string: string, selection_mode?: string, responses: Array<{ response_string: string, order?: number|null, weight?: number, lotto_prize?: string|null }> }} params
  * @returns {Promise<{ id: number, trigger_string: string, selection_mode: string, created_at: string, responses: Array<{ id: number, response_string: string, order: number|null, weight: number, linkId: number }> }|null>}
  */
 export async function createTriggerWithResponses({
@@ -525,9 +599,10 @@ export async function createTriggerWithResponses({
       item.weight == null || item.weight === ""
         ? null
         : clampWeight(item.weight);
+    const prize = normalizeLottoPrize(item.lotto_prize);
     const [ins] = await db.query(
-      "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight) VALUES (?, ?, ?, ?)",
-      [triggerId, responseId, order, w],
+      "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight, lotto_prize) VALUES (?, ?, ?, ?, ?)",
+      [triggerId, responseId, order, w, prize],
     );
     const linkId = ins?.insertId ?? ins?.lastInsertRowid;
     if (linkId != null) {
@@ -536,6 +611,7 @@ export async function createTriggerWithResponses({
         response_string: str.trim(),
         order,
         weight: w,
+        lotto_prize: prize,
         linkId,
       });
     }
@@ -551,7 +627,7 @@ export async function createTriggerWithResponses({
  * Update a trigger: selection_mode and/or response list (set order/weight for existing links, add new responses).
  * responses: [ { id: linkId, order?, weight? } ] to set order/weight, or [ { response_string, order?, weight? } ] to add new.
  * @param {number} triggerId
- * @param {{ selection_mode?: string, responses?: Array<{ id?: number, response_string?: string, order?: number|null, weight?: number }> }} updates
+ * @param {{ selection_mode?: string, responses?: Array<{ id?: number, response_string?: string, order?: number|null, weight?: number, lotto_prize?: string|null }> }} updates
  * @returns {Promise<boolean>}
  */
 export async function updateTrigger(triggerId, { selection_mode, responses }) {
@@ -583,10 +659,24 @@ export async function updateTrigger(triggerId, { selection_mode, responses }) {
               ? null
               : clampWeight(item.weight)
             : undefined;
-        if (weight !== undefined) {
+        const prize =
+          item.lotto_prize !== undefined
+            ? normalizeLottoPrize(item.lotto_prize)
+            : undefined;
+        if (weight !== undefined && prize !== undefined) {
+          await db.query(
+            "UPDATE trigger_response SET response_order = ?, weight = ?, lotto_prize = ? WHERE id = ? AND trigger_id = ?",
+            [order, weight, prize, linkId, triggerId],
+          );
+        } else if (weight !== undefined) {
           await db.query(
             "UPDATE trigger_response SET response_order = ?, weight = ? WHERE id = ? AND trigger_id = ?",
             [order, weight, linkId, triggerId],
+          );
+        } else if (prize !== undefined) {
+          await db.query(
+            "UPDATE trigger_response SET response_order = ?, lotto_prize = ? WHERE id = ? AND trigger_id = ?",
+            [order, prize, linkId, triggerId],
           );
         } else {
           await db.query(
@@ -611,9 +701,10 @@ export async function updateTrigger(triggerId, { selection_mode, responses }) {
           item.weight == null || item.weight === ""
             ? null
             : clampWeight(item.weight);
+        const prize = normalizeLottoPrize(item.lotto_prize);
         await db.query(
-          "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight) VALUES (?, ?, ?, ?)",
-          [triggerId, responseId, order, w],
+          "INSERT INTO trigger_response (trigger_id, response_id, response_order, weight, lotto_prize) VALUES (?, ?, ?, ?, ?)",
+          [triggerId, responseId, order, w, prize],
         );
         await db.query(
           "DELETE FROM trigger_response_state WHERE trigger_id = ?",
