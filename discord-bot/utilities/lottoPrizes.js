@@ -11,7 +11,23 @@ const defaultPlaceholderFn = async () => {};
 
 /** @type {Record<string, (context: LottoPrizeContext) => Promise<void>>} */
 const PLACEHOLDER_FNS = {
-  placeholder_timeout: async () => {},
+  TAL_timeout: async ({ message }) => {
+    if (typeof message.member?.timeout === "function") {
+      try {
+        await message.member.timeout(
+          10000,
+          "Lotto prize: Timeout for 10 seconds",
+        );
+        await message.reply("Timed you out for 10 seconds dumbass 😈");
+      } catch (err) {
+        await message.reply(
+          "I tried to timeout you but you're an admin or something",
+        );
+      }
+    } else {
+      await message.reply("Timeout not supported in this context!");
+    }
+  },
   placeholder_message: async () => {},
 };
 
