@@ -105,6 +105,7 @@
                             class="emoji-sample emoji-sample--image"
                             width="24"
                             height="24"
+                            @load="markImageLoaded(row)"
                             @error="markImageMissing(row)"
                           />
                         </div>
@@ -153,6 +154,7 @@ import {
   emojiImageUrl,
   fetchUserEmojiStats,
   isCustomDiscordEmoji,
+  logEmojiImageOutcome,
   resolveUserLabel,
 } from "../lib/emojiLeaderboard.js";
 
@@ -270,6 +272,15 @@ function formatFrequency(value) {
 }
 
 /**
+ * Record a successful image load for a custom emoji row.
+ * @param {{ emoid?: string|number }} row Emoji stats row.
+ * @returns {void}
+ */
+function markImageLoaded(row) {
+  logEmojiImageOutcome("loaded", row);
+}
+
+/**
  * Record a failed image load for a custom emoji row.
  * @param {{ emoid?: string|number }} row Emoji stats row.
  * @returns {void}
@@ -277,6 +288,7 @@ function formatFrequency(value) {
 function markImageMissing(row) {
   const id = String(row.emoid ?? "");
   if (!id) return;
+  logEmojiImageOutcome("missing", row);
   const next = new Set(missingImageIds.value);
   next.add(id);
   missingImageIds.value = next;
