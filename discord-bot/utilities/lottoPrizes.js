@@ -12,23 +12,36 @@ const defaultPlaceholderFn = async () => {};
 /** @type {Record<string, (context: LottoPrizeContext) => Promise<void>>} */
 const PLACEHOLDER_FNS = {
   TAL_timeout: async ({ message }) => {
-    if (typeof message.member?.timeout === "function") {
-      try {
-        await message.member.timeout(
-          10000,
-          "Lotto prize: Timeout for 10 seconds",
-        );
-        await message.reply("Timed you out for 10 seconds dumbass 😈");
-      } catch (err) {
+    // Pick random number 1-1000 inclusive
+    const roll = Math.floor(Math.random() * 1000) + 1;
+    if (roll === 1) {
+      if (typeof message.member?.timeout === "function") {
+        try {
+          await message.member.timeout(
+            3 * 60 * 1000, // 3 minutes in ms
+            "Lotto prize: Timeout for 3 minutes",
+          );
+          await message.reply(
+            "you rolled a 1. CURSE OF RA𓀀 𓀁 𓀂 𓀃 𓀄 𓀅 𓀆 𓀇 𓀈 𓀉 𓀊 𓀋 𓀌 𓀍 𓀎 𓀏 𓀐 𓀑 𓀒 𓀓 𓀔",
+          );
+        } catch (err) {
+          await message.reply(
+            "Rolled a 1 but youre an admin or something. Respectfully time yourself out.",
+          );
+        }
+      } else {
         await message.reply(
-          "I tried to timeout you but you're an admin or something",
+          "Timeout not supported in this context! Tell Justin because he has no clue why you got this message",
         );
       }
     } else {
-      await message.reply("Timeout not supported in this context!");
+      //await message.reply(`Lucky! You rolled a ${roll}, so no timeout this time.`);
+      console.log(`TAL roll: ${roll}`);
     }
   },
-  placeholder_message: async () => {},
+  placeholder_message: async () => {
+    console.log("placeholder_message");
+  },
 };
 
 /**

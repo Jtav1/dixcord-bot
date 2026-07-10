@@ -144,6 +144,21 @@ curl -s -X GET "${BASE_URL}/api/trigger-responses/random?trigger=takealookatthis
 
 ---
 
+## Selection modes
+
+Each trigger has a `selection_mode` that controls how `GET /api/trigger-responses/random` picks a response. Valid values: `random`, `ordered`, `weighted`, `lotto`.
+
+| Mode | Behavior |
+|------|----------|
+| `random` | Uniform random pick among all responses for the trigger. |
+| `ordered` | Round-robin: walks responses in `response_order` (then id), advancing state each hit so the next call returns the next response and wraps around. |
+| `weighted` | Weighted random: each response has a `weight` (0–100). A roll decides whether to pick from the highest-weight tier or from lower-weight responses, then one candidate is chosen at random from that subset. |
+| `lotto` | Same selection as `weighted`, plus an optional side effect: when the chosen response has a `lotto_prize`, the API returns that prize key and the bot runs the matching handler. |
+
+**Lotto prize handlers:** Prize handler functions must be defined in [`discord-bot/utilities/lottoPrizes.js`](../../discord-bot/utilities/lottoPrizes.js) (in the `PLACEHOLDER_FNS` map, keyed by the same `prize_string` / `lotto_prize` value). Catalog rows alone do nothing on the bot until a matching function exists there.
+
+---
+
 ## List lotto prize catalog (bot hydrates prize handlers)
 
 ```bash
