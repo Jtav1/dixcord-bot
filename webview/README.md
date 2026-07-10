@@ -8,14 +8,14 @@ All API traffic goes to same-origin `/api`, which is proxied to `WEBAPI_URL`. Th
 
 ## Features overview
 
-| Page | Route | What it shows |
-| ---- | ----- | ------------- |
-| **System Status** | `/system-status` (default) | Webapi / DB / bot heartbeat and cache status |
-| **Pin Archive** | `/pin-archive` | Paginated history of pinned messages |
-| **Emoji Count** | `/emoji-count` | Server emoji usage leaderboard |
-| **Sticker Count** | `/sticker-count` | Server sticker usage leaderboard |
-| **PlusPlus Rankings** | `/plusplus-rankings` | Top/bottom plusplus scores |
-| **Statistics** | `/statistics` | Aggregate counts (members, emojis/stickers, pins, triggers, etc.) |
+| Page                  | Route                      | What it shows                                                     |
+| --------------------- | -------------------------- | ----------------------------------------------------------------- |
+| **System Status**     | `/system-status` (default) | Webapi / DB / bot heartbeat and cache status                      |
+| **Pin Archive**       | `/pin-archive`             | Paginated history of pinned messages                              |
+| **Emoji Count**       | `/emoji-count`             | Server emoji usage leaderboard                                    |
+| **Sticker Count**     | `/sticker-count`           | Server sticker usage leaderboard                                  |
+| **PlusPlus Rankings** | `/plusplus-rankings`       | Top/bottom plusplus scores                                        |
+| **Statistics**        | `/statistics`              | Aggregate counts (members, emojis/stickers, pins, triggers, etc.) |
 
 Also includes light/dark theme toggle and static serving of local emoji/sticker files under `/files` when present.
 
@@ -38,13 +38,13 @@ Copy `.env.example` to `.env`:
 cp .env.example .env
 ```
 
-| Variable | Default | Description |
-| -------- | ------- | ----------- |
-| `PORT` | `3002` | Dev server and production server port |
-| `WEBAPI_URL` | `http://localhost:3000` | webapi base URL; proxied at `/api` (in Docker Compose use e.g. `http://webapi:3000`) |
-| `WEBVIEW_USERNAME` | — **required** | Service account email for webapi login (server-side only; must match webapi `WEBVIEW_USERNAME`) |
-| `WEBVIEW_PASSWORD` | — **required** | Service account password (must match webapi `WEBVIEW_PASSWORD`) |
-| `WEBVIEW_API_RATE_LIMIT_MAX` | `120` | Per-IP rate limit for `/api` proxy (requests per minute) |
+| Variable                     | Default                 | Description                                                                                     |
+| ---------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------- |
+| `PORT`                       | `3002`                  | Dev server and production server port                                                           |
+| `WEBAPI_URL`                 | `http://localhost:3000` | webapi base URL; proxied at `/api` (in Docker Compose use e.g. `http://webapi:3000`)            |
+| `WEBVIEW_USERNAME`           | — **required**          | Service account email for webapi login (server-side only; must match webapi `WEBVIEW_USERNAME`) |
+| `WEBVIEW_PASSWORD`           | — **required**          | Service account password (must match webapi `WEBVIEW_PASSWORD`)                                 |
+| `WEBVIEW_API_RATE_LIMIT_MAX` | `120`                   | Per-IP rate limit for `/api` proxy (requests per minute)                                        |
 
 Missing `WEBVIEW_USERNAME` / `WEBVIEW_PASSWORD` causes the production server to exit on startup. Client code should call `/api/...` only (see `src/lib/api.js`); no build-time API URL is required.
 
