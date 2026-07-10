@@ -1,119 +1,125 @@
 # dixcord-bot
 
-Discord bot for the Dixon Cox Butte Preservation Society. This README covers the bot only; the `webapi/` directory and related web API assets are documented separately.
+Discord bot for the Dixon Cox Butte Preservation Society. This README covers the bot only; the `webapi/` backend and `web-view/` public site are documented separately.
+
+The bot **depends on the web API** for almost all behavior. It loads configuration at startup (`GET /api/config`) and does not run meaningfully without a reachable API and valid credentials.
 
 ---
 
-## Dependency: API backend
+## Features overview
 
-The bot **depends on its web API backend** for almost all behavior. It loads configuration at startup (`GET /api/config`) and does not run meaningfully without a reachable API and valid credentials. The API provides:
+### Message handling (every non-bot message)
 
-- Configuration (pin threshold, emoji IDs, channels, etc.)
-- Trigger–response pairs, link replacements, and bot responses (fortune, link-fixer)
-- Storage and leaderboards for plusplus, emojis, reposts, and pin logging
-
-### Connecting to the API
-
-Set these environment variables so the bot can authenticate and talk to the backend. There are **no in-code defaults**—if any of the three are missing, API calls will fail.
-
-| Variable          | Description                                 |
-| ----------------- | ------------------------------------------- |
-| `WEBAPI_URL`      | Base URL of the web API (no trailing slash) |
-| `WEBAPI_USERNAME` | Login email for the API                     |
-| `WEBAPI_PASSWORD` | Login password for the API                  |
-
-The bot logs in via `POST /api/auth/login` with `email` and `password`, stores the JWT, and re-authenticates automatically when it receives a 401 from a request. Ensure the web API is running and that this user exists before starting the bot. Use the same credentials as configured for the web API (for example its admin user).
-
-### Container startup (Docker)
-
-The Discord bot image runs `[scripts/start.js](scripts/start.js)` instead of `bot.js` directly. On every start it:
-
-1. **Waits for the web API**: polls `GET ${WEBAPI_URL}/health` (no auth) every 2 seconds, up to 30 attempts, until the response is `200` with `{ "status": "ok" }`. If the API never becomes ready, the process exits with an error so the bot does not crash immediately on `getAllConfigurations()`.
-2. **Optionally deploys slash commands**: if `DEPLOY_SLASH_COMMANDS` is set to a truthy value (`1`, `true`, or `yes`, case-insensitive), it runs `node delete-all-commands.js` (clears all guild slash commands on Discord), then `node deploy-commands.js`, then starts the bot. If either step fails, the container exits without starting the bot.
-3. **Starts the bot**: `node bot.js` with inherited stdio.
-
-When running under **docker compose** at the repo root, `discord-bot` depends on `webapi` with `condition: service_healthy`, and the web API service defines a health check against `/health`. Point `WEBAPI_URL` at the API service from the bot container, e.g. `http://webapi:3000`.
-
-| Variable                | Description                                                                                                                                                                                                                  |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DEPLOY_SLASH_COMMANDS` | Optional. When unset, empty, or falsy (`0`, `false`, etc.), only the health wait runs, then the bot starts. Set to `true` or `1` to clear all guild `/` commands, then re-register from `commands/` on each container start. |
-
----
-
-## What the bot does
-
-### Message handling (on every non-bot message)
-
-- **Link fixing** – If the message contains links from configured source hosts (e.g. x.com, twitter, instagram, tiktok, bsky), the bot asks the API for a “fixed” embed-friendly link and replies with it.
-- **Trigger responses** – If the message (stripped) matches a trigger string from the API, the bot replies with a random response for that trigger (e.g. “take a look at this” → image).
-- **Fortune (8-ball)** – If you @mention the bot and the message ends with `?`, the bot replies with a random fortune from the API.
-- **Emoji tracking** – Detects emojis in the message and records usage in the API; if you reply with exactly one of the configured +/- emojis, it applies a plus or minus to the replied-to user.
-- **Plus/minus from text** – Sends message content to the API so it can parse `word++`, `user++`, and `--` (filtering and scoring are done in the API).
+- **Link fixing** – Rewrites configured social hosts (e.g. x.com, twitter, instagram, tiktok, bsky) into embed-friendly links via the API.
+- **Trigger responses** – If the message matches a trigger string, replies using the trigger’s `selection_mode`:
+  - `random` — uniform random
+  - `ordered` — round-robin by `response_order`
+  - `weighted` — weighted random
+  - `lotto` — weighted random plus optional `lotto_prize` side effect; prize handlers must be defined in [`utilities/lottoPrizes.js`](utilities/lottoPrizes.js) (keyed by `prize_string`)
+- **Fortune (8-ball)** – @mention the bot with a message ending in `?` for a random fortune from the API.
+- **Emoji tracking** – Records emoji usage; a reply with exactly one configured +/- emoji applies plus/minus to the replied-to user.
+- **Plus/minus from text** – Parses `word++` / `user++` / `--` via the API.
+- **Scheduled reminders** – Natural-language reminder messages are stored via the API and delivered later by the in-process scheduler.
 
 ### Reaction handling
 
-- **Pinning** – When a message reaches the configured number of “pin” emoji reactions, the bot posts an embed to a pin channel (author, content, who pinned), logs the pin via the API, and may reply with a random pin quip.
-- **Plus/minus votes** – Adding or removing the configured plus/minus emoji on a message records or reverses a vote for that message’s author (no self-vote).
-- **Emoji stats** – Any other emoji reaction is counted as emoji usage (for leaderboards).
-- **Repost** – A configured “repost” emoji records an accusation; removing it withdraws that accusation.
+- **Pinning** – At the configured pin-emoji threshold, posts a pin embed, logs the pin, and may reply with a pin quip.
+- **Plus/minus votes** – Add/remove configured +/- emoji to record or reverse a vote (no self-vote).
+- **Emoji stats** – Other emoji reactions count toward leaderboards.
+- **Repost** – Configured repost emoji records or withdraws an accusation.
 
 ### Slash commands
 
-| Command                     | Description                                                                     |
-| --------------------------- | ------------------------------------------------------------------------------- |
-| `/dixbot`                   | Short help/reference (link fix, triggers, 8-ball, spam note, logging note).     |
-| `/plusplus-total`           | Shows the ++ score for a given word or user (optional `word` / `user` options). |
-| `/plusplus-leaderboard`     | Top and bottom 5 plusplus scores.                                               |
-| `/plusplus-top-voters`      | Top 3 plusplus voters.                                                          |
-| `/plusplus-voter-frequency` | How many times a user has +/-’d something (optional `user`).                    |
-| `/top-emojis`               | Top 5 most used emojis in the server.                                           |
-| `/reposts-by-user`          | Number of reposts for a given user.                                             |
-| `/top-reposters`            | Top 5 “worst reposters” by repost count.                                        |
+| Command                     | Description                                              |
+| --------------------------- | -------------------------------------------------------- |
+| `/dixbot`                   | Short help/reference                                     |
+| `/plusplus-total`           | ++ score for a word or user                              |
+| `/plusplus-leaderboard`     | Top and bottom 5 plusplus scores                         |
+| `/plusplus-top-voters`      | Top 3 plusplus voters                                    |
+| `/plusplus-voter-frequency` | How many times a user has +/-’d something                |
+| `/top-emojis`               | Top 5 most used emojis                                   |
+| `/reposts-by-user`          | Repost count for a user                                  |
+| `/top-reposters`            | Top 5 reposters                                          |
+| `/pin-message`              | Manually pin a message into the pin flow                 |
+| `/scheduled-list`           | List your upcoming scheduled reminders (UTC)             |
+| `/scheduled-update`         | Update a pending reminder’s time and/or message          |
+| `/scheduled-delete`         | Delete a pending reminder by id                          |
+
+### Runtime behavior
+
+- Authenticates to webapi with a JWT; re-logins on 401.
+- Polls cache version and refreshes in-memory triggers, link hosts, and config when invalidated.
+- Sends heartbeats to webapi; waits for `/health` before starting in Docker.
+- Optionally clears and re-registers guild slash commands on container start.
 
 ---
 
 ## Environment variables
 
-### Discord (required)
+Copy `.env.example` to `.env` for local development. There are **no in-code defaults** for Discord or webapi credentials—missing values cause startup/API failures.
 
-| Variable            | Description                                                                                                                                                                                                                                           |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DISCORD_TOKEN`     | Bot token.                                                                                                                                                                                                                                            |
-| `DISCORD_CLIENT_ID` | Application (client) ID.                                                                                                                                                                                                                              |
-| `DISCORD_GUILD_ID`  | Guild (server) ID for command registration and context.                                                                                                                                                                                               |
-| `DEV_FLAG`          | Must be non-empty. Used in `configVars.js` for dev vs production (data paths and announce channel behavior). For example `DEV_FLAG=1` for development; use a value that matches your deployment (see `configVars.js` for how production is detected). |
+### Discord
+
+| Variable                                 | Required | Description |
+| ---------------------------------------- | -------- | ----------- |
+| `DISCORD_TOKEN`                          | yes      | Bot token |
+| `DISCORD_CLIENT_ID`                      | yes      | Application (client) ID |
+| `DISCORD_GUILD_ID`                       | yes      | Guild ID for command registration and bot context |
+| `DEV_FLAG`                               | yes      | Must be non-empty. Loosely `== false` (e.g. `0`) → production (`dataDirectory=/data`); otherwise development (`./data`) |
+| `DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID` | no       | Extra text channel whose non-bot message authors are merged into user-mapping sync (must be in `DISCORD_GUILD_ID`) |
+| `PERMISSIONS`                            | no       | Discord permissions mask for invite URLs; not read by the bot process |
 
 ### Web API
 
-See [Connecting to the API](#connecting-to-the-api) above. Copy `.env.example` to `.env` and fill in values when developing locally.
+| Variable          | Required | Description |
+| ----------------- | -------- | ----------- |
+| `WEBAPI_URL`      | yes      | Base URL of the web API (no trailing slash). In Docker Compose use e.g. `http://webapi:3000` |
+| `WEBAPI_USERNAME` | yes      | Login email; should match webapi `BOT_USERNAME` |
+| `WEBAPI_PASSWORD` | yes      | Login password; should match webapi `BOT_PASSWORD` |
 
-### Slash command auto-deploy (optional)
+The bot logs in via `POST /api/auth/login`, stores the JWT, and re-authenticates on 401.
 
-See [Container startup (Docker)](#container-startup-docker). For local runs you can mirror the same flow with `node scripts/start.js` from the `discord-bot` directory (still requires a reachable `WEBAPI_URL`).
+### Startup / files
+
+| Variable                | Required | Description |
+| ----------------------- | -------- | ----------- |
+| `DEPLOY_SLASH_COMMANDS` | no       | Truthy (`1`, `true`, `yes`) → on start (via `scripts/start.js`), clear all guild slash commands then re-register from `commands/`. Falsy/unset → skip deploy |
+| `PIN_FILES_DIR`         | no       | Directory for shared pin attachment files (default: `./files` under `discord-bot`) |
+
+---
+
+## Connecting to the API
+
+Ensure webapi is running and the bot service account exists before starting. Under Docker Compose, `discord-bot` depends on `webapi` with `condition: service_healthy`.
+
+### Container startup (`scripts/start.js`)
+
+1. Poll `GET ${WEBAPI_URL}/health` every 2s (up to 30 attempts) until `{ "status": "ok" }`.
+2. Optionally deploy slash commands when `DEPLOY_SLASH_COMMANDS` is truthy.
+3. Start `node bot.js`.
 
 ---
 
 ## Running the bot
 
-From the `discord-bot` directory (so `deploy-commands.js` and imports resolve correctly):
+From the `discord-bot` directory:
 
 - **Install:** `npm ci` (or `npm install`)
 - **Production-style:** `npm run run` → `node bot.js`
-- **Dev (watch restarts):** `npm run dev` → `node --watch bot.js`
-
-Ensure the web API is up and env vars are set before starting.
+- **Dev (watch):** `npm run dev` → `node --watch bot.js`
+- **Docker-style start:** `node scripts/start.js` (health wait → optional deploy → bot)
 
 ### Docker
 
-The `Dockerfile` uses Node 22, installs dependencies with `npm ci`, copies `scripts/`, and runs `node ./scripts/start.js` (wait for API → optional delete-all + deploy → `bot.js`). Build and run from the `discord-bot` context so paths match.
+The image uses Node 22, `npm ci`, and `node ./scripts/start.js`. Build from the `discord-bot` context.
 
 ---
 
 ## Deploying slash commands
 
-Slash commands are registered for the guild in `configVars.js` (`DISCORD_GUILD_ID`).
+Registered for the guild in `DISCORD_GUILD_ID`:
 
-- **Register or refresh commands:** `node deploy-commands.js`
+- **Register/refresh:** `node deploy-commands.js`
 - **Remove all guild commands:** `node delete-all-commands.js`
 
-Run these from the `discord-bot` directory after installing dependencies.
+Run from the `discord-bot` directory after installing dependencies.
