@@ -4,8 +4,10 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
+import { apiReference } from "@scalar/express-api-reference";
 import db from "./config/db.js";
 import { ensureSchemaMigrations } from "./scripts/ensureSchema.js";
+import { buildOpenApiSpec } from "./lib/openapi.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import botResponsesRoutes from "./routes/bot-responses.js";
@@ -422,6 +424,57 @@ app.get("/", publicLimiter, (req, res) => {
  *                 status: { type: string, enum: [ok] }
  */
 app.get("/health", publicLimiter, (req, res) => res.json({ status: "ok" }));
+
+const openApiSpec = buildOpenApiSpec();
+
+/**
+ * @openapi
+ * /openapi.json:
+ *   get:
+ *     operationId: getOpenApiSpec
+ *     tags: [System]
+ *     summary: OpenAPI 3.0 document for this API
+ *     security: []
+ *     responses:
+ *       '200':
+ *         description: The generated OpenAPI document (built from `@openapi` JSDoc in routes/*.js).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ */
+app.get("/openapi.json", publicLimiter, (req, res) => res.json(openApiSpec));
+
+// Scalar's standalone bundle loads from a CDN and needs script-src/style-src it wouldn't get
+// under the strict default CSP the app.use(helmet()) above already wrote to `res`; a nested
+// helmet({ contentSecurityPolicy: false }) middleware only skips setting its OWN header, it
+// does not clear one an earlier middleware already set, so replace it explicitly instead.
+const SCALAR_CDN = "https://cdn.jsdelivr.net";
+app.get(
+  "/docs",
+  publicLimiter,
+  (req, res, next) => {
+    res.setHeader(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        `script-src 'self' ${SCALAR_CDN}`,
+        `style-src 'self' 'unsafe-inline' ${SCALAR_CDN}`,
+        `font-src 'self' data: ${SCALAR_CDN}`,
+        "img-src 'self' data: https:",
+        `connect-src 'self' ${SCALAR_CDN}`,
+      ].join("; "),
+    );
+    next();
+  },
+  apiReference({
+    url: "/openapi.json",
+    pageTitle: "dixcord-bot webapi",
+    agent: {
+      disabled: true,
+    },
+  }),
+);
 
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api", apiLimiter);

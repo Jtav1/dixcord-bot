@@ -27,6 +27,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@scalar/express-api-reference": "^0.10.16",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",

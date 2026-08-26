@@ -30,14 +30,16 @@ If a task seems to require a state-changing git command, stop and ask the user t
 cd webapi
 cp .env.example .env   # first time only
 npm install
-npm run dev              # node --watch index.js
-npm start                # node index.js
+npm run dev              # node --watch index.js; API reference served live at /docs
+npm start                # node index.js; API reference served live at /docs
 npm run db:setup:sqlite  # create/upgrade the SQLite schema (also happens automatically on boot)
 npm run db:setup:mysql   # same, for MySQL
-npm run docs:generate    # regenerate openapi.generated.json from @openapi JSDoc in routes/*.js + index.js
-npm run docs:preview     # docs:generate, then serve it live via Scalar
+npm run docs:generate    # write openapi.generated.json from @openapi JSDoc (CLI use; the running server doesn't need this)
+npm run docs:preview     # docs:generate, then serve it via the separate @scalar/cli (not the same as GET /docs)
 npm run docs:build       # docs:generate, then validate the spec via Scalar
 ```
+
+With the server running, visit `http://localhost:3000/docs` for the interactive Scalar reference (backed by `GET /openapi.json`, built live from the current code — no generate step needed).
 
 No test suite exists in this service (no `test` script, no Jest/Mocha/Vitest dependency).
 
@@ -118,7 +120,7 @@ Full detail in [`docs/code-standards.md`](docs/code-standards.md); highlights th
 - ESM everywhere, explicit `.js`/`.vue` extensions on relative imports, double quotes, semicolons, 2-space indent. No ESLint/Prettier config exists anywhere in the repo — this is enforced by review, not tooling.
 - Files: kebab-case for route/command files whose name mirrors a URL segment or slash command; camelCase for single-purpose utility/service/library modules; PascalCase for Vue SFCs.
 - Exported/private functions are named `function` declarations by default (arrow functions are fine for callbacks — route handlers, command `execute`, event `execute` — and in files that already commit to that shape throughout). Document with a `/** */` JSDoc block (`@param`, `@returns`); route handlers additionally note HTTP method + path and body/query shape in that JSDoc.
-- Every webapi route handler carries an `@openapi` JSDoc tag (inline YAML: `operationId`, `tags`, `parameters`/`requestBody`, `responses`), appended after the existing plain-English JSDoc — `webapi/routes/pin-quips.js` is the canonical example. `webapi/scripts/write-openapi.js` (via `swagger-jsdoc`) merges these into `webapi/openapi.generated.json`; run `npm run docs:generate` after touching a route, `npm run docs:preview` to view it live in Scalar, `npm run docs:build` to also validate the spec. The webapi surface is still documented by hand too, in [`webapi/docs/README.md`](webapi/docs/README.md) (route index) plus per-category response-example files under `webapi/docs/` — update those as well when a route changes; they haven't been superseded by the generated spec.
+- Every webapi route handler carries an `@openapi` JSDoc tag (inline YAML: `operationId`, `tags`, `parameters`/`requestBody`, `responses`), appended after the existing plain-English JSDoc — `webapi/routes/pin-quips.js` is the canonical example. `webapi/lib/openapi.js` exports `buildOpenApiSpec()` (via `swagger-jsdoc`), which scans `routes/*.js` + `index.js` and merges them with the shared base (security scheme, tags, reusable error schemas/responses) defined there — that's the single source of truth for the base spec, don't duplicate it elsewhere. `webapi/index.js` calls it once at boot and serves the live result at `GET /openapi.json`, with the Scalar UI mounted at `GET /docs` (both public, no auth) — so the reference is always up to date with the running code, no build step needed to view it. `webapi/scripts/write-openapi.js` is a thin CLI wrapper around the same builder, used by `npm run docs:generate` (writes `webapi/openapi.generated.json`, gitignored), `npm run docs:preview` (also serves it via the separate `@scalar/cli`, useful for validating in CI or off-server), and `npm run docs:build` (also validates the spec). The webapi surface is still documented by hand too, in [`webapi/docs/README.md`](webapi/docs/README.md) (route index) plus per-category response-example files under `webapi/docs/` — update those as well when a route changes; they haven't been superseded by the generated spec.
 - Error envelope is always `{ ok: false, error: "human-readable message" }` — never `{ error, message }`. `error` is a free-text sentence (`"Trigger not found"`, `"Failed to list triggers"`), not a fixed snake_case code.
 - Success envelope is `{ ok: true, ...fields }`; lists use a named plural key (e.g. `{ ok: true, triggers: [...] }`), not a generic `items`, optionally with `total`/pagination metadata. Creates return `201` + the created resource; deletes return `{ ok: true }`.
 - Request validation is hand-rolled (`typeof`/`trim()`/`Array.isArray` checks + early `400`) — match neighboring routes rather than introducing a validation library.

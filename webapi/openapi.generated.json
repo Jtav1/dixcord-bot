@@ -7664,6 +7664,28 @@
           }
         }
       }
+    },
+    "/openapi.json": {
+      "get": {
+        "operationId": "getOpenApiSpec",
+        "tags": [
+          "System"
+        ],
+        "summary": "OpenAPI 3.0 document for this API",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The generated OpenAPI document (built from `@openapi` JSDoc in routes/*.js).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
