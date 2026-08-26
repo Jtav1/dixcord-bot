@@ -445,26 +445,11 @@ const openApiSpec = buildOpenApiSpec();
  */
 app.get("/openapi.json", publicLimiter, (req, res) => res.json(openApiSpec));
 
-// Scalar's standalone bundle loads from a CDN and needs script-src/style-src it wouldn't get
-// under the strict default CSP the app.use(helmet()) above already wrote to `res`; a nested
-// helmet({ contentSecurityPolicy: false }) middleware only skips setting its OWN header, it
-// does not clear one an earlier middleware already set, so replace it explicitly instead.
-const SCALAR_CDN = "https://cdn.jsdelivr.net";
 app.get(
   "/docs",
   publicLimiter,
   (req, res, next) => {
-    res.setHeader(
-      "Content-Security-Policy",
-      [
-        "default-src 'self'",
-        `script-src 'self' ${SCALAR_CDN}`,
-        `style-src 'self' 'unsafe-inline' ${SCALAR_CDN}`,
-        `font-src 'self' data: ${SCALAR_CDN}`,
-        "img-src 'self' data: https:",
-        `connect-src 'self' ${SCALAR_CDN}`,
-      ].join("; "),
-    );
+    res.removeHeader("Content-Security-Policy");
     next();
   },
   apiReference({

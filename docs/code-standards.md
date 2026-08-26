@@ -41,7 +41,8 @@ This document describes what the code **actually does**, not an aspirational sty
 - `/** ... */` block above exported (and most non-trivial private) functions: a short description, then `@param {type} name - description` per parameter, then `@returns {type}`.
 - For HTTP handlers / functions that call a specific endpoint, state method + path (and body/query shape) in the description, e.g. `POST /api/message-processing/pin-check with { messageId }`.
 - `@private` on helpers not part of a module's public surface. File-level JSDoc on service modules describing their responsibility is common (`webapi/services/*.js`) and worth doing for new ones.
-- Inline `//` comments only for non-obvious "why" (a Discord/API quirk, a workaround), on their own line above the code they describe.
+- Inline `//` comments only for non-obvious "why" (a Discord/API quirk, a workaround), on their own line above the code they describe, and **no more than 1-2 lines** — compress or drop it rather than writing a prose paragraph.
+- Comments are for exactly three things: `@openapi` JSDoc, a docblock prefacing a function, or a short (1-2 line) inline "why". Nothing else warrants a comment — don't add one to restate what the code already says.
 - JSDoc coverage is inconsistent in older `discord-bot/commands/` and `discord-bot/events/` files — match the newer, documented style going forward rather than the sparser older one.
 
 ### Testing
