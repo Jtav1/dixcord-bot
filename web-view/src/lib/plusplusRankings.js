@@ -6,6 +6,24 @@ export const LEADERBOARD_LIMIT = 20;
 /** Vote history rows shown per page inside an expanded leaderboard entry. */
 export const VOTE_HISTORY_PAGE_SIZE = 50;
 
+/**
+ * Sort plusplus vote rows for display with the newest vote first.
+ * @param {Array<{ id: number, timestamp: string }>} votes Vote rows from webapi.
+ * @returns {Array<{ id: number, timestamp: string }>} Same rows, newest-first by timestamp then id.
+ */
+export function sortVotesNewestFirst(votes) {
+  return [...votes].sort((a, b) => {
+    const aTime = new Date(a.timestamp).getTime();
+    const bTime = new Date(b.timestamp).getTime();
+    const aValid = !Number.isNaN(aTime);
+    const bValid = !Number.isNaN(bTime);
+
+    if (aValid && bValid && bTime !== aTime) return bTime - aTime;
+    if (aValid !== bValid) return aValid ? -1 : 1;
+    return b.id - a.id;
+  });
+}
+
 /** Max page size supported by GET /api/user-mappings. */
 const USER_MAPPINGS_PAGE_SIZE = 200;
 
@@ -89,12 +107,14 @@ export async function fetchPlusPlusVoteHistory(
     throw new Error(data?.error || "Failed to load plusplus vote history");
   }
 
+  const votes = Array.isArray(data.votes) ? data.votes : [];
+
   return {
     string: String(data.string ?? rowId),
     type: String(data.type ?? type),
     total: Number(data.total ?? 0),
     count: Number(data.count ?? 0),
-    votes: Array.isArray(data.votes) ? data.votes : [],
+    votes: sortVotesNewestFirst(votes),
   };
 }
 
