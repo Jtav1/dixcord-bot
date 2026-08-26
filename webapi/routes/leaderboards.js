@@ -1,7 +1,7 @@
 import express from "express";
 import { authenticate } from "../middleware/auth.js";
 import * as leaderboards from "../services/leaderboards.js";
-import { getEmojiStatsForUser } from "../services/events.js";
+import { getEmojiStatsForUser, getStickerStatsForUser } from "../services/events.js";
 import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
@@ -496,6 +496,135 @@ router.post("/emoji/users", authenticate, async (req, res) => {
 });
 
 /**
+ * POST /api/leaderboards/sticker
+ * Top used stickers.
+ * Body: { limit?: number, offset?: number } (optional; default limit 5, max 50; default offset 0)
+ * Auth: required.
+ * @openapi
+ * /api/leaderboards/sticker:
+ *   post:
+ *     operationId: getStickerLeaderboard
+ *     tags: [Leaderboards]
+ *     summary: Top used stickers
+ *     description: Paginated sticker usage leaderboard from emoji_frequency (stickers only).
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               limit: { type: integer, default: 5, minimum: 1, maximum: 50 }
+ *               offset: { type: integer, default: 0, minimum: 0 }
+ *     responses:
+ *       '200':
+ *         description: Sticker usage page.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 limit: { type: integer }
+ *                 offset: { type: integer }
+ *                 total: { type: integer, description: "Total sticker rows (for pagination)." }
+ *                 top:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       emoji: { type: string, description: "Sticker name." }
+ *                       frequency: { type: integer }
+ *                       emoid: { type: string, description: "Sticker id." }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/sticker", authenticate, async (req, res) => {
+  try {
+    const limit = leaderboards.parseLimit(req.body?.limit, 5, 50);
+    const offset =
+      req.body?.offset != null ? Math.max(0, parseInt(req.body.offset, 10) || 0) : 0;
+    const { rows, total } = await leaderboards.listStickerFrequency(limit, offset);
+    res.json({ ok: true, limit, offset, total, top: rows });
+  } catch (err) {
+    console.error("POST /api/leaderboards/sticker error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get sticker leaderboard" });
+  }
+});
+
+/**
+ * POST /api/leaderboards/sticker/users
+ * Top users by total sticker usage (paginated).
+ * Body: { app: "discord", limit?: number, offset?: number } (default limit 50, max 50; default offset 0)
+ * Auth: required.
+ * @openapi
+ * /api/leaderboards/sticker/users:
+ *   post:
+ *     operationId: getStickerUserLeaderboard
+ *     tags: [Leaderboards]
+ *     summary: Top users by total sticker usage
+ *     description: Paginated per-user sticker usage totals from user_emoji_tracking (stickers only).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app]
+ *             properties:
+ *               app: { type: string, enum: [discord] }
+ *               limit: { type: integer, default: 50, minimum: 1, maximum: 50 }
+ *               offset: { type: integer, default: 0, minimum: 0 }
+ *     responses:
+ *       '200':
+ *         description: Per-user sticker usage totals page.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 app: { type: string }
+ *                 limit: { type: integer }
+ *                 offset: { type: integer }
+ *                 total: { type: integer, description: "Total distinct users with sticker usage (for pagination)." }
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       userid: { type: string, description: "Platform user id (Discord snowflake)." }
+ *                       name: { type: string }
+ *                       total: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/sticker/users", authenticate, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    const limit = leaderboards.parseLimit(req.body?.limit, 50, 50);
+    const offset =
+      req.body?.offset != null ? Math.max(0, parseInt(req.body.offset, 10) || 0) : 0;
+    const { rows, total } = await leaderboards.listStickerUsersByTotalUsage(
+      limit,
+      offset,
+      app,
+    );
+    res.json({ ok: true, app, limit, offset, total, users: rows });
+  } catch (err) {
+    console.error("POST /api/leaderboards/sticker/users error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get sticker user leaderboard" });
+  }
+});
+
+/**
  * POST /api/leaderboards/repost
  * Top reposters by accusation count (mirrors top-reposters command).
  * Body: { app: "discord", limit?: number } (optional, default 5, max 50)
@@ -689,6 +818,79 @@ router.get("/emoji/user/:userId", authenticate, async (req, res) => {
   } catch (err) {
     console.error("GET /api/leaderboards/emoji/user/:userId error:", err);
     res.status(500).json({ ok: false, error: "Failed to get user emoji stats" });
+  }
+});
+
+/**
+ * GET /api/leaderboards/sticker/user/:userId
+ * Per-user sticker usage stats.
+ * Query: app=discord required, limit optional
+ * Auth: required.
+ * @openapi
+ * /api/leaderboards/sticker/user/{userId}:
+ *   get:
+ *     operationId: getStickerUserStats
+ *     tags: [Leaderboards]
+ *     summary: Per-user sticker usage stats
+ *     description: Sticker usage breakdown for one user from user_emoji_tracking (stickers only).
+ *     parameters:
+ *       - name: userId
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *         description: Discord snowflake of the user.
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         schema: { type: string, enum: [discord] }
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+ *         description: Max rows to return, sorted by frequency descending. Omit for all rows.
+ *     responses:
+ *       '200':
+ *         description: Sticker usage stats for the user (empty array if unknown user).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 app: { type: string }
+ *                 userId: { type: string }
+ *                 stats:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       emoid: { type: string }
+ *                       emoji: { type: string, description: "Sticker name." }
+ *                       frequency: { type: integer }
+ *       '400':
+ *         description: Missing/invalid app parameter.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/sticker/user/:userId", authenticate, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    const limit =
+      req.query.limit != null
+        ? leaderboards.parseLimit(req.query.limit, 50, 200)
+        : undefined;
+    const stats = await getStickerStatsForUser(req.params.userId, app, limit);
+    res.json({ ok: true, app, userId: req.params.userId, stats });
+  } catch (err) {
+    console.error("GET /api/leaderboards/sticker/user/:userId error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get user sticker stats" });
   }
 });
 

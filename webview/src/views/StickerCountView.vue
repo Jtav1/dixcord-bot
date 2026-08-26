@@ -3,11 +3,25 @@
     <header class="view-header mb-6">
       <h1 class="text-h4 font-weight-bold mb-2">Sticker Count</h1>
       <p class="text-body-1 text-medium-emphasis">
-        See which stickers are used most by dix, and which users use them the
-        most. Sorry Justin actually hasn't implemented tracking sticker usage
-        yet so this is kind of a placeholder lmao
+        See which stickers are used most by dix, and which users use them the most.
       </p>
     </header>
+
+    <v-alert
+      v-if="error"
+      type="error"
+      variant="tonal"
+      class="mb-6"
+      :text="error"
+    />
+
+    <v-alert
+      v-if="userError"
+      type="error"
+      variant="tonal"
+      class="mb-6"
+      :text="userError"
+    />
 
     <v-row>
       <v-col cols="12" md="6">
@@ -17,11 +31,13 @@
             Top Stickers
           </v-card-title>
           <v-card-text class="pa-0">
-            <v-alert
-              type="info"
-              variant="tonal"
-              title="Work in progress"
-              text="Sticker leaderboards are coming soon."
+            <StickerLeaderboardTable
+              :entries="entries"
+              :total="total"
+              :offset="offset"
+              :page="page"
+              :loading="loading"
+              @update:page="onPageChange"
             />
           </v-card-text>
         </v-card>
@@ -34,15 +50,142 @@
             Top Sticker Users
           </v-card-title>
           <v-card-text class="pa-0">
-            <v-alert
-              type="info"
-              variant="tonal"
-              title="Work in progress"
-              text="Per-user sticker rankings are coming soon."
+            <StickerUserLeaderboardPanels
+              :entries="userEntries"
+              :name-map="nameMap"
+              :total="userTotal"
+              :offset="userOffset"
+              :page="userPage"
+              :loading="userLoading"
+              @update:page="onUserPageChange"
             />
           </v-card-text>
         </v-card>
       </v-col>
     </v-row>
+
+    <p
+      v-if="!loading && !userLoading && updatedAt"
+      class="text-caption text-medium-emphasis text-center mt-6"
+    >
+      Updated {{ updatedAt }} · {{ total.toLocaleString() }} stickers tracked ·
+      {{ userTotal.toLocaleString() }} users ranked
+    </p>
   </div>
 </template>
+
+<script setup>
+import { onMounted, ref } from "vue";
+import StickerLeaderboardTable from "../components/StickerLeaderboardTable.vue";
+import StickerUserLeaderboardPanels from "../components/StickerUserLeaderboardPanels.vue";
+import {
+  STICKER_PAGE_SIZE,
+  fetchStickerLeaderboardPage,
+  fetchStickerUserLeaderboardPage,
+} from "../lib/stickerLeaderboard.js";
+import {
+  buildUserNameMap,
+  fetchAllUserMappings,
+} from "../lib/plusplusRankings.js";
+
+const loading = ref(true);
+const error = ref("");
+const entries = ref([]);
+const total = ref(0);
+const offset = ref(0);
+const page = ref(1);
+
+const userLoading = ref(true);
+const userError = ref("");
+const userEntries = ref([]);
+const userTotal = ref(0);
+const userOffset = ref(0);
+const userPage = ref(1);
+const nameMap = ref(new Map());
+
+const updatedAt = ref("");
+
+/**
+ * Load one page of sticker leaderboard data from webapi.
+ * @param {number} nextPage 1-based page number.
+ * @returns {Promise<void>}
+ */
+async function loadPage(nextPage) {
+  loading.value = true;
+  error.value = "";
+
+  const safePage = Math.max(1, nextPage);
+  const nextOffset = (safePage - 1) * STICKER_PAGE_SIZE;
+
+  try {
+    const result = await fetchStickerLeaderboardPage(nextOffset);
+    entries.value = result.entries;
+    total.value = result.total;
+    offset.value = result.offset;
+    page.value = safePage;
+  } catch (err) {
+    error.value =
+      err instanceof Error ? err.message : "Failed to load sticker leaderboard";
+  } finally {
+    loading.value = false;
+  }
+}
+
+/**
+ * Load one page of per-user sticker leaderboard data from webapi.
+ * @param {number} nextPage 1-based page number.
+ * @returns {Promise<void>}
+ */
+async function loadUserPage(nextPage) {
+  userLoading.value = true;
+  userError.value = "";
+
+  const safePage = Math.max(1, nextPage);
+  const nextOffset = (safePage - 1) * STICKER_PAGE_SIZE;
+
+  try {
+    const result = await fetchStickerUserLeaderboardPage(nextOffset);
+    userEntries.value = result.entries;
+    userTotal.value = result.total;
+    userOffset.value = result.offset;
+    userPage.value = safePage;
+  } catch (err) {
+    userError.value =
+      err instanceof Error
+        ? err.message
+        : "Failed to load sticker user leaderboard";
+  } finally {
+    userLoading.value = false;
+  }
+}
+
+/**
+ * Handle pagination control changes for the sticker frequency table.
+ * @param {number} nextPage 1-based page number.
+ * @returns {void}
+ */
+function onPageChange(nextPage) {
+  void loadPage(nextPage);
+}
+
+/**
+ * Handle pagination control changes for the user leaderboard.
+ * @param {number} nextPage 1-based page number.
+ * @returns {void}
+ */
+function onUserPageChange(nextPage) {
+  void loadUserPage(nextPage);
+}
+
+onMounted(async () => {
+  try {
+    const userMappings = await fetchAllUserMappings("discord");
+    nameMap.value = buildUserNameMap(userMappings);
+  } catch {
+    // Name resolution is best-effort; API rows include names as fallback.
+  }
+
+  await Promise.all([loadPage(1), loadUserPage(1)]);
+  updatedAt.value = new Date().toLocaleString();
+});
+</script>

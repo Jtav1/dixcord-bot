@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 
 import { token, guildId, isDev, version, clientId } from "./configVars.js";
 import { importEmojiList } from "./api/emojis.js";
+import { importStickerList } from "./api/stickers.js";
 import { syncUserMappingFromGuild } from "./api/userMapping.js";
 import { hydratePinHistory } from "./events/messages/utilities/pinHistoryHydration.js";
 import {
@@ -99,8 +100,10 @@ client.once(Events.ClientReady, async (readyClient) => {
   const oauthGuild = await client.guilds.fetch(guildId);
   const guild = await oauthGuild.fetch();
   const emojis = await guild.emojis.fetch();
+  const stickers = await guild.stickers.fetch();
 
   await importEmojiList(emojis);
+  await importStickerList(stickers);
   await syncUserMappingFromGuild(readyClient);
   await hydratePinHistory(readyClient).catch((err) => {
     console.error("pin-history hydration error:", err);

@@ -182,6 +182,43 @@ export async function getEmojiStatsForUser(userId, app, limit) {
   }));
 }
 
+const STICKER_FREQUENCY_WHERE = "ef.type = 'sticker'";
+
+/**
+ * Per-user sticker usage stats.
+ * @param {string} userId - platform user id
+ * @param {string} app
+ * @param {number} [limit] When omitted, returns all rows.
+ * @returns {Promise<Array<{ emoid: string, emoji: string, frequency: number }>>}
+ */
+export async function getStickerStatsForUser(userId, app, limit) {
+  if (!isChatMemberAppSupported(app)) return [];
+  const mid = await getChatMemberMappingIdByPlatformUserId(userId, app);
+  if (mid == null) return [];
+
+  const sql = `SELECT uet.emoid, ef.emoji, uet.frequency
+     FROM user_emoji_tracking uet
+     INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
+     WHERE uet.userid = ? AND (${STICKER_FREQUENCY_WHERE})
+     ORDER BY uet.frequency DESC`;
+
+  const params = [mid];
+  if (limit != null) {
+    params.push(parseLimit(limit, 50, 200));
+  }
+
+  const [rows] = await db.query(
+    limit != null ? `${sql} LIMIT ?` : sql,
+    params,
+  );
+
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    emoid: String(row.emoid),
+    emoji: String(row.emoji),
+    frequency: Number(row.frequency),
+  }));
+}
+
 /**
  * List sticker catalog from emoji_frequency where type = sticker.
  * @param {number} [limit]

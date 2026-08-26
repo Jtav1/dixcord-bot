@@ -184,6 +184,37 @@ export async function countEmoji(payload) {
   return { ok: true };
 }
 
+/**
+ * Record sticker usage from a message. No plus/minus concept for stickers (Discord has no
+ * reply-with-sticker vote mechanism), so this is simpler than countEmoji.
+ * @param {object} payload - { app: string, authorId: string (snowflake), stickers: Array<{ name, id? }> }
+ * @returns {Promise<{ ok: boolean, error?: string }>}
+ */
+export async function countSticker(payload) {
+  const appCheck = requireChatAppFromPayload(payload);
+  if (!appCheck.ok) return appCheck;
+  const chatApp = appCheck.app;
+
+  const { authorId, stickers = [] } = payload;
+
+  if (!authorId || !Array.isArray(stickers) || stickers.length === 0) {
+    return { ok: false };
+  }
+
+  const authorMap = await requireChatMemberMappingId(authorId, chatApp);
+  if (!authorMap.ok) return { ok: false, error: authorMap.error };
+
+  for (const st of stickers) {
+    const name = String(st.name ?? "?");
+    const id = st.id != null ? String(st.id) : name;
+    await ensureAndIncrementEmoji(id, name, false, "sticker");
+    if (id && authorId) {
+      await upsertUserEmoji(authorMap.id, id);
+    }
+  }
+  return { ok: true };
+}
+
 // --- Plus/minus in messages ---
 
 /**

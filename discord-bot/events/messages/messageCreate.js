@@ -15,6 +15,7 @@ import {
 } from "../../api/cacheRefresh.js";
 
 import { emojiDetector } from "./utilities/emojiDetector.js";
+import { stickerDetector } from "./utilities/stickerDetector.js";
 import { plusMinusMsg } from "./utilities/plusplus.js";
 
 const name = "messageCreate";
@@ -24,6 +25,7 @@ const execute = async (message) => {
 
   if (!message.author.bot && !(message.author.id === clientId)) {
     await emojiDetector(message);
+    await stickerDetector(message);
     await plusMinusMsg(message);
 
     const contentStripped = message.content
