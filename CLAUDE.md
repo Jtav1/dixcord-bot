@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Discord-bot: a self-hostable discord bot. This bot is comprised of a web backend `webapi/` and multiple front-ends; `discord-bot/` is the discord bot client built using discordjs, `web-view/` is a read-only website for reviewing bot info and stats, and `web-panel/` is an admin-only (and should be locally hosted and inaccessible from the internet really) bot control panel. 
+Discord-bot: a self-hostable discord bot. This bot is comprised of a web backend `webapi/` and multiple front-ends; `discord-bot/` is the discord bot client built using discordjs, `webview/` is a read-only website for reviewing bot info and stats, and `webadmin/` is an admin-only (and should be locally hosted and inaccessible from the internet really) bot control panel. 
 
 ## Git usage restriction
 
@@ -34,6 +34,9 @@ npm run dev              # node --watch index.js
 npm start                # node index.js
 npm run db:setup:sqlite  # create/upgrade the SQLite schema (also happens automatically on boot)
 npm run db:setup:mysql   # same, for MySQL
+npm run docs:generate    # regenerate openapi.generated.json from @openapi JSDoc in routes/*.js + index.js
+npm run docs:preview     # docs:generate, then serve it live via Scalar
+npm run docs:build       # docs:generate, then validate the spec via Scalar
 ```
 
 No test suite exists in this service (no `test` script, no Jest/Mocha/Vitest dependency).
@@ -51,10 +54,10 @@ node deploy-commands.js       # register/refresh guild slash commands
 node delete-all-commands.js   # remove all guild slash commands
 ```
 
-### web-view/ (public read-only site, port 3002 default)
+### webview/ (public read-only site, port 3002 default)
 
 ```bash
-cd web-view
+cd webview
 cp .env.example .env
 npm install
 npm run dev      # vite dev server
@@ -62,10 +65,10 @@ npm run build    # vite build -> dist/
 npm start        # node server.js (serves dist/ + proxies /api to webapi)
 ```
 
-### web-panel/ (admin panel, port 3001 default — currently a minimal scaffold)
+### webadmin/ (admin panel, port 3001 default — currently a minimal scaffold)
 
 ```bash
-cd web-panel
+cd webadmin
 cp .env.example .env
 npm install
 npm run dev
@@ -76,15 +79,15 @@ npm start
 ### Whole stack
 
 ```bash
-docker compose up --build   # webapi + discord-bot + web-view + web-panel, webapi healthcheck gates the other three
+docker compose up --build   # webapi + discord-bot + webview + webadmin, webapi healthcheck gates the other three
 ```
 
 ## Architecture
 
 ### Four services, one shared backend
 
-- Everything funnels through `webapi/`. `discord-bot`, `web-view`, and `web-panel` are independent clients that each authenticate to it with their own service-account JWT (`bot`, `webview`, and `admin` roles respectively — see Auth model). None of the frontends talk to the database directly.
-- `docker-compose.yml` at the repo root orchestrates all four services; `webapi` must report healthy (`GET /health`) before `discord-bot`, `web-view`, or `web-panel` start.
+- Everything funnels through `webapi/`. `discord-bot`, `webview`, and `webadmin` are independent clients that each authenticate to it with their own service-account JWT (`bot`, `webview`, and `admin` roles respectively — see Auth model). None of the frontends talk to the database directly.
+- `docker-compose.yml` at the repo root orchestrates all four services; `webapi` must report healthy (`GET /health`) before `discord-bot`, `webview`, or `webadmin` start.
 
 ### webapi request flow
 
@@ -95,7 +98,7 @@ docker compose up --build   # webapi + discord-bot + web-view + web-panel, webap
 ### Auth model
 
 - JWT only (`jsonwebtoken`) — no sessions or cookies. `POST /api/auth/login` (separately rate-limited) exchanges service-account credentials for a token; `POST /api/auth/register` is permanently disabled and always returns `403`.
-- Three roles: `admin` (full access; used by `web-panel`), `bot` (used by `discord-bot`), `webview` (used by `web-view`, additionally restricted server-side to an explicit allowlist of read-mostly routes/prefixes). There is no per-end-user auth on webapi — every human interacts through Discord or one of the two web frontends, never webapi directly.
+- Three roles: `admin` (full access; used by the `webadmin` service), `bot` (used by `discord-bot`), `webview` (used by the `webview` service, additionally restricted server-side to an explicit allowlist of read-mostly routes/prefixes). There is no per-end-user auth on webapi — every human interacts through Discord or one of the two web frontends, never webapi directly.
 - `middleware/auth.js` exports `signToken`, `authenticate`, `requireAdmin`, `requireBotOrAdmin`, `optionalAuth`. Routes apply `authenticate` per-handler (see [`docs/code-standards.md`](docs/code-standards.md) for the one file that deviates from this).
 
 ### Database / schema
@@ -106,7 +109,7 @@ docker compose up --build   # webapi + discord-bot + web-view + web-panel, webap
 ### File storage (pin attachments, emoji/sticker assets)
 
 - `discord-bot/files/` (`images/`, `videos/`, `other/`) holds Discord pin attachments the bot saves locally. Under compose it's bind-mounted into both `webapi` and `discord-bot` at the same path (`PIN_FILES_DIR=/data/pin-files`).
-- `web-view/files/` (`Emojis/`, `Stickers/`, `images/`, `videos/`, `other/`) is a separate directory, mounted **read-only** into `web-view` and served through a case-insensitive lookup (`web-view/lib/emojiFilesMiddleware.js`) at `/files/Emojis/*` etc. It is **not** wired into the same compose volume as `discord-bot/files/` — keep it populated/in sync by whatever process currently does so; don't assume the two are the same underlying directory.
+- `webview/files/` (`Emojis/`, `Stickers/`, `images/`, `videos/`, `other/`) is a separate directory, mounted **read-only** into `webview` and served through a case-insensitive lookup (`webview/lib/emojiFilesMiddleware.js`) at `/files/Emojis/*` etc. It is **not** wired into the same compose volume as `discord-bot/files/` — keep it populated/in sync by whatever process currently does so; don't assume the two are the same underlying directory.
 
 ## Code conventions
 
@@ -115,7 +118,7 @@ Full detail in [`docs/code-standards.md`](docs/code-standards.md); highlights th
 - ESM everywhere, explicit `.js`/`.vue` extensions on relative imports, double quotes, semicolons, 2-space indent. No ESLint/Prettier config exists anywhere in the repo — this is enforced by review, not tooling.
 - Files: kebab-case for route/command files whose name mirrors a URL segment or slash command; camelCase for single-purpose utility/service/library modules; PascalCase for Vue SFCs.
 - Exported/private functions are named `function` declarations by default (arrow functions are fine for callbacks — route handlers, command `execute`, event `execute` — and in files that already commit to that shape throughout). Document with a `/** */` JSDoc block (`@param`, `@returns`); route handlers additionally note HTTP method + path and body/query shape in that JSDoc.
-- There is no OpenAPI/swagger tooling in this repo. The webapi surface is documented by hand in [`webapi/docs/README.md`](webapi/docs/README.md) (route index) plus per-category response-example files under `webapi/docs/` — update those, not a generated spec, when a route changes.
+- Every webapi route handler carries an `@openapi` JSDoc tag (inline YAML: `operationId`, `tags`, `parameters`/`requestBody`, `responses`), appended after the existing plain-English JSDoc — `webapi/routes/pin-quips.js` is the canonical example. `webapi/scripts/write-openapi.js` (via `swagger-jsdoc`) merges these into `webapi/openapi.generated.json`; run `npm run docs:generate` after touching a route, `npm run docs:preview` to view it live in Scalar, `npm run docs:build` to also validate the spec. The webapi surface is still documented by hand too, in [`webapi/docs/README.md`](webapi/docs/README.md) (route index) plus per-category response-example files under `webapi/docs/` — update those as well when a route changes; they haven't been superseded by the generated spec.
 - Error envelope is always `{ ok: false, error: "human-readable message" }` — never `{ error, message }`. `error` is a free-text sentence (`"Trigger not found"`, `"Failed to list triggers"`), not a fixed snake_case code.
 - Success envelope is `{ ok: true, ...fields }`; lists use a named plural key (e.g. `{ ok: true, triggers: [...] }`), not a generic `items`, optionally with `total`/pagination metadata. Creates return `201` + the created resource; deletes return `{ ok: true }`.
 - Request validation is hand-rolled (`typeof`/`trim()`/`Array.isArray` checks + early `400`) — match neighboring routes rather than introducing a validation library.
@@ -127,4 +130,5 @@ Full detail in [`docs/code-standards.md`](docs/code-standards.md); highlights th
 2. Apply `authenticate` (and `requireAdmin`/`requireBotOrAdmin` if the route is role-gated) per handler, matching neighboring routes; hand-roll body/query validation with early `400`s.
 3. If the route needs new columns/tables, add them to **both** `webapi/sql/schema.sql` and `webapi/sql/schema.sqlite.sql`, and add the matching idempotent check to `webapi/scripts/ensureSchema.js`.
 4. Add the route to the `GET /` endpoint listing in `webapi/index.js` and to the route table in `webapi/docs/README.md`; add a response-example doc under `webapi/docs/` if the resource category already has one.
-5. There is currently no test suite for webapi — if the user wants coverage for the new route, that's a decision to raise explicitly, not something to skip silently or invent conventions for.
+5. Add an `@openapi` JSDoc block above the handler (see `webapi/routes/pin-quips.js`); run `npm run docs:generate` to confirm it merges cleanly into `webapi/openapi.generated.json`.
+6. There is currently no test suite for webapi — if the user wants coverage for the new route, that's a decision to raise explicitly, not something to skip silently or invent conventions for.

@@ -8,6 +8,40 @@ const router = express.Router();
  * GET /api/trigger-responses
  * List all trigger-response pairs.
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses:
+ *   get:
+ *     operationId: listTriggerResponses
+ *     tags: [Trigger Responses]
+ *     summary: List all trigger-response pairs
+ *     description: Flat list of every trigger/response junction row, joined with its trigger and response text.
+ *     responses:
+ *       '200':
+ *         description: All trigger-response pairs.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 triggerResponses:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer, description: Junction (trigger_response) row id }
+ *                       trigger_id: { type: integer }
+ *                       response_id: { type: integer }
+ *                       trigger_string: { type: string }
+ *                       response_string: { type: string }
+ *                       response_order: { type: integer, nullable: true }
+ *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                       selection_mode: { type: string, enum: [random, ordered, weighted] }
+ *                       created_at: { type: string }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/", authenticate, async (req, res) => {
   try {
@@ -25,6 +59,29 @@ router.get("/", authenticate, async (req, res) => {
  * GET /api/trigger-responses/triggers
  * List unique trigger strings (for bot to match against message content).
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/triggers:
+ *   get:
+ *     operationId: listTriggerStrings
+ *     tags: [Trigger Responses]
+ *     summary: List unique trigger strings
+ *     description: Bare trigger text only (no ids), for the bot to match against message content.
+ *     responses:
+ *       '200':
+ *         description: All trigger strings.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 triggers:
+ *                   type: array
+ *                   items: { type: string }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/triggers", authenticate, async (req, res) => {
   try {
@@ -40,6 +97,36 @@ router.get("/triggers", authenticate, async (req, res) => {
  * GET /api/trigger-responses/triggers/list
  * List all triggers with id and selection_mode (for CRUD).
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/triggers/list:
+ *   get:
+ *     operationId: listTriggersWithMode
+ *     tags: [Trigger Responses]
+ *     summary: List all triggers with id and selection_mode
+ *     description: >
+ *       CRUD-oriented listing (unlike GET /api/trigger-responses/triggers, which returns bare strings).
+ *       Registered before /triggers/{id} so the literal "list" segment is not shadowed by the id param route.
+ *     responses:
+ *       '200':
+ *         description: All triggers.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 triggers:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       trigger_string: { type: string }
+ *                       selection_mode: { type: string, enum: [random, ordered, weighted] }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/triggers/list", authenticate, async (req, res) => {
   try {
@@ -55,6 +142,57 @@ router.get("/triggers/list", authenticate, async (req, res) => {
  * GET /api/trigger-responses/triggers/responses?trigger=xxx | ?triggerId=xxx
  * Get all responses for a trigger by trigger text or trigger id.
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/triggers/responses:
+ *   get:
+ *     operationId: listResponsesForTrigger
+ *     tags: [Trigger Responses]
+ *     summary: Get all responses for a trigger, by trigger text or trigger id
+ *     description: >
+ *       Exactly one of `trigger` or `triggerId` must be supplied; `triggerId` takes precedence if both
+ *       are present. Returns 400 if neither is given. Registered before /triggers/{id} so the literal
+ *       "responses" segment is not shadowed by the id param route.
+ *     parameters:
+ *       - name: trigger
+ *         in: query
+ *         required: false
+ *         description: Trigger text. Ignored if triggerId is also given.
+ *         schema: { type: string }
+ *       - name: triggerId
+ *         in: query
+ *         required: false
+ *         description: Trigger id. Takes precedence over trigger if both are given.
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: The trigger and its responses.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 trigger_id: { type: integer }
+ *                 trigger_string: { type: string }
+ *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
+ *                 responses:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer, description: responses.id }
+ *                       response_string: { type: string }
+ *                       order: { type: integer, nullable: true }
+ *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                       linkId: { type: integer, description: trigger_response junction row id }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/triggers/responses", authenticate, async (req, res) => {
   try {
@@ -89,6 +227,48 @@ router.get("/triggers/responses", authenticate, async (req, res) => {
  * GET /api/trigger-responses/triggers/:id
  * Get one trigger by id with its responses array (each response has id, response_string, order, linkId).
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/triggers/{id}:
+ *   get:
+ *     operationId: getTrigger
+ *     tags: [Trigger Responses]
+ *     summary: Get one trigger by id, with its responses
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: The trigger and its responses.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 trigger_string: { type: string }
+ *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
+ *                 created_at: { type: string }
+ *                 responses:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer, description: responses.id }
+ *                       response_string: { type: string }
+ *                       order: { type: integer, nullable: true }
+ *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                       linkId: { type: integer, description: trigger_response junction row id }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/triggers/:id", authenticate, async (req, res) => {
   try {
@@ -112,6 +292,71 @@ router.get("/triggers/:id", authenticate, async (req, res) => {
  * Create a trigger (if it doesn't exist) with selection_mode and an array of responses.
  * Body: { trigger_string, selection_mode?, responses: [ { response_string, order?, weight? } ] }
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/triggers:
+ *   post:
+ *     operationId: createTrigger
+ *     tags: [Trigger Responses]
+ *     summary: Create a trigger with a batch of responses
+ *     description: >
+ *       Requires the admin role. If trigger_string already exists, reuses that trigger (and updates its
+ *       selection_mode) rather than creating a duplicate; response_string values are deduped the same way.
+ *       Entries in responses missing a non-empty response_string are silently skipped.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [trigger_string, responses]
+ *             properties:
+ *               trigger_string: { type: string }
+ *               selection_mode:
+ *                 type: string
+ *                 enum: [random, ordered, weighted]
+ *                 default: random
+ *                 description: Falls back to "random" if omitted or not one of the valid values.
+ *               responses:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: object
+ *                   required: [response_string]
+ *                   properties:
+ *                     response_string: { type: string }
+ *                     order: { type: integer, nullable: true, description: Used when selection_mode is "ordered". }
+ *                     weight: { type: integer, nullable: true, minimum: 0, maximum: 100, description: Used when selection_mode is "weighted". }
+ *     responses:
+ *       '201':
+ *         description: Created (or reused) trigger with its responses.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 trigger_string: { type: string }
+ *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
+ *                 created_at: { type: string }
+ *                 responses:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer, description: responses.id }
+ *                       response_string: { type: string }
+ *                       order: { type: integer, nullable: true }
+ *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                       linkId: { type: integer, description: trigger_response junction row id }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -148,6 +393,75 @@ router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
  * Update trigger: selection_mode and/or responses (set order/weight by link id, or add new response).
  * Body: { selection_mode?, responses?: [ { id: linkId, order?, weight? } | { response_string, order?, weight? } ] }
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/triggers/{id}:
+ *   put:
+ *     operationId: updateTrigger
+ *     tags: [Trigger Responses]
+ *     summary: Update a trigger's selection_mode and/or its response list
+ *     description: >
+ *       Requires the admin role. Each entry in `responses` is either `{ id: linkId, order?, weight? }` to
+ *       update an existing trigger_response link's order/weight, or `{ response_string, order?, weight? }`
+ *       to add a new response (deduped by response_string) to this trigger. Entries matching neither shape
+ *       are silently skipped. Both fields are optional; an empty body is a no-op that still returns 200.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               selection_mode:
+ *                 type: string
+ *                 enum: [random, ordered, weighted]
+ *                 description: Falls back to "random" if not one of the valid values.
+ *               responses:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer, description: Existing trigger_response link id to update. }
+ *                     response_string: { type: string, description: Adds a new response when id is not given. }
+ *                     order: { type: integer, nullable: true }
+ *                     weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *     responses:
+ *       '200':
+ *         description: The updated trigger with its responses.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 trigger_string: { type: string }
+ *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
+ *                 created_at: { type: string }
+ *                 responses:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer, description: responses.id }
+ *                       response_string: { type: string }
+ *                       order: { type: integer, nullable: true }
+ *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                       linkId: { type: integer, description: trigger_response junction row id }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -172,6 +486,39 @@ router.put("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
  * DELETE /api/trigger-responses/triggers/:id
  * Delete a trigger and remove orphaned responses that are no longer linked to any trigger.
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/triggers/{id}:
+ *   delete:
+ *     operationId: deleteTrigger
+ *     tags: [Trigger Responses]
+ *     summary: Delete a trigger
+ *     description: >
+ *       Requires the admin role. Removes all trigger_response links for this trigger, then deletes any
+ *       responses that are left with no remaining links (orphan cleanup).
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: Deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -194,6 +541,45 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
  * GET /api/trigger-responses/random?trigger=xxx
  * Return one response for the given trigger (selection_mode: random, weighted, or ordered is handled in service).
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/random:
+ *   get:
+ *     operationId: getRandomResponse
+ *     tags: [Trigger Responses]
+ *     summary: Get one selected response for a trigger
+ *     description: >
+ *       Looks up the trigger by exact trigger_string and picks one response per its selection_mode:
+ *       "random" (uniform DB-side random pick), "ordered" (round-robin by response_order, tracked in
+ *       trigger_response_state), or "weighted" (weighted roll against each link's weight, 0-100).
+ *       Selecting a response increments frequency counters on the trigger, response, and link rows.
+ *     parameters:
+ *       - name: trigger
+ *         in: query
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: The selected response.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 response: { type: string, description: The chosen response_string. }
+ *                 id: { type: integer, description: responses.id of the chosen response. }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         description: No trigger matching trigger_string, or it has no responses.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/random", authenticate, async (req, res) => {
   try {
@@ -221,6 +607,38 @@ router.get("/random", authenticate, async (req, res) => {
  * GET /api/trigger-responses/responses/:id
  * Get one response by id (responses table).
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/responses/{id}:
+ *   get:
+ *     operationId: getResponse
+ *     tags: [Trigger Responses]
+ *     summary: Get one response by id
+ *     description: Reads directly from the responses table (not the trigger_response junction).
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: The response.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 response_string: { type: string }
+ *                 created_at: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/responses/:id", authenticate, async (req, res) => {
   try {
@@ -243,6 +661,51 @@ router.get("/responses/:id", authenticate, async (req, res) => {
  * PUT /api/trigger-responses/responses/:id
  * Update a response's text. Body: { response_string }
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/responses/{id}:
+ *   put:
+ *     operationId: updateResponse
+ *     tags: [Trigger Responses]
+ *     summary: Update a response's text
+ *     description: >
+ *       Requires the admin role. Updates the shared responses row directly, so the new text applies to
+ *       every trigger this response is linked to.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [response_string]
+ *             properties:
+ *               response_string: { type: string }
+ *     responses:
+ *       '200':
+ *         description: The updated response.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 response_string: { type: string }
+ *                 created_at: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put("/responses/:id", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -270,6 +733,39 @@ router.put("/responses/:id", authenticate, requireAdmin, async (req, res) => {
  * DELETE /api/trigger-responses/responses/:id
  * Delete a response (removes from all triggers via cascade).
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/responses/{id}:
+ *   delete:
+ *     operationId: deleteResponse
+ *     tags: [Trigger Responses]
+ *     summary: Delete a response
+ *     description: >
+ *       Requires the admin role. Deletes the shared responses row; trigger_response links referencing it
+ *       are removed via ON DELETE CASCADE, so this unlinks the response from every trigger that used it.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: Deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete("/responses/:id", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -292,6 +788,47 @@ router.delete("/responses/:id", authenticate, requireAdmin, async (req, res) => 
  * GET /api/trigger-responses/:id
  * Get one trigger-response link (junction) by id.
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/{id}:
+ *   get:
+ *     operationId: getTriggerResponseLink
+ *     tags: [Trigger Responses]
+ *     summary: Get one trigger-response link by id
+ *     description: >
+ *       Registered last among the GET routes on this router so more specific literal segments
+ *       (/triggers, /triggers/list, /triggers/responses, /random, /responses/{id}) are matched first.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: trigger_response junction row id (not a trigger id or response id).
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: The trigger-response link.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer, description: Junction (trigger_response) row id }
+ *                 trigger_id: { type: integer }
+ *                 response_id: { type: integer }
+ *                 trigger_string: { type: string }
+ *                 response_string: { type: string }
+ *                 response_order: { type: integer, nullable: true }
+ *                 weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
+ *                 created_at: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/:id", authenticate, async (req, res) => {
   try {
@@ -319,6 +856,58 @@ router.get("/:id", authenticate, async (req, res) => {
  * Create a trigger-response pair.
  * Body: { trigger_string, response_string, response_order?, selection_mode?, weight? }
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses:
+ *   post:
+ *     operationId: createTriggerResponseLink
+ *     tags: [Trigger Responses]
+ *     summary: Create a single trigger-response pair
+ *     description: >
+ *       Requires the admin role. Convenience one-shot alternative to POST /api/trigger-responses/triggers:
+ *       gets-or-creates the trigger (by trigger_string) and the response (by response_string), then links
+ *       them with a new trigger_response row. Setting selection_mode here updates the trigger's mode.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [trigger_string, response_string]
+ *             properties:
+ *               trigger_string: { type: string }
+ *               response_string: { type: string }
+ *               response_order: { type: integer, nullable: true }
+ *               selection_mode:
+ *                 type: string
+ *                 enum: [random, ordered, weighted]
+ *                 default: random
+ *               weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *     responses:
+ *       '201':
+ *         description: The created trigger-response link.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer, description: Junction (trigger_response) row id }
+ *                 trigger_id: { type: integer }
+ *                 response_id: { type: integer }
+ *                 trigger_string: { type: string }
+ *                 response_string: { type: string }
+ *                 response_order: { type: integer, nullable: true }
+ *                 weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
+ *                 created_at: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -365,6 +954,63 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  * Update a trigger-response pair.
  * Body: { trigger_string?, response_string?, response_order?, selection_mode?, weight? }
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/{id}:
+ *   put:
+ *     operationId: updateTriggerResponseLink
+ *     tags: [Trigger Responses]
+ *     summary: Update a trigger-response link
+ *     description: >
+ *       Requires the admin role. All fields are optional but at least one must be given (400 otherwise).
+ *       Setting trigger_string or response_string re-points the link at a get-or-created trigger/response
+ *       (by string, deduped) rather than renaming the existing one in place. selection_mode is applied to
+ *       the link's trigger. response_order and weight may be set to null to clear them.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: trigger_response junction row id.
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               trigger_string: { type: string, description: Re-points the link at this (get-or-created) trigger. }
+ *               response_string: { type: string, description: Re-points the link at this (get-or-created) response. }
+ *               response_order: { type: integer, nullable: true }
+ *               selection_mode: { type: string, enum: [random, ordered, weighted] }
+ *               weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *     responses:
+ *       '200':
+ *         description: The updated trigger-response link.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer, description: Junction (trigger_response) row id }
+ *                 trigger_id: { type: integer }
+ *                 response_id: { type: integer }
+ *                 trigger_string: { type: string }
+ *                 response_string: { type: string }
+ *                 response_order: { type: integer, nullable: true }
+ *                 weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
+ *                 created_at: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -414,6 +1060,41 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
  * DELETE /api/trigger-responses/:id
  * Delete a trigger-response pair.
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/{id}:
+ *   delete:
+ *     operationId: deleteTriggerResponseLink
+ *     tags: [Trigger Responses]
+ *     summary: Delete a trigger-response link
+ *     description: >
+ *       Requires the admin role. Removes only the trigger_response junction row; the underlying trigger
+ *       and response rows are left in place (unlike DELETE /triggers/{id}, which also prunes orphaned
+ *       responses).
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         description: trigger_response junction row id.
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: Deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
   try {

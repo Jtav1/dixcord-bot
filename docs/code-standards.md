@@ -4,8 +4,8 @@ Conventions observed across this repository's four Node.js/ESM services:
 
 - **`discord-bot/`** — Discord.js v14 bot; depends on `webapi` for almost all behavior.
 - **`webapi/`** — Express REST API (MySQL or SQLite), JWT auth; backend for all other services.
-- **`web-view/`** — Vue 3 + Vuetify public read-only stats site, with a small Express prod server.
-- **`web-panel/`** — Admin panel frontend; currently an early-stage Vite scaffold (no framework chosen yet).
+- **`webview/`** — Vue 3 + Vuetify public read-only stats site, with a small Express prod server.
+- **`webadmin/`** — Admin panel frontend; currently an early-stage Vite scaffold (no framework chosen yet).
 
 This document describes what the code **actually does**, not an aspirational style — match neighboring files in the service you're editing over anything written here if the two disagree. There is no ESLint/Prettier config anywhere in the repo; these conventions are enforced by review, not tooling.
 
@@ -15,7 +15,7 @@ This document describes what the code **actually does**, not an aspirational sty
 
 ### Language and format
 
-- ESM everywhere (`"type": "module"` in every `package.json`). Explicit `.js` extensions on relative imports (`.vue` too, in web-view/web-panel components).
+- ESM everywhere (`"type": "module"` in every `package.json`). Explicit `.js` extensions on relative imports (`.vue` too, in webview/webadmin components).
 - Semicolons, double quotes, 2-space indent, no tabs. Trailing commas in multiline literals/params.
 - One blank line between logical sections and between import groups.
 
@@ -68,8 +68,9 @@ This document describes what the code **actually does**, not an aspirational sty
 - **DB access**: raw parameterized SQL only, via `db.query(sql, params)` with `?` placeholders — no ORM or query builder. `config/db.js` abstracts MySQL (`mysql2/promise`) vs SQLite (`better-sqlite3`) behind one `.query()` shape; dialect differences (`RAND()`/`RANDOM()`, `ON DUPLICATE KEY UPDATE`/`ON CONFLICT ... DO UPDATE`) are handled inline in services/routes behind an `isSqlite` check, not hidden inside the adapter.
 - **Schema**: hand-written `sql/schema.sql` (MySQL) and `sql/schema.sqlite.sql` (SQLite), reconciled at startup by `scripts/ensureSchema.js` using idempotent `tableExists`/`columnExists`/`constraintExists` checks. There is no versioned migration framework — when adding a column or table, update **both** schema files and `ensureSchema.js`.
 - **Validation**: hand-rolled inline in handlers (`typeof`/`trim()`/`Array.isArray` + early `400`) — no Joi/Zod/express-validator. Match the neighboring route rather than introducing a validation library.
+- **OpenAPI docs**: every route handler carries an `@openapi` JSDoc tag with an inline YAML fragment (method, `operationId`, `tags`, `parameters`/`requestBody`, `responses`), appended to the end of the existing plain-English JSDoc block — see `routes/pin-quips.js` for the canonical shape. `scripts/write-openapi.js` (via `swagger-jsdoc`) merges these into `openapi.generated.json`; the shared security scheme, tag list, and reusable `ErrorResponse`/`AuthErrorResponse` schemas and `Unauthorized`/`ForbiddenRole`/`ForbiddenBotOrAdmin`/`NotFound`/`BadRequest`/`ServerError` responses live in that script, not per-route. Run `npm run docs:generate` after adding/changing a route; `npm run docs:preview` serves it live via Scalar; `npm run docs:build` also validates the spec. New routes need a new `@openapi` block — there's no fallback that infers one.
 
-## web-view/
+## webview/
 
 - Vue 3 **`<script setup>`** only (no Options API found anywhere). `src/views/*View.vue` for route-level pages, `src/components/*.vue` for reusable pieces (PascalCase filenames), `src/composables/use*.js` for composition hooks, `src/lib/*.js` for per-feature API wrappers (camelCase).
 - `defineProps({...})` / `defineEmits([...])` with typed option objects; `ref` for local state, `computed` for derived values, `watch` to reset state on prop change, `onMounted` kicking off an async load via fire-and-forget `void loadX()`.
@@ -79,10 +80,10 @@ This document describes what the code **actually does**, not an aspirational sty
 - JSDoc is used consistently here, including in server-side `lib/*.js` — hold this directory to the same JSDoc bar described above, not a lighter frontend-only standard.
 - No `@/` path alias is configured in `vite.config.js`; imports are relative throughout. Keep it that way unless the depth of relative imports becomes a real problem worth raising explicitly, rather than adding an alias file-by-file.
 
-## web-panel/
+## webadmin/
 
 - Currently a minimal scaffold (`src/main.js`, `src/lib/api.js`, `style.css`) with no frontend framework chosen yet — don't infer component conventions from it.
-- `server.js` mirrors web-view's Express-static-plus-`/api`-proxy shape (health check, `http-proxy-middleware`, static `dist/`, SPA fallback) but **does not yet** attach a service-account JWT to the proxied requests the way web-view's does. If/when web-panel starts calling authenticated webapi routes, follow web-view's `lib/webapiAuth.js` pattern rather than inventing a second approach.
+- `server.js` mirrors webview's Express-static-plus-`/api`-proxy shape (health check, `http-proxy-middleware`, static `dist/`, SPA fallback) but **does not yet** attach a service-account JWT to the proxied requests the way webview's does. If/when webadmin starts calling authenticated webapi routes, follow webview's `lib/webapiAuth.js` pattern rather than inventing a second approach.
 - Otherwise follows the shared ESM/naming/JSDoc conventions above.
 
 ---
@@ -93,7 +94,7 @@ This document describes what the code **actually does**, not an aspirational sty
 - `{ error, message }` or bare `{ error }` (without `ok: false`) error envelopes in webapi — use `{ ok: false, error }`.
 - Introducing an ORM, query builder, or request-validation library into webapi without discussion — raw parameterized SQL and hand-rolled validation are the deliberate existing pattern, not a gap to fill unilaterally.
 - Silent `catch {}` blocks, except for genuinely non-critical Discord actions where the surrounding code already does this intentionally.
-- Copy-pasting a helper (like web-view's `parseJsonResponse`) into a new file instead of factoring it into the shared module it already almost lives in.
+- Copy-pasting a helper (like webview's `parseJsonResponse`) into a new file instead of factoring it into the shared module it already almost lives in.
 - JSDoc that only restates the function name.
 - Unrelated refactors or drive-by renames bundled with a feature change.
 
@@ -103,5 +104,6 @@ This document describes what the code **actually does**, not an aspirational sty
 - Web API route + error/response envelope: [`webapi/routes/trigger-responses.js`](../webapi/routes/trigger-responses.js)
 - Web API service module layout: [`webapi/services/messageProcessing.js`](../webapi/services/messageProcessing.js)
 - Web API auth middleware: [`webapi/middleware/auth.js`](../webapi/middleware/auth.js)
-- Web View component + composition style: [`web-view/src/views/SystemStatusView.vue`](../web-view/src/views/SystemStatusView.vue)
-- Web View server-side JWT caching: [`web-view/lib/webapiAuth.js`](../web-view/lib/webapiAuth.js)
+- Web API OpenAPI generator + shared components: [`webapi/scripts/write-openapi.js`](../webapi/scripts/write-openapi.js)
+- Webview component + composition style: [`webview/src/views/SystemStatusView.vue`](../webview/src/views/SystemStatusView.vue)
+- Webview server-side JWT caching: [`webview/lib/webapiAuth.js`](../webview/lib/webapiAuth.js)

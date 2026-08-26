@@ -9,6 +9,21 @@ const router = express.Router();
  * POST /api/auth/register
  * Registration disabled; only configured service accounts may use the API.
  * Auth: none (returns 403).
+ * @openapi
+ * /api/auth/register:
+ *   post:
+ *     operationId: registerUser
+ *     tags: [Auth]
+ *     summary: Register a new user (disabled)
+ *     description: Always returns 403 — only pre-configured service accounts (admin, bot, webview) may authenticate.
+ *     security: []
+ *     responses:
+ *       '403':
+ *         description: Registration is permanently disabled.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post("/register", (req, res) => {
   res.status(403).json({
@@ -23,6 +38,65 @@ router.post("/register", (req, res) => {
  * Body: { email, password }
  * Response: { ok, user, token, role }
  * Auth: none.
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     operationId: login
+ *     tags: [Auth]
+ *     summary: Exchange service-account credentials for a JWT
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email, password]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Must match ADMIN_USERNAME, BOT_USERNAME, or WEBVIEW_USERNAME.
+ *               password:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       '200':
+ *         description: Authenticated successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 role: { type: string, nullable: true, example: admin }
+ *                 token: { type: string, description: "JWT, default 7-day expiry (JWT_EXPIRES_IN)." }
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     email: { type: string }
+ *                     name: { type: string }
+ *                     role: { type: string, nullable: true }
+ *                     created_at: { type: string, format: date-time }
+ *       '400':
+ *         description: Missing email or password.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         description: Invalid email or password.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '503':
+ *         description: No service-account usernames configured on the server.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 router.post("/login", async (req, res) => {
   try {

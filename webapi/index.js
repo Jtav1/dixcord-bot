@@ -240,6 +240,27 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/**
+ * @openapi
+ * /:
+ *   get:
+ *     operationId: getApiInfo
+ *     tags: [System]
+ *     summary: API info and endpoint list
+ *     security: []
+ *     responses:
+ *       '200':
+ *         description: Service name, version, and a human-readable endpoint index.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 name: { type: string, example: dixcord-webapi }
+ *                 version: { type: string, example: v2.2 }
+ *                 endpoints: { type: object, description: "Nested map of resource -> route descriptions." }
+ *                 auth: { type: string, example: "Use header: Authorization: Bearer <token>" }
+ */
 app.get("/", publicLimiter, (req, res) => {
   res.json({
     name: "dixcord-webapi",
@@ -382,6 +403,24 @@ app.get("/", publicLimiter, (req, res) => {
   });
 });
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     operationId: getHealth
+ *     tags: [System]
+ *     summary: Health check
+ *     security: []
+ *     responses:
+ *       '200':
+ *         description: Service is up.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, enum: [ok] }
+ */
 app.get("/health", publicLimiter, (req, res) => res.json({ status: "ok" }));
 
 app.use("/api/auth", authLimiter, authRoutes);

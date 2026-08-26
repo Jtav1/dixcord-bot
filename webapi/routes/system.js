@@ -14,6 +14,39 @@ const router = express.Router();
  * GET /api/system/status
  * System and bot health status.
  * Auth: required (admin, bot, or webview).
+ * @openapi
+ * /api/system/status:
+ *   get:
+ *     operationId: getSystemStatus
+ *     tags: [System]
+ *     summary: Get system and bot health status
+ *     responses:
+ *       '200':
+ *         description: System status.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 status:
+ *                   type: object
+ *                   properties:
+ *                     webapi: { type: string, example: ok }
+ *                     db: { type: string, example: ok }
+ *                     cacheVersion: { type: string }
+ *                     bot:
+ *                       type: object
+ *                       nullable: true
+ *                       properties:
+ *                         guildId: { type: string }
+ *                         version: { type: string }
+ *                         lastSeenAt: { type: string }
+ *                         online: { type: boolean }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/status", authenticate, async (req, res) => {
   try {
@@ -29,6 +62,26 @@ router.get("/status", authenticate, async (req, res) => {
  * GET /api/system/cache-version
  * Current cache version for bot polling.
  * Auth: required (bot or admin).
+ * @openapi
+ * /api/system/cache-version:
+ *   get:
+ *     operationId: getCacheVersion
+ *     tags: [System]
+ *     summary: Get current cache version
+ *     responses:
+ *       '200':
+ *         description: Current cache version.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 cacheVersion: { type: string }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/cache-version", authenticate, async (req, res) => {
   try {
@@ -44,6 +97,29 @@ router.get("/cache-version", authenticate, async (req, res) => {
  * POST /api/system/invalidate-cache
  * Increment cache version so bots reload cached content.
  * Auth: admin required.
+ * @openapi
+ * /api/system/invalidate-cache:
+ *   post:
+ *     operationId: invalidateCache
+ *     tags: [System]
+ *     summary: Increment cache version
+ *     description: Requires the admin role. Records an audit log entry.
+ *     responses:
+ *       '200':
+ *         description: New cache version.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 cacheVersion: { type: string }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post("/invalidate-cache", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -63,6 +139,38 @@ router.post("/invalidate-cache", authenticate, requireAdmin, async (req, res) =>
  * Bot heartbeat (guild id, version, optional lastReadyAt).
  * Body: { guildId, version, lastReadyAt? }
  * Auth: required (bot or admin).
+ * @openapi
+ * /api/system/heartbeat:
+ *   post:
+ *     operationId: postHeartbeat
+ *     tags: [System]
+ *     summary: Record a bot heartbeat
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [guildId, version]
+ *             properties:
+ *               guildId: { type: string }
+ *               version: { type: string }
+ *               lastReadyAt: { type: string, nullable: true }
+ *     responses:
+ *       '200':
+ *         description: Heartbeat recorded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post("/heartbeat", authenticate, async (req, res) => {
   try {

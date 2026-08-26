@@ -9,6 +9,56 @@ const router = express.Router();
  * List pin history entries with pagination.
  * Query: ?limit=&offset=
  * Auth: required (admin or bot).
+ * @openapi
+ * /api/pin-history:
+ *   get:
+ *     operationId: listPinHistory
+ *     tags: [Pin History]
+ *     summary: List pin history entries
+ *     parameters:
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 50 }
+ *       - name: offset
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 0 }
+ *     responses:
+ *       '200':
+ *         description: Page of pin history entries, newest first.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 pinHistory:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       msgid: { type: string }
+ *                       timestamp: { type: string }
+ *                       author: { type: integer, nullable: true }
+ *                       contents: { type: string, nullable: true }
+ *                       attachments:
+ *                         type: array
+ *                         items: { type: string }
+ *                       channelId: { type: string, nullable: true }
+ *                       channelName: { type: string, nullable: true }
+ *                       pinners:
+ *                         type: array
+ *                         items: { type: integer }
+ *                       hydrated: { type: boolean }
+ *                 total: { type: integer }
+ *                 limit: { type: integer }
+ *                 offset: { type: integer }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/", authenticate, async (req, res) => {
   try {
@@ -27,6 +77,57 @@ router.get("/", authenticate, async (req, res) => {
  * List pin_history rows not yet hydrated (`hydrated = false`).
  * Query: ?limit=&offset=
  * Auth: required (admin or bot).
+ * @openapi
+ * /api/pin-history/incomplete:
+ *   get:
+ *     operationId: listIncompletePinHistory
+ *     tags: [Pin History]
+ *     summary: List pin history entries not yet hydrated
+ *     description: Returns pin_history rows where hydrated = false, ordered oldest id first.
+ *     parameters:
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 50 }
+ *       - name: offset
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 0 }
+ *     responses:
+ *       '200':
+ *         description: Page of unhydrated pin history entries.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 pinHistory:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       msgid: { type: string }
+ *                       timestamp: { type: string }
+ *                       author: { type: integer, nullable: true }
+ *                       contents: { type: string, nullable: true }
+ *                       attachments:
+ *                         type: array
+ *                         items: { type: string }
+ *                       channelId: { type: string, nullable: true }
+ *                       channelName: { type: string, nullable: true }
+ *                       pinners:
+ *                         type: array
+ *                         items: { type: integer }
+ *                       hydrated: { type: boolean }
+ *                 total: { type: integer }
+ *                 limit: { type: integer }
+ *                 offset: { type: integer }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/incomplete", authenticate, async (req, res) => {
   try {
@@ -44,6 +145,51 @@ router.get("/incomplete", authenticate, async (req, res) => {
  * GET /api/pin-history/:id
  * Get one pin history entry by primary key.
  * Auth: required (admin or bot).
+ * @openapi
+ * /api/pin-history/{id}:
+ *   get:
+ *     operationId: getPinHistoryEntry
+ *     tags: [Pin History]
+ *     summary: Get one pin history entry by id
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: The pin history entry.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 pin:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     msgid: { type: string }
+ *                     timestamp: { type: string }
+ *                     author: { type: integer, nullable: true }
+ *                     contents: { type: string, nullable: true }
+ *                     attachments:
+ *                       type: array
+ *                       items: { type: string }
+ *                     channelId: { type: string, nullable: true }
+ *                     channelName: { type: string, nullable: true }
+ *                     pinners:
+ *                       type: array
+ *                       items: { type: integer }
+ *                     hydrated: { type: boolean }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/:id", authenticate, async (req, res) => {
   try {
@@ -67,6 +213,81 @@ router.get("/:id", authenticate, async (req, res) => {
  * Update one pin history entry (partial body supported).
  * Body fields: app?, author?, authorId?, contents?, attachments?, channelId?, channelName?, pinners?, pinnerIds?
  * Auth: required (admin or bot).
+ * @openapi
+ * /api/pin-history/{id}:
+ *   put:
+ *     operationId: updatePinHistoryEntry
+ *     tags: [Pin History]
+ *     summary: Update one pin history entry
+ *     description: >
+ *       Partial update; only provided fields are changed. `app` (a supported chat-member app id)
+ *       is required when `authorId` or `pinnerIds` is provided, since those are resolved to
+ *       chat_member_mapping ids via that app. `author`/`pinners` accept resolved mapping ids
+ *       directly instead.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               app: { type: string, description: "Chat-member app id; required when authorId or pinnerIds is set." }
+ *               author: { type: integer, nullable: true, description: "chat_member_mapping id." }
+ *               authorId: { type: string, nullable: true, description: "Platform user id, resolved via app." }
+ *               contents: { type: string, nullable: true }
+ *               attachments:
+ *                 type: array
+ *                 items: { type: string }
+ *               channelId: { type: string, nullable: true }
+ *               channelName: { type: string, nullable: true }
+ *               pinners:
+ *                 type: array
+ *                 items: { type: integer }
+ *                 description: chat_member_mapping ids.
+ *               pinnerIds:
+ *                 type: array
+ *                 items: { type: string }
+ *                 description: Platform user ids, resolved via app.
+ *               hydrated: { type: boolean }
+ *     responses:
+ *       '200':
+ *         description: Updated pin history entry.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 pin:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     msgid: { type: string }
+ *                     timestamp: { type: string }
+ *                     author: { type: integer, nullable: true }
+ *                     contents: { type: string, nullable: true }
+ *                     attachments:
+ *                       type: array
+ *                       items: { type: string }
+ *                     channelId: { type: string, nullable: true }
+ *                     channelName: { type: string, nullable: true }
+ *                     pinners:
+ *                       type: array
+ *                       items: { type: integer }
+ *                     hydrated: { type: boolean }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put("/:id", authenticate, async (req, res) => {
   try {

@@ -9,6 +9,53 @@ const router = express.Router();
  * List audit log entries with pagination.
  * Query: ?limit=&offset=
  * Auth: admin required.
+ * @openapi
+ * /api/audit-log:
+ *   get:
+ *     operationId: listAuditLog
+ *     tags: [Audit Log]
+ *     summary: List audit log entries
+ *     description: Requires the admin role.
+ *     parameters:
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 50 }
+ *       - name: offset
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 0 }
+ *     responses:
+ *       '200':
+ *         description: Page of audit log entries, most recent first.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 auditLog:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       user_id: { type: integer }
+ *                       user_email: { type: string, nullable: true }
+ *                       action: { type: string }
+ *                       resource: { type: string }
+ *                       resource_id: { type: string, nullable: true }
+ *                       details: { type: object }
+ *                       created_at: { type: string }
+ *                 total: { type: integer }
+ *                 limit: { type: integer }
+ *                 offset: { type: integer }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/", authenticate, requireAdmin, async (req, res) => {
   try {
