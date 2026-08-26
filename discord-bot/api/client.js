@@ -138,3 +138,16 @@ export function patch(path, body, options = {}) {
 export function del(path, options = {}) {
   return request("DELETE", path, options);
 }
+
+/**
+ * Human-readable message from a failed webapi request. Prefers the server's own
+ * `{ error }` body (e.g. "Unknown user; not in chat_member_mapping for this app.") over
+ * axios's generic "Request failed with status code 400".
+ * @param {unknown} err
+ * @returns {string}
+ */
+export function describeApiError(err) {
+  if (err?.response?.data?.error) return String(err.response.data.error);
+  if (err?.message) return String(err.message);
+  return String(err);
+}

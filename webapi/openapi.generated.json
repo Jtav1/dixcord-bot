@@ -4272,6 +4272,90 @@
         }
       }
     },
+    "/api/message-processing/sticker-count": {
+      "post": {
+        "operationId": "recordStickerCount",
+        "tags": [
+          "Message Processing"
+        ],
+        "summary": "Record sticker usage in a message",
+        "description": "Increments emoji_frequency (type='sticker') / user_emoji_tracking for each sticker in the message. Unlike emoji-count, there is no plus/minus branch — Discord has no reply-with-sticker vote mechanism.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "authorId",
+                  "stickers"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
+                  "authorId": {
+                    "type": "string",
+                    "description": "Discord snowflake of the message author."
+                  },
+                  "stickers": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sticker usage recorded. `ok` may be false with no `error` when authorId or stickers were missing/empty.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/invalid app parameter, or authorId is not a known chat member.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/message-processing/plusminus": {
       "post": {
         "operationId": "recordPlusMinus",
@@ -5989,6 +6073,196 @@
         }
       }
     },
+    "/api/leaderboards/sticker": {
+      "post": {
+        "operationId": "getStickerLeaderboard",
+        "tags": [
+          "Leaderboards"
+        ],
+        "summary": "Top used stickers",
+        "description": "Paginated sticker usage leaderboard from emoji_frequency (stickers only).",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "limit": {
+                    "type": "integer",
+                    "default": 5,
+                    "minimum": 1,
+                    "maximum": 50
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sticker usage page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total sticker rows (for pagination)."
+                    },
+                    "top": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "emoji": {
+                            "type": "string",
+                            "description": "Sticker name."
+                          },
+                          "frequency": {
+                            "type": "integer"
+                          },
+                          "emoid": {
+                            "type": "string",
+                            "description": "Sticker id."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/leaderboards/sticker/users": {
+      "post": {
+        "operationId": "getStickerUserLeaderboard",
+        "tags": [
+          "Leaderboards"
+        ],
+        "summary": "Top users by total sticker usage",
+        "description": "Paginated per-user sticker usage totals from user_emoji_tracking (stickers only).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 1,
+                    "maximum": 50
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Per-user sticker usage totals page.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "app": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer",
+                      "description": "Total distinct users with sticker usage (for pagination)."
+                    },
+                    "users": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userid": {
+                            "type": "string",
+                            "description": "Platform user id (Discord snowflake)."
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "total": {
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/leaderboards/repost": {
       "post": {
         "operationId": "getRepostLeaderboard",
@@ -6247,6 +6521,110 @@
                           },
                           "animated": {
                             "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/invalid app parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/leaderboards/sticker/user/{userId}": {
+      "get": {
+        "operationId": "getStickerUserStats",
+        "tags": [
+          "Leaderboards"
+        ],
+        "summary": "Per-user sticker usage stats",
+        "description": "Sticker usage breakdown for one user from user_emoji_tracking (stickers only).",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Discord snowflake of the user."
+          },
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "discord"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            },
+            "description": "Max rows to return, sorted by frequency descending. Omit for all rows."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sticker usage stats for the user (empty array if unknown user).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "app": {
+                      "type": "string"
+                    },
+                    "userId": {
+                      "type": "string"
+                    },
+                    "stats": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "emoid": {
+                            "type": "string"
+                          },
+                          "emoji": {
+                            "type": "string",
+                            "description": "Sticker name."
+                          },
+                          "frequency": {
+                            "type": "integer"
                           }
                         }
                       }

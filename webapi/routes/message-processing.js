@@ -2,6 +2,7 @@ import express from "express";
 import { authenticate } from "../middleware/auth.js";
 import {
   countEmoji,
+  countSticker,
   recordPlusMinusMessage,
   recordPlusMinusReaction,
   countRepost,
@@ -97,6 +98,76 @@ router.post("/emoji-count", authenticate, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to record emoji count" });
+  }
+});
+
+/**
+ * POST /api/message-processing/sticker-count
+ * Record sticker usage in a message.
+ * Body: { app: "discord", authorId: string, stickers: Array<{ name: string, id?: string }> }
+ * Auth: required.
+ * @openapi
+ * /api/message-processing/sticker-count:
+ *   post:
+ *     operationId: recordStickerCount
+ *     tags: [Message Processing]
+ *     summary: Record sticker usage in a message
+ *     description: >
+ *       Increments emoji_frequency (type='sticker') / user_emoji_tracking for each sticker in the
+ *       message. Unlike emoji-count, there is no plus/minus branch — Discord has no reply-with-sticker
+ *       vote mechanism.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, authorId, stickers]
+ *             properties:
+ *               app: { type: string, enum: [discord] }
+ *               authorId: { type: string, description: "Discord snowflake of the message author." }
+ *               stickers:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     name: { type: string }
+ *                     id: { type: string }
+ *     responses:
+ *       '200':
+ *         description: >
+ *           Sticker usage recorded. `ok` may be false with no `error` when authorId or stickers
+ *           were missing/empty.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean }
+ *       '400':
+ *         description: Missing/invalid app parameter, or authorId is not a known chat member.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/sticker-count", authenticate, async (req, res) => {
+  try {
+    if (!resolveChatAppFromRequest(req)) {
+      return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    }
+    const result = await countSticker(req.body);
+    if (result.ok === false && result.error) {
+      return res.status(400).json({ ...result, ok: false });
+    }
+    res.json({ ...result, ok: result.ok !== false });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ok: false, error: "Failed to record sticker count" });
   }
 });
 
