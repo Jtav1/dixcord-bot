@@ -19,8 +19,9 @@ EXPOSE 3000
 COPY --from=builder /app/node_modules ./node_modules
 COPY . .
 
-# Run as non-root
-RUN addgroup -g 1001 -S app && adduser -u 1001 -S app -G app
+# Run as non-root; the app needs to create data/ itself for the default SQLite path
+RUN addgroup -g 1001 -S app && adduser -u 1001 -S app -G app \
+  && mkdir -p data && chown -R app:app /app
 USER app
 
 CMD ["node", "index.js"]
