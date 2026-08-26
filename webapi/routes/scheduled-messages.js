@@ -68,6 +68,110 @@ function denyUnlessBotOrAdmin(req, res) {
  * - bot scope:  ?scope=bot
  * - admin scope: ?scope=admin&status=pending|sent|all
  * Auth: required.
+ * @openapi
+ * /api/scheduled-messages:
+ *   get:
+ *     operationId: listScheduledMessages
+ *     tags: [Scheduled Messages]
+ *     summary: List scheduled messages (requester, bot, or admin scope)
+ *     description: >
+ *       Behavior depends on `scope`:
+ *         - Omitted (default, "requester scope"): resolves `requesterUserId` to a
+ *           chat_member_mapping row and returns that single user's upcoming
+ *           pending scheduled messages. Requires the bot or admin role (checked
+ *           in-handler); callers other than the bot act on a user's behalf via
+ *           `requesterUserId`.
+ *         - `scope=bot`: returns every pending scheduled message for the app
+ *           (all users), for the bot's own scheduler loop. Requires the bot
+ *           role (checked in-handler); `requesterUserId` is ignored.
+ *         - `scope=admin`: returns a paginated, `status`-filterable list across
+ *           all users for the admin panel. Requires the admin role (checked
+ *           in-handler); `requesterUserId` is ignored.
+ *     parameters:
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         schema: { type: string, enum: [discord] }
+ *         description: Chat app key. Currently only "discord" is supported.
+ *       - name: scope
+ *         in: query
+ *         required: false
+ *         schema: { type: string, enum: [bot, admin] }
+ *         description: Selects bot or admin scope. Omit for requester scope.
+ *       - name: requesterUserId
+ *         in: query
+ *         required: false
+ *         schema: { type: string }
+ *         description: >
+ *           Platform user id (e.g. Discord snowflake) to resolve to a
+ *           chat_member_mapping row. Required (and only used) in requester
+ *           scope (i.e. when `scope` is omitted).
+ *       - name: status
+ *         in: query
+ *         required: false
+ *         schema: { type: string, enum: [pending, sent, all], default: all }
+ *         description: Only used when `scope=admin`.
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 50 }
+ *         description: Only used when `scope=admin`. Clamped server-side to 1-200.
+ *       - name: offset
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 0 }
+ *         description: Only used when `scope=admin`.
+ *     responses:
+ *       '200':
+ *         description: >
+ *           Scheduled messages for the resolved scope. `total`, `limit`, and
+ *           `offset` are only present for `scope=admin`.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 scheduledMessages:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       user_id: { type: integer }
+ *                       app: { type: string, enum: [discord] }
+ *                       chat_channel_id: { type: string }
+ *                       chat_guild_id: { type: string, nullable: true }
+ *                       message_body: { type: string }
+ *                       scheduled_at: { type: string, format: date-time, nullable: true }
+ *                       status: { type: string, enum: [pending, sent] }
+ *                       sent_at: { type: string, format: date-time, nullable: true }
+ *                       created_at: { type: string, format: date-time, nullable: true }
+ *                 total: { type: integer, description: "scope=admin only." }
+ *                 limit: { type: integer, description: "scope=admin only." }
+ *                 offset: { type: integer, description: "scope=admin only." }
+ *       '400':
+ *         description: >
+ *           Missing/invalid `app`, an invalid `status` value (scope=admin), or
+ *           an unresolvable `requesterUserId` (requester scope).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         description: >
+ *           Role check failed for the requested scope: bot role required for
+ *           `scope=bot`, admin role required for `scope=admin`, or bot/admin
+ *           role required for requester scope. All checks are enforced
+ *           in-handler (not via `requireAdmin`/`requireBotOrAdmin` middleware).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/", authenticate, async (req, res) => {
   try {
@@ -128,6 +232,73 @@ router.get("/", authenticate, async (req, res) => {
  * Get a scheduled message by id; requester must own row.
  * Query: ?app=<chatApp>&requesterUserId=...
  * Auth: required (bot or admin; bot supplies requesterUserId on behalf of user).
+ * @openapi
+ * /api/scheduled-messages/{id}:
+ *   get:
+ *     operationId: getScheduledMessage
+ *     tags: [Scheduled Messages]
+ *     summary: Get one scheduled message by id
+ *     description: >
+ *       Requires the bot or admin role (checked in-handler via the same
+ *       requester-resolution helper as the list/create/update/delete routes).
+ *       The resolved requester must own the row.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         schema: { type: string, enum: [discord] }
+ *         description: Chat app key. Currently only "discord" is supported.
+ *       - name: requesterUserId
+ *         in: query
+ *         required: true
+ *         schema: { type: string }
+ *         description: Platform user id (e.g. Discord snowflake) resolved to a chat_member_mapping row.
+ *     responses:
+ *       '200':
+ *         description: The scheduled message.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 scheduledMessage:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     user_id: { type: integer }
+ *                     app: { type: string, enum: [discord] }
+ *                     chat_channel_id: { type: string }
+ *                     chat_guild_id: { type: string, nullable: true }
+ *                     message_body: { type: string }
+ *                     scheduled_at: { type: string, format: date-time, nullable: true }
+ *                     status: { type: string, enum: [pending, sent] }
+ *                     sent_at: { type: string, format: date-time, nullable: true }
+ *                     created_at: { type: string, format: date-time, nullable: true }
+ *       '400':
+ *         description: Invalid `id`, missing/invalid `app`, or an unresolvable `requesterUserId`.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         description: >
+ *           Either the caller is not bot/admin, or the resolved requester does
+ *           not own this scheduled message. Both checks are enforced in-handler.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/:id", authenticate, async (req, res) => {
   try {
@@ -168,6 +339,72 @@ router.get("/:id", authenticate, async (req, res) => {
  * Create a scheduled message.
  * Body: { app, requesterUserId, chat_channel_id, chat_guild_id?, message_body, scheduled_at }
  * Auth: required (bot or admin; bot supplies requesterUserId on behalf of user).
+ * @openapi
+ * /api/scheduled-messages:
+ *   post:
+ *     operationId: createScheduledMessage
+ *     tags: [Scheduled Messages]
+ *     summary: Create a scheduled message
+ *     description: >
+ *       Requires the bot or admin role (checked in-handler). `requesterUserId`
+ *       is resolved to a chat_member_mapping row and becomes the owner of the
+ *       new row; the bot supplies it on behalf of the end user.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, requesterUserId, chat_channel_id, message_body, scheduled_at]
+ *             properties:
+ *               app: { type: string, enum: [discord] }
+ *               requesterUserId:
+ *                 type: string
+ *                 description: Platform user id (e.g. Discord snowflake) resolved to a chat_member_mapping row.
+ *               chat_channel_id: { type: string }
+ *               chat_guild_id: { type: string, nullable: true }
+ *               message_body: { type: string }
+ *               scheduled_at:
+ *                 type: string
+ *                 format: date-time
+ *                 description: Any value parseable by `new Date(...)`; normalized to UTC ISO 8601.
+ *     responses:
+ *       '201':
+ *         description: Created scheduled message.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 scheduledMessage:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     user_id: { type: integer }
+ *                     app: { type: string, enum: [discord] }
+ *                     chat_channel_id: { type: string }
+ *                     chat_guild_id: { type: string, nullable: true }
+ *                     message_body: { type: string }
+ *                     scheduled_at: { type: string, format: date-time, nullable: true }
+ *                     status: { type: string, enum: [pending, sent] }
+ *                     sent_at: { type: string, format: date-time, nullable: true }
+ *                     created_at: { type: string, format: date-time, nullable: true }
+ *       '400':
+ *         description: >
+ *           Missing/invalid `app`, an unresolvable `requesterUserId`, missing
+ *           `chat_channel_id`, missing `message_body`, or an invalid
+ *           `scheduled_at`.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post("/", authenticate, async (req, res) => {
   try {
@@ -234,6 +471,119 @@ router.post("/", authenticate, async (req, res) => {
  * Body (bot sent-mark): { scope: "bot", status: "sent", sent_at? }
  * Body (admin update): { scope: "admin", app, message_body?, scheduled_at? }
  * Auth: required (requester updates: bot or admin).
+ * @openapi
+ * /api/scheduled-messages/{id}:
+ *   put:
+ *     operationId: updateScheduledMessage
+ *     tags: [Scheduled Messages]
+ *     summary: Update a scheduled message (requester edit, bot sent-mark, or admin override)
+ *     description: >
+ *       `app` (query or body) is always required and is used to look up the
+ *       existing row before branching on `scope`:
+ *         - `scope=bot`: marks the row `status="sent"` (optionally with a
+ *           `sent_at`, defaulting to now). Requires the bot role
+ *           (checked in-handler). Used by the scheduler after dispatch.
+ *         - `scope=admin`: updates `message_body` and/or `scheduled_at` on any
+ *           row regardless of status. Requires the admin role (checked
+ *           in-handler). At least one field must be provided.
+ *         - Omitted (default, "requester scope"): resolves `requesterUserId`
+ *           to a chat_member_mapping row, requires it to own the row, requires
+ *           the row to still be `status="pending"`, and updates
+ *           `message_body` and/or `scheduled_at`. Requires the bot or admin
+ *           role (checked in-handler); at least one field must be provided.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *       - name: app
+ *         in: query
+ *         required: false
+ *         schema: { type: string, enum: [discord] }
+ *         description: Chat app key. May be supplied here or in the request body; required either way.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             oneOf:
+ *               - title: RequesterUpdate
+ *                 type: object
+ *                 properties:
+ *                   app: { type: string, enum: [discord] }
+ *                   requesterUserId:
+ *                     type: string
+ *                     description: Platform user id (e.g. Discord snowflake) resolved to a chat_member_mapping row.
+ *                   message_body: { type: string }
+ *                   scheduled_at: { type: string, format: date-time }
+ *               - title: BotMarkSent
+ *                 type: object
+ *                 required: [scope, status]
+ *                 properties:
+ *                   scope: { type: string, enum: [bot] }
+ *                   status: { type: string, enum: [sent] }
+ *                   sent_at:
+ *                     type: string
+ *                     format: date-time
+ *                     description: Defaults to the current time when omitted.
+ *               - title: AdminUpdate
+ *                 type: object
+ *                 required: [scope]
+ *                 properties:
+ *                   scope: { type: string, enum: [admin] }
+ *                   app: { type: string, enum: [discord] }
+ *                   message_body: { type: string }
+ *                   scheduled_at: { type: string, format: date-time }
+ *     responses:
+ *       '200':
+ *         description: Updated scheduled message.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 scheduledMessage:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     user_id: { type: integer }
+ *                     app: { type: string, enum: [discord] }
+ *                     chat_channel_id: { type: string }
+ *                     chat_guild_id: { type: string, nullable: true }
+ *                     message_body: { type: string }
+ *                     scheduled_at: { type: string, format: date-time, nullable: true }
+ *                     status: { type: string, enum: [pending, sent] }
+ *                     sent_at: { type: string, format: date-time, nullable: true }
+ *                     created_at: { type: string, format: date-time, nullable: true }
+ *       '400':
+ *         description: >
+ *           Invalid `id`; missing/invalid `app`; for `scope=bot`, `status` was
+ *           not `"sent"`; for `scope=admin` or requester scope, an empty
+ *           `message_body`, an invalid `scheduled_at`, or neither field
+ *           provided; for requester scope, an unresolvable `requesterUserId`
+ *           or the row is no longer `status="pending"`.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         description: >
+ *           Role check failed for the requested scope: bot role required for
+ *           `scope=bot`, admin role required for `scope=admin`, bot/admin role
+ *           required for requester scope, or (requester scope) the resolved
+ *           requester does not own this row. All checks are enforced
+ *           in-handler.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put("/:id", authenticate, async (req, res) => {
   try {
@@ -381,6 +731,91 @@ router.put("/:id", authenticate, async (req, res) => {
  * Delete pending scheduled message by id when owned by requester, or admin scope.
  * Body/query: { app, requesterUserId } or { scope: "admin", app }
  * Auth: required (requester delete: bot or admin).
+ * @openapi
+ * /api/scheduled-messages/{id}:
+ *   delete:
+ *     operationId: deleteScheduledMessage
+ *     tags: [Scheduled Messages]
+ *     summary: Delete a scheduled message (requester delete or admin override)
+ *     description: >
+ *       `scope=admin` (query or body) deletes the row regardless of status and
+ *       requires the admin role (checked in-handler). Otherwise (default,
+ *       "requester scope") requires the bot or admin role (checked
+ *       in-handler), resolves `requesterUserId` to a chat_member_mapping row,
+ *       and only deletes the row when it is owned by that requester and still
+ *       `status="pending"`.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *       - name: scope
+ *         in: query
+ *         required: false
+ *         schema: { type: string, enum: [admin] }
+ *         description: May also be supplied in the request body. Omit for requester scope.
+ *       - name: app
+ *         in: query
+ *         required: false
+ *         schema: { type: string, enum: [discord] }
+ *         description: >
+ *           Chat app key. May be supplied here or in the request body;
+ *           required for requester scope (not read for `scope=admin`).
+ *       - name: requesterUserId
+ *         in: query
+ *         required: false
+ *         schema: { type: string }
+ *         description: >
+ *           Platform user id (e.g. Discord snowflake) resolved to a
+ *           chat_member_mapping row. Required for requester scope; may also
+ *           be supplied in the request body.
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               scope: { type: string, enum: [admin] }
+ *               app: { type: string, enum: [discord] }
+ *               requesterUserId: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         description: >
+ *           Invalid `id`; or, for requester scope, missing/invalid `app` or an
+ *           unresolvable `requesterUserId`.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         description: >
+ *           Admin role required for `scope=admin`, or bot/admin role required
+ *           for requester scope. Both checks are enforced in-handler.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '404':
+ *         description: >
+ *           Not found for `scope=admin`, or (requester scope) no pending row
+ *           with this id is owned by the resolved requester.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete("/:id", authenticate, async (req, res) => {
   try {

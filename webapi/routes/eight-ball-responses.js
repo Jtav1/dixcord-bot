@@ -9,6 +9,34 @@ const router = express.Router();
  * GET /api/eight-ball-responses
  * List all eight-ball responses.
  * Auth: required (admin or bot).
+ * @openapi
+ * /api/eight-ball-responses:
+ *   get:
+ *     operationId: listEightBallResponses
+ *     tags: [Eight Ball Responses]
+ *     summary: List all eight-ball responses
+ *     responses:
+ *       '200':
+ *         description: All eight-ball responses.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 eightBallResponses:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       response_string: { type: string }
+ *                       sentiment: { type: string, enum: [positive, negative, neutral] }
+ *                       frequency: { type: integer }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/", authenticate, async (req, res) => {
   try {
@@ -26,6 +54,41 @@ router.get("/", authenticate, async (req, res) => {
  * GET /api/eight-ball-responses/:id
  * Get one eight-ball response by id.
  * Auth: required (admin or bot).
+ * @openapi
+ * /api/eight-ball-responses/{id}:
+ *   get:
+ *     operationId: getEightBallResponse
+ *     tags: [Eight Ball Responses]
+ *     summary: Get one eight-ball response by id
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: The eight-ball response.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 eightBallResponse:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     response_string: { type: string }
+ *                     sentiment: { type: string, enum: [positive, negative, neutral] }
+ *                     frequency: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/:id", authenticate, async (req, res) => {
   try {
@@ -53,6 +116,47 @@ router.get("/:id", authenticate, async (req, res) => {
  * Create an eight-ball response.
  * Body: { response_string: string, sentiment: "positive"|"negative"|"neutral" }
  * Auth: admin required.
+ * @openapi
+ * /api/eight-ball-responses:
+ *   post:
+ *     operationId: createEightBallResponse
+ *     tags: [Eight Ball Responses]
+ *     summary: Create an eight-ball response
+ *     description: Requires the admin role.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [response_string, sentiment]
+ *             properties:
+ *               response_string: { type: string }
+ *               sentiment: { type: string, enum: [positive, negative, neutral] }
+ *     responses:
+ *       '201':
+ *         description: Created eight-ball response.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 eightBallResponse:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     response_string: { type: string }
+ *                     sentiment: { type: string, enum: [positive, negative, neutral] }
+ *                     frequency: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -98,6 +202,53 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  * Update an eight-ball response.
  * Body: { response_string?: string, sentiment?: string }
  * Auth: admin required.
+ * @openapi
+ * /api/eight-ball-responses/{id}:
+ *   put:
+ *     operationId: updateEightBallResponse
+ *     tags: [Eight Ball Responses]
+ *     summary: Update an eight-ball response
+ *     description: Requires the admin role. Provide at least one of response_string or sentiment.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               response_string: { type: string }
+ *               sentiment: { type: string, enum: [positive, negative, neutral] }
+ *     responses:
+ *       '200':
+ *         description: Updated eight-ball response.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 eightBallResponse:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     response_string: { type: string }
+ *                     sentiment: { type: string, enum: [positive, negative, neutral] }
+ *                     frequency: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -136,6 +287,37 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
  * DELETE /api/eight-ball-responses/:id
  * Delete an eight-ball response.
  * Auth: admin required.
+ * @openapi
+ * /api/eight-ball-responses/{id}:
+ *   delete:
+ *     operationId: deleteEightBallResponse
+ *     tags: [Eight Ball Responses]
+ *     summary: Delete an eight-ball response
+ *     description: Requires the admin role.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: Deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
   try {

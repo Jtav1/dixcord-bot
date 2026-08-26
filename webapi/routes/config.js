@@ -12,6 +12,47 @@ const router = express.Router();
  * Returns all rows from the configurations table with metadata.
  * Response: { config, entries, entriesWithMeta }
  * Auth: required.
+ * @openapi
+ * /api/config:
+ *   get:
+ *     operationId: listConfig
+ *     tags: [Config]
+ *     summary: List all configuration entries
+ *     responses:
+ *       '200':
+ *         description: All configuration entries, keyed by name and with metadata.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 config:
+ *                   type: object
+ *                   description: Map of config name to value.
+ *                   additionalProperties: { type: string }
+ *                 entries:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       config: { type: string }
+ *                       value: { type: string }
+ *                 entriesWithMeta:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       config: { type: string }
+ *                       value: { type: string }
+ *                       description: { type: string, nullable: true }
+ *                       type: { type: string }
+ *                       requiresBotRestart: { type: boolean }
+ *                       deprecated: { type: boolean }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/", authenticate, async (req, res) => {
   try {
@@ -33,6 +74,48 @@ router.get("/", authenticate, async (req, res) => {
  * Create a new configuration key.
  * Body: { config: string, value?: string }
  * Auth: admin required.
+ * @openapi
+ * /api/config:
+ *   post:
+ *     operationId: createConfig
+ *     tags: [Config]
+ *     summary: Create a new configuration key
+ *     description: Requires the admin role.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [config]
+ *             properties:
+ *               config: { type: string, description: "Configuration key name." }
+ *               value: { type: string }
+ *     responses:
+ *       '201':
+ *         description: Created configuration entry.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 config: { type: string }
+ *                 value: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '409':
+ *         description: A configuration entry with this key already exists.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -78,6 +161,44 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  * Update a configuration value by name. Only updates if the config key exists.
  * Body: { config: string, value: string }
  * Auth: admin required.
+ * @openapi
+ * /api/config:
+ *   put:
+ *     operationId: updateConfig
+ *     tags: [Config]
+ *     summary: Update a configuration value by name
+ *     description: Requires the admin role. Only updates if the config key already exists.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [config]
+ *             properties:
+ *               config: { type: string, description: "Configuration key name." }
+ *               value: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Updated configuration entry.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 config: { type: string }
+ *                 value: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put("/", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -115,6 +236,37 @@ router.put("/", authenticate, requireAdmin, async (req, res) => {
  * DELETE /api/config/:key
  * Delete a configuration key.
  * Auth: admin required.
+ * @openapi
+ * /api/config/{key}:
+ *   delete:
+ *     operationId: deleteConfig
+ *     tags: [Config]
+ *     summary: Delete a configuration key
+ *     description: Requires the admin role.
+ *     parameters:
+ *       - name: key
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete("/:key", authenticate, requireAdmin, async (req, res) => {
   try {

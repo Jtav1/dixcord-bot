@@ -42,14 +42,14 @@ services:
     #   - DB_NAME=api_template
     restart: unless-stopped
 
-  web-panel:
+  webadmin:
     build:
-      context: ./web-panel
+      context: ./webadmin
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
     env_file:
-      - ./web-panel/.env
+      - ./webadmin/.env
     environment:
       - NODE_ENV=production
       - PORT=3001
@@ -70,14 +70,14 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  web-view:
+  webview:
     build:
-      context: ./web-view
+      context: ./webview
       dockerfile: Dockerfile
     ports:
       - "3002:3002"
     env_file:
-      - ./web-view/.env
+      - ./webview/.env
     environment:
       - NODE_ENV=production
       - PORT=3002
@@ -85,7 +85,7 @@ services:
       webapi:
         condition: service_healthy
     volumes:
-      - ./web-view/files:/app/files:ro
+      - ./webview/files:/app/files:ro
     healthcheck:
       test:
         [

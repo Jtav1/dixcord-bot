@@ -8,6 +8,32 @@ const router = express.Router();
  * GET /api/pin-quips
  * List all pin quips.
  * Auth: required.
+ * @openapi
+ * /api/pin-quips:
+ *   get:
+ *     operationId: listPinQuips
+ *     tags: [Pin Quips]
+ *     summary: List all pin quips
+ *     responses:
+ *       '200':
+ *         description: All pin quips.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 pinQuips:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       quip: { type: string }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/", authenticate, async (req, res) => {
   try {
@@ -23,6 +49,33 @@ router.get("/", authenticate, async (req, res) => {
  * GET /api/pin-quips/random
  * Return one random pin quip (for bot to use when pinning).
  * Auth: required.
+ * @openapi
+ * /api/pin-quips/random:
+ *   get:
+ *     operationId: getRandomPinQuip
+ *     tags: [Pin Quips]
+ *     summary: Get one random pin quip
+ *     responses:
+ *       '200':
+ *         description: A random pin quip.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 quip: { type: string }
+ *                 id: { type: integer }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         description: No pin quips exist yet.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/random", authenticate, async (req, res) => {
   try {
@@ -43,6 +96,36 @@ router.get("/random", authenticate, async (req, res) => {
  * GET /api/pin-quips/:id
  * Get one pin quip by id.
  * Auth: required.
+ * @openapi
+ * /api/pin-quips/{id}:
+ *   get:
+ *     operationId: getPinQuip
+ *     tags: [Pin Quips]
+ *     summary: Get one pin quip by id
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: The pin quip.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 quip: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/:id", authenticate, async (req, res) => {
   try {
@@ -66,6 +149,41 @@ router.get("/:id", authenticate, async (req, res) => {
  * Create a pin quip.
  * Body: { quip: string }
  * Auth: required.
+ * @openapi
+ * /api/pin-quips:
+ *   post:
+ *     operationId: createPinQuip
+ *     tags: [Pin Quips]
+ *     summary: Create a pin quip
+ *     description: Requires the admin role.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [quip]
+ *             properties:
+ *               quip: { type: string }
+ *     responses:
+ *       '201':
+ *         description: Created pin quip.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 quip: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -99,6 +217,48 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  * Update a pin quip.
  * Body: { quip: string }
  * Auth: required.
+ * @openapi
+ * /api/pin-quips/{id}:
+ *   put:
+ *     operationId: updatePinQuip
+ *     tags: [Pin Quips]
+ *     summary: Update a pin quip
+ *     description: Requires the admin role.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [quip]
+ *             properties:
+ *               quip: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Updated pin quip.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 quip: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -129,6 +289,37 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
  * DELETE /api/pin-quips/:id
  * Delete a pin quip.
  * Auth: required.
+ * @openapi
+ * /api/pin-quips/{id}:
+ *   delete:
+ *     operationId: deletePinQuip
+ *     tags: [Pin Quips]
+ *     summary: Delete a pin quip
+ *     description: Requires the admin role.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: Deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
   try {

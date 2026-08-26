@@ -20,6 +20,61 @@ const router = express.Router();
  * List user mappings with pagination.
  * Query: ?app=discord&limit=&offset=&search=
  * Auth: required (admin or bot).
+ * @openapi
+ * /api/user-mappings:
+ *   get:
+ *     operationId: listUserMappings
+ *     tags: [User Mappings]
+ *     summary: List user mappings with pagination
+ *     parameters:
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         description: Chat app to scope the mapping to. Currently only "discord" is supported.
+ *         schema: { type: string, enum: [discord] }
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         description: Max rows to return (default 50).
+ *         schema: { type: integer, default: 50 }
+ *       - name: offset
+ *         in: query
+ *         required: false
+ *         description: Rows to skip (default 0).
+ *         schema: { type: integer, default: 0 }
+ *       - name: search
+ *         in: query
+ *         required: false
+ *         description: Case-insensitive substring match against name, handle, or platform user id.
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Matching user mappings.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 userMappings:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       name: { type: string }
+ *                       handle: { type: string }
+ *                       platformUserId: { type: string }
+ *                       app: { type: string }
+ *                 total: { type: integer }
+ *                 limit: { type: integer }
+ *                 offset: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/", authenticate, async (req, res) => {
   try {
@@ -43,6 +98,47 @@ router.get("/", authenticate, async (req, res) => {
  * Get one user mapping by id.
  * Query: ?app=discord
  * Auth: required (admin or bot).
+ * @openapi
+ * /api/user-mappings/{id}:
+ *   get:
+ *     operationId: getUserMapping
+ *     tags: [User Mappings]
+ *     summary: Get one user mapping by id
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         description: Chat app to scope the mapping to. Currently only "discord" is supported.
+ *         schema: { type: string, enum: [discord] }
+ *     responses:
+ *       '200':
+ *         description: The user mapping.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 userMapping:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     name: { type: string }
+ *                     handle: { type: string }
+ *                     platformUserId: { type: string }
+ *                     app: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/:id", authenticate, async (req, res) => {
   try {
@@ -70,6 +166,53 @@ router.get("/:id", authenticate, async (req, res) => {
  * Create a user mapping.
  * Body: { app, name, handle, platformUserId }
  * Auth: admin required.
+ * @openapi
+ * /api/user-mappings:
+ *   post:
+ *     operationId: createUserMapping
+ *     tags: [User Mappings]
+ *     summary: Create a user mapping
+ *     description: Requires the admin role. `platformUserId` may also be sent as `discord_id` for backward compatibility.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, name, handle, platformUserId]
+ *             properties:
+ *               app:
+ *                 type: string
+ *                 enum: [discord]
+ *                 description: Chat app to scope the mapping to. Currently only "discord" is supported.
+ *               name: { type: string }
+ *               handle: { type: string }
+ *               platformUserId: { type: string }
+ *     responses:
+ *       '201':
+ *         description: Created user mapping.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 userMapping:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     name: { type: string }
+ *                     handle: { type: string }
+ *                     platformUserId: { type: string }
+ *                     app: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -111,6 +254,60 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  * Update a user mapping.
  * Body: { app, name?, handle?, platformUserId? }
  * Auth: admin required.
+ * @openapi
+ * /api/user-mappings/{id}:
+ *   put:
+ *     operationId: updateUserMapping
+ *     tags: [User Mappings]
+ *     summary: Update a user mapping
+ *     description: Requires the admin role. Provide at least one of name, handle, or platformUserId. `platformUserId` may also be sent as `discord_id`.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app]
+ *             properties:
+ *               app:
+ *                 type: string
+ *                 enum: [discord]
+ *                 description: Chat app to scope the mapping to. Currently only "discord" is supported.
+ *               name: { type: string }
+ *               handle: { type: string }
+ *               platformUserId: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Updated user mapping.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 userMapping:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     name: { type: string }
+ *                     handle: { type: string }
+ *                     platformUserId: { type: string }
+ *                     app: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -153,6 +350,42 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
  * Delete a user mapping.
  * Query: ?app=discord
  * Auth: admin required.
+ * @openapi
+ * /api/user-mappings/{id}:
+ *   delete:
+ *     operationId: deleteUserMapping
+ *     tags: [User Mappings]
+ *     summary: Delete a user mapping
+ *     description: Requires the admin role.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         description: Chat app to scope the mapping to. Currently only "discord" is supported.
+ *         schema: { type: string, enum: [discord] }
+ *     responses:
+ *       '200':
+ *         description: Deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
   try {

@@ -4,7 +4,7 @@
 
 ## 2. TLS (external, not included in this stack)
 
-Reverse proxy info for web-view and webapi here
+Reverse proxy info for webview and webapi here
 
 ## 3. Quick start (production)
 

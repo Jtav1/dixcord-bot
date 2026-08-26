@@ -1,5 +1,5 @@
 {
-  "name": "dixcord-bot-web-panel",
+  "name": "dixcord-bot-webadmin",
   "version": "2.2.1",
   "description": "Admin panel frontend for dixcord-bot",
   "type": "module",

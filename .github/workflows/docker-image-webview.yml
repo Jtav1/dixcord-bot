@@ -12,7 +12,7 @@ permissions:
 on:
   push:
     # Only a pushed release tag triggers this workflow at all; the `changes` job
-    # below decides whether web-view's image actually needs rebuilding for it.
+    # below decides whether webview's image actually needs rebuilding for it.
     tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+rc[0-9]+"]
 
 env:
@@ -41,17 +41,17 @@ jobs:
             | head -n1 || true)
           echo "prev=${prev}" >> "$GITHUB_OUTPUT"
 
-      - name: Check for web-view/ changes since previous release
+      - name: Check for webview/ changes since previous release
         id: check
         run: |
           if [ -z "${{ steps.prev-tag.outputs.prev }}" ]; then
             echo "No previous release tag found; building."
             echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "${{ steps.prev-tag.outputs.prev }}" "${GITHUB_REF_NAME}" -- web-view/; then
-            echo "No web-view/ changes since ${{ steps.prev-tag.outputs.prev }}; skipping build."
+          elif git diff --quiet "${{ steps.prev-tag.outputs.prev }}" "${GITHUB_REF_NAME}" -- webview/; then
+            echo "No webview/ changes since ${{ steps.prev-tag.outputs.prev }}; skipping build."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "web-view/ changed since ${{ steps.prev-tag.outputs.prev }}; building."
+            echo "webview/ changed since ${{ steps.prev-tag.outputs.prev }}; building."
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -107,13 +107,13 @@ jobs:
         id: build-and-push
         uses: docker/build-push-action@v6.19.2
         with:
-          context: ./web-view
-          file: ./web-view/Dockerfile
+          context: ./webview
+          file: ./webview/Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=web-view-${{ hashFiles('web-view/package-lock.json') }}
-          cache-to: type=gha,mode=max,scope=web-view-${{ hashFiles('web-view/package-lock.json') }}
+          cache-from: type=gha,scope=webview-${{ hashFiles('webview/package-lock.json') }}
+          cache-to: type=gha,mode=max,scope=webview-${{ hashFiles('webview/package-lock.json') }}
 
       # Sign the resulting Docker image digest except on PRs.
       # This will only write to the public Rekor transparency log when the Docker

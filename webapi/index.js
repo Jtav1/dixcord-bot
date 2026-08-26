@@ -4,8 +4,10 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
+import { apiReference } from "@scalar/express-api-reference";
 import db from "./config/db.js";
 import { ensureSchemaMigrations } from "./scripts/ensureSchema.js";
+import { buildOpenApiSpec } from "./lib/openapi.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import botResponsesRoutes from "./routes/bot-responses.js";
@@ -240,6 +242,27 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/**
+ * @openapi
+ * /:
+ *   get:
+ *     operationId: getApiInfo
+ *     tags: [System]
+ *     summary: API info and endpoint list
+ *     security: []
+ *     responses:
+ *       '200':
+ *         description: Service name, version, and a human-readable endpoint index.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 name: { type: string, example: dixcord-webapi }
+ *                 version: { type: string, example: v2.2 }
+ *                 endpoints: { type: object, description: "Nested map of resource -> route descriptions." }
+ *                 auth: { type: string, example: "Use header: Authorization: Bearer <token>" }
+ */
 app.get("/", publicLimiter, (req, res) => {
   res.json({
     name: "dixcord-webapi",
@@ -382,7 +405,61 @@ app.get("/", publicLimiter, (req, res) => {
   });
 });
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     operationId: getHealth
+ *     tags: [System]
+ *     summary: Health check
+ *     security: []
+ *     responses:
+ *       '200':
+ *         description: Service is up.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status: { type: string, enum: [ok] }
+ */
 app.get("/health", publicLimiter, (req, res) => res.json({ status: "ok" }));
+
+const openApiSpec = buildOpenApiSpec();
+
+/**
+ * @openapi
+ * /openapi.json:
+ *   get:
+ *     operationId: getOpenApiSpec
+ *     tags: [System]
+ *     summary: OpenAPI 3.0 document for this API
+ *     security: []
+ *     responses:
+ *       '200':
+ *         description: The generated OpenAPI document (built from `@openapi` JSDoc in routes/*.js).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ */
+app.get("/openapi.json", publicLimiter, (req, res) => res.json(openApiSpec));
+
+app.get(
+  "/docs",
+  publicLimiter,
+  (req, res, next) => {
+    res.removeHeader("Content-Security-Policy");
+    next();
+  },
+  apiReference({
+    url: "/openapi.json",
+    pageTitle: "dixcord-bot webapi",
+    agent: {
+      disabled: true,
+    },
+  }),
+);
 
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api", apiLimiter);

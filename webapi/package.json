@@ -14,7 +14,10 @@
     "db:seed:trigger-responses": "node scripts/sqlite/seed-trigger-responses.js",
     "db:seed:trigger-responses:mysql": "node scripts/mysql/seed-trigger-responses.js",
     "db:migrate:mysql": "node scripts/mysql/setup.js",
-    "db:migrate:sqlite": "node scripts/sqlite/setup.js"
+    "db:migrate:sqlite": "node scripts/sqlite/setup.js",
+    "docs:generate": "node scripts/write-openapi.js",
+    "docs:preview": "npm run docs:generate && scalar document serve openapi.generated.json --watch",
+    "docs:build": "npm run docs:generate && scalar document validate openapi.generated.json"
   },
   "keywords": [
     "express",
@@ -24,14 +27,19 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@scalar/express-api-reference": "^0.10.16",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
-    "express-rate-limit": "^8.5.1",
-    "helmet": "^8.1.0",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.1",
+    "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.17.4"
+  },
+  "devDependencies": {
+    "@scalar/cli": "^2.0.1",
+    "swagger-jsdoc": "^6.3.0"
   },
   "optionalDependencies": {
     "better-sqlite3": "^12.6.2"

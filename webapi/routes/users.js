@@ -22,6 +22,33 @@ function isServiceAccount(req) {
  * GET /api/users/me
  * Current user profile (from JWT).
  * Auth: required.
+ * @openapi
+ * /api/users/me:
+ *   get:
+ *     operationId: getCurrentUser
+ *     tags: [Users]
+ *     summary: Current user profile
+ *     responses:
+ *       '200':
+ *         description: The authenticated user's profile.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     email: { type: string }
+ *                     name: { type: string }
+ *                     created_at: { type: string, format: date-time }
+ *                     role: { type: string, nullable: true }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
  */
 router.get('/me', async (req, res) => {
   res.json({ ok: true, user: req.user });
@@ -32,6 +59,54 @@ router.get('/me', async (req, res) => {
  * Update current user profile (name and/or password).
  * Body: { name?, password? }
  * Auth: required. Service accounts cannot self-update.
+ * @openapi
+ * /api/users/me:
+ *   put:
+ *     operationId: updateCurrentUser
+ *     tags: [Users]
+ *     summary: Update current user profile
+ *     description: Service accounts (admin/bot/webview) cannot update their own profile via this route.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name: { type: string }
+ *               password: { type: string, format: password }
+ *     responses:
+ *       '200':
+ *         description: Updated profile.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 user:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     email: { type: string }
+ *                     name: { type: string }
+ *                     created_at: { type: string, format: date-time }
+ *       '400':
+ *         description: No valid fields to update.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         description: Service account profiles are managed via environment configuration.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put('/me', async (req, res) => {
   if (isServiceAccount(req)) {
@@ -69,6 +144,32 @@ router.put('/me', async (req, res) => {
  * DELETE /api/users/me
  * Delete current user account.
  * Auth: required. Service accounts cannot self-delete.
+ * @openapi
+ * /api/users/me:
+ *   delete:
+ *     operationId: deleteCurrentUser
+ *     tags: [Users]
+ *     summary: Delete current user account
+ *     description: Service accounts (admin/bot/webview) cannot be deleted via this route.
+ *     responses:
+ *       '200':
+ *         description: Account deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         description: Service accounts cannot be deleted via the API.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete('/me', async (req, res) => {
   if (isServiceAccount(req)) {

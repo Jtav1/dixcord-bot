@@ -4,6 +4,9 @@ node_modules/
 data/
 *.sqlite\
 
+# Generated OpenAPI spec (npm run docs:generate); regenerate, don't commit.
+openapi.generated.json
+
 # dotenv environment variables file
 .env
 .env.test

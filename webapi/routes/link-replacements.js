@@ -31,6 +31,33 @@ function validateLinkReplacementFields(fields) {
  * GET /api/link-replacements
  * List all link replacements (source_host -> target_host).
  * Auth: required.
+ * @openapi
+ * /api/link-replacements:
+ *   get:
+ *     operationId: listLinkReplacements
+ *     tags: [Link Replacements]
+ *     summary: List all link replacements
+ *     responses:
+ *       '200':
+ *         description: All link replacements.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 linkReplacements:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       source_host: { type: string }
+ *                       target_host: { type: string }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/", authenticate, async (req, res) => {
   try {
@@ -46,6 +73,37 @@ router.get("/", authenticate, async (req, res) => {
  * GET /api/link-replacements/:id
  * Get one link replacement by id.
  * Auth: required.
+ * @openapi
+ * /api/link-replacements/{id}:
+ *   get:
+ *     operationId: getLinkReplacement
+ *     tags: [Link Replacements]
+ *     summary: Get one link replacement by id
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: The link replacement.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 source_host: { type: string }
+ *                 target_host: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/:id", authenticate, async (req, res) => {
   try {
@@ -69,6 +127,49 @@ router.get("/:id", authenticate, async (req, res) => {
  * Create a link replacement.
  * Body: { source_host, target_host }
  * Auth: required.
+ * @openapi
+ * /api/link-replacements:
+ *   post:
+ *     operationId: createLinkReplacement
+ *     tags: [Link Replacements]
+ *     summary: Create a link replacement
+ *     description: Requires the admin role.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [source_host, target_host]
+ *             properties:
+ *               source_host: { type: string, description: "Hostname to rewrite (no scheme, path, or port)." }
+ *               target_host: { type: string, description: "Replacement hostname (no scheme, path, or port)." }
+ *     responses:
+ *       '201':
+ *         description: Created link replacement.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 source_host: { type: string }
+ *                 target_host: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '409':
+ *         description: A replacement for this source_host already exists.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -109,6 +210,55 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  * Update a link replacement.
  * Body: { source_host?, target_host? }
  * Auth: required.
+ * @openapi
+ * /api/link-replacements/{id}:
+ *   put:
+ *     operationId: updateLinkReplacement
+ *     tags: [Link Replacements]
+ *     summary: Update a link replacement
+ *     description: Requires the admin role. At least one of source_host or target_host must be provided.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               source_host: { type: string, description: "Hostname to rewrite (no scheme, path, or port)." }
+ *               target_host: { type: string, description: "Replacement hostname (no scheme, path, or port)." }
+ *     responses:
+ *       '200':
+ *         description: Updated link replacement.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 source_host: { type: string }
+ *                 target_host: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '409':
+ *         description: A replacement for this source_host already exists.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.put("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
@@ -146,6 +296,37 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
  * DELETE /api/link-replacements/:id
  * Delete a link replacement.
  * Auth: required.
+ * @openapi
+ * /api/link-replacements/{id}:
+ *   delete:
+ *     operationId: deleteLinkReplacement
+ *     tags: [Link Replacements]
+ *     summary: Delete a link replacement
+ *     description: Requires the admin role.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: Deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
   try {

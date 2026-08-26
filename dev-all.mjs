@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Run discord-bot, webapi, and web-view together for local development.
+ * Run discord-bot, webapi, webview, and webadmin together for local development.
  *
  * Usage (from repo root):
  *   node dev-all.mjs
@@ -133,10 +133,12 @@ try {
   shutdown(1);
 }
 
-spawnService("web-view", "web-view", "dev");
+spawnService("webview", "webview", "dev");
+spawnService("webadmin", "webadmin", "dev");
 spawnService("discord-bot", "discord-bot", "dev");
 
 console.log("[dev-all] all services running. Press Ctrl+C to stop.");
 console.log("[dev-all]   webapi:      http://localhost:3000");
-console.log("[dev-all]   web-view:    http://localhost:3002");
+console.log("[dev-all]   webadmin:    http://localhost:3001");
+console.log("[dev-all]   webview:     http://localhost:3002");
 console.log("[dev-all]   discord-bot: connected when token is configured");
