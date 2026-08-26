@@ -13,6 +13,24 @@ async function getRandomPinQuip() {
 }
 
 /**
+ * Resolve a possibly-partial message to full data (needed for `.author`, `.reactions`, etc.).
+ * Partials.Message is enabled (bot.js), so messages not in the client's cache arrive partial.
+ * @param {import('discord.js').MessageReaction} reaction
+ * @returns {Promise<import('discord.js').Message | null>} null if the fetch failed (e.g. message deleted before fetch completed)
+ */
+async function resolveMessage(reaction) {
+  if (!reaction.message.partial) return reaction.message;
+  try {
+    return await reaction.message.fetch();
+  } catch (err) {
+    console.error(
+      `bot: reactionHandler could not fetch a partial message (likely deleted before fetch completed): ${api.describeApiError(err)}`,
+    );
+    return null;
+  }
+}
+
+/**
  * Handle messageReactionAdd: pin threshold, plus/minus votes, emoji counting, repost counting.
  * @param {MessageReaction} reaction
  * @param {User} user
@@ -28,9 +46,16 @@ export async function handleReactionAdd(reaction, user, options) {
     repostEmojiId,
   } = options;
 
-  const message = !reaction.message.author
-    ? await reaction.message.fetch()
-    : reaction.message;
+  const message = await resolveMessage(reaction);
+  if (!message) return;
+
+  const emoji = reaction.emoji;
+  if (!emoji) {
+    console.error(
+      `bot: reactionHandler got a reaction with no resolvable emoji on message ${message.id} from user ${user.id}; skipping`,
+    );
+    return;
+  }
 
   const allReactions = message.reactions.valueOf();
   const pinReact = allReactions.get(pinEmoji);
@@ -44,30 +69,49 @@ export async function handleReactionAdd(reaction, user, options) {
   }
 
   if (
-    (reaction.emoji.id === plusEmoji || reaction.emoji.name === plusEmoji) &&
+    (emoji.id === plusEmoji || emoji.name === plusEmoji) &&
     user.id !== message.author.id
   ) {
-    await doplus(reaction.message.author.id, "user", user.id);
+    await doplus(message.author.id, "user", user.id);
   }
 
   if (
-    (reaction.emoji.id === minusEmoji || reaction.emoji.name === minusEmoji) &&
+    (emoji.id === minusEmoji || emoji.name === minusEmoji) &&
     user.id !== message.author.id
   ) {
-    await dominus(reaction.message.author.id, "user", user.id);
+    await dominus(message.author.id, "user", user.id);
   }
 
   if (
-    reaction._emoji.name !== pinEmoji &&
-    reaction._emoji.id !== plusEmoji &&
-    reaction._emoji.id !== minusEmoji
+    emoji.name !== pinEmoji &&
+    emoji.id !== plusEmoji &&
+    emoji.id !== minusEmoji
   ) {
-    await countEmoji(reaction._emoji.name, reaction._emoji.id, user.id);
+    if (reaction.partial) {
+      // A partial reaction's emoji data isn't fully cached - typically a custom emoji from a
+      // server this bot isn't in. Rather than spend a Discord API call resolving it, just skip
+      // counting it.
+      console.log(
+        `bot: skipping emoji count for a partial reaction (likely a custom emoji from another server) on message ${message.id} from user ${user.id}`,
+      );
+    } else {
+      try {
+        await countEmoji(emoji.name, emoji.id, user.id);
+      } catch (err) {
+        console.error(
+          `bot: countEmoji failed for reaction emoji "${emoji.id ?? emoji.name}" on message ${message.id} from user ${user.id}: ${api.describeApiError(err)}`,
+        );
+      }
+    }
   }
 
   const repostReact = allReactions.get(repostEmojiId);
   if (repostReact) {
-    countRepost(message.author.id, message.id, user.id);
+    countRepost(message.author.id, message.id, user.id).catch((err) => {
+      console.error(
+        `bot: countRepost failed for message ${message.id} (accused ${message.author.id}, accuser ${user.id}): ${api.describeApiError(err)}`,
+      );
+    });
   }
 }
 
@@ -80,25 +124,36 @@ export async function handleReactionAdd(reaction, user, options) {
 export async function handleReactionRemove(reaction, user, options) {
   const { plusEmoji, minusEmoji, repostEmojiId } = options;
 
-  const message = !reaction.message.author
-    ? await reaction.message.fetch()
-    : reaction.message;
+  const message = await resolveMessage(reaction);
+  if (!message) return;
 
-  if (reaction._emoji.id === repostEmojiId) {
-    uncountRepost(message.author.id, message.id, user.id);
+  const emoji = reaction.emoji;
+  if (!emoji) {
+    console.error(
+      `bot: reactionHandler got a reaction-remove with no resolvable emoji on message ${message.id} from user ${user.id}; skipping`,
+    );
+    return;
+  }
+
+  if (emoji.id === repostEmojiId) {
+    uncountRepost(message.author.id, message.id, user.id).catch((err) => {
+      console.error(
+        `bot: uncountRepost failed for message ${message.id} (accused ${message.author.id}, accuser ${user.id}): ${api.describeApiError(err)}`,
+      );
+    });
   }
 
   if (
-    (reaction.emoji.id === plusEmoji || reaction.emoji.name === plusEmoji) &&
+    (emoji.id === plusEmoji || emoji.name === plusEmoji) &&
     user.id !== message.author.id
   ) {
-    await dominus(reaction.message.author.id, "user", user.id);
+    await dominus(message.author.id, "user", user.id);
   }
 
   if (
-    (reaction.emoji.id === minusEmoji || reaction.emoji.name === minusEmoji) &&
+    (emoji.id === minusEmoji || emoji.name === minusEmoji) &&
     user.id !== message.author.id
   ) {
-    await doplus(reaction.message.author.id, "user", user.id);
+    await doplus(message.author.id, "user", user.id);
   }
 }

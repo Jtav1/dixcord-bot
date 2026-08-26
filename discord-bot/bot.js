@@ -39,6 +39,24 @@ const client = new Client({
 
 const commands = [];
 
+/**
+ * Wrap an event handler so a thrown/rejected execute() is logged instead of crashing the
+ * process (discord.js does not catch async listener rejections, and Node terminates on an
+ * unhandled rejection by default).
+ * @param {string} eventName
+ * @param {(...args: any[]) => any} handler
+ * @returns {(...args: any[]) => Promise<void>}
+ */
+function guardEventHandler(eventName, handler) {
+  return async (...args) => {
+    try {
+      await handler(...args);
+    } catch (err) {
+      console.error(`bot: unhandled error in "${eventName}" handler:`, err);
+    }
+  };
+}
+
 const eventsPath = path.join(import.meta.dirname, "events");
 const eventCategories = fs.readdirSync(eventsPath);
 
@@ -52,10 +70,11 @@ for (const category of eventCategories) {
       pathToFileURL(path.join(eventCategoryPath, file))
     );
 
+    const guarded = guardEventHandler(event.name, event.execute);
     if (event.once) {
-      client.once(event.name, (...args) => event.execute(...args));
+      client.once(event.name, guarded);
     } else {
-      client.on(event.name, (...args) => event.execute(...args));
+      client.on(event.name, guarded);
     }
   }
 }
@@ -117,26 +136,32 @@ client.once(Events.ClientReady, async (readyClient) => {
   );
 });
 
-client.on("messageReactionAdd", async (reaction, user) => {
-  if (user.id !== clientId) {
-    await handleReactionAdd(reaction, user, {
-      client,
-      pinEmoji: getPinEmoji(),
-      pinThreshold: getPinThreshold(),
+client.on(
+  "messageReactionAdd",
+  guardEventHandler("messageReactionAdd", async (reaction, user) => {
+    if (user.id !== clientId) {
+      await handleReactionAdd(reaction, user, {
+        client,
+        pinEmoji: getPinEmoji(),
+        pinThreshold: getPinThreshold(),
+        plusEmoji: getPlusEmoji(),
+        minusEmoji: getMinusEmoji(),
+        repostEmojiId: getRepostEmojiId(),
+      });
+    }
+  }),
+);
+
+client.on(
+  "messageReactionRemove",
+  guardEventHandler("messageReactionRemove", async (reaction, user) => {
+    await handleReactionRemove(reaction, user, {
       plusEmoji: getPlusEmoji(),
       minusEmoji: getMinusEmoji(),
       repostEmojiId: getRepostEmojiId(),
     });
-  }
-});
-
-client.on("messageReactionRemove", async (reaction, user) => {
-  await handleReactionRemove(reaction, user, {
-    plusEmoji: getPlusEmoji(),
-    minusEmoji: getMinusEmoji(),
-    repostEmojiId: getRepostEmojiId(),
-  });
-});
+  }),
+);
 
 client.on(Events.Error, async (error) => {
   console.error("Discord Client Error: ", error);
