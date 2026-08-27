@@ -17,6 +17,7 @@ import {
   updateScheduledMessageById,
 } from "../services/scheduledMessages.js";
 import { requireChatMemberMappingId } from "../services/chatMemberMapping.js";
+import { parseReminderText } from "../services/reminderParsing.js";
 import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
@@ -59,6 +60,90 @@ function denyUnlessBotOrAdmin(req, res) {
   }
   return false;
 }
+
+/**
+ * POST /api/scheduled-messages/parse-reminder
+ * Parse "remind me" style reminder text (already stripped of any platform mention syntax)
+ * into a scheduled time + message body.
+ * Body: { text: string, isReply?: boolean }
+ * Auth: required (bot or admin).
+ * @openapi
+ * /api/scheduled-messages/parse-reminder:
+ *   post:
+ *     operationId: parseReminderText
+ *     tags: [Scheduled Messages]
+ *     summary: Parse reminder text into a scheduled time + message body
+ *     description: >
+ *       Client-agnostic NLP parsing (chrono-node) of two accepted formats: "[at/in] <time>
+ *       remind me <message>" or "remind me [at/in <time>] <message>". Callers strip their
+ *       platform's mention syntax (e.g. Discord's `<@id>`) before calling this. When `isReply`
+ *       is true and the text has no explicit time keyword after "remind me" (e.g. just "remind
+ *       me tomorrow" as a reply to another message), the whole remainder is parsed as a time
+ *       phrase and `usesReplyContext` is returned true with `messageContent: null` — the caller
+ *       is expected to build the reminder body itself (e.g. a mention of the requester plus a
+ *       link to the message replied to).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [text]
+ *             properties:
+ *               text: { type: string, description: "Reminder text with any bot mention already stripped." }
+ *               isReply: { type: boolean, default: false, description: "Whether the source message was a reply to another message." }
+ *     responses:
+ *       '200':
+ *         description: Parsed reminder.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 scheduledAt: { type: string, format: date-time }
+ *                 messageContent:
+ *                   type: string
+ *                   nullable: true
+ *                   description: Null when usesReplyContext is true.
+ *                 usesReplyContext: { type: boolean }
+ *       '400':
+ *         description: Missing `text`, or the text didn't match a recognized reminder format.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/parse-reminder", authenticate, async (req, res) => {
+  try {
+    if (denyUnlessBotOrAdmin(req, res)) return;
+
+    const result = parseReminderText({
+      text: req.body?.text,
+      isReply: req.body?.isReply,
+    });
+    if (!result.ok) {
+      return res.status(400).json({ ok: false, error: result.error });
+    }
+    return res.json({
+      ok: true,
+      scheduledAt: result.scheduledAt,
+      messageContent: result.messageContent,
+      usesReplyContext: result.usesReplyContext,
+    });
+  } catch (err) {
+    console.error("POST /api/scheduled-messages/parse-reminder error:", err);
+    return res
+      .status(500)
+      .json({ ok: false, error: "Failed to parse reminder text" });
+  }
+});
 
 /**
  * GET /api/scheduled-messages

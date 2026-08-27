@@ -1,3 +1,5 @@
+import { MessageType } from "discord.js";
+
 import { clientId } from "../../configVars.js";
 
 import {
@@ -6,9 +8,11 @@ import {
 } from "../../api/responses.js";
 import { getRandomResponseForTrigger } from "../../api/triggerResponses.js";
 import { executeLottoPrize } from "../../utilities/lottoPrizes.js";
-import { createScheduledMessage } from "../../api/scheduledMessages.js";
+import {
+  createScheduledMessage,
+  parseReminderText,
+} from "../../api/scheduledMessages.js";
 import { refreshScheduledMessagesCache } from "../../scheduler/messageScheduler.js";
-import { parseReminderMessage } from "./utilities/scheduleParser.js";
 import {
   getCachedLinkHosts,
   getCachedTriggers,
@@ -79,16 +83,19 @@ const execute = async (message) => {
 
     if (message.content.startsWith(`<@${clientId}>`)) {
       if (message.content.toLowerCase().includes("remind me")) {
-        const parsedReminder = parseReminderMessage({
-          content: message.content,
-          botId: clientId,
-          message: message,
+        const mentionRegex = new RegExp(`^<@!?${clientId}>\\s+`, "i");
+        const reminderText = message.content.replace(mentionRegex, "").trim();
+        const isReply = message.type === MessageType.Reply;
+
+        const parsedReminder = await parseReminderText({
+          text: reminderText,
+          isReply,
         });
 
         if (!parsedReminder.ok) {
           console.log(
-            "bot: scheduler parse failure: full_message",
-            parsedReminder,
+            "bot: scheduler parse failure:",
+            parsedReminder.error,
           );
           await message.react("❌").catch(() => null);
 
@@ -97,29 +104,36 @@ const execute = async (message) => {
           );
 
           return;
-        } else if (parsedReminder.ok === true) {
-          try {
-            const created = await createScheduledMessage({
-              requesterUserId: message.author.id,
-              chatChannelId: message.channelId,
-              chatGuildId: message.guildId,
-              messageBody: parsedReminder.messageContent,
-              scheduledAtUtcIso: parsedReminder.scheduledAt,
-            });
-            if (!created) {
-              console.log(
-                "bot: scheduler create failure: no created row returned",
-              );
-              await message.react("❌").catch(() => null);
-              return;
-            }
-            await refreshScheduledMessagesCache();
-            await message.react("✅").catch(() => null);
-          } catch (err) {
-            console.log("bot: scheduler create failure:", err);
+        }
+
+        // Reply-with-no-explicit-time reminders don't carry their own body text (see
+        // webapi's parse-reminder route) - the bot builds a Discord-specific mention + link
+        // to the replied message instead.
+        const messageBody = parsedReminder.usesReplyContext
+          ? `<@${message.author.id}> reminder: https://discord.com/channels/${message.reference.guildId}/${message.reference.channelId}/${message.reference.messageId}`
+          : parsedReminder.messageContent;
+
+        try {
+          const created = await createScheduledMessage({
+            requesterUserId: message.author.id,
+            chatChannelId: message.channelId,
+            chatGuildId: message.guildId,
+            messageBody,
+            scheduledAtUtcIso: parsedReminder.scheduledAt,
+          });
+          if (!created) {
+            console.log(
+              "bot: scheduler create failure: no created row returned",
+            );
             await message.react("❌").catch(() => null);
             return;
           }
+          await refreshScheduledMessagesCache();
+          await message.react("✅").catch(() => null);
+        } catch (err) {
+          console.log("bot: scheduler create failure:", err);
+          await message.react("❌").catch(() => null);
+          return;
         }
       } else if (!response && message.content.endsWith("?")) {
         response = await getFortuneResponse();
