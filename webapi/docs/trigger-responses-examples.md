@@ -144,6 +144,47 @@ curl -s -X GET "${BASE_URL}/api/trigger-responses/random?trigger=takealookatthis
 
 ---
 
+## Selection modes
+
+Each trigger has a `selection_mode` that controls how `GET /api/trigger-responses/random` picks a response. Valid values: `random`, `ordered`, `weighted`.
+
+| Mode | Behavior |
+|------|----------|
+| `random` | Uniform random pick among all responses for the trigger. |
+| `ordered` | Round-robin: walks responses in `response_order` (then id), advancing state each hit so the next call returns the next response and wraps around. |
+| `weighted` | Weighted random: each response has a `weight` (0–100). A roll decides whether to pick from the highest-weight tier or from lower-weight responses, then one candidate is chosen at random from that subset. A weighted response may also carry a `lotto_prize`; when the chosen response has one, the API returns that prize key and the bot runs the matching handler instead of replying directly. |
+
+**Lotto prize handlers:** Prize handler functions must be defined in [`discord-bot/utilities/lottoPrizes.js`](../../discord-bot/utilities/lottoPrizes.js) (in the `PLACEHOLDER_FNS` map, keyed by the same `prize_string` / `lotto_prize` value). Catalog rows alone do nothing on the bot until a matching function exists there.
+
+---
+
+## List lotto prize catalog (bot hydrates prize handlers)
+
+```bash
+curl -s -X GET "${BASE_URL}/api/trigger-responses/lotto-prizes" \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+---
+
+## Create a weighted trigger with a prize response
+
+```bash
+curl -s -X POST "${BASE_URL}/api/trigger-responses/triggers" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "trigger_string": "lotto",
+    "selection_mode": "weighted",
+    "responses": [
+      { "response_string": "You won!", "weight": 10, "lotto_prize": "TAL_timeout" },
+      { "response_string": "Try again.", "weight": 90 }
+    ]
+  }'
+```
+
+---
+
 ## Get one response by id (responses table)
 
 ```bash
