@@ -282,6 +282,47 @@ export async function ensureSchemaMigrations() {
     );
   }
 
+  // trigger_response_user_history table
+  if (!(await tableExists(db, "trigger_response_user_history", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE trigger_response_user_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          trigger_response_id INTEGER NOT NULL REFERENCES trigger_response(id) ON DELETE CASCADE,
+          timestamp TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      await db.query(
+        "CREATE INDEX IF NOT EXISTS idx_trigger_response_user_history_user ON trigger_response_user_history(user_id)",
+      );
+      await db.query(
+        "CREATE INDEX IF NOT EXISTS idx_trigger_response_user_history_trigger_response ON trigger_response_user_history(trigger_response_id)",
+      );
+    } else {
+      await db.query(`
+        CREATE TABLE trigger_response_user_history (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          trigger_response_id INT NOT NULL,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          KEY idx_trigger_response_user_history_user (user_id),
+          KEY idx_trigger_response_user_history_trigger_response (trigger_response_id),
+          CONSTRAINT fk_trigger_response_user_history_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          CONSTRAINT fk_trigger_response_user_history_trigger_response FOREIGN KEY (trigger_response_id) REFERENCES trigger_response(id) ON DELETE CASCADE
+        )
+      `);
+    }
+    applied.push("trigger_response_user_history table");
+    console.log(
+      "db: migration applied: created trigger_response_user_history table",
+    );
+  } else {
+    console.log(
+      "db: schema ok: trigger_response_user_history table already exists",
+    );
+  }
+
   // trigger_response.lotto_prize column
   if (await tableExists(db, "trigger_response", isSqlite)) {
     if (

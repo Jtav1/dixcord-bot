@@ -212,13 +212,14 @@ async function getWeightedResponseForTrigger(triggerId) {
     id: chosen.id,
     response_string: chosen.response_string,
     lotto_prize: chosen.lotto_prize,
+    trigger_response_id: chosen.trigger_response_id,
   };
 }
 
 /**
  * One response for the given trigger: random, or next in round-robin order.
  * @param {string} trigger
- * @returns {Promise<{ id: number, response_string: string }|null>} id is responses.id
+ * @returns {Promise<{ id: number, response_string: string, trigger_response_id: number, lotto_prize?: string|null }|null>} id is responses.id; trigger_response_id is the junction row id (for history logging)
  */
 export async function getRandomResponse(trigger) {
   if (!trigger || typeof trigger !== "string" || !trigger.trim()) return null;
@@ -258,7 +259,11 @@ export async function getRandomResponse(trigger) {
       chosen.id,
       chosen.trigger_response_id,
     );
-    return { id: chosen.id, response_string: chosen.response_string };
+    return {
+      id: chosen.id,
+      response_string: chosen.response_string,
+      trigger_response_id: chosen.trigger_response_id,
+    };
   }
 
   if (selection_mode === "weighted") {
@@ -276,7 +281,11 @@ export async function getRandomResponse(trigger) {
     result.id,
     result.trigger_response_id,
   );
-  return { id: result.id, response_string: result.response_string };
+  return {
+    id: result.id,
+    response_string: result.response_string,
+    trigger_response_id: result.trigger_response_id,
+  };
 }
 
 const VALID_MODES = ["random", "ordered", "weighted"];

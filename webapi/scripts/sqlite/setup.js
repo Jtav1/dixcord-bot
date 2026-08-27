@@ -222,6 +222,20 @@ const initializeDatabase = () => {
       last_used_response_order INTEGER NULL
     )
   `);
+  exec(`
+    CREATE TABLE IF NOT EXISTS trigger_response_user_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+      trigger_response_id INTEGER NOT NULL REFERENCES trigger_response(id) ON DELETE CASCADE,
+      timestamp TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  exec(`
+    CREATE INDEX IF NOT EXISTS idx_trigger_response_user_history_user ON trigger_response_user_history(user_id)
+  `);
+  exec(`
+    CREATE INDEX IF NOT EXISTS idx_trigger_response_user_history_trigger_response ON trigger_response_user_history(trigger_response_id)
+  `);
 
   exec(`
     CREATE TABLE IF NOT EXISTS scheduled_messages (

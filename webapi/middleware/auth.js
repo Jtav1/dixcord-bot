@@ -29,6 +29,7 @@ export const WEBVIEW_ALLOWED_ROUTE_PREFIXES = [
   "/api/leaderboards/plusplus/history/",
   "/api/leaderboards/emoji/user/",
   "/api/leaderboards/sticker/user/",
+  "/api/trigger-responses/history/",
 ];
 
 /**

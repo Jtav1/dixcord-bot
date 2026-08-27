@@ -2,6 +2,11 @@ import express from "express";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 import * as triggerResponses from "../services/triggerResponses.js";
 import * as triggerLottoPrizes from "../services/triggerLottoPrizes.js";
+import {
+  listTriggerResponseHistoryForUser,
+  recordTriggerResponseUsage,
+} from "../services/triggerResponseHistory.js";
+import { resolveChatAppFromRequest } from "../utils/chatAppHttp.js";
 
 const router = express.Router();
 
@@ -539,8 +544,11 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
 });
 
 /**
- * GET /api/trigger-responses/random?trigger=xxx
- * Return one response for the given trigger (selection_mode: random, weighted, ordered, or lotto is handled in service).
+ * GET /api/trigger-responses/random?trigger=xxx&app=discord&userId=yyy
+ * Return one response for the given trigger (selection_mode: random, weighted, or ordered).
+ * When app and userId are both given, also logs the selection to trigger_response_user_history
+ * against the requesting user's chat_member_mapping row; this is best-effort and never fails the
+ * request (an unmapped user still gets a response, just without a history row).
  * Auth: required.
  * @openapi
  * /api/trigger-responses/random:
@@ -553,10 +561,23 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
  *       "random" (uniform DB-side random pick), "ordered" (round-robin by response_order, tracked in
  *       trigger_response_state), or "weighted" (weighted roll against each link's weight, 0-100).
  *       Selecting a response increments frequency counters on the trigger, response, and link rows.
+ *       When app and userId are both supplied, also records a trigger_response_user_history row for
+ *       the requesting user (resolved via chat_member_mapping); this is best-effort and silently
+ *       skipped if the user isn't mapped yet, so it never affects the response returned.
  *     parameters:
  *       - name: trigger
  *         in: query
  *         required: true
+ *         schema: { type: string }
+ *       - name: app
+ *         in: query
+ *         required: false
+ *         description: Chat app key for userId, e.g. "discord". Required (together with userId) to log history.
+ *         schema: { type: string, enum: [discord] }
+ *       - name: userId
+ *         in: query
+ *         required: false
+ *         description: Platform user id (e.g. Discord snowflake) of the user receiving the response, for history logging.
  *         schema: { type: string }
  *     responses:
  *       '200':
@@ -597,6 +618,22 @@ router.get("/random", authenticate, async (req, res) => {
         .status(404)
         .json({ ok: false, error: "No responses found for this trigger" });
     }
+
+    const app = resolveChatAppFromRequest(req);
+    const userId = req.query.userId;
+    if (app && userId) {
+      const historyResult = await recordTriggerResponseUsage(
+        row.trigger_response_id,
+        userId,
+        app,
+      );
+      if (!historyResult.ok) {
+        console.warn(
+          `GET /api/trigger-responses/random: history not recorded for userId=${userId}: ${historyResult.error}`,
+        );
+      }
+    }
+
     res.json({
       ok: true,
       response: row.response_string,
@@ -833,6 +870,85 @@ router.get("/lotto-prizes", authenticate, async (req, res) => {
   } catch (err) {
     console.error("GET /api/trigger-responses/lotto-prizes error:", err);
     res.status(500).json({ ok: false, error: "Failed to list lotto prizes" });
+  }
+});
+
+/**
+ * GET /api/trigger-responses/history/:chatMemberId
+ * Paginated trigger_response_user_history for one internal user (chat_member_mapping.id).
+ * Query: ?limit=&offset=
+ * Auth: required. Registered before /:id so "history" is not shadowed by the junction-id route.
+ * @openapi
+ * /api/trigger-responses/history/{chatMemberId}:
+ *   get:
+ *     operationId: listTriggerResponseHistoryForUser
+ *     tags: [Trigger Responses]
+ *     summary: List one user's trigger-response usage history
+ *     description: >
+ *       chatMemberId is the internal chat_member_mapping.id (as returned by GET /api/user-mappings),
+ *       not a platform id. Entries are newest first, joined with trigger/response text for display.
+ *     parameters:
+ *       - name: chatMemberId
+ *         in: path
+ *         required: true
+ *         description: chat_member_mapping.id of the user whose history to list.
+ *         schema: { type: integer }
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 50 }
+ *       - name: offset
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 0 }
+ *     responses:
+ *       '200':
+ *         description: Page of trigger-response history entries, newest first.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 history:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer, description: trigger_response_user_history row id }
+ *                       timestamp: { type: string }
+ *                       triggerResponseId: { type: integer }
+ *                       triggerString: { type: string }
+ *                       responseString: { type: string }
+ *                 total: { type: integer }
+ *                 limit: { type: integer }
+ *                 offset: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/history/:chatMemberId", authenticate, async (req, res) => {
+  try {
+    const chatMemberId = parseInt(req.params.chatMemberId, 10);
+    if (Number.isNaN(chatMemberId)) {
+      return res.status(400).json({ ok: false, error: "Invalid chatMemberId" });
+    }
+    const limit = req.query.limit != null ? parseInt(req.query.limit, 10) : 50;
+    const offset = req.query.offset != null ? parseInt(req.query.offset, 10) : 0;
+
+    const { entries, total } = await listTriggerResponseHistoryForUser(
+      chatMemberId,
+      { limit, offset },
+    );
+    res.json({ ok: true, history: entries, total, limit, offset });
+  } catch (err) {
+    console.error("GET /api/trigger-responses/history/:chatMemberId error:", err);
+    res
+      .status(500)
+      .json({ ok: false, error: "Failed to list trigger-response history" });
   }
 });
 

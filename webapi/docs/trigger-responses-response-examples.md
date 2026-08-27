@@ -240,6 +240,39 @@ See also [trigger-responses-examples.md](trigger-responses-examples.md) for samp
 
 ---
 
+## GET /api/trigger-responses/history/:chatMemberId
+
+**200 OK**
+
+```json
+{
+  "ok": true,
+  "history": [
+    {
+      "id": 5,
+      "timestamp": "2026-08-27 05:18:59",
+      "triggerResponseId": 1,
+      "triggerString": "takealookatthis",
+      "responseString": "You won!"
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}
+```
+
+**400 Bad Request**
+
+```json
+{
+  "ok": false,
+  "error": "Invalid chatMemberId"
+}
+```
+
+---
+
 ## GET /api/trigger-responses/responses/:id
 
 **200 OK**

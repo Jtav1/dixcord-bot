@@ -148,6 +148,18 @@ CREATE TABLE IF NOT EXISTS trigger_response_state (
   FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE
 );
 
+-- History: one row per (user, trigger_response) usage, for audit/analytics
+CREATE TABLE IF NOT EXISTS trigger_response_user_history (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  trigger_response_id INT NOT NULL,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_trigger_response_user_history_user (user_id),
+  KEY idx_trigger_response_user_history_trigger_response (trigger_response_id),
+  CONSTRAINT fk_trigger_response_user_history_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  CONSTRAINT fk_trigger_response_user_history_trigger_response FOREIGN KEY (trigger_response_id) REFERENCES trigger_response(id) ON DELETE CASCADE
+);
+
 -- Scheduled messages (bot polls due rows and posts to channel). Requester is chat_member_mapping.id (per-app user rows).
 CREATE TABLE IF NOT EXISTS scheduled_messages (
   id INT AUTO_INCREMENT PRIMARY KEY,

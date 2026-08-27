@@ -5,6 +5,8 @@ import StickerCountView from "../views/StickerCountView.vue";
 import PlusPlusRankingsView from "../views/PlusPlusRankingsView.vue";
 import StatisticsView from "../views/StatisticsView.vue";
 import SystemStatusView from "../views/SystemStatusView.vue";
+import TriggerHistoryUsersView from "../views/TriggerHistoryUsersView.vue";
+import TriggerHistoryUserView from "../views/TriggerHistoryUserView.vue";
 
 /**
  * Application route table.
@@ -44,6 +46,18 @@ const routes = [
     name: "statistics",
     component: StatisticsView,
     meta: { title: "Statistics" },
+  },
+  {
+    path: "/trigger-history",
+    name: "trigger-history",
+    component: TriggerHistoryUsersView,
+    meta: { title: "Trigger History" },
+  },
+  {
+    path: "/trigger-history/:id",
+    name: "trigger-history-user",
+    component: TriggerHistoryUserView,
+    meta: { title: "Trigger History" },
   },
   {
     path: "/system-status",

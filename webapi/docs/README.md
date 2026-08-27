@@ -14,7 +14,7 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 - **Config** – Key/value bot settings (pin threshold, emoji IDs, channels, etc.).
 - **Link replacements** – CRUD for source_host → target_host rewrite rules.
 - **Pin quips** – CRUD + random quip for pin reactions.
-- **Trigger–responses** – Triggers with selection modes (`random`, `ordered` round-robin, `weighted`, `lotto`), responses, junction links, lotto prize catalog, frequency tracking. See [trigger-responses-examples.md](trigger-responses-examples.md).
+- **Trigger–responses** – Triggers with selection modes (`random`, `ordered` round-robin, `weighted`), responses, junction links, lotto prize catalog, frequency tracking, per-user usage history. See [trigger-responses-examples.md](trigger-responses-examples.md).
 - **Leaderboards** – Plusplus, emoji, and repost rankings and per-user totals.
 - **Eight-ball responses** – Fortune string catalog (admin writes).
 - **User mappings** – Discord member ↔ display mapping.
@@ -101,8 +101,9 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/trigger-responses/triggers/:id` | ✓ | One trigger with responses |
 | POST | `/api/trigger-responses/triggers` | ✓ | Create trigger + responses |
 | PUT | `/api/trigger-responses/triggers/:id` | ✓ | Update trigger / responses |
-| GET | `/api/trigger-responses/random?trigger=` | ✓ | One response for trigger (mode-aware) |
+| GET | `/api/trigger-responses/random?trigger=&app=&userId=` | ✓ | One response for trigger (mode-aware); app+userId optionally logs trigger_response_user_history |
 | GET | `/api/trigger-responses/lotto-prizes` | ✓ | Lotto prize catalog |
+| GET | `/api/trigger-responses/history/:chatMemberId?limit=&offset=` | ✓ | Paginated trigger-response usage history for one user |
 | GET | `/api/trigger-responses/responses/:id` | ✓ | One response by id |
 | PUT | `/api/trigger-responses/responses/:id` | ✓ | Update response text |
 | DELETE | `/api/trigger-responses/responses/:id` | ✓ | Delete response |
