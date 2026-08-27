@@ -2020,6 +2020,107 @@
         }
       }
     },
+    "/api/trigger-responses/history/{chatMemberId}": {
+      "get": {
+        "operationId": "listTriggerResponseHistoryForUser",
+        "tags": [
+          "Trigger Responses"
+        ],
+        "summary": "List one user's trigger-response usage history",
+        "description": "chatMemberId is the internal chat_member_mapping.id (as returned by GET /api/user-mappings), not a platform id. Entries are newest first, joined with trigger/response text for display.\n",
+        "parameters": [
+          {
+            "name": "chatMemberId",
+            "in": "path",
+            "required": true,
+            "description": "chat_member_mapping.id of the user whose history to list.",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Page of trigger-response history entries, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "trigger_response_user_history row id"
+                          },
+                          "timestamp": {
+                            "type": "string"
+                          },
+                          "triggerResponseId": {
+                            "type": "integer"
+                          },
+                          "triggerString": {
+                            "type": "string"
+                          },
+                          "responseString": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/trigger-responses/{id}": {
       "get": {
         "operationId": "getTriggerResponseLink",

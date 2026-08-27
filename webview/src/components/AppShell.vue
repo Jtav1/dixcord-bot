@@ -52,11 +52,14 @@ const tabs = [
   { label: "Sticker Count", route: "/sticker-count" },
   { label: "PlusPlus Rankings", route: "/plusplus-rankings" },
   { label: "Statistics", route: "/statistics" },
+  { label: "Trigger History", route: "/trigger-history" },
 ];
 
 const route = useRoute();
 
-const activeTab = computed(() => route.path);
+const activeTab = computed(
+  () => tabs.find((tab) => route.path.startsWith(tab.route))?.route,
+);
 </script>
 
 <style scoped>

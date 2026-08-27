@@ -151,6 +151,17 @@ curl -s -X GET "${BASE_URL}/api/trigger-responses/random?trigger=takealookatthis
 
 ---
 
+## List one user's trigger-response history (webview use)
+
+`chatMemberId` is the internal `chat_member_mapping.id` (e.g. from `GET /api/user-mappings`), not a platform id.
+
+```bash
+curl -s -X GET "${BASE_URL}/api/trigger-responses/history/1?limit=50&offset=0" \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
+---
+
 ## Selection modes
 
 Each trigger has a `selection_mode` that controls how `GET /api/trigger-responses/random` picks a response. Valid values: `random`, `ordered`, `weighted`.
