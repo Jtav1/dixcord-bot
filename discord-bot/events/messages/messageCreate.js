@@ -60,7 +60,7 @@ const execute = async (message) => {
     );
     if (matchedTrigger) {
       const { response: triggerResponse, lotto_prize } =
-        await getRandomResponseForTrigger(matchedTrigger);
+        await getRandomResponseForTrigger(matchedTrigger, message.author.id);
       if (triggerResponse.length > 0) {
         if (lotto_prize) {
           await executeLottoPrize(lotto_prize, {

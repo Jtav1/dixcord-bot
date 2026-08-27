@@ -146,6 +146,16 @@ CREATE TABLE IF NOT EXISTS trigger_response_state (
   last_used_response_order INTEGER NULL
 );
 
+-- History: one row per (user, trigger_response) usage, for audit/analytics
+CREATE TABLE IF NOT EXISTS trigger_response_user_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  trigger_response_id INTEGER NOT NULL REFERENCES trigger_response(id) ON DELETE CASCADE,
+  timestamp TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_trigger_response_user_history_user ON trigger_response_user_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_trigger_response_user_history_trigger_response ON trigger_response_user_history(trigger_response_id);
+
 -- Scheduled messages (bot polls due rows and posts to channel). Requester is chat_member_mapping.id.
 CREATE TABLE IF NOT EXISTS scheduled_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

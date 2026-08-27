@@ -1691,12 +1691,33 @@
           "Trigger Responses"
         ],
         "summary": "Get one selected response for a trigger",
-        "description": "Looks up the trigger by exact trigger_string and picks one response per its selection_mode: \"random\" (uniform DB-side random pick), \"ordered\" (round-robin by response_order, tracked in trigger_response_state), or \"weighted\" (weighted roll against each link's weight, 0-100). Selecting a response increments frequency counters on the trigger, response, and link rows.\n",
+        "description": "Looks up the trigger by exact trigger_string and picks one response per its selection_mode: \"random\" (uniform DB-side random pick), \"ordered\" (round-robin by response_order, tracked in trigger_response_state), or \"weighted\" (weighted roll against each link's weight, 0-100). Selecting a response increments frequency counters on the trigger, response, and link rows. When app and userId are both supplied, also records a trigger_response_user_history row for the requesting user (resolved via chat_member_mapping); this is best-effort and silently skipped if the user isn't mapped yet, so it never affects the response returned.\n",
         "parameters": [
           {
             "name": "trigger",
             "in": "query",
             "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "app",
+            "in": "query",
+            "required": false,
+            "description": "Chat app key for userId, e.g. \"discord\". Required (together with userId) to log history.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "discord"
+              ]
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "description": "Platform user id (e.g. Discord snowflake) of the user receiving the response, for history logging.",
             "schema": {
               "type": "string"
             }

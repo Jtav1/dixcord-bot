@@ -76,9 +76,13 @@ export const getLottoPrizesList = async () => {
  * Get a response for the given trigger.
  * Uses GET /api/trigger-responses/random for all modes (random, ordered, weighted) so selection and frequency tracking happen on the server.
  * @param {string|{ trigger_string: string, selection_mode?: string }} triggerOrObject - Trigger string or object with trigger_string and selection_mode
+ * @param {string} [discordUserId] - Discord snowflake of the user receiving the response, so the server can log trigger_response_user_history
  * @returns {Promise<{ response: string, lotto_prize: string|null }>} Response payload or empty response if none (e.g. 404)
  */
-export const getRandomResponseForTrigger = async (triggerOrObject) => {
+export const getRandomResponseForTrigger = async (
+  triggerOrObject,
+  discordUserId,
+) => {
   const triggerString =
     typeof triggerOrObject === "string"
       ? triggerOrObject?.trim()
@@ -88,7 +92,10 @@ export const getRandomResponseForTrigger = async (triggerOrObject) => {
 
   try {
     const { data } = await api.get("/api/trigger-responses/random", {
-      params: { trigger: triggerString },
+      params: {
+        trigger: triggerString,
+        ...(discordUserId ? { app: "discord", userId: discordUserId } : {}),
+      },
     });
     if (!data?.ok) return { response: "", lotto_prize: null };
     const lottoPrize =

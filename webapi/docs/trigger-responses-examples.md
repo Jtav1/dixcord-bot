@@ -142,6 +142,13 @@ curl -s -X GET "${BASE_URL}/api/trigger-responses/random?trigger=takealookatthis
   -H "Authorization: Bearer ${TOKEN}"
 ```
 
+Pass `app` and `userId` to also log the selection to `trigger_response_user_history` against the requesting user's `chat_member_mapping` row (resolved from their platform id). This is best-effort: if the user isn't mapped yet, the response is still returned, just without a history row.
+
+```bash
+curl -s -X GET "${BASE_URL}/api/trigger-responses/random?trigger=takealookatthis&app=discord&userId=123456789012345678" \
+  -H "Authorization: Bearer ${TOKEN}"
+```
+
 ---
 
 ## Selection modes

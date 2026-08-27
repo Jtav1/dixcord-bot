@@ -2,6 +2,8 @@ import express from "express";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 import * as triggerResponses from "../services/triggerResponses.js";
 import * as triggerLottoPrizes from "../services/triggerLottoPrizes.js";
+import { recordTriggerResponseUsage } from "../services/triggerResponseHistory.js";
+import { resolveChatAppFromRequest } from "../utils/chatAppHttp.js";
 
 const router = express.Router();
 
@@ -539,8 +541,11 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
 });
 
 /**
- * GET /api/trigger-responses/random?trigger=xxx
- * Return one response for the given trigger (selection_mode: random, weighted, ordered, or lotto is handled in service).
+ * GET /api/trigger-responses/random?trigger=xxx&app=discord&userId=yyy
+ * Return one response for the given trigger (selection_mode: random, weighted, or ordered).
+ * When app and userId are both given, also logs the selection to trigger_response_user_history
+ * against the requesting user's chat_member_mapping row; this is best-effort and never fails the
+ * request (an unmapped user still gets a response, just without a history row).
  * Auth: required.
  * @openapi
  * /api/trigger-responses/random:
@@ -553,10 +558,23 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
  *       "random" (uniform DB-side random pick), "ordered" (round-robin by response_order, tracked in
  *       trigger_response_state), or "weighted" (weighted roll against each link's weight, 0-100).
  *       Selecting a response increments frequency counters on the trigger, response, and link rows.
+ *       When app and userId are both supplied, also records a trigger_response_user_history row for
+ *       the requesting user (resolved via chat_member_mapping); this is best-effort and silently
+ *       skipped if the user isn't mapped yet, so it never affects the response returned.
  *     parameters:
  *       - name: trigger
  *         in: query
  *         required: true
+ *         schema: { type: string }
+ *       - name: app
+ *         in: query
+ *         required: false
+ *         description: Chat app key for userId, e.g. "discord". Required (together with userId) to log history.
+ *         schema: { type: string, enum: [discord] }
+ *       - name: userId
+ *         in: query
+ *         required: false
+ *         description: Platform user id (e.g. Discord snowflake) of the user receiving the response, for history logging.
  *         schema: { type: string }
  *     responses:
  *       '200':
@@ -597,6 +615,22 @@ router.get("/random", authenticate, async (req, res) => {
         .status(404)
         .json({ ok: false, error: "No responses found for this trigger" });
     }
+
+    const app = resolveChatAppFromRequest(req);
+    const userId = req.query.userId;
+    if (app && userId) {
+      const historyResult = await recordTriggerResponseUsage(
+        row.trigger_response_id,
+        userId,
+        app,
+      );
+      if (!historyResult.ok) {
+        console.warn(
+          `GET /api/trigger-responses/random: history not recorded for userId=${userId}: ${historyResult.error}`,
+        );
+      }
+    }
+
     res.json({
       ok: true,
       response: row.response_string,
