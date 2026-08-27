@@ -794,6 +794,37 @@ router.delete("/responses/:id", authenticate, requireAdmin, async (req, res) => 
  * GET /api/trigger-responses/lotto-prizes
  * List lotto prize catalog rows (id, prize_string, frequency).
  * Auth: required.
+ * @openapi
+ * /api/trigger-responses/lotto-prizes:
+ *   get:
+ *     operationId: listLottoPrizes
+ *     tags: [Trigger Responses]
+ *     summary: List the lotto prize catalog
+ *     description: >
+ *       Catalog of prize keys usable as a weighted trigger response's trigger_response.lotto_prize value.
+ *       The bot hydrates its in-process prize handler table from this list, matching each
+ *       prize_string against a handler function; catalog rows with no matching handler are a no-op.
+ *     responses:
+ *       '200':
+ *         description: All lotto prize catalog rows.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 lottoPrizes:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       prize_string: { type: string }
+ *                       frequency: { type: integer, description: Times this prize has been awarded. }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
  */
 router.get("/lotto-prizes", authenticate, async (req, res) => {
   try {

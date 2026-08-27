@@ -62,15 +62,14 @@ const execute = async (message) => {
       const { response: triggerResponse, lotto_prize } =
         await getRandomResponseForTrigger(matchedTrigger);
       if (triggerResponse.length > 0) {
-        await message.reply(triggerResponse);
-        if (
-          matchedTrigger.selection_mode === "lotto" &&
-          lotto_prize
-        ) {
+        if (lotto_prize) {
           await executeLottoPrize(lotto_prize, {
             message,
             client: message.client,
+            responseText: triggerResponse,
           });
+        } else {
+          await message.reply(triggerResponse);
         }
         response = "";
       } else {

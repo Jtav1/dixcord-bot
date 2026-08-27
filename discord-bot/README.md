@@ -14,8 +14,7 @@ The bot **depends on the web API** for almost all behavior. It loads configurati
 - **Trigger responses** – If the message matches a trigger string, replies using the trigger’s `selection_mode`:
   - `random` — uniform random
   - `ordered` — round-robin by `response_order`
-  - `weighted` — weighted random
-  - `lotto` — weighted random plus optional `lotto_prize` side effect; prize handlers must be defined in [`utilities/lottoPrizes.js`](utilities/lottoPrizes.js) (keyed by `prize_string`)
+  - `weighted` — weighted random; a response may optionally carry a `lotto_prize` function name, in which case the bot dispatches to that function (defined in [`utilities/lottoPrizes.js`](utilities/lottoPrizes.js), keyed by `prize_string`) instead of auto-replying
 - **Fortune (8-ball)** – @mention the bot with a message ending in `?` for a random fortune from the API.
 - **Emoji tracking** – Records emoji usage; a reply with exactly one configured +/- emoji applies plus/minus to the replied-to user.
 - **Plus/minus from text** – Parses `word++` / `user++` / `--` via the API.

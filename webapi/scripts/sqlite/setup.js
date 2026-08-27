@@ -184,7 +184,7 @@ const initializeDatabase = () => {
     CREATE TABLE IF NOT EXISTS triggers (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trigger_string TEXT NOT NULL UNIQUE,
-      selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered', 'weighted', 'lotto')),
+      selection_mode TEXT NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered', 'weighted')),
       created_at TEXT DEFAULT (datetime('now')),
       frequency INTEGER DEFAULT 0
     )

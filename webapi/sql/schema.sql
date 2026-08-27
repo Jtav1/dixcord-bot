@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS pin_quips (
 CREATE TABLE IF NOT EXISTS triggers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   trigger_string VARCHAR(255) NOT NULL UNIQUE,
-  selection_mode VARCHAR(10) NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered', 'weighted', 'lotto')),
+  selection_mode VARCHAR(10) NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered', 'weighted')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   frequency INT DEFAULT 0
 );

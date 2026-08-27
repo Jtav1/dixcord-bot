@@ -2,7 +2,9 @@
  * Lotto prize handlers built from webapi trigger_lotto_prizes catalog.
  */
 
-/** @typedef {{ message: import("discord.js").Message, client: import("discord.js").Client }} LottoPrizeContext */
+import { timeoutMember } from "./timeoutMember.js";
+
+/** @typedef {{ message: import("discord.js").Message, client: import("discord.js").Client, responseText: string }} LottoPrizeContext */
 
 /** @type {Array<{ id: number, lotto_prize: string, fn: (context: LottoPrizeContext) => Promise<void> }>} */
 let lottoPrizeHandlers = [];
@@ -11,14 +13,15 @@ const defaultPlaceholderFn = async () => {};
 
 /** @type {Record<string, (context: LottoPrizeContext) => Promise<void>>} */
 const PLACEHOLDER_FNS = {
-  TAL_timeout: async ({ message }) => {
+  TAL_timeout: async ({ message, responseText }) => {
     // Pick random number 1-1000 inclusive
     const roll = Math.floor(Math.random() * 1000) + 1;
     if (roll === 1) {
       if (typeof message.member?.timeout === "function") {
         try {
-          await message.member.timeout(
-            3 * 60 * 1000, // 3 minutes in ms
+          await timeoutMember(
+            message.member,
+            3 * 60, // 3 minutes in seconds
             "Lotto prize: Timeout for 3 minutes",
           );
           await message.reply(
@@ -35,7 +38,9 @@ const PLACEHOLDER_FNS = {
         );
       }
     } else {
-      //await message.reply(`Lucky! You rolled a ${roll}, so no timeout this time.`);
+      if (responseText) {
+        await message.reply(responseText);
+      }
       console.log(`TAL roll: ${roll}`);
     }
   },

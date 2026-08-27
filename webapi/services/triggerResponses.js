@@ -170,50 +170,12 @@ async function getRandomResponseByRandomSelection(triggerId) {
 /**
  * Weighted selection: roll 1-100; if roll >= maxWeight pick from responses with weight >= maxWeight,
  * else pick from responses with weight < maxWeight; then return one at random from that subset.
- * @param {number} triggerId
- * @returns {Promise<{ id: number, response_string: string }|null>}
- */
-async function getWeightedResponseForTrigger(triggerId) {
-  const [weightRows] = await db.query(
-    `SELECT r.id, r.response_string, COALESCE(tr.weight, 0) AS weight, tr.id AS trigger_response_id
-     FROM trigger_response tr
-     JOIN responses r ON r.id = tr.response_id
-     WHERE tr.trigger_id = ?`,
-    [triggerId],
-  );
-  if (!weightRows || weightRows.length === 0) return null;
-  const normalized = weightRows.map((row) => ({
-    ...row,
-    weight: clampWeight(row.weight),
-  }));
-  const maxWeight = Math.max(...normalized.map((r) => r.weight));
-
-  const roll = 100 - (Math.floor(Math.random() * 100) + 1);
-
-  let candidates =
-    roll < maxWeight
-      ? normalized.filter((r) => r.weight >= maxWeight)
-      : normalized.filter((r) => r.weight < maxWeight);
-
-  if (candidates.length === 0) {
-    candidates = normalized.filter((r) => r.weight >= maxWeight);
-  }
-  const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-  if (!chosen) return null;
-  await incrementSelectionFrequencies(
-    triggerId,
-    chosen.id,
-    chosen.trigger_response_id,
-  );
-  return { id: chosen.id, response_string: chosen.response_string };
-}
-
-/**
- * Lotto selection: same weighted roll as weighted mode, also returns lotto_prize.
+ * A chosen response may carry lotto_prize (a prize function name); the caller is responsible for
+ * dispatching to it instead of replying directly when present.
  * @param {number} triggerId
  * @returns {Promise<{ id: number, response_string: string, lotto_prize: string|null }|null>}
  */
-async function getLottoResponseForTrigger(triggerId) {
+async function getWeightedResponseForTrigger(triggerId) {
   const [weightRows] = await db.query(
     `SELECT r.id, r.response_string, COALESCE(tr.weight, 0) AS weight, tr.lotto_prize, tr.id AS trigger_response_id
      FROM trigger_response tr
@@ -300,11 +262,7 @@ export async function getRandomResponse(trigger) {
   }
 
   if (selection_mode === "weighted") {
-    return getWeightedResponseForTrigger(triggerId);
-  }
-
-  if (selection_mode === "lotto") {
-    const result = await getLottoResponseForTrigger(triggerId);
+    const result = await getWeightedResponseForTrigger(triggerId);
     if (result?.lotto_prize) {
       await incrementLottoPrizeFrequency(result.lotto_prize);
     }
@@ -321,7 +279,7 @@ export async function getRandomResponse(trigger) {
   return { id: result.id, response_string: result.response_string };
 }
 
-const VALID_MODES = ["random", "ordered", "weighted", "lotto"];
+const VALID_MODES = ["random", "ordered", "weighted"];
 
 /** Get or create trigger by trigger_string; return trigger id. */
 async function getOrCreateTriggerId(trigger_string, selection_mode) {

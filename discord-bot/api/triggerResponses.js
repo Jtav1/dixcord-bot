@@ -74,7 +74,7 @@ export const getLottoPrizesList = async () => {
 
 /**
  * Get a response for the given trigger.
- * Uses GET /api/trigger-responses/random for all modes (random, ordered, weighted, lotto) so selection and frequency tracking happen on the server.
+ * Uses GET /api/trigger-responses/random for all modes (random, ordered, weighted) so selection and frequency tracking happen on the server.
  * @param {string|{ trigger_string: string, selection_mode?: string }} triggerOrObject - Trigger string or object with trigger_string and selection_mode
  * @returns {Promise<{ response: string, lotto_prize: string|null }>} Response payload or empty response if none (e.g. 404)
  */

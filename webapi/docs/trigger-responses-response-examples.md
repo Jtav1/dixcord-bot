@@ -193,14 +193,14 @@ See also [trigger-responses-examples.md](trigger-responses-examples.md) for samp
 }
 ```
 
-**200 OK** (lotto mode, when selected link has `lotto_prize`)
+**200 OK** (weighted, when the selected response has a `lotto_prize`)
 
 ```json
 {
   "ok": true,
   "response": "You won!",
   "id": 1,
-  "lotto_prize": "placeholder_timeout"
+  "lotto_prize": "TAL_timeout"
 }
 ```
 
@@ -214,7 +214,7 @@ See also [trigger-responses-examples.md](trigger-responses-examples.md) for samp
 {
   "ok": true,
   "lottoPrizes": [
-    { "id": 1, "prize_string": "placeholder_timeout", "frequency": 0 },
+    { "id": 1, "prize_string": "TAL_timeout", "frequency": 0 },
     { "id": 2, "prize_string": "placeholder_message", "frequency": 0 }
   ]
 }

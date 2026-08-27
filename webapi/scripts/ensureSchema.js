@@ -261,11 +261,25 @@ export async function ensureSchemaMigrations() {
   const lottoPrizeCount = Number(lottoPrizeCountRows?.[0]?.cnt ?? 0);
   if (lottoPrizeCount === 0) {
     await db.query(
-      "INSERT INTO trigger_lotto_prizes (prize_string) VALUES (?), (?)",
-      ["placeholder_timeout", "placeholder_message"],
+      "INSERT INTO trigger_lotto_prizes (prize_string) VALUES (?)",
+      ["TAL_timeout"],
     );
     applied.push("trigger_lotto_prizes seed rows");
     console.log("db: migration applied: seeded trigger_lotto_prizes rows");
+  }
+
+  // Cleanup: the now-retired 'lotto' selection_mode was folded into 'weighted'
+  const [lottoModeRows] = await db.query(
+    "SELECT COUNT(*) AS cnt FROM triggers WHERE selection_mode = 'lotto'",
+  );
+  if (Number(lottoModeRows?.[0]?.cnt ?? 0) > 0) {
+    await db.query(
+      "UPDATE triggers SET selection_mode = 'weighted' WHERE selection_mode = 'lotto'",
+    );
+    applied.push("triggers.selection_mode lotto -> weighted cleanup");
+    console.log(
+      "db: migration applied: converted lotto-mode triggers to weighted",
+    );
   }
 
   // trigger_response.lotto_prize column
