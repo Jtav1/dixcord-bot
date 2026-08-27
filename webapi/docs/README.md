@@ -145,6 +145,7 @@ See [admin-backend-api.md](admin-backend-api.md) for full admin route documentat
 | POST | `/api/scheduled-messages` | ✓ | Create scheduled message |
 | PUT | `/api/scheduled-messages/:id` | ✓ | User/bot/admin update |
 | DELETE | `/api/scheduled-messages/:id` | ✓ | User or admin delete |
+| POST | `/api/scheduled-messages/parse-reminder` | ✓ | Parse "remind me" text into a scheduled time + message body |
 
 ## Response examples by route category
 

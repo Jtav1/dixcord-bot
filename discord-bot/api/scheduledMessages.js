@@ -1,6 +1,30 @@
 import * as api from "./client.js";
 
 /**
+ * Parse "remind me" style reminder text into a scheduled time + message body.
+ * POST /api/scheduled-messages/parse-reminder
+ * @param {{ text: string, isReply?: boolean }} payload - Mention-stripped text and reply context.
+ * @returns {Promise<{ ok: true, scheduledAt: string, messageContent: string|null, usesReplyContext: boolean } | { ok: false, error: string }>}
+ */
+export async function parseReminderText(payload) {
+  try {
+    const { data } = await api.post("/api/scheduled-messages/parse-reminder", {
+      text: payload.text,
+      isReply: Boolean(payload.isReply),
+    });
+    if (!data?.ok) return { ok: false, error: data?.error || "Could not parse reminder" };
+    return {
+      ok: true,
+      scheduledAt: data.scheduledAt,
+      messageContent: data.messageContent,
+      usesReplyContext: Boolean(data.usesReplyContext),
+    };
+  } catch (err) {
+    return { ok: false, error: api.describeApiError(err) };
+  }
+}
+
+/**
  * Create a scheduled message for a requester.
  * @param {{ requesterUserId: string, chatChannelId: string, chatGuildId?: string|null, messageBody: string, scheduledAtUtcIso: string }} payload - Creation fields.
  * @returns {Promise<{ id: number, user_id: number, app: string, chat_channel_id: string, chat_guild_id: string|null, message_body: string, scheduled_at: string, status: string, sent_at: string|null, created_at: string|null }|null>} Created row or null.
