@@ -35,7 +35,7 @@
     "express-rate-limit": "^8.5.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
-    "mysql2": "^3.17.4",
+    "mysql2": "^3.23.1",
     "swagger-jsdoc": "^6.3.0"
   },
   "devDependencies": {
