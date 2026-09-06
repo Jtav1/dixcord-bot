@@ -9,10 +9,10 @@ import { timeoutMember } from "./timeoutMember.js";
 /** @type {Array<{ id: number, lotto_prize: string, fn: (context: LottoPrizeContext) => Promise<void> }>} */
 let lottoPrizeHandlers = [];
 
-const defaultPlaceholderFn = async () => {};
+const defaultPrizeFn = async () => {};
 
 /** @type {Record<string, (context: LottoPrizeContext) => Promise<void>>} */
-const PLACEHOLDER_FNS = {
+const PRIZE_FNS = {
   TAL_timeout: async ({ message, responseText }) => {
     // Pick random number 1-1000 inclusive
     const roll = Math.floor(Math.random() * 1000) + 1;
@@ -25,11 +25,12 @@ const PLACEHOLDER_FNS = {
             "Lotto prize: Timeout for 3 minutes",
           );
           await message.reply(
-            "you rolled a 1. CURSE OF RA𓀀 𓀁 𓀂 𓀃 𓀄 𓀅 𓀆 𓀇 𓀈 𓀉 𓀊 𓀋 𓀌 𓀍 𓀎 𓀏 𓀐 𓀑 𓀒 𓀓 𓀔",
+            "CURSE OF RA𓀀 𓀁 𓀂 𓀃 𓀄 𓀅 𓀆 𓀇 𓀈 𓀉 𓀊 𓀋 𓀌 𓀍 𓀎 𓀏 𓀐 𓀑 𓀒 𓀓 𓀔",
           );
         } catch (err) {
+          console.error("lotto TAL_timeout error:", err);
           await message.reply(
-            "Rolled a 1 but youre an admin or something. Respectfully time yourself out.",
+            "You were supposed to get a curse of ra but it broke somehow. Please tell Justin",
           );
         }
       } else {
@@ -50,12 +51,12 @@ const PLACEHOLDER_FNS = {
 };
 
 /**
- * Resolve a placeholder function for a catalog prize string.
+ * Resolve the handler function for a catalog prize string.
  * @param {string} prizeString
  * @returns {(context: LottoPrizeContext) => Promise<void>}
  */
-function getPlaceholderFn(prizeString) {
-  return PLACEHOLDER_FNS[prizeString] ?? defaultPlaceholderFn;
+function getPrizeFn(prizeString) {
+  return PRIZE_FNS[prizeString] ?? defaultPrizeFn;
 }
 
 /**
@@ -67,7 +68,7 @@ export const rebuildLottoPrizeHandlers = (rows) => {
   lottoPrizeHandlers = (rows ?? []).map((row) => ({
     id: Number(row.id),
     lotto_prize: String(row.prize_string),
-    fn: getPlaceholderFn(String(row.prize_string)),
+    fn: getPrizeFn(String(row.prize_string)),
   }));
 };
 
