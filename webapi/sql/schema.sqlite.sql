@@ -199,3 +199,49 @@ CREATE TABLE IF NOT EXISTS system_state (
   state_value TEXT NOT NULL,
   updated_at TEXT DEFAULT (datetime('now'))
 );
+
+-- Chat-platform guild snapshots (app-scoped: "discord" today, other chat platforms possible later)
+CREATE TABLE IF NOT EXISTS guild_info (
+  app TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  icon_url TEXT NULL,
+  description TEXT NULL,
+  owner_id TEXT NULL,
+  boost_tier INTEGER NULL,
+  boost_count INTEGER NULL,
+  verification_level TEXT NULL,
+  preferred_locale TEXT NULL,
+  guild_created_at TEXT NULL,
+  synced_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (app, guild_id)
+);
+
+CREATE TABLE IF NOT EXISTS guild_channels (
+  app TEXT NOT NULL,
+  id TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  type TEXT NULL,
+  position INTEGER NULL,
+  parent_id TEXT NULL,
+  synced_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (app, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_guild_channels_guild ON guild_channels (app, guild_id);
+
+CREATE TABLE IF NOT EXISTS guild_roles (
+  app TEXT NOT NULL,
+  id TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  color TEXT NULL,
+  position INTEGER NULL,
+  mentionable INTEGER NULL,
+  hoisted INTEGER NULL,
+  synced_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (app, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_guild_roles_guild ON guild_roles (app, guild_id);

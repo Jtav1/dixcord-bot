@@ -49,6 +49,7 @@ The bot **depends on the web API** for almost all behavior. It loads configurati
 - Authenticates to webapi with a JWT; re-logins on 401.
 - Polls cache version and refreshes in-memory triggers, link hosts, and config when invalidated.
 - Sends heartbeats to webapi; waits for `/health` before starting in Docker.
+- Pushes a full guild snapshot (metadata, channels, roles) to `POST /api/guild/sync` on startup and every 5 minutes.
 - Optionally clears and re-registers guild slash commands on container start.
 
 ### Feature toggles
