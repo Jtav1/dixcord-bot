@@ -7,6 +7,7 @@ import db from "../config/db.js";
 import {
   columnExists,
   constraintExists,
+  indexExists,
   isSqliteDb,
   tableExists,
 } from "./schemaUtils.js";
@@ -145,6 +146,153 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: created system_state table");
   } else {
     console.log("db: schema ok: system_state table already exists");
+  }
+
+  // guild_info table (app/guild-scoped chat-platform guild snapshot)
+  if (!(await tableExists(db, "guild_info", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_info (
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          icon_url TEXT NULL,
+          description TEXT NULL,
+          owner_id TEXT NULL,
+          boost_tier INTEGER NULL,
+          boost_count INTEGER NULL,
+          verification_level TEXT NULL,
+          preferred_locale TEXT NULL,
+          guild_created_at TEXT NULL,
+          synced_at TEXT DEFAULT (datetime('now')),
+          PRIMARY KEY (app, guild_id)
+        )
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE guild_info (
+          app VARCHAR(20) NOT NULL,
+          guild_id VARCHAR(64) NOT NULL,
+          name VARCHAR(100) NOT NULL,
+          icon_url VARCHAR(500) NULL,
+          description VARCHAR(500) NULL,
+          owner_id VARCHAR(64) NULL,
+          boost_tier INT NULL,
+          boost_count INT NULL,
+          verification_level VARCHAR(20) NULL,
+          preferred_locale VARCHAR(10) NULL,
+          guild_created_at TIMESTAMP NULL,
+          synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (app, guild_id)
+        )
+      `);
+    }
+    applied.push("guild_info table");
+    console.log("db: migration applied: created guild_info table");
+  } else {
+    console.log("db: schema ok: guild_info table already exists");
+  }
+
+  // guild_channels table (app/guild-scoped channel catalog)
+  if (!(await tableExists(db, "guild_channels", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_channels (
+          app TEXT NOT NULL,
+          id TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          type TEXT NULL,
+          position INTEGER NULL,
+          parent_id TEXT NULL,
+          synced_at TEXT DEFAULT (datetime('now')),
+          PRIMARY KEY (app, id)
+        )
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE guild_channels (
+          app VARCHAR(20) NOT NULL,
+          id VARCHAR(64) NOT NULL,
+          guild_id VARCHAR(64) NOT NULL,
+          name VARCHAR(100) NOT NULL,
+          type VARCHAR(30) NULL,
+          position INT NULL,
+          parent_id VARCHAR(64) NULL,
+          synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (app, id),
+          KEY idx_guild_channels_guild (app, guild_id)
+        )
+      `);
+    }
+    applied.push("guild_channels table");
+    console.log("db: migration applied: created guild_channels table");
+  } else {
+    console.log("db: schema ok: guild_channels table already exists");
+  }
+
+  if (
+    isSqlite &&
+    (await tableExists(db, "guild_channels", isSqlite)) &&
+    !(await indexExists(db, "guild_channels", "idx_guild_channels_guild", isSqlite))
+  ) {
+    await db.query(
+      "CREATE INDEX idx_guild_channels_guild ON guild_channels (app, guild_id)",
+    );
+    applied.push("guild_channels.idx_guild_channels_guild index");
+    console.log("db: migration applied: created guild_channels.idx_guild_channels_guild index");
+  }
+
+  // guild_roles table (app/guild-scoped role catalog)
+  if (!(await tableExists(db, "guild_roles", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_roles (
+          app TEXT NOT NULL,
+          id TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          color TEXT NULL,
+          position INTEGER NULL,
+          mentionable INTEGER NULL,
+          hoisted INTEGER NULL,
+          synced_at TEXT DEFAULT (datetime('now')),
+          PRIMARY KEY (app, id)
+        )
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE guild_roles (
+          app VARCHAR(20) NOT NULL,
+          id VARCHAR(64) NOT NULL,
+          guild_id VARCHAR(64) NOT NULL,
+          name VARCHAR(100) NOT NULL,
+          color VARCHAR(7) NULL,
+          position INT NULL,
+          mentionable TINYINT(1) NULL,
+          hoisted TINYINT(1) NULL,
+          synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (app, id),
+          KEY idx_guild_roles_guild (app, guild_id)
+        )
+      `);
+    }
+    applied.push("guild_roles table");
+    console.log("db: migration applied: created guild_roles table");
+  } else {
+    console.log("db: schema ok: guild_roles table already exists");
+  }
+
+  if (
+    isSqlite &&
+    (await tableExists(db, "guild_roles", isSqlite)) &&
+    !(await indexExists(db, "guild_roles", "idx_guild_roles_guild", isSqlite))
+  ) {
+    await db.query(
+      "CREATE INDEX idx_guild_roles_guild ON guild_roles (app, guild_id)",
+    );
+    applied.push("guild_roles.idx_guild_roles_guild index");
+    console.log("db: migration applied: created guild_roles.idx_guild_roles_guild index");
   }
 
   // pin_history expanded metadata (author, message snapshot, pinners)

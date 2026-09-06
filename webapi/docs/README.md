@@ -20,6 +20,7 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 - **User mappings** – Discord member ↔ display mapping.
 - **Pin history** – Paginated pin log (and shared pin file storage via `PIN_FILES_DIR`).
 - **System** – Health, status, cache version / invalidate, bot heartbeat.
+- **Guild** – App/guild-scoped snapshot of platform-client guild metadata, channels, roles, and the emoji/sticker catalog; pushed periodically by a platform client (discord-bot today), read by admin panel/webview.
 - **Statistics** – Aggregate counts across tracking tables (used by web-view).
 - **Scheduled messages** – Create/list/update/delete reminders for bot delivery; admin scope for moderation.
 - **Events & audit** – Raw plusplus/repost events; admin audit log.
@@ -128,6 +129,8 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/system/cache-version` | ✓ | Cache version for bot polling |
 | POST | `/api/system/invalidate-cache` | admin | Bump cache version |
 | POST | `/api/system/heartbeat` | ✓ | Bot heartbeat |
+| GET | `/api/guild?app=&guildId=` | ✓ | Synced guild metadata, channels, roles, emoji/sticker catalog |
+| POST | `/api/guild/sync` | ✓ | Push a full guild snapshot (body: `{ app, guildId, guild, channels, roles }`) |
 | GET | `/api/events/plusplus` | ✓ | Raw plusplus events |
 | GET | `/api/events/reposts` | ✓ | Raw repost events |
 | GET | `/api/audit-log` | admin | Audit log |
@@ -165,6 +168,7 @@ Example JSON responses for each API route category:
 | **Trigger-Responses** | [trigger-responses-response-examples.md](trigger-responses-response-examples.md) | Triggers, responses, links, random |
 | **Leaderboards** | [leaderboards-response-examples.md](leaderboards-response-examples.md) | Plusplus, emoji, repost |
 | **Admin backend** | [admin-backend-api.md](admin-backend-api.md) | New admin-panel backend routes |
+| **Guild** | [guild-response-examples.md](guild-response-examples.md) | Guild metadata, channels, roles, emoji/sticker catalog |
 
 ## Request examples (cURL)
 

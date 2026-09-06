@@ -204,3 +204,47 @@ CREATE TABLE IF NOT EXISTS system_state (
   state_value VARCHAR(255) NOT NULL,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+-- Chat-platform guild snapshots (app-scoped: "discord" today, other chat platforms possible later)
+CREATE TABLE IF NOT EXISTS guild_info (
+  app VARCHAR(20) NOT NULL,
+  guild_id VARCHAR(64) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  icon_url VARCHAR(500) NULL,
+  description VARCHAR(500) NULL,
+  owner_id VARCHAR(64) NULL,
+  boost_tier INT NULL,
+  boost_count INT NULL,
+  verification_level VARCHAR(20) NULL,
+  preferred_locale VARCHAR(10) NULL,
+  guild_created_at TIMESTAMP NULL,
+  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (app, guild_id)
+);
+
+CREATE TABLE IF NOT EXISTS guild_channels (
+  app VARCHAR(20) NOT NULL,
+  id VARCHAR(64) NOT NULL,
+  guild_id VARCHAR(64) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  type VARCHAR(30) NULL,
+  position INT NULL,
+  parent_id VARCHAR(64) NULL,
+  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (app, id),
+  KEY idx_guild_channels_guild (app, guild_id)
+);
+
+CREATE TABLE IF NOT EXISTS guild_roles (
+  app VARCHAR(20) NOT NULL,
+  id VARCHAR(64) NOT NULL,
+  guild_id VARCHAR(64) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  color VARCHAR(7) NULL,
+  position INT NULL,
+  mentionable TINYINT(1) NULL,
+  hoisted TINYINT(1) NULL,
+  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (app, id),
+  KEY idx_guild_roles_guild (app, guild_id)
+);

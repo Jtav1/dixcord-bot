@@ -25,6 +25,7 @@ import systemRoutes from "./routes/system.js";
 import eventsRoutes from "./routes/events.js";
 import auditLogRoutes from "./routes/audit-log.js";
 import statisticsRoutes from "./routes/statistics.js";
+import guildRoutes from "./routes/guild.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -349,6 +350,13 @@ app.get("/", publicLimiter, (req, res) => {
         authRequired: true,
         adminRoutes: ["GET /api/audit-log?limit=&offset="],
       },
+      guild: {
+        authRequired: true,
+        routes: [
+          "GET /api/guild?app=&guildId=",
+          "POST /api/guild/sync (body: { app, guildId, guild, channels, roles })",
+        ],
+      },
       botResponses: {
         authRequired: true,
         routes: [
@@ -480,6 +488,7 @@ app.use("/api/system", systemRoutes);
 app.use("/api/events", eventsRoutes);
 app.use("/api/audit-log", auditLogRoutes);
 app.use("/api/statistics", statisticsRoutes);
+app.use("/api/guild", guildRoutes);
 
 app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 

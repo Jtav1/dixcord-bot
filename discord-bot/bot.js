@@ -25,6 +25,7 @@ import {
 } from "./configStore.js";
 import { startCacheVersionPoller } from "./api/cacheRefresh.js";
 import { startHeartbeat } from "./api/system.js";
+import { startGuildInfoSync } from "./api/guildInfo.js";
 import { startMessageScheduler } from "./scheduler/messageScheduler.js";
 import {
   handleReactionAdd,
@@ -145,6 +146,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   await startMessageScheduler(readyClient);
   startCacheVersionPoller();
   startHeartbeat(readyClient, readyClient.readyAt);
+  startGuildInfoSync(readyClient);
 
   console.log(
     `bot: Ready! Logged in as ${readyClient.user.tag} at ${new Date().toLocaleString()}`,
