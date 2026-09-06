@@ -26,6 +26,10 @@
             </template>
             <v-list-item-title>Web API</v-list-item-title>
             <v-list-item-subtitle>{{ formatStatus(status.webapi) }}</v-list-item-subtitle>
+            <v-list-item-subtitle class="mt-1">
+              Up {{ formatDuration(status.webapiUptimeSeconds) }} · Memory
+              {{ formatBytes(status.webapiMemoryRssBytes) }}
+            </v-list-item-subtitle>
           </v-list-item>
 
           <v-list-item>
@@ -33,7 +37,9 @@
               <v-icon :color="statusColor(status.db)">mdi-database-outline</v-icon>
             </template>
             <v-list-item-title>Database</v-list-item-title>
-            <v-list-item-subtitle>{{ formatStatus(status.db) }}</v-list-item-subtitle>
+            <v-list-item-subtitle>
+              {{ formatStatus(status.db) }} ({{ status.dbType }})
+            </v-list-item-subtitle>
           </v-list-item>
 
           <v-list-item>
@@ -69,6 +75,26 @@
             <v-list-item-subtitle class="mt-1">
               Last seen {{ formatTimestamp(status.bot.lastSeenAt) }}
             </v-list-item-subtitle>
+            <v-list-item-subtitle v-if="status.bot.uptimeSeconds != null" class="mt-1">
+              Up {{ formatDuration(status.bot.uptimeSeconds) }}
+            </v-list-item-subtitle>
+            <v-list-item-subtitle
+              v-if="status.bot.memberCount != null || status.bot.channelCount != null"
+              class="mt-1"
+            >
+              <template v-if="status.bot.memberCount != null">
+                {{ formatCount(status.bot.memberCount) }} members
+              </template>
+              <template v-if="status.bot.memberCount != null && status.bot.channelCount != null">
+                ·
+              </template>
+              <template v-if="status.bot.channelCount != null">
+                {{ formatCount(status.bot.channelCount) }} channels
+              </template>
+            </v-list-item-subtitle>
+            <v-list-item-subtitle v-if="status.bot.wsPingMs != null" class="mt-1">
+              Gateway ping {{ status.bot.wsPingMs }}ms
+            </v-list-item-subtitle>
           </v-list-item>
 
           <v-list-item v-else>
@@ -97,7 +123,25 @@ import { fetchSystemStatus } from "../lib/systemStatus.js";
 
 const loading = ref(true);
 const error = ref("");
-/** @type {import("vue").Ref<{ webapi: string, db: string, cacheVersion: string, bot: { guildId: string, version: string, lastSeenAt: string, online: boolean } | null } | null>} */
+/** @type {import("vue").Ref<{
+ *   webapi: string,
+ *   db: string,
+ *   dbType: string,
+ *   cacheVersion: string,
+ *   webapiUptimeSeconds: number,
+ *   webapiMemoryRssBytes: number,
+ *   bot: {
+ *     guildId: string,
+ *     version: string,
+ *     lastSeenAt: string,
+ *     online: boolean,
+ *     readyAt: string | null,
+ *     uptimeSeconds: number | null,
+ *     memberCount: number | null,
+ *     channelCount: number | null,
+ *     wsPingMs: number | null,
+ *   } | null,
+ * } | null>} */
 const status = ref(null);
 const updatedAt = ref("");
 
@@ -128,6 +172,50 @@ function formatTimestamp(iso) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return date.toLocaleString();
+}
+
+/**
+ * Format a whole number of seconds as a compact "Xh Ym" / "Xd Yh" duration.
+ * @param {number} totalSeconds Duration in seconds.
+ * @returns {string} Human-readable duration.
+ */
+function formatDuration(totalSeconds) {
+  const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m`;
+  return `${seconds}s`;
+}
+
+/**
+ * Format a byte count as a human-readable size (e.g. "128.4 MB").
+ * @param {number} bytes Byte count.
+ * @returns {string} Human-readable size.
+ */
+function formatBytes(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${n} B`;
+  const units = ["KB", "MB", "GB"];
+  let value = n / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toFixed(1)} ${units[unitIndex]}`;
+}
+
+/**
+ * Format a numeric count for display.
+ * @param {number} value Count value.
+ * @returns {string} Locale-formatted number string.
+ */
+function formatCount(value) {
+  return Number(value).toLocaleString();
 }
 
 /**

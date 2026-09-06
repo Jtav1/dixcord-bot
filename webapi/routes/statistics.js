@@ -45,6 +45,11 @@ const router = express.Router();
  *                     responses: { type: integer }
  *                     triggerResponseFrequencySum: { type: integer }
  *                     repostTracking: { type: integer }
+ *                     scheduledMessages:
+ *                       type: object
+ *                       properties:
+ *                         pending: { type: integer }
+ *                         sent: { type: integer }
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':

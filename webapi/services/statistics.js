@@ -25,7 +25,8 @@ function toCount(value) {
  *   triggers: number,
  *   responses: number,
  *   triggerResponseFrequencySum: number,
- *   repostTracking: number
+ *   repostTracking: number,
+ *   scheduledMessages: { pending: number, sent: number }
  * }>}
  */
 export async function getDatabaseStatistics() {
@@ -41,7 +42,9 @@ export async function getDatabaseStatistics() {
       (SELECT COUNT(*) FROM triggers) AS triggers_count,
       (SELECT COUNT(*) FROM responses) AS responses_count,
       (SELECT COALESCE(SUM(frequency), 0) FROM trigger_response) AS trigger_response_frequency_sum,
-      (SELECT COUNT(*) FROM user_repost_tracking) AS repost_tracking_count`,
+      (SELECT COUNT(*) FROM user_repost_tracking) AS repost_tracking_count,
+      (SELECT COUNT(*) FROM scheduled_messages WHERE status = 'pending') AS scheduled_pending_count,
+      (SELECT COUNT(*) FROM scheduled_messages WHERE status = 'sent') AS scheduled_sent_count`,
   );
 
   const row = rows?.[0] ?? {};
@@ -69,5 +72,9 @@ export async function getDatabaseStatistics() {
     responses: toCount(row.responses_count),
     triggerResponseFrequencySum: toCount(row.trigger_response_frequency_sum),
     repostTracking: toCount(row.repost_tracking_count),
+    scheduledMessages: {
+      pending: toCount(row.scheduled_pending_count),
+      sent: toCount(row.scheduled_sent_count),
+    },
   };
 }

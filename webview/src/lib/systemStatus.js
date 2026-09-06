@@ -25,7 +25,25 @@ async function parseJsonResponse(res, context) {
 
 /**
  * Fetch system and bot health status from webapi.
- * @returns {Promise<{ webapi: string, db: string, cacheVersion: string, bot: { guildId: string, version: string, lastSeenAt: string, online: boolean } | null }>}
+ * @returns {Promise<{
+ *   webapi: string,
+ *   db: string,
+ *   dbType: string,
+ *   cacheVersion: string,
+ *   webapiUptimeSeconds: number,
+ *   webapiMemoryRssBytes: number,
+ *   bot: {
+ *     guildId: string,
+ *     version: string,
+ *     lastSeenAt: string,
+ *     online: boolean,
+ *     readyAt: string | null,
+ *     uptimeSeconds: number | null,
+ *     memberCount: number | null,
+ *     channelCount: number | null,
+ *     wsPingMs: number | null,
+ *   } | null,
+ * }>}
  */
 export async function fetchSystemStatus() {
   const res = await fetch(`${API_BASE}/system/status`);

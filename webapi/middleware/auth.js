@@ -22,6 +22,7 @@ export const WEBVIEW_ALLOWED_ROUTES = [
   { method: "GET", path: "/api/system/status" },
   { method: "GET", path: "/api/statistics" },
   { method: "GET", path: "/api/user-mappings" },
+  { method: "GET", path: "/api/trigger-responses/lotto-prizes" },
 ];
 
 /** GET path prefixes the webview service account may access. */

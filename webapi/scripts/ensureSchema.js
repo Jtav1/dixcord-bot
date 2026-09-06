@@ -97,6 +97,31 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: bot_status table already exists");
   }
 
+  // bot_status: session/health columns (ready_at, member_count, channel_count, ws_ping_ms)
+  if (await tableExists(db, "bot_status", isSqlite)) {
+    const botStatusColumns = isSqlite
+      ? [
+          { name: "ready_at", sql: "ready_at TEXT NULL" },
+          { name: "member_count", sql: "member_count INTEGER NULL" },
+          { name: "channel_count", sql: "channel_count INTEGER NULL" },
+          { name: "ws_ping_ms", sql: "ws_ping_ms INTEGER NULL" },
+        ]
+      : [
+          { name: "ready_at", sql: "ready_at TIMESTAMP NULL" },
+          { name: "member_count", sql: "member_count INT NULL" },
+          { name: "channel_count", sql: "channel_count INT NULL" },
+          { name: "ws_ping_ms", sql: "ws_ping_ms INT NULL" },
+        ];
+
+    for (const col of botStatusColumns) {
+      if (!(await columnExists(db, "bot_status", col.name, isSqlite))) {
+        await db.query(`ALTER TABLE bot_status ADD COLUMN ${col.sql}`);
+        applied.push(`bot_status.${col.name} column`);
+        console.log(`db: migration applied: added bot_status.${col.name} column`);
+      }
+    }
+  }
+
   // system_state table
   if (!(await tableExists(db, "system_state", isSqlite))) {
     if (isSqlite) {
@@ -255,17 +280,49 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: trigger_lotto_prizes table already exists");
   }
 
+  // trigger_lotto_prizes.display_name column (friendly name for webview display) - must exist
+  // before the seed insert below references it.
+  if (
+    !(await columnExists(db, "trigger_lotto_prizes", "display_name", isSqlite))
+  ) {
+    await db.query(
+      isSqlite
+        ? "ALTER TABLE trigger_lotto_prizes ADD COLUMN display_name TEXT NULL"
+        : "ALTER TABLE trigger_lotto_prizes ADD COLUMN display_name VARCHAR(255) NULL",
+    );
+    applied.push("trigger_lotto_prizes.display_name column");
+    console.log(
+      "db: migration applied: added trigger_lotto_prizes.display_name column",
+    );
+  }
+
   const [lottoPrizeCountRows] = await db.query(
     "SELECT COUNT(*) AS cnt FROM trigger_lotto_prizes",
   );
   const lottoPrizeCount = Number(lottoPrizeCountRows?.[0]?.cnt ?? 0);
   if (lottoPrizeCount === 0) {
     await db.query(
-      "INSERT INTO trigger_lotto_prizes (prize_string) VALUES (?)",
-      ["TAL_timeout"],
+      "INSERT INTO trigger_lotto_prizes (prize_string, display_name) VALUES (?, ?)",
+      ["TAL_timeout", "Curse of Taking a Look"],
     );
     applied.push("trigger_lotto_prizes seed rows");
     console.log("db: migration applied: seeded trigger_lotto_prizes rows");
+  }
+
+  // Backfill known display names for existing catalog rows that don't have one yet.
+  const [talTimeoutRows] = await db.query(
+    "SELECT id FROM trigger_lotto_prizes WHERE prize_string = ? AND display_name IS NULL",
+    ["TAL_timeout"],
+  );
+  if (talTimeoutRows && talTimeoutRows.length > 0) {
+    await db.query(
+      "UPDATE trigger_lotto_prizes SET display_name = ? WHERE prize_string = ?",
+      ["Curse of Taking a Look", "TAL_timeout"],
+    );
+    applied.push("trigger_lotto_prizes.display_name backfill");
+    console.log(
+      "db: migration applied: backfilled TAL_timeout display_name",
+    );
   }
 
   // Cleanup: the now-retired 'lotto' selection_mode was folded into 'weighted'

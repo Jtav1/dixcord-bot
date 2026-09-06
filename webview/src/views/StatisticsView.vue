@@ -118,6 +118,42 @@
           </v-card-text>
         </v-card>
       </v-col>
+
+      <v-col cols="12" sm="6" md="4">
+        <v-card class="glass-card pa-6 h-100">
+          <v-card-title class="text-h6 pa-0 mb-4">
+            <v-icon start color="primary">mdi-clock-outline</v-icon>
+            Reminders
+          </v-card-title>
+          <v-card-text class="pa-0 statistics-metrics">
+            <p>
+              Pending: {{ formatCount(statistics.scheduledMessages.pending) }}
+            </p>
+            <p>Sent: {{ formatCount(statistics.scheduledMessages.sent) }}</p>
+          </v-card-text>
+        </v-card>
+      </v-col>
+
+      <v-col cols="12" sm="6" md="4">
+        <v-card class="glass-card pa-6 h-100">
+          <v-card-title class="text-h6 pa-0 mb-4">
+            <v-icon start color="secondary">mdi-dice-multiple-outline</v-icon>
+            Lotto Prizes
+          </v-card-title>
+          <v-card-text class="pa-0 statistics-metrics">
+            <p
+              v-if="!lottoPrizes.length"
+              class="text-caption text-medium-emphasis"
+            >
+              No lotto prizes in the catalog.
+            </p>
+            <p v-for="prize in lottoPrizes" :key="prize.id">
+              {{ prize.display_name || prize.prize_string }}:
+              {{ formatCount(prize.frequency) }}
+            </p>
+          </v-card-text>
+        </v-card>
+      </v-col>
     </v-row>
 
     <p
@@ -132,6 +168,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { fetchStatistics } from "../lib/statistics.js";
+import { fetchLottoPrizes } from "../lib/lottoPrizes.js";
 
 const loading = ref(true);
 const error = ref("");
@@ -144,9 +181,12 @@ const error = ref("");
  *   triggers: number,
  *   responses: number,
  *   triggerResponseFrequencySum: number,
- *   repostTracking: number
+ *   repostTracking: number,
+ *   scheduledMessages: { pending: number, sent: number }
  * } | null>} */
 const statistics = ref(null);
+/** @type {import("vue").Ref<Array<{ id: number, prize_string: string, frequency: number, display_name: string|null }>>} */
+const lottoPrizes = ref([]);
 const updatedAt = ref("");
 
 /**
@@ -174,6 +214,12 @@ async function loadStatistics() {
       err instanceof Error ? err.message : "Failed to load statistics";
   } finally {
     loading.value = false;
+  }
+
+  try {
+    lottoPrizes.value = await fetchLottoPrizes();
+  } catch (err) {
+    console.warn("Failed to load lotto prizes:", err);
   }
 }
 

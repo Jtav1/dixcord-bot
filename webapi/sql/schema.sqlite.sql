@@ -137,7 +137,8 @@ CREATE TABLE IF NOT EXISTS trigger_response (
 CREATE TABLE IF NOT EXISTS trigger_lotto_prizes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   prize_string TEXT NOT NULL UNIQUE,
-  frequency INTEGER DEFAULT 0
+  frequency INTEGER DEFAULT 0,
+  display_name TEXT NULL
 );
 
 -- Round-robin state: last-used response_order per trigger (for ordered selection)
@@ -186,7 +187,11 @@ CREATE TABLE IF NOT EXISTS bot_status (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   guild_id TEXT NOT NULL UNIQUE,
   version TEXT NOT NULL,
-  last_seen_at TEXT DEFAULT (datetime('now'))
+  last_seen_at TEXT DEFAULT (datetime('now')),
+  ready_at TEXT NULL,
+  member_count INTEGER NULL,
+  channel_count INTEGER NULL,
+  ws_ping_ms INTEGER NULL
 );
 
 CREATE TABLE IF NOT EXISTS system_state (
