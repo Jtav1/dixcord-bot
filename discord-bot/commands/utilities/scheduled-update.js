@@ -1,7 +1,8 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
-import { updateScheduledMessageForUser } from "../../api/scheduledMessages.js";
-import { refreshScheduledMessagesCache } from "../../scheduler/messageScheduler.js";
-import * as chrono from "chrono-node";
+import {
+  parseTimeExpression,
+  updateScheduledMessageForUser,
+} from "../../api/scheduledMessages.js";
 
 const cmdName = "scheduled-update";
 
@@ -46,12 +47,18 @@ const execute = async (interaction) => {
     return;
   }
 
-  let messageTime, messageContent;
+  let scheduledAt, messageContent;
 
   if (timeExpression) {
-    messageTime = chrono.parseDate(timeExpression, Date.now(), {
-      forwardDate: true,
-    });
+    const parsedTime = await parseTimeExpression(timeExpression);
+    if (!parsedTime.ok) {
+      await interaction.reply({
+        content: `Could not understand that time: ${parsedTime.error}`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    scheduledAt = parsedTime.scheduledAt;
   }
 
   if (messageBody) {
@@ -63,7 +70,7 @@ const execute = async (interaction) => {
       id,
       requesterUserId: interaction.user.id,
       messageContent: messageContent,
-      scheduledAt: messageTime,
+      scheduledAt,
     });
 
     if (!updated) {
@@ -75,7 +82,6 @@ const execute = async (interaction) => {
       return;
     }
 
-    await refreshScheduledMessagesCache();
     await interaction.reply({
       content: `Updated scheduled reminder #${updated.id}. New UTC time: ${updated.scheduled_at}`,
       flags: MessageFlags.Ephemeral,

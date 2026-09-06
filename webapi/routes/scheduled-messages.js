@@ -10,6 +10,7 @@ import {
   createScheduledMessage,
   deletePendingScheduledMessageByIdForUser,
   deleteScheduledMessageByIdAdmin,
+  getDueScheduledMessagesForBot,
   getPendingScheduledMessagesForBot,
   getScheduledMessagesForAdmin,
   getUpcomingScheduledMessagesByUserId,
@@ -17,6 +18,7 @@ import {
   updateScheduledMessageById,
 } from "../services/scheduledMessages.js";
 import { requireChatMemberMappingId } from "../services/chatMemberMapping.js";
+import { parseReminderText, parseTimeExpression } from "../services/reminderParsing.js";
 import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
@@ -61,11 +63,95 @@ function denyUnlessBotOrAdmin(req, res) {
 }
 
 /**
+ * POST /api/scheduled-messages/parse-reminder
+ * Parse "remind me" style reminder text (already stripped of any platform mention syntax)
+ * into a scheduled time + message body.
+ * Body: { text: string, isReply?: boolean }
+ * Auth: required (bot or admin).
+ * @openapi
+ * /api/scheduled-messages/parse-reminder:
+ *   post:
+ *     operationId: parseReminderText
+ *     tags: [Scheduled Messages]
+ *     summary: Parse reminder text into a scheduled time + message body
+ *     description: >
+ *       Client-agnostic NLP parsing (chrono-node) of two accepted formats: "[at/in] <time>
+ *       remind me <message>" or "remind me [at/in <time>] <message>". Callers strip their
+ *       platform's mention syntax (e.g. Discord's `<@id>`) before calling this. When `isReply`
+ *       is true and the text has no explicit time keyword after "remind me" (e.g. just "remind
+ *       me tomorrow" as a reply to another message), the whole remainder is parsed as a time
+ *       phrase and `usesReplyContext` is returned true with `messageContent: null` — the caller
+ *       is expected to build the reminder body itself (e.g. a mention of the requester plus a
+ *       link to the message replied to).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [text]
+ *             properties:
+ *               text: { type: string, description: "Reminder text with any bot mention already stripped." }
+ *               isReply: { type: boolean, default: false, description: "Whether the source message was a reply to another message." }
+ *     responses:
+ *       '200':
+ *         description: Parsed reminder.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 scheduledAt: { type: string, format: date-time }
+ *                 messageContent:
+ *                   type: string
+ *                   nullable: true
+ *                   description: Null when usesReplyContext is true.
+ *                 usesReplyContext: { type: boolean }
+ *       '400':
+ *         description: Missing `text`, or the text didn't match a recognized reminder format.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/parse-reminder", authenticate, async (req, res) => {
+  try {
+    if (denyUnlessBotOrAdmin(req, res)) return;
+
+    const result = parseReminderText({
+      text: req.body?.text,
+      isReply: req.body?.isReply,
+    });
+    if (!result.ok) {
+      return res.status(400).json({ ok: false, error: result.error });
+    }
+    return res.json({
+      ok: true,
+      scheduledAt: result.scheduledAt,
+      messageContent: result.messageContent,
+      usesReplyContext: result.usesReplyContext,
+    });
+  } catch (err) {
+    console.error("POST /api/scheduled-messages/parse-reminder error:", err);
+    return res
+      .status(500)
+      .json({ ok: false, error: "Failed to parse reminder text" });
+  }
+});
+
+/**
  * GET /api/scheduled-messages
  * List upcoming scheduled messages for requester, or bot scope list of all pending rows.
  * Query:
  * - requester scope: ?app=<chatApp>&requesterUserId=... (bot or admin; bot on behalf of user)
- * - bot scope:  ?scope=bot
+ * - bot scope:  ?scope=bot&due=true|false
  * - admin scope: ?scope=admin&status=pending|sent|all
  * Auth: required.
  * @openapi
@@ -81,9 +167,12 @@ function denyUnlessBotOrAdmin(req, res) {
  *           pending scheduled messages. Requires the bot or admin role (checked
  *           in-handler); callers other than the bot act on a user's behalf via
  *           `requesterUserId`.
- *         - `scope=bot`: returns every pending scheduled message for the app
- *           (all users), for the bot's own scheduler loop. Requires the bot
- *           role (checked in-handler); `requesterUserId` is ignored.
+ *         - `scope=bot`: returns pending scheduled messages for the app (all
+ *           users), for the bot's own scheduler loop. `due=true` filters to
+ *           only rows whose scheduled_at has passed, so the "what's due right
+ *           now" comparison happens server-side rather than in the bot;
+ *           omitted/false returns every pending row. Requires the bot role
+ *           (checked in-handler); `requesterUserId` is ignored.
  *         - `scope=admin`: returns a paginated, `status`-filterable list across
  *           all users for the admin panel. Requires the admin role (checked
  *           in-handler); `requesterUserId` is ignored.
@@ -98,6 +187,11 @@ function denyUnlessBotOrAdmin(req, res) {
  *         required: false
  *         schema: { type: string, enum: [bot, admin] }
  *         description: Selects bot or admin scope. Omit for requester scope.
+ *       - name: due
+ *         in: query
+ *         required: false
+ *         schema: { type: boolean, default: false }
+ *         description: Only used when `scope=bot`. When true, returns only rows currently due (scheduled_at <= now).
  *       - name: requesterUserId
  *         in: query
  *         required: false
@@ -182,7 +276,10 @@ router.get("/", authenticate, async (req, res) => {
       if (!isBotRole(req.user?.role)) {
         return res.status(403).json({ ok: false, error: "Bot access required" });
       }
-      const rows = await getPendingScheduledMessagesForBot(app);
+      const dueOnly = req.query?.due === "true" || req.query?.due === "1";
+      const rows = dueOnly
+        ? await getDueScheduledMessagesForBot(app)
+        : await getPendingScheduledMessagesForBot(app);
       return res.json({ ok: true, scheduledMessages: rows });
     }
 
@@ -331,6 +428,71 @@ router.get("/:id", authenticate, async (req, res) => {
     return res
       .status(500)
       .json({ ok: false, error: "Failed to get scheduled message" });
+  }
+});
+
+/**
+ * POST /api/scheduled-messages/parse-time
+ * Parse a bare time expression (no "remind me" grammar) into a scheduled time.
+ * Body: { text: string }
+ * Auth: required (bot or admin).
+ * @openapi
+ * /api/scheduled-messages/parse-time:
+ *   post:
+ *     operationId: parseTimeExpression
+ *     tags: [Scheduled Messages]
+ *     summary: Parse a bare time expression into a scheduled time
+ *     description: >
+ *       Client-agnostic NLP parsing (chrono-node) of a free-text time expression with no
+ *       surrounding "remind me" grammar (e.g. "in 10 minutes", "tomorrow at 5pm") - used for
+ *       updating an existing scheduled message's time, as opposed to POST
+ *       /api/scheduled-messages/parse-reminder which also extracts a reminder body.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [text]
+ *             properties:
+ *               text: { type: string, description: "Free-text time expression." }
+ *     responses:
+ *       '200':
+ *         description: Parsed time.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 scheduledAt: { type: string, format: date-time }
+ *       '400':
+ *         description: Missing `text`, or no time could be parsed from it.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/parse-time", authenticate, async (req, res) => {
+  try {
+    if (denyUnlessBotOrAdmin(req, res)) return;
+
+    const result = parseTimeExpression(req.body?.text);
+    if (!result.ok) {
+      return res.status(400).json({ ok: false, error: result.error });
+    }
+    return res.json({ ok: true, scheduledAt: result.scheduledAt });
+  } catch (err) {
+    console.error("POST /api/scheduled-messages/parse-time error:", err);
+    return res
+      .status(500)
+      .json({ ok: false, error: "Failed to parse time expression" });
   }
 });
 

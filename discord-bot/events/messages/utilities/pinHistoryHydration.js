@@ -17,7 +17,7 @@ import {
  */
 
 /**
- * Resolve a channel display name for pin history (up to 100 chars).
+ * Resolve a channel display name for pin history. Truncation for storage happens in webapi.
  * @param {import("discord.js").Client} client
  * @param {string} channelId
  * @returns {Promise<string|null>}
@@ -25,7 +25,7 @@ import {
 async function getChannelName(client, channelId) {
   const channel = await client.channels.fetch(channelId).catch(() => null);
   if (!channel?.name) return null;
-  return String(channel.name).slice(0, 100);
+  return String(channel.name);
 }
 
 /**
@@ -305,11 +305,9 @@ export async function hydratePinHistoryRow(client, row, searchContext) {
     );
   }
 
-  const channelId = String(sourceMessage.channelId).slice(0, 32);
+  const channelId = String(sourceMessage.channelId);
   const channelName = await getChannelName(client, channelId);
-  const contents = sourceMessage.content
-    ? String(sourceMessage.content).slice(0, 5000)
-    : "";
+  const contents = sourceMessage.content ? String(sourceMessage.content) : "";
 
   await updatePinHistoryRow(row.id, {
     app: "discord",

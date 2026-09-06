@@ -30,22 +30,23 @@ function pinnerMentionsFromUserIds(userIds) {
 }
 
 /**
- * Resolve a channel display name for pin history (up to 100 chars).
+ * Resolve a channel display name for pin history. Truncation for storage happens in webapi.
  * @param {import("discord.js").Message["channel"]} channel
  * @returns {Promise<string|null>}
  */
 async function getChannelNameForPin(channel) {
   if (!channel) return null;
-  if (channel.name) return String(channel.name).slice(0, 100);
+  if (channel.name) return String(channel.name);
   if (typeof channel.fetch === "function") {
     const fetched = await channel.fetch().catch(() => null);
-    if (fetched?.name) return String(fetched.name).slice(0, 100);
+    if (fetched?.name) return String(fetched.name);
   }
   return null;
 }
 
 /**
- * Build the pin-log API payload from a Discord message.
+ * Build the pin-log API payload from a Discord message. webapi truncates contents/channelId to
+ * their column widths, so the raw values are sent as-is here.
  * @param {import("discord.js").Message} message
  * @param {string[]} attachmentPaths - Relative paths under `files/`
  * @param {string[]} pinnerUserIds - Discord user snowflakes
@@ -53,8 +54,8 @@ async function getChannelNameForPin(channel) {
  * @returns {object}
  */
 function buildPinLogPayload(message, attachmentPaths, pinnerUserIds, channelName) {
-  const contents = message.content ? String(message.content).slice(0, 5000) : null;
-  const channelId = message.channelId ? String(message.channelId).slice(0, 32) : null;
+  const contents = message.content ? String(message.content) : null;
+  const channelId = message.channelId ? String(message.channelId) : null;
 
   return {
     app: "discord",

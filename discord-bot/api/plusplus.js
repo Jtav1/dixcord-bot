@@ -34,14 +34,22 @@ export const minusminus = async (string, typestr, voterid) => {
  * does all parsing: word++/user++/--, filter list, self-vote skip. No parsing in the bot.
  * @param {string} messageContent - Raw message content
  * @param {string} voterId - Author's user id
+ * @param {{ isReply?: boolean, repliedUserId?: string|null }} [replyContext] - Reply metadata, for
+ *   a reply message that's just "++"/"--" with no word/mention for the webapi parser to match.
  */
-export const recordPlusMinusFromMessage = async (messageContent, voterId) => {
+export const recordPlusMinusFromMessage = async (
+  messageContent,
+  voterId,
+  replyContext = {},
+) => {
   if (!voterId) return;
   await api.post("/api/message-processing/plusminus", {
     app: "discord",
     type: "message",
     message: { content: messageContent ?? "", author: { id: voterId } },
     voterId,
+    isReply: Boolean(replyContext.isReply),
+    repliedUserId: replyContext.repliedUserId ?? null,
   });
 };
 

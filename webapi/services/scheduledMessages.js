@@ -173,6 +173,28 @@ export async function getPendingScheduledMessagesForBot(app) {
 }
 
 /**
+ * Get pending scheduled messages that are currently due (scheduled_at <= now) for the bot's
+ * send loop. Filtering by time here (rather than in the bot) keeps the "what's due right now"
+ * decision server-side.
+ * @param {string} app - Chat app key.
+ * @returns {Promise<Array<ReturnType<typeof serializeScheduledMessageRow>>>} Due rows sorted by schedule time.
+ */
+export async function getDueScheduledMessagesForBot(app) {
+  const cfg = getScheduledMessageAppConfig(app);
+  if (!cfg) return [];
+  const nowSql = utcIsoToSqlDatetime(new Date().toISOString());
+  const [rows] = await db.query(
+    `SELECT * FROM scheduled_messages
+     WHERE status = 'pending' AND scheduled_at <= ? AND \`${cfg.channelIdColumn}\` IS NOT NULL
+     ORDER BY scheduled_at ASC, id ASC`,
+    [nowSql],
+  );
+  return Array.isArray(rows)
+    ? rows.map((row) => serializeScheduledMessageRow(row, app))
+    : [];
+}
+
+/**
  * Update one scheduled message row by id.
  * @param {number} id - scheduled_messages.id
  * @param {{ message_body?: string, scheduled_at?: string, status?: "pending"|"sent", sent_at?: string|null }} updates - Allowed updates.

@@ -1,6 +1,5 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { deleteScheduledMessageForUser } from "../../api/scheduledMessages.js";
-import { refreshScheduledMessagesCache } from "../../scheduler/messageScheduler.js";
 
 const cmdName = "scheduled-delete";
 
@@ -35,7 +34,6 @@ const execute = async (interaction) => {
       return;
     }
 
-    await refreshScheduledMessagesCache();
     await interaction.reply({
       content: `Deleted scheduled reminder #${id}.`,
       flags: MessageFlags.Ephemeral,

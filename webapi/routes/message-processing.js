@@ -175,7 +175,7 @@ router.post("/sticker-count", authenticate, async (req, res) => {
  * POST /api/message-processing/plusminus
  * Two modes (use type to choose):
  * - type: "message": Parse message for word++ / user++ / -- and record votes (filter list applied).
- *   Body: { app: "discord", type: "message", message: { content: string, author: { id: string } }, voterId: string }
+ *   Body: { app: "discord", type: "message", message: { content: string, author: { id: string } }, voterId: string, isReply?: boolean, repliedUserId?: string }
  * - type: "reaction": Record a single +/- from a reaction (e.g. emoji on a message).
  *   Body: { app: "discord", type: "reaction", targetUserId: string, reactorId: string, value: 1 | -1 }
  * Auth: required.
@@ -188,7 +188,11 @@ router.post("/sticker-count", authenticate, async (req, res) => {
  *     description: >
  *       type defaults to "message" when omitted or not "reaction". "message" parses word++/word--
  *       and @mention++/@mention-- tokens out of message.content and records one vote per match
- *       (self-votes on mentions are skipped). "reaction" records a single +/- vote directly.
+ *       (self-votes on mentions are skipped); total +/- characters are capped at 2 to prevent one
+ *       message from casting a pile of votes at once. When isReply is true and repliedUserId is
+ *       given and message.content is exactly "++" or "--" (no preceding word/mention for the
+ *       parser to match), a single vote is recorded for repliedUserId instead. "reaction" records
+ *       a single +/- vote directly.
  *     requestBody:
  *       required: true
  *       content:
@@ -209,6 +213,8 @@ router.post("/sticker-count", authenticate, async (req, res) => {
  *                         properties:
  *                           id: { type: string }
  *                   voterId: { type: string, description: "Discord snowflake of the message author (voter)." }
+ *                   isReply: { type: boolean, default: false, description: "Whether the source message was a reply to another message." }
+ *                   repliedUserId: { type: string, description: "Discord snowflake of the user being replied to; only used when message.content is exactly \"++\" or \"--\"." }
  *               - type: object
  *                 required: [app, type, targetUserId, reactorId, value]
  *                 properties:

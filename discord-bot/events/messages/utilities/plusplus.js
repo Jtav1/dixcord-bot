@@ -20,78 +20,43 @@ export const dominus = async (string, typestr, voterid) => {
   });
 };
 
-function countPlusMinusStrings(str) {
-  let count = 0;
-  count += [...str].filter((c) => c === "+").length;
-  count += [...str].filter((c) => c === "-").length;
-  return count;
-}
-
 /**
  * Pass message content to the API only if word++/user++ or word--/user-- detected in the message.
- * Parses for any instance of 'word++', 'word--', 'user++', 'user--' (allowing unicode/emoji-style words, not just alnum).
- * No unnecessary API call for messages lacking any ++/-- pattern.
+ * No unnecessary API call for messages lacking any ++/-- pattern; all parsing/decision logic
+ * (mentions, word votes, self-vote skip, the bare-"++"/"--" reply case) happens in webapi via
+ * recordPlusMinusFromMessage. This just supplies Discord-specific reply context.
  */
 export const plusMinusMsg = async (rawMessage) => {
-  // Regex for matching 'something++' or 'something--' (not preceded/followed by + or -)
-  // Matches user mentions as well
-  const plusMinusRegex =
-    /^(?:\s*)?(\+\+|--)$|(?:<@!?\d+>|\S.*?)(\+\+|--)(?!\+|-)/g;
+  const plusMinusRegex = /\+\+|--/;
 
   if (typeof rawMessage.content !== "string") return;
+  if (!plusMinusRegex.test(rawMessage.content)) return;
 
-  if (plusMinusRegex.test(rawMessage.content)) {
-    // If this message is a reply to another message, and that replied message has an author,
-    // use doplus/dominus for a user vote on the replied-to user instead of normal plusminus
+  let isReply = false;
+  let repliedUserId = null;
 
-    if (countPlusMinusStrings(rawMessage.content) > 2) {
-      // console.log("bot: Multiple ++/-- detected, skipping parse");
-      return;
-    }
-
-    if (
-      rawMessage.reference &&
-      rawMessage.reference.messageId &&
-      rawMessage.channel &&
-      typeof rawMessage.channel.messages?.fetch === "function"
-    ) {
-      try {
-        const repliedMsg = await rawMessage.channel.messages.fetch(
-          rawMessage.reference.messageId,
-        );
-        const targetUserId = repliedMsg?.author?.id;
-        const voterId = rawMessage.author?.id;
-
-        // Only if it's not self-voting and the replied message is not from a bot
-        if (targetUserId && voterId && targetUserId !== voterId) {
-          if (
-            rawMessage.content.includes("++") &&
-            rawMessage.content.length === 2
-          ) {
-            await doplus(targetUserId, "user", voterId);
-          } else if (
-            rawMessage.content.includes("--") &&
-            rawMessage.content.length === 2
-          ) {
-            await dominus(targetUserId, "user", voterId);
-          } else if (
-            rawMessage.content.includes("++") ||
-            rawMessage.content.includes("--")
-          ) {
-            await recordPlusMinusFromMessage(
-              rawMessage.content,
-              rawMessage.author?.id,
-            );
-          }
-          return;
-        }
-      } catch (err) {
-        // Fallback to normal message parsing if any error occurs fetching replied message
-        console.log("bot: plusMinusMsg Could not fetch replied message", err);
+  if (
+    rawMessage.reference &&
+    rawMessage.reference.messageId &&
+    rawMessage.channel &&
+    typeof rawMessage.channel.messages?.fetch === "function"
+  ) {
+    try {
+      const repliedMsg = await rawMessage.channel.messages.fetch(
+        rawMessage.reference.messageId,
+      );
+      if (repliedMsg?.author?.id) {
+        isReply = true;
+        repliedUserId = repliedMsg.author.id;
       }
+    } catch (err) {
+      // Fallback to normal message parsing if the replied message can't be fetched.
+      console.log("bot: plusMinusMsg could not fetch replied message", err);
     }
-
-    // Default: record message content for plusminus parsing
-    await recordPlusMinusFromMessage(rawMessage.content, rawMessage.author?.id);
   }
+
+  await recordPlusMinusFromMessage(rawMessage.content, rawMessage.author?.id, {
+    isReply,
+    repliedUserId,
+  });
 };

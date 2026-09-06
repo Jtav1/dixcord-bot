@@ -1,62 +1,24 @@
 import { AsyncTask, SimpleIntervalJob, ToadScheduler } from "toad-scheduler";
 import {
-  getPendingScheduledMessagesForBot,
+  getDueScheduledMessagesForBot,
   markScheduledMessageSent,
 } from "../api/scheduledMessages.js";
 
 let scheduler = null;
 let dueMessagesJob = null;
-let scheduledMessagesCache = [];
 let discordClient = null;
 let runInProgress = false;
 
 /**
- * Normalize a datetime-like value to epoch ms, or null when invalid.
- * @param {unknown} value - Datetime input.
- * @returns {number|null} UTC timestamp in ms.
- */
-function toEpochMs(value) {
-  const d = new Date(String(value ?? ""));
-  if (Number.isNaN(d.getTime())) return null;
-  return d.getTime();
-}
-
-/**
- * Refresh in-memory scheduled messages cache from webapi bot scope.
- * @returns {Promise<Array<object>>} Refreshed cache.
- */
-export async function refreshScheduledMessagesCache() {
-  const rows = await getPendingScheduledMessagesForBot();
-  scheduledMessagesCache = Array.isArray(rows) ? rows : [];
-  return scheduledMessagesCache;
-}
-
-/**
- * Read current scheduler cache.
- * @returns {Array<object>} Cached scheduled messages.
- */
-export function getScheduledMessagesCache() {
-  return scheduledMessagesCache;
-}
-
-/**
- * Process all currently due/past-due cached scheduled messages.
- * Sends messages and marks them sent in webapi.
+ * Send and mark-sent every scheduled message webapi currently considers due
+ * (scheduled_at <= now); webapi does the due-time comparison.
  * @returns {Promise<number>} Number of messages successfully sent+marked.
  */
 export async function processDueScheduledMessages() {
   if (!discordClient || runInProgress) return 0;
   runInProgress = true;
   try {
-    const nowMs = Date.now();
-    const dueRows = scheduledMessagesCache.filter((row) => {
-      const scheduledMs = toEpochMs(row?.scheduled_at);
-      return (
-        scheduledMs != null &&
-        scheduledMs <= nowMs &&
-        String(row?.status ?? "") === "pending"
-      );
-    });
+    const dueRows = await getDueScheduledMessagesForBot();
 
     let sentCount = 0;
     for (const row of dueRows) {
@@ -77,9 +39,6 @@ export async function processDueScheduledMessages() {
       }
     }
 
-    if (sentCount > 0) {
-      await refreshScheduledMessagesCache();
-    }
     return sentCount;
   } finally {
     runInProgress = false;
@@ -87,13 +46,12 @@ export async function processDueScheduledMessages() {
 }
 
 /**
- * Start recurring scheduler job and perform initial cache load.
+ * Start recurring scheduler job.
  * @param {import("discord.js").Client} client - Discord client instance.
  * @returns {Promise<void>}
  */
 export async function startMessageScheduler(client) {
   discordClient = client;
-  await refreshScheduledMessagesCache();
 
   if (!scheduler) scheduler = new ToadScheduler();
   if (dueMessagesJob) return;
