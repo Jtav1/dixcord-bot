@@ -406,25 +406,23 @@ const migrateTables = async () => {
 
 const importConfigs = async () => {
   const isDev = process.env.NODE_ENV !== "production";
-  const delay = Math.floor(Math.random() * 60000 + 60000);
   const pinThreshold = isDev ? 1 : 3;
   const pinChannelId = isDev ? "710671234471559228" : "915462110761349201";
   const announceChannelId = isDev ? "710671234471559228" : "911427650730487878";
 
   const configArray = [
-    ["rare_frequency", "0.1"],
     ["twitter_fix_enabled", "true"],
     ["pin_threshold", String(pinThreshold)],
     ["pin_emoji", "\ud83d\udccc"],
     ["repost_emoji", "1072368151922233404"],
     ["announce_channel_id", announceChannelId],
-    ["take_a_look_delay", String(delay)],
-    ["take_a_look_repost_limit", "2"],
     ["pin_channel_id", pinChannelId],
     ["plusplus_emoji", "1333222614033760326"],
     ["minusminus_emoji", "1333222612683194442"],
-    ["timeout_emoji", null],
-    ["timeout_vote_threshold", "5"],
+    [
+      "user_mapping_import_channel_id",
+      process.env.DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID ?? "",
+    ],
   ];
 
   const placeholders = configArray.map(() => "(?, ?)").join(", ");

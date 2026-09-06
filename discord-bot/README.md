@@ -65,8 +65,9 @@ Copy `.env.example` to `.env` for local development. There are **no in-code defa
 | `DISCORD_CLIENT_ID`                      | yes      | Application (client) ID |
 | `DISCORD_GUILD_ID`                       | yes      | Guild ID for command registration and bot context |
 | `DEV_FLAG`                               | yes      | Must be non-empty. Loosely `== false` (e.g. `0`) → production (`dataDirectory=/data`); otherwise development (`./data`) |
-| `DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID` | no       | Extra text channel whose non-bot message authors are merged into user-mapping sync (must be in `DISCORD_GUILD_ID`) |
 | `PERMISSIONS`                            | no       | Discord permissions mask for invite URLs; not read by the bot process |
+
+The extra text channel whose non-bot message authors are merged into user-mapping sync is configured via the `user_mapping_import_channel_id` webapi config key (not an env var) — see `webapi/services/configMetadata.js`.
 
 ### Web API
 

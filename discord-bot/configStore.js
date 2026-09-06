@@ -121,4 +121,13 @@ export function getPinMessageRoleIds() {
   }
 }
 
+/**
+ * Extra text channel whose non-bot message authors are merged into
+ * user-mapping sync. Empty string when unset.
+ * @returns {string}
+ */
+export function getUserMappingImportChannelId() {
+  return getConfigValue("user_mapping_import_channel_id", "");
+}
+
 await loadConfig();

@@ -7,37 +7,38 @@ export const CONFIG_METADATA = Object.freeze({
   pin_threshold: {
     description: "Number of pin reactions required before auto-pin alert",
     type: "integer",
-    requiresBotRestart: true,
+    requiresBotRestart: false,
   },
   pin_emoji: {
     description: "Emoji name or ID used for pin reactions",
     type: "string",
-    requiresBotRestart: true,
+    requiresBotRestart: false,
   },
   pin_channel_id: {
     description: "Discord channel ID where pin embeds are posted",
     type: "string",
-    requiresBotRestart: true,
+    requiresBotRestart: false,
   },
   repost_emoji: {
     description: "Discord emoji ID for repost accusation reactions",
     type: "string",
-    requiresBotRestart: true,
+    requiresBotRestart: false,
   },
   announce_channel_id: {
-    description: "Discord channel ID for bot online announcements",
+    description:
+      "Discord channel ID for bot online announcements (read once at bot startup)",
     type: "string",
     requiresBotRestart: true,
   },
   plusplus_emoji: {
     description: "Discord emoji ID for plus votes",
     type: "string",
-    requiresBotRestart: true,
+    requiresBotRestart: false,
   },
   minusminus_emoji: {
     description: "Discord emoji ID for minus votes",
     type: "string",
-    requiresBotRestart: true,
+    requiresBotRestart: false,
   },
   pin_message_role_ids: {
     description: "JSON array of Discord role IDs allowed to use /pin-message",
@@ -49,35 +50,11 @@ export const CONFIG_METADATA = Object.freeze({
     type: "boolean",
     requiresBotRestart: false,
   },
-  rare_frequency: {
-    description: "Unused legacy setting",
-    type: "number",
-    requiresBotRestart: false,
-    deprecated: true,
-  },
-  take_a_look_delay: {
-    description: "Unused legacy setting (milliseconds)",
-    type: "integer",
-    requiresBotRestart: false,
-    deprecated: true,
-  },
-  take_a_look_repost_limit: {
-    description: "Unused legacy setting",
-    type: "integer",
-    requiresBotRestart: false,
-    deprecated: true,
-  },
-  timeout_emoji: {
-    description: "Unused legacy setting",
+  user_mapping_import_channel_id: {
+    description:
+      "Extra text channel merged into user-mapping sync; applied on next sync (bot startup)",
     type: "string",
-    requiresBotRestart: false,
-    deprecated: true,
-  },
-  timeout_vote_threshold: {
-    description: "Unused legacy setting",
-    type: "integer",
-    requiresBotRestart: false,
-    deprecated: true,
+    requiresBotRestart: true,
   },
 });
 
