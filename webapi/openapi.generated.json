@@ -964,6 +964,11 @@
                     "nullable": true,
                     "minimum": 0,
                     "maximum": 100
+                  },
+                  "response_function": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Optional function key to dispatch to instead of replying with response_string; usable regardless of selection_mode."
                   }
                 }
               }
@@ -1136,6 +1141,11 @@
                           "minimum": 0,
                           "maximum": 100,
                           "description": "Used when selection_mode is \"weighted\"."
+                        },
+                        "response_function": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Optional function key to dispatch to instead of replying with response_string; usable regardless of selection_mode."
                         }
                       }
                     }
@@ -1539,6 +1549,11 @@
                           "nullable": true,
                           "minimum": 0,
                           "maximum": 100
+                        },
+                        "response_function": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Optional function key to dispatch to instead of replying with response_string; usable regardless of selection_mode."
                         }
                       }
                     }
@@ -1691,7 +1706,7 @@
           "Trigger Responses"
         ],
         "summary": "Get one selected response for a trigger",
-        "description": "Looks up the trigger by exact trigger_string and picks one response per its selection_mode: \"random\" (uniform DB-side random pick), \"ordered\" (round-robin by response_order, tracked in trigger_response_state), or \"weighted\" (weighted roll against each link's weight, 0-100). Selecting a response increments frequency counters on the trigger, response, and link rows. When app and userId are both supplied, also records a trigger_response_user_history row for the requesting user (resolved via chat_member_mapping); this is best-effort and silently skipped if the user isn't mapped yet, so it never affects the response returned.\n",
+        "description": "Looks up the trigger by exact trigger_string and picks one response per its selection_mode: \"random\" (uniform DB-side random pick), \"ordered\" (round-robin by response_order, tracked in trigger_response_state), or \"weighted\" (weighted roll against each link's weight, 0-100). Selecting a response increments frequency counters on the trigger, response, and link rows. Regardless of selection_mode, if the chosen link has a response_function set, its usage frequency in the trigger response function catalog is also incremented and the function key is returned in the response body. When app and userId are both supplied, also records a trigger_response_user_history row for the requesting user (resolved via chat_member_mapping); this is best-effort and silently skipped if the user isn't mapped yet, so it never affects the response returned.\n",
         "parameters": [
           {
             "name": "trigger",
@@ -1744,6 +1759,11 @@
                     "id": {
                       "type": "integer",
                       "description": "responses.id of the chosen response."
+                    },
+                    "response_function": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Present only when the selected trigger_response link has a response_function set (any selection_mode). When present, the caller should dispatch to the named function instead of displaying `response` directly.\n"
                     }
                   }
                 }
@@ -1973,7 +1993,7 @@
           "Trigger Responses"
         ],
         "summary": "List the trigger response function catalog",
-        "description": "Catalog of function keys usable as a weighted trigger response's trigger_response.response_function value. The bot hydrates its in-process function handler table from this list, matching each function_name against a handler function; catalog rows with no matching handler are a no-op.\n",
+        "description": "Catalog of function keys usable as any trigger_response link's response_function value, regardless of the owning trigger's selection_mode. The bot hydrates its in-process function handler table from this list, matching each function_name against a handler function; catalog rows with no matching handler are a no-op.\n",
         "responses": {
           "200": {
             "description": "All trigger response function catalog rows.",
@@ -2265,6 +2285,11 @@
                     "nullable": true,
                     "minimum": 0,
                     "maximum": 100
+                  },
+                  "response_function": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Optional function key to dispatch to instead of replying with response_string; usable regardless of selection_mode."
                   }
                 }
               }

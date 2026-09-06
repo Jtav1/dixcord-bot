@@ -151,12 +151,14 @@ async function incrementSelectionFrequencies(
 
 /**
  * Select one response at random for the trigger via DB ORDER BY RAND()/RANDOM().
+ * A chosen response may carry response_function (a named function key); the caller is responsible for
+ * dispatching to it instead of replying directly when present.
  * @param {number} triggerId
- * @returns {Promise<{ id: number, response_string: string, trigger_response_id: number }|null>}
+ * @returns {Promise<{ id: number, response_string: string, response_function: string|null, trigger_response_id: number }|null>}
  */
 async function getRandomResponseByRandomSelection(triggerId) {
   const [rows] = await db.query(
-    `SELECT r.id, r.response_string, tr.id AS trigger_response_id
+    `SELECT r.id, r.response_string, tr.response_function, tr.id AS trigger_response_id
      FROM trigger_response tr
      JOIN responses r ON r.id = tr.response_id
      WHERE tr.trigger_id = ?
@@ -164,7 +166,11 @@ async function getRandomResponseByRandomSelection(triggerId) {
      LIMIT 1`,
     [triggerId],
   );
-  return rows && rows.length > 0 ? rows[0] : null;
+  if (!rows || rows.length === 0) return null;
+  return {
+    ...rows[0],
+    response_function: normalizeResponseFunction(rows[0].response_function),
+  };
 }
 
 /**
@@ -217,9 +223,11 @@ async function getWeightedResponseForTrigger(triggerId) {
 }
 
 /**
- * One response for the given trigger: random, or next in round-robin order.
+ * One response for the given trigger: random, next in round-robin order, or a weighted roll. The
+ * chosen response may carry a response_function key regardless of selection_mode; the caller
+ * should dispatch to it instead of replying directly when present.
  * @param {string} trigger
- * @returns {Promise<{ id: number, response_string: string, trigger_response_id: number, response_function?: string|null }|null>} id is responses.id; trigger_response_id is the junction row id (for history logging)
+ * @returns {Promise<{ id: number, response_string: string, trigger_response_id: number, response_function: string|null }|null>} id is responses.id; trigger_response_id is the junction row id (for history logging)
  */
 export async function getRandomResponse(trigger) {
   if (!trigger || typeof trigger !== "string" || !trigger.trim()) return null;
@@ -237,7 +245,7 @@ export async function getRandomResponse(trigger) {
 
   if (selection_mode === "ordered") {
     const [orderedRows] = await db.query(
-      `SELECT r.id, r.response_string, tr.id AS trigger_response_id, tr.response_order
+      `SELECT r.id, r.response_string, tr.response_function, tr.id AS trigger_response_id, tr.response_order
        FROM trigger_response tr
        JOIN responses r ON r.id = tr.response_id
        WHERE tr.trigger_id = ?
@@ -259,10 +267,15 @@ export async function getRandomResponse(trigger) {
       chosen.id,
       chosen.trigger_response_id,
     );
+    const responseFunction = normalizeResponseFunction(chosen.response_function);
+    if (responseFunction) {
+      await incrementResponseFunctionFrequency(responseFunction);
+    }
     return {
       id: chosen.id,
       response_string: chosen.response_string,
       trigger_response_id: chosen.trigger_response_id,
+      response_function: responseFunction,
     };
   }
 
@@ -281,10 +294,14 @@ export async function getRandomResponse(trigger) {
     result.id,
     result.trigger_response_id,
   );
+  if (result.response_function) {
+    await incrementResponseFunctionFrequency(result.response_function);
+  }
   return {
     id: result.id,
     response_string: result.response_string,
     trigger_response_id: result.trigger_response_id,
+    response_function: result.response_function,
   };
 }
 

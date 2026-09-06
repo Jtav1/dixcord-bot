@@ -332,6 +332,7 @@ router.get("/triggers/:id", authenticate, async (req, res) => {
  *                     response_string: { type: string }
  *                     order: { type: integer, nullable: true, description: Used when selection_mode is "ordered". }
  *                     weight: { type: integer, nullable: true, minimum: 0, maximum: 100, description: Used when selection_mode is "weighted". }
+ *                     response_function: { type: string, nullable: true, description: Optional function key to dispatch to instead of replying with response_string; usable regardless of selection_mode. }
  *     responses:
  *       '201':
  *         description: Created (or reused) trigger with its responses.
@@ -435,6 +436,7 @@ router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
  *                     response_string: { type: string, description: Adds a new response when id is not given. }
  *                     order: { type: integer, nullable: true }
  *                     weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                     response_function: { type: string, nullable: true, description: Optional function key to dispatch to instead of replying with response_string; usable regardless of selection_mode. }
  *     responses:
  *       '200':
  *         description: The updated trigger with its responses.
@@ -561,6 +563,9 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
  *       "random" (uniform DB-side random pick), "ordered" (round-robin by response_order, tracked in
  *       trigger_response_state), or "weighted" (weighted roll against each link's weight, 0-100).
  *       Selecting a response increments frequency counters on the trigger, response, and link rows.
+ *       Regardless of selection_mode, if the chosen link has a response_function set, its usage
+ *       frequency in the trigger response function catalog is also incremented and the function key
+ *       is returned in the response body.
  *       When app and userId are both supplied, also records a trigger_response_user_history row for
  *       the requesting user (resolved via chat_member_mapping); this is best-effort and silently
  *       skipped if the user isn't mapped yet, so it never affects the response returned.
@@ -590,6 +595,13 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
  *                 ok: { type: boolean, enum: [true] }
  *                 response: { type: string, description: The chosen response_string. }
  *                 id: { type: integer, description: responses.id of the chosen response. }
+ *                 response_function:
+ *                   type: string
+ *                   nullable: true
+ *                   description: >
+ *                     Present only when the selected trigger_response link has a response_function
+ *                     set (any selection_mode). When present, the caller should dispatch to the
+ *                     named function instead of displaying `response` directly.
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -838,9 +850,10 @@ router.delete("/responses/:id", authenticate, requireAdmin, async (req, res) => 
  *     tags: [Trigger Responses]
  *     summary: List the trigger response function catalog
  *     description: >
- *       Catalog of function keys usable as a weighted trigger response's trigger_response.response_function
- *       value. The bot hydrates its in-process function handler table from this list, matching each
- *       function_name against a handler function; catalog rows with no matching handler are a no-op.
+ *       Catalog of function keys usable as any trigger_response link's response_function value,
+ *       regardless of the owning trigger's selection_mode. The bot hydrates its in-process function
+ *       handler table from this list, matching each function_name against a handler function;
+ *       catalog rows with no matching handler are a no-op.
  *     responses:
  *       '200':
  *         description: All trigger response function catalog rows.
@@ -1053,6 +1066,7 @@ router.get("/:id", authenticate, async (req, res) => {
  *                 enum: [random, ordered, weighted]
  *                 default: random
  *               weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *               response_function: { type: string, nullable: true, description: Optional function key to dispatch to instead of replying with response_string; usable regardless of selection_mode. }
  *     responses:
  *       '201':
  *         description: The created trigger-response link.
@@ -1161,6 +1175,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  *               response_order: { type: integer, nullable: true }
  *               selection_mode: { type: string, enum: [random, ordered, weighted] }
  *               weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *               response_function: { type: string, nullable: true, description: Optional function key to dispatch to instead of replying with response_string; usable regardless of selection_mode. }
  *     responses:
  *       '200':
  *         description: The updated trigger-response link.

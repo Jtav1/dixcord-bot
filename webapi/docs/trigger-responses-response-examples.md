@@ -183,7 +183,7 @@ See also [trigger-responses-examples.md](trigger-responses-examples.md) for samp
 
 ## GET /api/trigger-responses/random?trigger=xxx
 
-**200 OK** (random / ordered / weighted)
+**200 OK** (any selection_mode: random, ordered, or weighted)
 
 ```json
 {
@@ -193,7 +193,7 @@ See also [trigger-responses-examples.md](trigger-responses-examples.md) for samp
 }
 ```
 
-**200 OK** (weighted, when the selected response has a `response_function`)
+**200 OK** (any selection_mode, when the selected response has a `response_function`)
 
 ```json
 {

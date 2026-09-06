@@ -170,7 +170,9 @@ Each trigger has a `selection_mode` that controls how `GET /api/trigger-response
 |------|----------|
 | `random` | Uniform random pick among all responses for the trigger. |
 | `ordered` | Round-robin: walks responses in `response_order` (then id), advancing state each hit so the next call returns the next response and wraps around. |
-| `weighted` | Weighted random: each response has a `weight` (0–100). A roll decides whether to pick from the highest-weight tier or from lower-weight responses, then one candidate is chosen at random from that subset. A weighted response may also carry a `response_function`; when the chosen response has one, the API returns that function key and the bot runs the matching handler instead of replying directly. |
+| `weighted` | Weighted random: each response has a `weight` (0–100). A roll decides whether to pick from the highest-weight tier or from lower-weight responses, then one candidate is chosen at random from that subset. |
+
+Any response, in any selection_mode, may also carry a `response_function`. When the response chosen by `GET /api/trigger-responses/random` has one, the API returns that function key alongside the response text, and the bot runs the matching handler instead of replying directly.
 
 **Trigger response function handlers:** Handler functions must be defined in [`discord-bot/utilities/triggerResponseFunctions.js`](../../discord-bot/utilities/triggerResponseFunctions.js) (in the `RESPONSE_FUNCTIONS` map, keyed by the same `function_name` / `response_function` value). Catalog rows alone do nothing on the bot until a matching function exists there.
 
@@ -185,7 +187,9 @@ curl -s -X GET "${BASE_URL}/api/trigger-responses/functions" \
 
 ---
 
-## Create a weighted trigger with a response function
+## Create a trigger with a response function
+
+`response_function` can be set on a response in any selection_mode (random, ordered, or weighted) — this example uses weighted:
 
 ```bash
 curl -s -X POST "${BASE_URL}/api/trigger-responses/triggers" \
