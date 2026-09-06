@@ -129,7 +129,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   });
   await startMessageScheduler(readyClient);
   startCacheVersionPoller();
-  startHeartbeat();
+  startHeartbeat(readyClient, readyClient.readyAt);
 
   console.log(
     `bot: Ready! Logged in as ${readyClient.user.tag} at ${new Date().toLocaleString()}`,

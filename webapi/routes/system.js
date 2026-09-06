@@ -34,7 +34,10 @@ const router = express.Router();
  *                   properties:
  *                     webapi: { type: string, example: ok }
  *                     db: { type: string, example: ok }
+ *                     dbType: { type: string, enum: [mysql, sqlite] }
  *                     cacheVersion: { type: string }
+ *                     webapiUptimeSeconds: { type: integer, description: "Seconds since this webapi process started." }
+ *                     webapiMemoryRssBytes: { type: integer, description: "Resident set size of this webapi process, in bytes." }
  *                     bot:
  *                       type: object
  *                       nullable: true
@@ -43,6 +46,11 @@ const router = express.Router();
  *                         version: { type: string }
  *                         lastSeenAt: { type: string }
  *                         online: { type: boolean }
+ *                         readyAt: { type: string, nullable: true, description: "When the bot's current gateway session became ready; stable across heartbeats until the bot restarts." }
+ *                         uptimeSeconds: { type: integer, nullable: true, description: "Seconds since readyAt." }
+ *                         memberCount: { type: integer, nullable: true, description: "Guild member count as of the last heartbeat." }
+ *                         channelCount: { type: integer, nullable: true, description: "Cached guild channel count as of the last heartbeat." }
+ *                         wsPingMs: { type: integer, nullable: true, description: "Discord gateway heartbeat latency in ms as of the last heartbeat." }
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
@@ -136,8 +144,8 @@ router.post("/invalidate-cache", authenticate, requireAdmin, async (req, res) =>
 
 /**
  * POST /api/system/heartbeat
- * Bot heartbeat (guild id, version, optional lastReadyAt).
- * Body: { guildId, version, lastReadyAt? }
+ * Bot heartbeat (guild id, version, and optional session/health fields).
+ * Body: { guildId, version, readyAt?, memberCount?, channelCount?, wsPingMs? }
  * Auth: required (bot or admin).
  * @openapi
  * /api/system/heartbeat:
@@ -155,7 +163,10 @@ router.post("/invalidate-cache", authenticate, requireAdmin, async (req, res) =>
  *             properties:
  *               guildId: { type: string }
  *               version: { type: string }
- *               lastReadyAt: { type: string, nullable: true }
+ *               readyAt: { type: string, nullable: true, description: "When the bot's current gateway session became ready. Send the same value on every heartbeat within one process lifetime; only changes on restart." }
+ *               memberCount: { type: integer, nullable: true, description: "Guild member count." }
+ *               channelCount: { type: integer, nullable: true, description: "Cached guild channel count." }
+ *               wsPingMs: { type: integer, nullable: true, description: "Discord gateway heartbeat latency in ms." }
  *     responses:
  *       '200':
  *         description: Heartbeat recorded.
@@ -182,7 +193,14 @@ router.post("/heartbeat", authenticate, async (req, res) => {
         error: "guildId and version are required",
       });
     }
-    await recordBotHeartbeat({ guildId, version, lastReadyAt: req.body?.lastReadyAt });
+    await recordBotHeartbeat({
+      guildId,
+      version,
+      readyAt: req.body?.readyAt,
+      memberCount: req.body?.memberCount,
+      channelCount: req.body?.channelCount,
+      wsPingMs: req.body?.wsPingMs,
+    });
     res.json({ ok: true });
   } catch (err) {
     console.error("POST /api/system/heartbeat error:", err);

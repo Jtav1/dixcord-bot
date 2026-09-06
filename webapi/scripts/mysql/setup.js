@@ -210,7 +210,8 @@ const initializeDatabase = async () => {
     CREATE TABLE IF NOT EXISTS trigger_lotto_prizes (
       id INT AUTO_INCREMENT PRIMARY KEY,
       prize_string VARCHAR(255) NOT NULL UNIQUE,
-      frequency INT DEFAULT 0
+      frequency INT DEFAULT 0,
+      display_name VARCHAR(255) NULL
     )
   `);
   await execQuery(`
@@ -315,7 +316,11 @@ const migrateTables = async () => {
         id INT AUTO_INCREMENT PRIMARY KEY,
         guild_id VARCHAR(32) NOT NULL UNIQUE,
         version VARCHAR(50) NOT NULL,
-        last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        ready_at TIMESTAMP NULL,
+        member_count INT NULL,
+        channel_count INT NULL,
+        ws_ping_ms INT NULL
       )
     `);
   }

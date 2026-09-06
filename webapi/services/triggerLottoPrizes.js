@@ -6,17 +6,18 @@ import db from "../config/db.js";
 
 /**
  * List all lotto prize catalog rows ordered by id.
- * @returns {Promise<Array<{ id: number, prize_string: string, frequency: number }>>}
+ * @returns {Promise<Array<{ id: number, prize_string: string, frequency: number, display_name: string|null }>>}
  */
 export async function getAll() {
   const [rows] = await db.query(
-    "SELECT id, prize_string, frequency FROM trigger_lotto_prizes ORDER BY id ASC",
+    "SELECT id, prize_string, frequency, display_name FROM trigger_lotto_prizes ORDER BY id ASC",
   );
   return Array.isArray(rows)
     ? rows.map((row) => ({
         id: Number(row.id),
         prize_string: String(row.prize_string),
         frequency: Number(row.frequency ?? 0),
+        display_name: row.display_name == null ? null : String(row.display_name),
       }))
     : [];
 }

@@ -53,13 +53,26 @@ export async function incrementCacheVersion() {
 
 /**
  * Record bot heartbeat.
- * @param {{ guildId: string, version: string, lastReadyAt?: string }} payload
+ * @param {{ guildId: string, version: string, readyAt?: string|null, memberCount?: number|null, channelCount?: number|null, wsPingMs?: number|null }} payload
  * @returns {Promise<void>}
  */
 export async function recordBotHeartbeat(payload) {
   const guildId = String(payload.guildId ?? "").trim();
   const version = String(payload.version ?? "").trim();
   if (!guildId) return;
+
+  const readyAt = payload.readyAt ? new Date(payload.readyAt) : null;
+  const readyAtSql =
+    readyAt && !Number.isNaN(readyAt.getTime()) ? readyAt.toISOString() : null;
+  const memberCount = Number.isFinite(Number(payload.memberCount))
+    ? Number(payload.memberCount)
+    : null;
+  const channelCount = Number.isFinite(Number(payload.channelCount))
+    ? Number(payload.channelCount)
+    : null;
+  const wsPingMs = Number.isFinite(Number(payload.wsPingMs))
+    ? Number(payload.wsPingMs)
+    : null;
 
   const [rows] = await db.query(
     "SELECT id FROM bot_status WHERE guild_id = ?",
@@ -68,20 +81,23 @@ export async function recordBotHeartbeat(payload) {
 
   if (rows && rows.length > 0) {
     await db.query(
-      "UPDATE bot_status SET version = ?, last_seen_at = CURRENT_TIMESTAMP WHERE guild_id = ?",
-      [version, guildId],
+      `UPDATE bot_status
+       SET version = ?, last_seen_at = CURRENT_TIMESTAMP, ready_at = ?, member_count = ?, channel_count = ?, ws_ping_ms = ?
+       WHERE guild_id = ?`,
+      [version, readyAtSql, memberCount, channelCount, wsPingMs, guildId],
     );
   } else {
     await db.query(
-      "INSERT INTO bot_status (guild_id, version, last_seen_at) VALUES (?, ?, CURRENT_TIMESTAMP)",
-      [guildId, version],
+      `INSERT INTO bot_status (guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms)
+       VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?)`,
+      [guildId, version, readyAtSql, memberCount, channelCount, wsPingMs],
     );
   }
 }
 
 /**
  * Get system status for admin monitoring.
- * @returns {Promise<{ webapi: string, db: string, cacheVersion: string, bot: object|null }>}
+ * @returns {Promise<{ webapi: string, db: string, dbType: string, cacheVersion: string, webapiUptimeSeconds: number, webapiMemoryRssBytes: number, bot: object|null }>}
  */
 export async function getSystemStatus() {
   let dbStatus = "ok";
@@ -91,10 +107,11 @@ export async function getSystemStatus() {
     dbStatus = "error";
   }
 
+  const dbType = (process.env.DB_TYPE || "mysql").toLowerCase();
   const cacheVersion = await getCacheVersion();
 
   const [botRows] = await db.query(
-    "SELECT guild_id, version, last_seen_at FROM bot_status ORDER BY last_seen_at DESC LIMIT 1",
+    "SELECT guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms FROM bot_status ORDER BY last_seen_at DESC LIMIT 1",
   );
   const botRow = botRows?.[0] ?? null;
 
@@ -102,18 +119,32 @@ export async function getSystemStatus() {
   if (botRow) {
     const lastSeen = new Date(botRow.last_seen_at);
     const ageMs = Date.now() - lastSeen.getTime();
+    const readyAt = botRow.ready_at ? new Date(botRow.ready_at) : null;
+    const uptimeSeconds =
+      readyAt && !Number.isNaN(readyAt.getTime())
+        ? Math.max(0, Math.floor((Date.now() - readyAt.getTime()) / 1000))
+        : null;
     bot = {
       guildId: String(botRow.guild_id),
       version: String(botRow.version),
       lastSeenAt: botRow.last_seen_at,
       online: ageMs < 120_000,
+      readyAt: botRow.ready_at ?? null,
+      uptimeSeconds,
+      memberCount: botRow.member_count == null ? null : Number(botRow.member_count),
+      channelCount:
+        botRow.channel_count == null ? null : Number(botRow.channel_count),
+      wsPingMs: botRow.ws_ping_ms == null ? null : Number(botRow.ws_ping_ms),
     };
   }
 
   return {
     webapi: "ok",
     db: dbStatus,
+    dbType,
     cacheVersion,
+    webapiUptimeSeconds: Math.floor(process.uptime()),
+    webapiMemoryRssBytes: process.memoryUsage().rss,
     bot,
   };
 }

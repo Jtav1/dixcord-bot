@@ -34,7 +34,8 @@ async function parseJsonResponse(res, context) {
  *   triggers: number,
  *   responses: number,
  *   triggerResponseFrequencySum: number,
- *   repostTracking: number
+ *   repostTracking: number,
+ *   scheduledMessages: { pending: number, sent: number }
  * }>}
  */
 export async function fetchStatistics() {

@@ -213,7 +213,8 @@ const initializeDatabase = () => {
     CREATE TABLE IF NOT EXISTS trigger_lotto_prizes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       prize_string TEXT NOT NULL UNIQUE,
-      frequency INTEGER DEFAULT 0
+      frequency INTEGER DEFAULT 0,
+      display_name TEXT NULL
     )
   `);
   exec(`
@@ -290,7 +291,11 @@ const migrateTables = () => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         guild_id TEXT NOT NULL UNIQUE,
         version TEXT NOT NULL,
-        last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP
+        last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        ready_at TEXT NULL,
+        member_count INTEGER NULL,
+        channel_count INTEGER NULL,
+        ws_ping_ms INTEGER NULL
       )
     `);
   }

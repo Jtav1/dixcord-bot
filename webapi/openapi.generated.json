@@ -2426,8 +2426,23 @@
                           "type": "string",
                           "example": "ok"
                         },
+                        "dbType": {
+                          "type": "string",
+                          "enum": [
+                            "mysql",
+                            "sqlite"
+                          ]
+                        },
                         "cacheVersion": {
                           "type": "string"
+                        },
+                        "webapiUptimeSeconds": {
+                          "type": "integer",
+                          "description": "Seconds since this webapi process started."
+                        },
+                        "webapiMemoryRssBytes": {
+                          "type": "integer",
+                          "description": "Resident set size of this webapi process, in bytes."
                         },
                         "bot": {
                           "type": "object",
@@ -2444,6 +2459,31 @@
                             },
                             "online": {
                               "type": "boolean"
+                            },
+                            "readyAt": {
+                              "type": "string",
+                              "nullable": true,
+                              "description": "When the bot's current gateway session became ready; stable across heartbeats until the bot restarts."
+                            },
+                            "uptimeSeconds": {
+                              "type": "integer",
+                              "nullable": true,
+                              "description": "Seconds since readyAt."
+                            },
+                            "memberCount": {
+                              "type": "integer",
+                              "nullable": true,
+                              "description": "Guild member count as of the last heartbeat."
+                            },
+                            "channelCount": {
+                              "type": "integer",
+                              "nullable": true,
+                              "description": "Cached guild channel count as of the last heartbeat."
+                            },
+                            "wsPingMs": {
+                              "type": "integer",
+                              "nullable": true,
+                              "description": "Discord gateway heartbeat latency in ms as of the last heartbeat."
                             }
                           }
                         }
@@ -2567,9 +2607,25 @@
                   "version": {
                     "type": "string"
                   },
-                  "lastReadyAt": {
+                  "readyAt": {
                     "type": "string",
-                    "nullable": true
+                    "nullable": true,
+                    "description": "When the bot's current gateway session became ready. Send the same value on every heartbeat within one process lifetime; only changes on restart."
+                  },
+                  "memberCount": {
+                    "type": "integer",
+                    "nullable": true,
+                    "description": "Guild member count."
+                  },
+                  "channelCount": {
+                    "type": "integer",
+                    "nullable": true,
+                    "description": "Cached guild channel count."
+                  },
+                  "wsPingMs": {
+                    "type": "integer",
+                    "nullable": true,
+                    "description": "Discord gateway heartbeat latency in ms."
                   }
                 }
               }
@@ -2679,6 +2735,17 @@
                         },
                         "repostTracking": {
                           "type": "integer"
+                        },
+                        "scheduledMessages": {
+                          "type": "object",
+                          "properties": {
+                            "pending": {
+                              "type": "integer"
+                            },
+                            "sent": {
+                              "type": "integer"
+                            }
+                          }
                         }
                       }
                     }

@@ -858,6 +858,7 @@ router.delete("/responses/:id", authenticate, requireAdmin, async (req, res) => 
  *                       id: { type: integer }
  *                       prize_string: { type: string }
  *                       frequency: { type: integer, description: Times this prize has been awarded. }
+ *                       display_name: { type: string, nullable: true, description: Friendly name for display (e.g. in the webview); null if not set. }
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
