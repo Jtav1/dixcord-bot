@@ -128,15 +128,15 @@ CREATE TABLE IF NOT EXISTS trigger_response (
   response_id INTEGER NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
   response_order INTEGER NULL,
   weight INTEGER NULL DEFAULT NULL CHECK (weight IS NULL OR (weight >= 0 AND weight <= 100)),
-  lotto_prize TEXT NULL,
+  response_function TEXT NULL,
   frequency INTEGER DEFAULT 0,
   UNIQUE (trigger_id, response_id)
 );
 
--- Catalog of lotto prize keys (matched by trigger_response.lotto_prize)
-CREATE TABLE IF NOT EXISTS trigger_lotto_prizes (
+-- Catalog of trigger response function keys (matched by trigger_response.response_function)
+CREATE TABLE IF NOT EXISTS trigger_response_functions (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  prize_string TEXT NOT NULL UNIQUE,
+  function_name TEXT NOT NULL UNIQUE,
   frequency INTEGER DEFAULT 0,
   display_name TEXT NULL
 );

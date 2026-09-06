@@ -12,7 +12,7 @@ export const getTriggerList = async () => {
 };
 
 /**
- * List all triggers with id and selection_mode (for weighted/random/ordered/lotto handling).
+ * List all triggers with id and selection_mode (for weighted/random/ordered handling).
  * GET /api/trigger-responses/triggers/list
  * @returns {Promise<Array<{ id: number, trigger_string: string, selection_mode: string }>>}
  */
@@ -26,7 +26,7 @@ export const getTriggersList = async () => {
  * Get all responses for a trigger (by trigger string).
  * GET /api/trigger-responses/triggers/responses?trigger=xxx
  * @param {string} triggerString - Trigger string
- * @returns {Promise<{ trigger_id: number, trigger_string: string, selection_mode: string, responses: Array<{ id: number, response_string: string, order: number|null, weight: number, lotto_prize: string|null, linkId: number }> }|null>}
+ * @returns {Promise<{ trigger_id: number, trigger_string: string, selection_mode: string, responses: Array<{ id: number, response_string: string, order: number|null, weight: number, response_function: string|null, linkId: number }> }|null>}
  */
 export const getAllResponsesForTrigger = async (triggerString) => {
   if (
@@ -55,17 +55,17 @@ export const getAllResponsesForTrigger = async (triggerString) => {
 };
 
 /**
- * List lotto prize catalog rows from webapi.
- * GET /api/trigger-responses/lotto-prizes
- * @returns {Promise<Array<{ id: number, prize_string: string }>>}
+ * List trigger response function catalog rows from webapi.
+ * GET /api/trigger-responses/functions
+ * @returns {Promise<Array<{ id: number, function_name: string }>>}
  */
-export const getLottoPrizesList = async () => {
+export const getTriggerResponseFunctionsList = async () => {
   try {
-    const { data } = await api.get("/api/trigger-responses/lotto-prizes");
-    if (!data?.ok || !Array.isArray(data.lottoPrizes)) return [];
-    return data.lottoPrizes.map((row) => ({
+    const { data } = await api.get("/api/trigger-responses/functions");
+    if (!data?.ok || !Array.isArray(data.responseFunctions)) return [];
+    return data.responseFunctions.map((row) => ({
       id: Number(row.id),
-      prize_string: String(row.prize_string),
+      function_name: String(row.function_name),
     }));
   } catch (_) {
     return [];
@@ -77,7 +77,7 @@ export const getLottoPrizesList = async () => {
  * Uses GET /api/trigger-responses/random for all modes (random, ordered, weighted) so selection and frequency tracking happen on the server.
  * @param {string|{ trigger_string: string, selection_mode?: string }} triggerOrObject - Trigger string or object with trigger_string and selection_mode
  * @param {string} [discordUserId] - Discord snowflake of the user receiving the response, so the server can log trigger_response_user_history
- * @returns {Promise<{ response: string, lotto_prize: string|null }>} Response payload or empty response if none (e.g. 404)
+ * @returns {Promise<{ response: string, response_function: string|null }>} Response payload or empty response if none (e.g. 404)
  */
 export const getRandomResponseForTrigger = async (
   triggerOrObject,
@@ -88,7 +88,7 @@ export const getRandomResponseForTrigger = async (
       ? triggerOrObject?.trim()
       : triggerOrObject?.trigger_string?.trim();
 
-  if (!triggerString) return { response: "", lotto_prize: null };
+  if (!triggerString) return { response: "", response_function: null };
 
   try {
     const { data } = await api.get("/api/trigger-responses/random", {
@@ -97,16 +97,16 @@ export const getRandomResponseForTrigger = async (
         ...(discordUserId ? { app: "discord", userId: discordUserId } : {}),
       },
     });
-    if (!data?.ok) return { response: "", lotto_prize: null };
-    const lottoPrize =
-      typeof data.lotto_prize === "string" && data.lotto_prize.trim()
-        ? data.lotto_prize.trim()
+    if (!data?.ok) return { response: "", response_function: null };
+    const responseFunction =
+      typeof data.response_function === "string" && data.response_function.trim()
+        ? data.response_function.trim()
         : null;
     return {
       response: data.response ?? "",
-      lotto_prize: lottoPrize,
+      response_function: responseFunction,
     };
   } catch (_) {
-    return { response: "", lotto_prize: null };
+    return { response: "", response_function: null };
   }
 };

@@ -193,29 +193,29 @@ See also [trigger-responses-examples.md](trigger-responses-examples.md) for samp
 }
 ```
 
-**200 OK** (weighted, when the selected response has a `lotto_prize`)
+**200 OK** (weighted, when the selected response has a `response_function`)
 
 ```json
 {
   "ok": true,
   "response": "You won!",
   "id": 1,
-  "lotto_prize": "TAL_timeout"
+  "response_function": "TAL_timeout"
 }
 ```
 
 ---
 
-## GET /api/trigger-responses/lotto-prizes
+## GET /api/trigger-responses/functions
 
 **200 OK**
 
 ```json
 {
   "ok": true,
-  "lottoPrizes": [
-    { "id": 1, "prize_string": "TAL_timeout", "frequency": 0 },
-    { "id": 2, "prize_string": "placeholder_message", "frequency": 0 }
+  "responseFunctions": [
+    { "id": 1, "function_name": "TAL_timeout", "frequency": 0, "display_name": "Curse of Taking a Look" },
+    { "id": 2, "function_name": "placeholder_message", "frequency": 0, "display_name": null }
   ]
 }
 ```

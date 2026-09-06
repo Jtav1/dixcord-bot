@@ -1966,17 +1966,17 @@
         }
       }
     },
-    "/api/trigger-responses/lotto-prizes": {
+    "/api/trigger-responses/functions": {
       "get": {
-        "operationId": "listLottoPrizes",
+        "operationId": "listTriggerResponseFunctions",
         "tags": [
           "Trigger Responses"
         ],
-        "summary": "List the lotto prize catalog",
-        "description": "Catalog of prize keys usable as a weighted trigger response's trigger_response.lotto_prize value. The bot hydrates its in-process prize handler table from this list, matching each prize_string against a handler function; catalog rows with no matching handler are a no-op.\n",
+        "summary": "List the trigger response function catalog",
+        "description": "Catalog of function keys usable as a weighted trigger response's trigger_response.response_function value. The bot hydrates its in-process function handler table from this list, matching each function_name against a handler function; catalog rows with no matching handler are a no-op.\n",
         "responses": {
           "200": {
-            "description": "All lotto prize catalog rows.",
+            "description": "All trigger response function catalog rows.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1988,7 +1988,7 @@
                         true
                       ]
                     },
-                    "lottoPrizes": {
+                    "responseFunctions": {
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -1996,12 +1996,12 @@
                           "id": {
                             "type": "integer"
                           },
-                          "prize_string": {
+                          "function_name": {
                             "type": "string"
                           },
                           "frequency": {
                             "type": "integer",
-                            "description": "Times this prize has been awarded."
+                            "description": "Times this function has been invoked."
                           },
                           "display_name": {
                             "type": "string",

@@ -137,19 +137,19 @@
       <v-col cols="12" sm="6" md="4">
         <v-card class="glass-card pa-6 h-100">
           <v-card-title class="text-h6 pa-0 mb-4">
-            <v-icon start color="secondary">mdi-dice-multiple-outline</v-icon>
-            Lotto Prizes
+            <v-icon start color="secondary">mdi-function-variant</v-icon>
+            Trigger Response Functions
           </v-card-title>
           <v-card-text class="pa-0 statistics-metrics">
             <p
-              v-if="!lottoPrizes.length"
+              v-if="!responseFunctions.length"
               class="text-caption text-medium-emphasis"
             >
-              No lotto prizes in the catalog.
+              No trigger response functions in the catalog.
             </p>
-            <p v-for="prize in lottoPrizes" :key="prize.id">
-              {{ prize.display_name || prize.prize_string }}:
-              {{ formatCount(prize.frequency) }}
+            <p v-for="fn in responseFunctions" :key="fn.id">
+              {{ fn.display_name || fn.function_name }}:
+              {{ formatCount(fn.frequency) }}
             </p>
           </v-card-text>
         </v-card>
@@ -168,7 +168,7 @@
 <script setup>
 import { onMounted, ref } from "vue";
 import { fetchStatistics } from "../lib/statistics.js";
-import { fetchLottoPrizes } from "../lib/lottoPrizes.js";
+import { fetchTriggerResponseFunctions } from "../lib/triggerResponseFunctions.js";
 
 const loading = ref(true);
 const error = ref("");
@@ -185,8 +185,8 @@ const error = ref("");
  *   scheduledMessages: { pending: number, sent: number }
  * } | null>} */
 const statistics = ref(null);
-/** @type {import("vue").Ref<Array<{ id: number, prize_string: string, frequency: number, display_name: string|null }>>} */
-const lottoPrizes = ref([]);
+/** @type {import("vue").Ref<Array<{ id: number, function_name: string, frequency: number, display_name: string|null }>>} */
+const responseFunctions = ref([]);
 const updatedAt = ref("");
 
 /**
@@ -217,9 +217,9 @@ async function loadStatistics() {
   }
 
   try {
-    lottoPrizes.value = await fetchLottoPrizes();
+    responseFunctions.value = await fetchTriggerResponseFunctions();
   } catch (err) {
-    console.warn("Failed to load lotto prizes:", err);
+    console.warn("Failed to load trigger response functions:", err);
   }
 }
 

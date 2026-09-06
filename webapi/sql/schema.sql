@@ -127,17 +127,17 @@ CREATE TABLE IF NOT EXISTS trigger_response (
   response_id INT NOT NULL,
   response_order INT NULL,
   weight INT NULL DEFAULT NULL,
-  lotto_prize VARCHAR(255) NULL,
+  response_function VARCHAR(255) NULL,
   frequency INT DEFAULT 0,
   FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE,
   FOREIGN KEY (response_id) REFERENCES responses(id) ON DELETE CASCADE,
   UNIQUE KEY unique_trigger_response (trigger_id, response_id)
 );
 
--- Catalog of lotto prize keys (matched by trigger_response.lotto_prize)
-CREATE TABLE IF NOT EXISTS trigger_lotto_prizes (
+-- Catalog of trigger response function keys (matched by trigger_response.response_function)
+CREATE TABLE IF NOT EXISTS trigger_response_functions (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  prize_string VARCHAR(255) NOT NULL UNIQUE,
+  function_name VARCHAR(255) NOT NULL UNIQUE,
   frequency INT DEFAULT 0,
   display_name VARCHAR(255) NULL
 );

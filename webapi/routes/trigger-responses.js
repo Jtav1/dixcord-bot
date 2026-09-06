@@ -1,7 +1,7 @@
 import express from "express";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 import * as triggerResponses from "../services/triggerResponses.js";
-import * as triggerLottoPrizes from "../services/triggerLottoPrizes.js";
+import * as triggerResponseFunctions from "../services/triggerResponseFunctions.js";
 import {
   listTriggerResponseHistoryForUser,
   recordTriggerResponseUsage,
@@ -638,7 +638,7 @@ router.get("/random", authenticate, async (req, res) => {
       ok: true,
       response: row.response_string,
       id: row.id,
-      ...(row.lotto_prize ? { lotto_prize: row.lotto_prize } : {}),
+      ...(row.response_function ? { response_function: row.response_function } : {}),
     });
   } catch (err) {
     console.error("GET /api/trigger-responses/random error:", err);
@@ -828,49 +828,51 @@ router.delete("/responses/:id", authenticate, requireAdmin, async (req, res) => 
 });
 
 /**
- * GET /api/trigger-responses/lotto-prizes
- * List lotto prize catalog rows (id, prize_string, frequency).
+ * GET /api/trigger-responses/functions
+ * List trigger response function catalog rows (id, function_name, frequency, display_name).
  * Auth: required.
  * @openapi
- * /api/trigger-responses/lotto-prizes:
+ * /api/trigger-responses/functions:
  *   get:
- *     operationId: listLottoPrizes
+ *     operationId: listTriggerResponseFunctions
  *     tags: [Trigger Responses]
- *     summary: List the lotto prize catalog
+ *     summary: List the trigger response function catalog
  *     description: >
- *       Catalog of prize keys usable as a weighted trigger response's trigger_response.lotto_prize value.
- *       The bot hydrates its in-process prize handler table from this list, matching each
- *       prize_string against a handler function; catalog rows with no matching handler are a no-op.
+ *       Catalog of function keys usable as a weighted trigger response's trigger_response.response_function
+ *       value. The bot hydrates its in-process function handler table from this list, matching each
+ *       function_name against a handler function; catalog rows with no matching handler are a no-op.
  *     responses:
  *       '200':
- *         description: All lotto prize catalog rows.
+ *         description: All trigger response function catalog rows.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
  *                 ok: { type: boolean, enum: [true] }
- *                 lottoPrizes:
+ *                 responseFunctions:
  *                   type: array
  *                   items:
  *                     type: object
  *                     properties:
  *                       id: { type: integer }
- *                       prize_string: { type: string }
- *                       frequency: { type: integer, description: Times this prize has been awarded. }
+ *                       function_name: { type: string }
+ *                       frequency: { type: integer, description: Times this function has been invoked. }
  *                       display_name: { type: string, nullable: true, description: Friendly name for display (e.g. in the webview); null if not set. }
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
  *         $ref: '#/components/responses/ServerError'
  */
-router.get("/lotto-prizes", authenticate, async (req, res) => {
+router.get("/functions", authenticate, async (req, res) => {
   try {
-    const lottoPrizes = await triggerLottoPrizes.getAll();
-    res.json({ ok: true, lottoPrizes });
+    const responseFunctions = await triggerResponseFunctions.getAll();
+    res.json({ ok: true, responseFunctions });
   } catch (err) {
-    console.error("GET /api/trigger-responses/lotto-prizes error:", err);
-    res.status(500).json({ ok: false, error: "Failed to list lotto prizes" });
+    console.error("GET /api/trigger-responses/functions error:", err);
+    res
+      .status(500)
+      .json({ ok: false, error: "Failed to list trigger response functions" });
   }
 });
 
@@ -1023,7 +1025,7 @@ router.get("/:id", authenticate, async (req, res) => {
 /**
  * POST /api/trigger-responses
  * Create a trigger-response pair.
- * Body: { trigger_string, response_string, response_order?, selection_mode?, weight?, lotto_prize? }
+ * Body: { trigger_string, response_string, response_order?, selection_mode?, weight?, response_function? }
  * Auth: required.
  * @openapi
  * /api/trigger-responses:
@@ -1086,7 +1088,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
       response_order,
       selection_mode,
       weight,
-      lotto_prize,
+      response_function,
     } = req.body ?? {};
     if (
       trigger_string == null ||
@@ -1108,7 +1110,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
       response_order,
       selection_mode,
       weight,
-      lotto_prize,
+      response_function,
     );
     if (id == null) {
       return res
@@ -1128,7 +1130,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
 /**
  * PUT /api/trigger-responses/:id
  * Update a trigger-response pair.
- * Body: { trigger_string?, response_string?, response_order?, selection_mode?, weight?, lotto_prize? }
+ * Body: { trigger_string?, response_string?, response_order?, selection_mode?, weight?, response_function? }
  * Auth: required.
  * @openapi
  * /api/trigger-responses/{id}:
@@ -1200,7 +1202,7 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
       response_order,
       selection_mode,
       weight,
-      lotto_prize,
+      response_function,
     } = req.body ?? {};
     const updates = {};
     if (typeof trigger_string === "string" && trigger_string.trim())
@@ -1215,12 +1217,13 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
     if (typeof selection_mode === "string" && selection_mode.trim())
       updates.selection_mode = selection_mode.trim();
     if (weight !== undefined) updates.weight = weight;
-    if (lotto_prize !== undefined) updates.lotto_prize = lotto_prize;
+    if (response_function !== undefined)
+      updates.response_function = response_function;
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({
         ok: false,
         error:
-          "Provide at least one of trigger_string, response_string, response_order, selection_mode, weight, or lotto_prize to update",
+          "Provide at least one of trigger_string, response_string, response_order, selection_mode, weight, or response_function to update",
       });
     }
     const updated = await triggerResponses.update(id, updates);

@@ -24,20 +24,21 @@ async function parseJsonResponse(res, context) {
 }
 
 /**
- * Fetch the lotto prize catalog (weighted trigger-response prize keys and how often each fired).
- * @returns {Promise<Array<{ id: number, prize_string: string, frequency: number, display_name: string|null }>>}
+ * Fetch the trigger response function catalog (weighted trigger-response handler functions and
+ * how often each fired).
+ * @returns {Promise<Array<{ id: number, function_name: string, frequency: number, display_name: string|null }>>}
  */
-export async function fetchLottoPrizes() {
-  const res = await fetch(`${API_BASE}/trigger-responses/lotto-prizes`);
+export async function fetchTriggerResponseFunctions() {
+  const res = await fetch(`${API_BASE}/trigger-responses/functions`);
 
   if (!res.ok) {
-    throw new Error(`Failed to load lotto prizes (${res.status})`);
+    throw new Error(`Failed to load trigger response functions (${res.status})`);
   }
 
-  const data = await parseJsonResponse(res, "Lotto prizes");
+  const data = await parseJsonResponse(res, "Trigger response functions");
   if (!data?.ok) {
-    throw new Error(data?.error || "Failed to load lotto prizes");
+    throw new Error(data?.error || "Failed to load trigger response functions");
   }
 
-  return Array.isArray(data.lottoPrizes) ? data.lottoPrizes : [];
+  return Array.isArray(data.responseFunctions) ? data.responseFunctions : [];
 }

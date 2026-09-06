@@ -7,7 +7,7 @@ import {
   getFortuneResponse,
 } from "../../api/responses.js";
 import { getRandomResponseForTrigger } from "../../api/triggerResponses.js";
-import { executeLottoPrize } from "../../utilities/lottoPrizes.js";
+import { executeResponseFunction } from "../../utilities/triggerResponseFunctions.js";
 import {
   createScheduledMessage,
   parseReminderText,
@@ -62,11 +62,11 @@ const execute = async (message) => {
       contentStripped.includes(t.trigger_string),
     );
     if (matchedTrigger) {
-      const { response: triggerResponse, lotto_prize } =
+      const { response: triggerResponse, response_function } =
         await getRandomResponseForTrigger(matchedTrigger, message.author.id);
       if (triggerResponse.length > 0) {
-        if (lotto_prize) {
-          await executeLottoPrize(lotto_prize, {
+        if (response_function) {
+          await executeResponseFunction(response_function, {
             message,
             client: message.client,
             responseText: triggerResponse,
