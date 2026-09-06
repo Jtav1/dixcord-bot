@@ -21,6 +21,14 @@ import {
 import { emojiDetector } from "./utilities/emojiDetector.js";
 import { stickerDetector } from "./utilities/stickerDetector.js";
 import { plusMinusMsg } from "./utilities/plusplus.js";
+import {
+  isLinkFixerEnabled,
+  isTriggerResponsesEnabled,
+  isRemindersEnabled,
+  isEightBallEnabled,
+  isStickerTrackingEnabled,
+  isPlusPlusEnabled,
+} from "../../configStore.js";
 
 const name = "messageCreate";
 
@@ -29,59 +37,63 @@ const execute = async (message) => {
 
   if (!message.author.bot && !(message.author.id === clientId)) {
     await emojiDetector(message);
-    await stickerDetector(message);
-    await plusMinusMsg(message);
+    if (isStickerTrackingEnabled()) await stickerDetector(message);
+    if (isPlusPlusEnabled()) await plusMinusMsg(message);
 
     const contentStripped = message.content
       .toLowerCase()
       .replace(/[^a-zA-Z0-9!]/g, "");
 
-    let linkHosts = getCachedLinkHosts();
-    if (linkHosts === null) {
-      await refreshContentCaches();
-      linkHosts = getCachedLinkHosts() ?? [];
-    }
-    const twitCheck = message.content.split(" ").filter((word) => {
-      const tmpWord = word.replace(/[<>]/g, "");
-      return linkHosts.some((host) => tmpWord.includes(host));
-    });
+    if (isLinkFixerEnabled()) {
+      let linkHosts = getCachedLinkHosts();
+      if (linkHosts === null) {
+        await refreshContentCaches();
+        linkHosts = getCachedLinkHosts() ?? [];
+      }
+      const twitCheck = message.content.split(" ").filter((word) => {
+        const tmpWord = word.replace(/[<>]/g, "");
+        return linkHosts.some((host) => tmpWord.includes(host));
+      });
 
-    if (twitCheck.length > 0) {
-      const twitFixReply = await getLinkFixerResponse(message.content ?? "");
-      if (twitFixReply.length > 0) {
-        response = twitFixReply;
+      if (twitCheck.length > 0) {
+        const twitFixReply = await getLinkFixerResponse(message.content ?? "");
+        if (twitFixReply.length > 0) {
+          response = twitFixReply;
+        }
       }
     }
 
-    let triggers = getCachedTriggers();
-    if (triggers === null) {
-      await refreshContentCaches();
-      triggers = getCachedTriggers() ?? [];
-    }
-    const matchedTrigger = triggers.find((t) =>
-      contentStripped.includes(t.trigger_string),
-    );
-    if (matchedTrigger) {
-      const { response: triggerResponse, response_function } =
-        await getRandomResponseForTrigger(matchedTrigger, message.author.id);
-      if (triggerResponse.length > 0) {
-        if (response_function) {
-          await executeResponseFunction(response_function, {
-            message,
-            client: message.client,
-            responseText: triggerResponse,
-          });
+    if (isTriggerResponsesEnabled()) {
+      let triggers = getCachedTriggers();
+      if (triggers === null) {
+        await refreshContentCaches();
+        triggers = getCachedTriggers() ?? [];
+      }
+      const matchedTrigger = triggers.find((t) =>
+        contentStripped.includes(t.trigger_string),
+      );
+      if (matchedTrigger) {
+        const { response: triggerResponse, response_function } =
+          await getRandomResponseForTrigger(matchedTrigger, message.author.id);
+        if (triggerResponse.length > 0) {
+          if (response_function) {
+            await executeResponseFunction(response_function, {
+              message,
+              client: message.client,
+              responseText: triggerResponse,
+            });
+          } else {
+            await message.reply(triggerResponse);
+          }
+          response = "";
         } else {
-          await message.reply(triggerResponse);
+          response = triggerResponse;
         }
-        response = "";
-      } else {
-        response = triggerResponse;
       }
     }
 
     if (message.content.startsWith(`<@${clientId}>`)) {
-      if (message.content.toLowerCase().includes("remind me")) {
+      if (isRemindersEnabled() && message.content.toLowerCase().includes("remind me")) {
         const mentionRegex = new RegExp(`^<@!?${clientId}>\\s+`, "i");
         const reminderText = message.content.replace(mentionRegex, "").trim();
         const isReply = message.type === MessageType.Reply;
@@ -133,7 +145,11 @@ const execute = async (message) => {
           await message.react("❌").catch(() => null);
           return;
         }
-      } else if (!response && message.content.endsWith("?")) {
+      } else if (
+        isEightBallEnabled() &&
+        !response &&
+        message.content.endsWith("?")
+      ) {
         response = await getFortuneResponse();
       }
     }

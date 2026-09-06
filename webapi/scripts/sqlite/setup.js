@@ -361,7 +361,6 @@ const envOrDefault = (envKey, defaultVal) =>
 
 const importConfigs = () => {
   const isDev = process.env.NODE_ENV !== "production";
-  const defaultDelay = Math.floor(Math.random() * 60000 + 60000);
   const defaultPinThreshold = isDev ? 1 : 3;
   const defaultPinChannelId = isDev
     ? "710671234471559228"
@@ -371,8 +370,15 @@ const importConfigs = () => {
     : "911427650730487878";
 
   const configArray = [
-    ["rare_frequency", envOrDefault("RARE_FREQUENCY", "0.1")],
     ["twitter_fix_enabled", envOrDefault("TWITTER_FIX_ENABLED", "true")],
+    ["trigger_responses_enabled", "true"],
+    ["reminders_enabled", "true"],
+    ["eight_ball_enabled", "true"],
+    ["emoji_tracking_enabled", "true"],
+    ["sticker_tracking_enabled", "true"],
+    ["plusplus_enabled", "true"],
+    ["repost_detection_enabled", "true"],
+    ["pin_system_enabled", "true"],
     [
       "pin_threshold",
       envOrDefault("PIN_THRESHOLD", String(defaultPinThreshold)),
@@ -383,19 +389,16 @@ const importConfigs = () => {
       "announce_channel_id",
       envOrDefault("ANNOUNCE_CHANNEL_ID", defaultAnnounceChannelId),
     ],
-    [
-      "take_a_look_delay",
-      envOrDefault("TAKE_A_LOOK_DELAY", String(defaultDelay)),
-    ],
-    ["take_a_look_repost_limit", envOrDefault("TAKE_A_LOOK_REPOST_LIMIT", "2")],
     ["pin_channel_id", envOrDefault("PIN_CHANNEL_ID", defaultPinChannelId)],
     ["plusplus_emoji", envOrDefault("PLUSPLUS_EMOJI", "1333222614033760326")],
     [
       "minusminus_emoji",
       envOrDefault("MINUSMINUS_EMOJI", "1333222612683194442"),
     ],
-    ["timeout_emoji", envOrDefault("TIMEOUT_EMOJI", null)],
-    ["timeout_vote_threshold", envOrDefault("TIMEOUT_VOTE_THRESHOLD", "5")],
+    [
+      "user_mapping_import_channel_id",
+      envOrDefault("DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID", ""),
+    ],
   ];
 
   const insert = db.prepare(

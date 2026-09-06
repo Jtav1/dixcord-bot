@@ -4,6 +4,7 @@ import { getTopEmoji } from "../../api/emojis.js";
 import { EmbedBuilder } from "discord.js";
 
 const cmdName = "top-emojis";
+const featureKey = "emoji_tracking_enabled";
 
 const data = new SlashCommandBuilder()
   .setName("top-emojis")
@@ -34,4 +35,4 @@ const execute = async (interaction) => {
   await interaction.reply({ embeds: [emojiEmbed] });
 };
 
-export { cmdName, data, execute };
+export { cmdName, data, execute, featureKey };

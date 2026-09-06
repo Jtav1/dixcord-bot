@@ -8,16 +8,16 @@
 {
   "ok": true,
   "config": {
-    "take_a_look_delay": "60000",
-    "take_a_look_repost_limit": "3",
+    "pin_threshold": "3",
+    "pin_channel_id": "915462110761349201",
     "twitter_fix_enabled": "true",
-    "rare_frequency": "0.1"
+    "plusplus_enabled": "true"
   },
   "entries": [
-    { "config": "take_a_look_delay", "value": "60000" },
-    { "config": "take_a_look_repost_limit", "value": "3" },
+    { "config": "pin_threshold", "value": "3" },
+    { "config": "pin_channel_id", "value": "915462110761349201" },
     { "config": "twitter_fix_enabled", "value": "true" },
-    { "config": "rare_frequency", "value": "0.1" }
+    { "config": "plusplus_enabled", "value": "true" }
   ]
 }
 ```

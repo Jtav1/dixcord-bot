@@ -7,6 +7,7 @@ import { getPinMessageRoleIds } from "../../configStore.js";
 //   node deploy-commands.js
 
 const cmdName = "pin-message";
+const featureKey = "pin_system_enabled";
 
 const data = new SlashCommandBuilder()
   .setName("pin-message")
@@ -94,4 +95,4 @@ async function getRandomPinQuip() {
   return "PINNED";
 }
 
-export { cmdName, data, execute };
+export { cmdName, data, execute, featureKey };

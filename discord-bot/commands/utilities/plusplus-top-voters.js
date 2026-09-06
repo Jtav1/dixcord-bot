@@ -3,6 +3,7 @@ import { getTopVoters } from "../../api/plusplus.js";
 import { EmbedBuilder } from "discord.js";
 
 const cmdName = "plusplus-top-voters";
+const featureKey = "plusplus_enabled";
 
 const data = new SlashCommandBuilder()
   .setName("plusplus-top-voters")
@@ -26,4 +27,4 @@ const execute = async (interaction) => {
   await interaction.reply({ embeds: [voterEmbed] });
 };
 
-export { cmdName, data, execute };
+export { cmdName, data, execute, featureKey };

@@ -21,6 +21,7 @@ If a task seems to require a state-changing git command, stop and ask the user t
 - Prefer established, well-maintained libraries when they reduce overall complexity or improve reliability. Do not reimplement common functionality without a clear reason and user approval.
 - Lean on the dependencies already in the project before writing your own implementation and adding packages. Do not assume a library lacks a capability without checking its documentation.
 - Suggest improvements when planning to facilitate implementation of these rules.
+- Comments should be EXTREMELY CONCISE. Even function-header comments. Condense as much as possible while maintaining readability. 
 
 ## Commands
 

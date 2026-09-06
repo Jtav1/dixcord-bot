@@ -1,5 +1,6 @@
 import * as api from "./client.js";
-import { guildId, userMappingImportChannelId } from "../configVars.js";
+import { guildId } from "../configVars.js";
+import { getUserMappingImportChannelId } from "../configStore.js";
 
 /**
  * Sync Discord user rows with the web API.
@@ -17,19 +18,19 @@ export const importUserMappingList = async (userRows) => {
 
 /**
  * Collect guild members (non-bot) plus any message authors in the channel from
- * DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID, then POST to webapi.
+ * the user_mapping_import_channel_id config, then POST to webapi.
  * @param {import('discord.js').Client} client
  */
 export async function syncUserMappingFromGuild(client) {
   const oauthGuild = await client.guilds.fetch(guildId);
   const guild = await oauthGuild.fetch();
   const channel = await guild.channels
-    .fetch(userMappingImportChannelId)
+    .fetch(getUserMappingImportChannelId())
     .catch(() => null);
 
   if (!channel || channel.guildId !== guild.id) {
     console.log(
-      "bot: DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID not found or not in guild; skipping user mapping sync",
+      "bot: user_mapping_import_channel_id not found or not in guild; skipping user mapping sync",
     );
     return;
   }

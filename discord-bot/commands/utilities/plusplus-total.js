@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 import { getTotalScoreByString } from "../../api/plusplus.js";
 
 const cmdName = "plusplus-total";
+const featureKey = "plusplus_enabled";
 
 const data = new SlashCommandBuilder()
   .setName("plusplus-total")
@@ -51,4 +52,4 @@ const execute = async (interaction) => {
   });
 };
 
-export { cmdName, data, execute };
+export { cmdName, data, execute, featureKey };

@@ -5,6 +5,7 @@ import { getTopReposters } from "../../api/emojis.js";
 import { getAllConfigurations } from "../../api/configurations.js";
 
 const cmdName = "top-reposters";
+const featureKey = "repost_detection_enabled";
 
 const configs = await getAllConfigurations();
 const repostEmojiId = configs.filter(
@@ -37,4 +38,4 @@ const execute = async (interaction) => {
   await interaction.reply({ embeds: [repostEmbed] });
 };
 
-export { cmdName, data, execute };
+export { cmdName, data, execute, featureKey };

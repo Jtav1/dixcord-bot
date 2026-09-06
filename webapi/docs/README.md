@@ -11,7 +11,7 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 - **Auth & users** – Login (JWT); register disabled; profile get/update/delete. Bootstraps service accounts from env (`admin`, `bot`, `webview`).
 - **Bot responses** – Random 8-ball fortunes; social link fixer.
 - **Message processing** – Emoji/sticker usage, plus/minus scoring, repost tracking, pin check/log, emoji/sticker import.
-- **Config** – Key/value bot settings (pin threshold, emoji IDs, channels, etc.).
+- **Config** – Key/value bot settings (pin threshold, emoji IDs, channels, feature on/off toggles, etc.).
 - **Link replacements** – CRUD for source_host → target_host rewrite rules.
 - **Pin quips** – CRUD + random quip for pin reactions.
 - **Trigger–responses** – Triggers with selection modes (`random`, `ordered` round-robin, `weighted`), responses, junction links, trigger response function catalog, frequency tracking, per-user usage history. See [trigger-responses-examples.md](trigger-responses-examples.md).

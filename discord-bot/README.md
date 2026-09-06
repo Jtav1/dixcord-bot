@@ -51,6 +51,26 @@ The bot **depends on the web API** for almost all behavior. It loads configurati
 - Sends heartbeats to webapi; waits for `/health` before starting in Docker.
 - Optionally clears and re-registers guild slash commands on container start.
 
+### Feature toggles
+
+Each key below is a webapi `configurations` boolean (not an env var), defaults to `"true"`, and
+can be flipped to `"false"` via `PUT /api/config` — no bot restart required, picked up on the
+next cache-version poll (≤30s). Disabling a key only affects what's listed; adjacent
+functionality (e.g. `/scheduled-*` reminder management, pin-history startup hydration) stays
+available regardless.
+
+| Key | Disables |
+| --- | --- |
+| `twitter_fix_enabled` | Link fixer |
+| `trigger_responses_enabled` | Trigger-string auto-replies |
+| `reminders_enabled` | Creating new reminders via "@bot remind me ..." |
+| `eight_ball_enabled` | 8-ball/fortune replies |
+| `emoji_tracking_enabled` | Emoji usage tracking (message content + reactions) |
+| `sticker_tracking_enabled` | Sticker usage tracking |
+| `plusplus_enabled` | ++/-- voting (text, reactions, emoji-reply shortcut) and its leaderboard commands |
+| `repost_detection_enabled` | Repost accusation tracking and its leaderboard commands |
+| `pin_system_enabled` | Auto-pin threshold and `/pin-message` |
+
 ---
 
 ## Environment variables
@@ -65,8 +85,9 @@ Copy `.env.example` to `.env` for local development. There are **no in-code defa
 | `DISCORD_CLIENT_ID`                      | yes      | Application (client) ID |
 | `DISCORD_GUILD_ID`                       | yes      | Guild ID for command registration and bot context |
 | `DEV_FLAG`                               | yes      | Must be non-empty. Loosely `== false` (e.g. `0`) → production (`dataDirectory=/data`); otherwise development (`./data`) |
-| `DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID` | no       | Extra text channel whose non-bot message authors are merged into user-mapping sync (must be in `DISCORD_GUILD_ID`) |
 | `PERMISSIONS`                            | no       | Discord permissions mask for invite URLs; not read by the bot process |
+
+The extra text channel whose non-bot message authors are merged into user-mapping sync is configured via the `user_mapping_import_channel_id` webapi config key (not an env var) — see `webapi/services/configMetadata.js`.
 
 ### Web API
 
