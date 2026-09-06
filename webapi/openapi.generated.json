@@ -2002,6 +2002,11 @@
                           "frequency": {
                             "type": "integer",
                             "description": "Times this prize has been awarded."
+                          },
+                          "display_name": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Friendly name for display (e.g. in the webview); null if not set."
                           }
                         }
                       }
