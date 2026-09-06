@@ -36,7 +36,7 @@ const syncServicePasswords =
 /**
  * Create or update a service account user row.
  * Password is set on create; existing rows only sync password when SYNC_SERVICE_PASSWORDS=true.
- * Role is always enforced on existing rows.
+ * Role is always enforced on existing rows...
  * @param {string} email Service account email.
  * @param {string} password Plain-text password from env.
  * @param {string} name Display name.
