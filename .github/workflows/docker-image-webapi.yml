@@ -11,9 +11,8 @@ permissions:
 
 on:
   push:
-    # Release tags and every commit to master trigger this workflow; the
-    # `changes` job below decides whether webapi's image actually needs rebuilding.
-    branches: ["master"]
+    # Only a pushed release tag triggers this workflow at all; the `changes` job
+    # below decides whether webapi's image actually needs rebuilding for it.
     tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+rc[0-9]+"]
 
 env:
@@ -26,7 +25,7 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      changed: ${{ steps.check.outputs.changed || steps.check-branch.outputs.changed }}
+      changed: ${{ steps.check.outputs.changed }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -35,7 +34,6 @@ jobs:
 
       - name: Find previous release tag
         id: prev-tag
-        if: startsWith(github.ref, 'refs/tags/')
         run: |
           prev=$(git tag --sort=-creatordate \
             | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(rc[0-9]+)?$' \
@@ -45,7 +43,6 @@ jobs:
 
       - name: Check for webapi/ changes since previous release
         id: check
-        if: startsWith(github.ref, 'refs/tags/')
         run: |
           if [ -z "${{ steps.prev-tag.outputs.prev }}" ]; then
             echo "No previous release tag found; building."
@@ -55,21 +52,6 @@ jobs:
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "webapi/ changed since ${{ steps.prev-tag.outputs.prev }}; building."
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Check for webapi/ changes since previous commit
-        id: check-branch
-        if: github.ref == 'refs/heads/master'
-        run: |
-          if [ -z "${{ github.event.before }}" ] || ! git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
-            echo "No previous commit to diff against; building."
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet "${{ github.event.before }}" "${{ github.sha }}" -- webapi/; then
-            echo "No webapi/ changes since previous commit; skipping build."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "webapi/ changed since previous commit; building."
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
@@ -90,9 +72,9 @@ jobs:
       # Install the cosign tool
       # https://github.com/sigstore/cosign-installer
       - name: Install Cosign
-        uses: sigstore/cosign-installer@v4.0.0
+        uses: sigstore/cosign-installer@v4.1.2
         with:
-          cosign-release: "v3.0.3"
+          cosign-release: "v3.0.6"
       - name: Check install!
         run: cosign version
 
@@ -105,7 +87,7 @@ jobs:
       # Login against a Docker registry
       # https://github.com/docker/login-action
       - name: Log into registry ${{ env.REGISTRY }}
-        uses: docker/login-action@v4.0.0
+        uses: docker/login-action@v4.6.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -115,7 +97,7 @@ jobs:
       # https://github.com/docker/metadata-action
       - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v5.10.0
+        uses: docker/metadata-action@v6.2.0
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
