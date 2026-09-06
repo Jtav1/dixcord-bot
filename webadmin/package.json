@@ -1,5 +1,5 @@
 {
-  "name": "dixcord-bot-web-panel",
+  "name": "dixcord-bot-webadmin",
   "version": "2.2.1",
   "description": "Admin panel frontend for dixcord-bot",
   "type": "module",
@@ -13,6 +13,8 @@
   "dependencies": {
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
+    "helmet": "^8.2.0",
     "http-proxy-middleware": "^3.0.5"
   },
   "devDependencies": {
