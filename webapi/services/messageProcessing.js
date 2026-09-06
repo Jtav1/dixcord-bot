@@ -253,8 +253,10 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
 }
 
 /**
- * Parse message for word++ / user++ / -- and record votes.
- * @param {object} payload - { app: string, message: { content, author: { id } }, voterId: string (snowflake) }
+ * Parse message for word++ / user++ / -- and record votes. A reply consisting of just "++"/"--"
+ * has no preceding word/mention for the regex below to match, so that case is treated as a
+ * single vote on the replied-to user instead.
+ * @param {object} payload - { app: string, message: { content, author: { id } }, voterId: string (snowflake), isReply?: boolean, repliedUserId?: string }
  * @returns {Promise<{ ok: boolean, recorded?: number, error?: string }>}
  */
 export async function recordPlusMinusMessage(payload) {
@@ -262,12 +264,31 @@ export async function recordPlusMinusMessage(payload) {
   if (!appCheck.ok) return appCheck;
   const chatApp = appCheck.app;
 
-  const { message, voterId } = payload;
-  const content = message?.content ?? "";
+  const { message, voterId, isReply = false, repliedUserId = null } = payload;
+  const content = String(message?.content ?? "");
   if (!voterId) return { ok: false, error: "voterId is required" };
 
   const voterOk = await requireChatMemberMappingId(voterId, chatApp);
   if (!voterOk.ok) return { ok: false, error: voterOk.error };
+
+  const trimmed = content.trim();
+  if (isReply && repliedUserId && (trimmed === "++" || trimmed === "--")) {
+    const ok = await recordPlusPlus(
+      repliedUserId,
+      "user",
+      voterId,
+      trimmed === "++" ? 1 : -1,
+      chatApp,
+    );
+    if (!ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
+    return { ok: true, recorded: 1 };
+  }
+
+  // Cap total +/- characters so one message can't cast a pile of votes at once.
+  const plusMinusCharCount = (content.match(/[+-]/g) ?? []).length;
+  if (plusMinusCharCount > 2) {
+    return { ok: true, recorded: 0 };
+  }
 
   const regex = /(\S+)\s*(\+\+|\-\-)/g;
 

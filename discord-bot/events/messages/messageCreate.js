@@ -12,7 +12,6 @@ import {
   createScheduledMessage,
   parseReminderText,
 } from "../../api/scheduledMessages.js";
-import { refreshScheduledMessagesCache } from "../../scheduler/messageScheduler.js";
 import {
   getCachedLinkHosts,
   getCachedTriggers,
@@ -128,7 +127,6 @@ const execute = async (message) => {
             await message.react("❌").catch(() => null);
             return;
           }
-          await refreshScheduledMessagesCache();
           await message.react("✅").catch(() => null);
         } catch (err) {
           console.log("bot: scheduler create failure:", err);

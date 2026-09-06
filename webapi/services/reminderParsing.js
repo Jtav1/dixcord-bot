@@ -116,3 +116,32 @@ export function parseReminderText(payload) {
 
   return { ok: false, error: "Unrecognized reminder format" };
 }
+
+/**
+ * @typedef {object} TimeParseResult
+ * @property {boolean} ok
+ * @property {string} [scheduledAt] - ISO 8601 UTC timestamp.
+ * @property {string} [error]
+ */
+
+/**
+ * Parse a bare time expression (e.g. "in 10 minutes", "tomorrow at 5pm") with no surrounding
+ * "remind me" grammar - used to parse the free-text `time` option on the scheduled-update command.
+ * @param {string} text - Time expression text.
+ * @returns {TimeParseResult}
+ */
+export function parseTimeExpression(text) {
+  const trimmed = String(text ?? "").trim();
+  if (!trimmed) {
+    return { ok: false, error: "Time text is required" };
+  }
+
+  const scheduledAt = chrono.parseDate(trimmed, Date.now(), {
+    forwardDate: true,
+  });
+  if (!scheduledAt) {
+    return { ok: false, error: "Could not parse a time from that text" };
+  }
+
+  return { ok: true, scheduledAt: scheduledAt.toISOString() };
+}

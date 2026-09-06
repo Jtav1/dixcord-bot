@@ -2788,7 +2788,7 @@
           "Scheduled Messages"
         ],
         "summary": "List scheduled messages (requester, bot, or admin scope)",
-        "description": "Behavior depends on `scope`:\n  - Omitted (default, \"requester scope\"): resolves `requesterUserId` to a\n    chat_member_mapping row and returns that single user's upcoming\n    pending scheduled messages. Requires the bot or admin role (checked\n    in-handler); callers other than the bot act on a user's behalf via\n    `requesterUserId`.\n  - `scope=bot`: returns every pending scheduled message for the app\n    (all users), for the bot's own scheduler loop. Requires the bot\n    role (checked in-handler); `requesterUserId` is ignored.\n  - `scope=admin`: returns a paginated, `status`-filterable list across\n    all users for the admin panel. Requires the admin role (checked\n    in-handler); `requesterUserId` is ignored.\n",
+        "description": "Behavior depends on `scope`:\n  - Omitted (default, \"requester scope\"): resolves `requesterUserId` to a\n    chat_member_mapping row and returns that single user's upcoming\n    pending scheduled messages. Requires the bot or admin role (checked\n    in-handler); callers other than the bot act on a user's behalf via\n    `requesterUserId`.\n  - `scope=bot`: returns pending scheduled messages for the app (all\n    users), for the bot's own scheduler loop. `due=true` filters to\n    only rows whose scheduled_at has passed, so the \"what's due right\n    now\" comparison happens server-side rather than in the bot;\n    omitted/false returns every pending row. Requires the bot role\n    (checked in-handler); `requesterUserId` is ignored.\n  - `scope=admin`: returns a paginated, `status`-filterable list across\n    all users for the admin panel. Requires the admin role (checked\n    in-handler); `requesterUserId` is ignored.\n",
         "parameters": [
           {
             "name": "app",
@@ -2814,6 +2814,16 @@
               ]
             },
             "description": "Selects bot or admin scope. Omit for requester scope."
+          },
+          {
+            "name": "due",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Only used when `scope=bot`. When true, returns only rows currently due (scheduled_at <= now)."
           },
           {
             "name": "requesterUserId",
@@ -3595,6 +3605,78 @@
                 }
               }
             }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/scheduled-messages/parse-time": {
+      "post": {
+        "operationId": "parseTimeExpression",
+        "tags": [
+          "Scheduled Messages"
+        ],
+        "summary": "Parse a bare time expression into a scheduled time",
+        "description": "Client-agnostic NLP parsing (chrono-node) of a free-text time expression with no surrounding \"remind me\" grammar (e.g. \"in 10 minutes\", \"tomorrow at 5pm\") - used for updating an existing scheduled message's time, as opposed to POST /api/scheduled-messages/parse-reminder which also extracts a reminder body.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "text"
+                ],
+                "properties": {
+                  "text": {
+                    "type": "string",
+                    "description": "Free-text time expression."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Parsed time.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "scheduledAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing `text`, or no time could be parsed from it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenBotOrAdmin"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -4624,7 +4706,7 @@
           "Message Processing"
         ],
         "summary": "Parse a message or reaction for plus/minus votes",
-        "description": "type defaults to \"message\" when omitted or not \"reaction\". \"message\" parses word++/word-- and @mention++/@mention-- tokens out of message.content and records one vote per match (self-votes on mentions are skipped). \"reaction\" records a single +/- vote directly.\n",
+        "description": "type defaults to \"message\" when omitted or not \"reaction\". \"message\" parses word++/word-- and @mention++/@mention-- tokens out of message.content and records one vote per match (self-votes on mentions are skipped); total +/- characters are capped at 2 to prevent one message from casting a pile of votes at once. When isReply is true and repliedUserId is given and message.content is exactly \"++\" or \"--\" (no preceding word/mention for the parser to match), a single vote is recorded for repliedUserId instead. \"reaction\" records a single +/- vote directly.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -4670,6 +4752,15 @@
                       "voterId": {
                         "type": "string",
                         "description": "Discord snowflake of the message author (voter)."
+                      },
+                      "isReply": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Whether the source message was a reply to another message."
+                      },
+                      "repliedUserId": {
+                        "type": "string",
+                        "description": "Discord snowflake of the user being replied to; only used when message.content is exactly \"++\" or \"--\"."
                       }
                     }
                   },

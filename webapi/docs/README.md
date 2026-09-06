@@ -139,13 +139,14 @@ See [admin-backend-api.md](admin-backend-api.md) for full admin route documentat
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/scheduled-messages?app=discord&scope=bot` | ✓ | Pending rows for bot scheduler |
+| GET | `/api/scheduled-messages?app=discord&scope=bot&due=` | ✓ | Pending rows for bot scheduler; `due=true` filters to only currently-due rows |
 | GET | `/api/scheduled-messages?app=discord&scope=admin&status=` | admin | Admin list (pending/sent/all) |
 | GET | `/api/scheduled-messages/:id` | ✓ | Get one (requester-owned) |
 | POST | `/api/scheduled-messages` | ✓ | Create scheduled message |
 | PUT | `/api/scheduled-messages/:id` | ✓ | User/bot/admin update |
 | DELETE | `/api/scheduled-messages/:id` | ✓ | User or admin delete |
 | POST | `/api/scheduled-messages/parse-reminder` | ✓ | Parse "remind me" text into a scheduled time + message body |
+| POST | `/api/scheduled-messages/parse-time` | ✓ | Parse a bare time expression (no "remind me" grammar) into a scheduled time |
 
 ## Response examples by route category
 
