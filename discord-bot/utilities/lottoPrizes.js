@@ -25,11 +25,12 @@ const PLACEHOLDER_FNS = {
             "Lotto prize: Timeout for 3 minutes",
           );
           await message.reply(
-            "you rolled a 1. CURSE OF RA𓀀 𓀁 𓀂 𓀃 𓀄 𓀅 𓀆 𓀇 𓀈 𓀉 𓀊 𓀋 𓀌 𓀍 𓀎 𓀏 𓀐 𓀑 𓀒 𓀓 𓀔",
+            "CURSE OF RA𓀀 𓀁 𓀂 𓀃 𓀄 𓀅 𓀆 𓀇 𓀈 𓀉 𓀊 𓀋 𓀌 𓀍 𓀎 𓀏 𓀐 𓀑 𓀒 𓀓 𓀔",
           );
         } catch (err) {
+          console.error(err);
           await message.reply(
-            "Rolled a 1 but youre an admin or something. Respectfully time yourself out.",
+            "'You were supposed to get a curse of ra but it broke somehow. Please tell Justin'",
           );
         }
       } else {
