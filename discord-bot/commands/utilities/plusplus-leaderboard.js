@@ -3,6 +3,7 @@ import { getTopScores, getBottomScores } from '../../api/plusplus.js';
 import { EmbedBuilder } from "discord.js";
 
 const cmdName = "plusplus-leaderboard";
+const featureKey = "plusplus_enabled";
 
 const data = new SlashCommandBuilder()
   .setName("plusplus-leaderboard")
@@ -34,4 +35,4 @@ const execute = async (interaction) => {
   await interaction.reply({ embeds: [voteEmbed] });
 };
 
-export { cmdName, data, execute };
+export { cmdName, data, execute, featureKey };

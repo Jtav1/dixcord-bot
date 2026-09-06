@@ -412,6 +412,14 @@ const importConfigs = async () => {
 
   const configArray = [
     ["twitter_fix_enabled", "true"],
+    ["trigger_responses_enabled", "true"],
+    ["reminders_enabled", "true"],
+    ["eight_ball_enabled", "true"],
+    ["emoji_tracking_enabled", "true"],
+    ["sticker_tracking_enabled", "true"],
+    ["plusplus_enabled", "true"],
+    ["repost_detection_enabled", "true"],
+    ["pin_system_enabled", "true"],
     ["pin_threshold", String(pinThreshold)],
     ["pin_emoji", "\ud83d\udccc"],
     ["repost_emoji", "1072368151922233404"],

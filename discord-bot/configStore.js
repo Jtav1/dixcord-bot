@@ -130,4 +130,58 @@ export function getUserMappingImportChannelId() {
   return getConfigValue("user_mapping_import_channel_id", "");
 }
 
+/**
+ * Generic feature-toggle check. Missing/unseeded keys default to enabled.
+ * @param {string} key
+ * @returns {boolean}
+ */
+export function isFeatureEnabled(key) {
+  return getConfigValue(key, "true") !== "false";
+}
+
+/** @returns {boolean} */
+export function isLinkFixerEnabled() {
+  return isFeatureEnabled("twitter_fix_enabled");
+}
+
+/** @returns {boolean} */
+export function isTriggerResponsesEnabled() {
+  return isFeatureEnabled("trigger_responses_enabled");
+}
+
+/** @returns {boolean} */
+export function isRemindersEnabled() {
+  return isFeatureEnabled("reminders_enabled");
+}
+
+/** @returns {boolean} */
+export function isEightBallEnabled() {
+  return isFeatureEnabled("eight_ball_enabled");
+}
+
+/** @returns {boolean} */
+export function isEmojiTrackingEnabled() {
+  return isFeatureEnabled("emoji_tracking_enabled");
+}
+
+/** @returns {boolean} */
+export function isStickerTrackingEnabled() {
+  return isFeatureEnabled("sticker_tracking_enabled");
+}
+
+/** @returns {boolean} */
+export function isPlusPlusEnabled() {
+  return isFeatureEnabled("plusplus_enabled");
+}
+
+/** @returns {boolean} */
+export function isRepostDetectionEnabled() {
+  return isFeatureEnabled("repost_detection_enabled");
+}
+
+/** @returns {boolean} */
+export function isPinSystemEnabled() {
+  return isFeatureEnabled("pin_system_enabled");
+}
+
 await loadConfig();

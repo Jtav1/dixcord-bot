@@ -1,5 +1,5 @@
 // Require the necessary discord.js classes
-import { Client, Events, GatewayIntentBits, Partials } from "discord.js";
+import { Client, Events, GatewayIntentBits, MessageFlags, Partials } from "discord.js";
 
 import fs from "node:fs";
 import path from "node:path";
@@ -17,6 +17,11 @@ import {
   getPinThreshold,
   getPlusEmoji,
   getRepostEmojiId,
+  isFeatureEnabled,
+  isPinSystemEnabled,
+  isPlusPlusEnabled,
+  isEmojiTrackingEnabled,
+  isRepostDetectionEnabled,
 } from "./configStore.js";
 import { startCacheVersionPoller } from "./api/cacheRefresh.js";
 import { startHeartbeat } from "./api/system.js";
@@ -105,9 +110,19 @@ for (const category of commandsCategories) {
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isCommand()) return;
 
-  let runCommand = commands.find(
+  const runCommand = commands.find(
     (cmd) => cmd.cmdName === interaction.commandName,
   );
+  if (!runCommand) return;
+
+  if (runCommand.featureKey && !isFeatureEnabled(runCommand.featureKey)) {
+    await interaction.reply({
+      flags: MessageFlags.Ephemeral,
+      content: "This feature is currently disabled.",
+    });
+    return;
+  }
+
   try {
     await runCommand.execute(interaction);
   } catch (e) {
@@ -147,6 +162,10 @@ client.on(
         plusEmoji: getPlusEmoji(),
         minusEmoji: getMinusEmoji(),
         repostEmojiId: getRepostEmojiId(),
+        pinSystemEnabled: isPinSystemEnabled(),
+        plusPlusEnabled: isPlusPlusEnabled(),
+        emojiTrackingEnabled: isEmojiTrackingEnabled(),
+        repostDetectionEnabled: isRepostDetectionEnabled(),
       });
     }
   }),
@@ -159,6 +178,8 @@ client.on(
       plusEmoji: getPlusEmoji(),
       minusEmoji: getMinusEmoji(),
       repostEmojiId: getRepostEmojiId(),
+      plusPlusEnabled: isPlusPlusEnabled(),
+      repostDetectionEnabled: isRepostDetectionEnabled(),
     });
   }),
 );

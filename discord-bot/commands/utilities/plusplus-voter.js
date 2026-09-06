@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 import { getTotalScoreByString, getVotesById } from "../../api/plusplus.js";
 
 const cmdName = "plusplus-voter-frequency";
+const featureKey = "plusplus_enabled";
 
 const data = new SlashCommandBuilder()
   .setName("plusplus-voter-frequency")
@@ -25,4 +26,4 @@ const execute = async (interaction) => {
   });
 };
 
-export { cmdName, data, execute };
+export { cmdName, data, execute, featureKey };

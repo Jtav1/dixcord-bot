@@ -275,6 +275,34 @@ export async function ensureSchemaMigrations() {
     );
   }
 
+  // Seed feature-toggle configuration keys (default enabled) if missing
+  const featureToggleKeys = [
+    "trigger_responses_enabled",
+    "reminders_enabled",
+    "eight_ball_enabled",
+    "emoji_tracking_enabled",
+    "sticker_tracking_enabled",
+    "plusplus_enabled",
+    "repost_detection_enabled",
+    "pin_system_enabled",
+  ];
+  for (const key of featureToggleKeys) {
+    const [rows] = await db.query(
+      "SELECT config FROM configurations WHERE config = ?",
+      [key],
+    );
+    if (!rows || rows.length === 0) {
+      await db.query(
+        "INSERT INTO configurations (config, value) VALUES (?, ?)",
+        [key, "true"],
+      );
+      applied.push(`${key} configuration seed`);
+      console.log(`db: migration applied: seeded ${key} configuration`);
+    } else {
+      console.log(`db: schema ok: ${key} configuration already exists`);
+    }
+  }
+
   // Drop deprecated/unused configuration keys
   const deprecatedConfigKeys = [
     "rare_frequency",

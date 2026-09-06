@@ -2,7 +2,12 @@ import { parseEmoji } from "discord.js";
 
 import { describeApiError } from "../../../api/client.js";
 import { countEmoji } from "../../../api/emojis.js";
-import { getMinusEmoji, getPlusEmoji } from "../../../configStore.js";
+import {
+  getMinusEmoji,
+  getPlusEmoji,
+  isPlusPlusEnabled,
+  isEmojiTrackingEnabled,
+} from "../../../configStore.js";
 import { doplus, dominus } from "./plusplus.js";
 
 /**
@@ -12,6 +17,10 @@ import { doplus, dominus } from "./plusplus.js";
  * @returns {Promise<void>}
  */
 export const emojiDetector = async (rawMessage) => {
+  const plusMinusEnabled = isPlusPlusEnabled();
+  const emojiTrackingEnabled = isEmojiTrackingEnabled();
+  if (!plusMinusEnabled && !emojiTrackingEnabled) return;
+
   const EMOJIREGEX =
     /((<|<a):?:\w+:?\d+>)|\p{Emoji_Presentation}|\p{Extended_Pictographic}/gmu;
   const emojiMatcher = (str) => str.match(EMOJIREGEX);
@@ -38,11 +47,11 @@ export const emojiDetector = async (rawMessage) => {
   // message, and concurrent countEmoji calls for a not-yet-catalogued emoji race on webapi's
   // insert-if-missing check (duplicate-key error). Awaiting one at a time avoids that race.
   for (const emo of mapEmoAry) {
-    if (emo.id === plusEmoji && doPlusMinus && messageType === "reply" && repliedUser) {
+    if (plusMinusEnabled && emo.id === plusEmoji && doPlusMinus && messageType === "reply" && repliedUser) {
       await doplus(repliedUser.id, "user", rawMessage.author.id);
-    } else if (emo.id === minusEmoji && doPlusMinus && messageType === "reply" && repliedUser) {
+    } else if (plusMinusEnabled && emo.id === minusEmoji && doPlusMinus && messageType === "reply" && repliedUser) {
       await dominus(repliedUser.id, "user", rawMessage.author.id);
-    } else {
+    } else if (emojiTrackingEnabled) {
       try {
         await countEmoji(emo.name, emo.id, rawMessage.author.id);
       } catch (err) {

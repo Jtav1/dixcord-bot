@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from "discord.js";
 import { getRepostsForUser } from "../../api/emojis.js";
 
 const cmdName = "reposts-by-user";
+const featureKey = "repost_detection_enabled";
 
 const data = new SlashCommandBuilder()
   .setName("reposts-by-user")
@@ -25,4 +26,4 @@ const execute = async (interaction) => {
   });
 };
 
-export { cmdName, data, execute };
+export { cmdName, data, execute, featureKey };

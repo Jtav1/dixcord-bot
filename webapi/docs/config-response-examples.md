@@ -10,12 +10,14 @@
   "config": {
     "pin_threshold": "3",
     "pin_channel_id": "915462110761349201",
-    "twitter_fix_enabled": "true"
+    "twitter_fix_enabled": "true",
+    "plusplus_enabled": "true"
   },
   "entries": [
     { "config": "pin_threshold", "value": "3" },
     { "config": "pin_channel_id", "value": "915462110761349201" },
-    { "config": "twitter_fix_enabled", "value": "true" }
+    { "config": "twitter_fix_enabled", "value": "true" },
+    { "config": "plusplus_enabled", "value": "true" }
   ]
 }
 ```
