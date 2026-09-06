@@ -255,71 +255,120 @@ export async function ensureSchemaMigrations() {
     );
   }
 
-  // trigger_lotto_prizes catalog table
-  if (!(await tableExists(db, "trigger_lotto_prizes", isSqlite))) {
+  // trigger_response_functions catalog table (formerly trigger_lotto_prizes)
+  if (await tableExists(db, "trigger_response_functions", isSqlite)) {
+    console.log(
+      "db: schema ok: trigger_response_functions table already exists",
+    );
+  } else if (await tableExists(db, "trigger_lotto_prizes", isSqlite)) {
+    await db.query(
+      "ALTER TABLE trigger_lotto_prizes RENAME TO trigger_response_functions",
+    );
+    applied.push(
+      "trigger_lotto_prizes table renamed to trigger_response_functions",
+    );
+    console.log(
+      "db: migration applied: renamed trigger_lotto_prizes table to trigger_response_functions",
+    );
+  } else {
     if (isSqlite) {
       await db.query(`
-        CREATE TABLE trigger_lotto_prizes (
+        CREATE TABLE trigger_response_functions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          prize_string TEXT NOT NULL UNIQUE,
+          function_name TEXT NOT NULL UNIQUE,
           frequency INTEGER DEFAULT 0
         )
       `);
     } else {
       await db.query(`
-        CREATE TABLE trigger_lotto_prizes (
+        CREATE TABLE trigger_response_functions (
           id INT AUTO_INCREMENT PRIMARY KEY,
-          prize_string VARCHAR(255) NOT NULL UNIQUE,
+          function_name VARCHAR(255) NOT NULL UNIQUE,
           frequency INT DEFAULT 0
         )
       `);
     }
-    applied.push("trigger_lotto_prizes table");
-    console.log("db: migration applied: created trigger_lotto_prizes table");
-  } else {
-    console.log("db: schema ok: trigger_lotto_prizes table already exists");
+    applied.push("trigger_response_functions table");
+    console.log(
+      "db: migration applied: created trigger_response_functions table",
+    );
   }
 
-  // trigger_lotto_prizes.display_name column (friendly name for webview display) - must exist
-  // before the seed insert below references it.
+  // trigger_response_functions.prize_string -> function_name column rename (upgrade path)
   if (
-    !(await columnExists(db, "trigger_lotto_prizes", "display_name", isSqlite))
+    !(await columnExists(
+      db,
+      "trigger_response_functions",
+      "function_name",
+      isSqlite,
+    )) &&
+    (await columnExists(
+      db,
+      "trigger_response_functions",
+      "prize_string",
+      isSqlite,
+    ))
+  ) {
+    await db.query(
+      "ALTER TABLE trigger_response_functions RENAME COLUMN prize_string TO function_name",
+    );
+    applied.push(
+      "trigger_response_functions.prize_string renamed to function_name",
+    );
+    console.log(
+      "db: migration applied: renamed trigger_response_functions.prize_string to function_name",
+    );
+  }
+
+  // trigger_response_functions.display_name column (friendly name for webview display) - must
+  // exist before the seed insert below references it.
+  if (
+    !(await columnExists(
+      db,
+      "trigger_response_functions",
+      "display_name",
+      isSqlite,
+    ))
   ) {
     await db.query(
       isSqlite
-        ? "ALTER TABLE trigger_lotto_prizes ADD COLUMN display_name TEXT NULL"
-        : "ALTER TABLE trigger_lotto_prizes ADD COLUMN display_name VARCHAR(255) NULL",
+        ? "ALTER TABLE trigger_response_functions ADD COLUMN display_name TEXT NULL"
+        : "ALTER TABLE trigger_response_functions ADD COLUMN display_name VARCHAR(255) NULL",
     );
-    applied.push("trigger_lotto_prizes.display_name column");
+    applied.push("trigger_response_functions.display_name column");
     console.log(
-      "db: migration applied: added trigger_lotto_prizes.display_name column",
+      "db: migration applied: added trigger_response_functions.display_name column",
     );
   }
 
-  const [lottoPrizeCountRows] = await db.query(
-    "SELECT COUNT(*) AS cnt FROM trigger_lotto_prizes",
+  const [responseFunctionCountRows] = await db.query(
+    "SELECT COUNT(*) AS cnt FROM trigger_response_functions",
   );
-  const lottoPrizeCount = Number(lottoPrizeCountRows?.[0]?.cnt ?? 0);
-  if (lottoPrizeCount === 0) {
+  const responseFunctionCount = Number(
+    responseFunctionCountRows?.[0]?.cnt ?? 0,
+  );
+  if (responseFunctionCount === 0) {
     await db.query(
-      "INSERT INTO trigger_lotto_prizes (prize_string, display_name) VALUES (?, ?)",
+      "INSERT INTO trigger_response_functions (function_name, display_name) VALUES (?, ?)",
       ["TAL_timeout", "Curse of Taking a Look"],
     );
-    applied.push("trigger_lotto_prizes seed rows");
-    console.log("db: migration applied: seeded trigger_lotto_prizes rows");
+    applied.push("trigger_response_functions seed rows");
+    console.log(
+      "db: migration applied: seeded trigger_response_functions rows",
+    );
   }
 
   // Backfill known display names for existing catalog rows that don't have one yet.
   const [talTimeoutRows] = await db.query(
-    "SELECT id FROM trigger_lotto_prizes WHERE prize_string = ? AND display_name IS NULL",
+    "SELECT id FROM trigger_response_functions WHERE function_name = ? AND display_name IS NULL",
     ["TAL_timeout"],
   );
   if (talTimeoutRows && talTimeoutRows.length > 0) {
     await db.query(
-      "UPDATE trigger_lotto_prizes SET display_name = ? WHERE prize_string = ?",
+      "UPDATE trigger_response_functions SET display_name = ? WHERE function_name = ?",
       ["Curse of Taking a Look", "TAL_timeout"],
     );
-    applied.push("trigger_lotto_prizes.display_name backfill");
+    applied.push("trigger_response_functions.display_name backfill");
     console.log(
       "db: migration applied: backfilled TAL_timeout display_name",
     );
@@ -380,23 +429,33 @@ export async function ensureSchemaMigrations() {
     );
   }
 
-  // trigger_response.lotto_prize column
+  // trigger_response.response_function column (formerly lotto_prize)
   if (await tableExists(db, "trigger_response", isSqlite)) {
     if (
-      !(await columnExists(db, "trigger_response", "lotto_prize", isSqlite))
+      await columnExists(db, "trigger_response", "response_function", isSqlite)
+    ) {
+      console.log(
+        "db: schema ok: trigger_response.response_function column already exists",
+      );
+    } else if (
+      await columnExists(db, "trigger_response", "lotto_prize", isSqlite)
     ) {
       await db.query(
-        isSqlite
-          ? "ALTER TABLE trigger_response ADD COLUMN lotto_prize TEXT NULL"
-          : "ALTER TABLE trigger_response ADD COLUMN lotto_prize VARCHAR(255) NULL",
+        "ALTER TABLE trigger_response RENAME COLUMN lotto_prize TO response_function",
       );
-      applied.push("trigger_response.lotto_prize column");
+      applied.push("trigger_response.lotto_prize renamed to response_function");
       console.log(
-        "db: migration applied: added trigger_response.lotto_prize column",
+        "db: migration applied: renamed trigger_response.lotto_prize to response_function",
       );
     } else {
+      await db.query(
+        isSqlite
+          ? "ALTER TABLE trigger_response ADD COLUMN response_function TEXT NULL"
+          : "ALTER TABLE trigger_response ADD COLUMN response_function VARCHAR(255) NULL",
+      );
+      applied.push("trigger_response.response_function column");
       console.log(
-        "db: schema ok: trigger_response.lotto_prize column already exists",
+        "db: migration applied: added trigger_response.response_function column",
       );
     }
   }
