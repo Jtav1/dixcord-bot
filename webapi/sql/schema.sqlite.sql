@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS trigger_response (
   response_order INTEGER NULL,
   weight INTEGER NULL DEFAULT NULL CHECK (weight IS NULL OR (weight >= 0 AND weight <= 100)),
   response_function INTEGER NULL REFERENCES trigger_response_functions(id) ON DELETE SET NULL,
+  response_function_parameters TEXT NULL,
   frequency INTEGER DEFAULT 0,
   UNIQUE (trigger_id, response_id)
 );

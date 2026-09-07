@@ -901,6 +901,12 @@
                             "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
                             "or null.": null
                           },
+                          "response_function_parameters": {
+                            "type": "object",
+                            "nullable": true,
+                            "description": "JSON payload passed to response_function at dispatch time",
+                            "or null.": null
+                          },
                           "selection_mode": {
                             "type": "string",
                             "enum": [
@@ -1025,6 +1031,12 @@
                       "type": "string",
                       "nullable": true,
                       "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
+                      "or null.": null
+                    },
+                    "response_function_parameters": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "JSON payload passed to response_function at dispatch time",
                       "or null.": null
                     },
                     "selection_mode": {
@@ -1226,6 +1238,12 @@
                             "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
                             "or null.": null
                           },
+                          "response_function_parameters": {
+                            "type": "object",
+                            "nullable": true,
+                            "description": "JSON payload passed to response_function at dispatch time",
+                            "or null.": null
+                          },
                           "linkId": {
                             "type": "integer",
                             "description": "trigger_response junction row id"
@@ -1395,6 +1413,12 @@
                             "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
                             "or null.": null
                           },
+                          "response_function_parameters": {
+                            "type": "object",
+                            "nullable": true,
+                            "description": "JSON payload passed to response_function at dispatch time",
+                            "or null.": null
+                          },
                           "linkId": {
                             "type": "integer",
                             "description": "trigger_response junction row id"
@@ -1496,6 +1520,12 @@
                             "type": "string",
                             "nullable": true,
                             "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
+                            "or null.": null
+                          },
+                          "response_function_parameters": {
+                            "type": "object",
+                            "nullable": true,
+                            "description": "JSON payload passed to response_function at dispatch time",
                             "or null.": null
                           },
                           "linkId": {
@@ -1652,6 +1682,12 @@
                             "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
                             "or null.": null
                           },
+                          "response_function_parameters": {
+                            "type": "object",
+                            "nullable": true,
+                            "description": "JSON payload passed to response_function at dispatch time",
+                            "or null.": null
+                          },
                           "linkId": {
                             "type": "integer",
                             "description": "trigger_response junction row id"
@@ -1800,6 +1836,11 @@
                       "type": "string",
                       "nullable": true,
                       "description": "Present only when the selected trigger_response link has a response_function set (any selection_mode). When present, the caller should dispatch to the named function instead of displaying `response` directly.\n"
+                    },
+                    "response_function_parameters": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "Present only when the selected link has a non-null response_function_parameters payload. Passed to the dispatched function as its execution config.\n"
                     }
                   }
                 }
@@ -2323,6 +2364,12 @@
                       "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
                       "or null.": null
                     },
+                    "response_function_parameters": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "JSON payload passed to response_function at dispatch time",
+                      "or null.": null
+                    },
                     "selection_mode": {
                       "type": "string",
                       "enum": [
@@ -2460,6 +2507,12 @@
                       "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
                       "or null.": null
                     },
+                    "response_function_parameters": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "JSON payload passed to response_function at dispatch time",
+                      "or null.": null
+                    },
                     "selection_mode": {
                       "type": "string",
                       "enum": [
@@ -2524,6 +2577,123 @@
                       "enum": [
                         true
                       ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/trigger-responses/{id}/parameters": {
+      "patch": {
+        "operationId": "updateTriggerResponseParameters",
+        "tags": [
+          "Trigger Responses"
+        ],
+        "summary": "Set a trigger-response link's function parameters",
+        "description": "Requires the admin role. Kept separate from PUT /api/trigger-responses/{id} so a function's execution config can be edited independently of the link's trigger/response/weight/selection fields. Pass null to clear a previously set payload. Has no effect unless the link also has a response_function set (see PUT /api/trigger-responses/{id}).\n",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "parameters"
+                ],
+                "properties": {
+                  "parameters": {
+                    "type": "object",
+                    "nullable": true,
+                    "description": "Arbitrary JSON object passed to the dispatched function's handler, or null to clear."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated trigger-response link.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "id": {
+                      "type": "integer"
+                    },
+                    "trigger_string": {
+                      "type": "string"
+                    },
+                    "response_string": {
+                      "type": "string"
+                    },
+                    "response_order": {
+                      "type": "integer",
+                      "nullable": true
+                    },
+                    "weight": {
+                      "type": "integer",
+                      "nullable": true,
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "response_function": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
+                      "or null.": null
+                    },
+                    "response_function_parameters": {
+                      "type": "object",
+                      "nullable": true,
+                      "description": "JSON payload passed to response_function at dispatch time",
+                      "or null.": null
+                    },
+                    "selection_mode": {
+                      "type": "string",
+                      "enum": [
+                        "random",
+                        "ordered",
+                        "weighted"
+                      ]
+                    },
+                    "created_at": {
+                      "type": "string"
                     }
                   }
                 }

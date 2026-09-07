@@ -18,6 +18,47 @@ const orderByResponseOrderClause = isSqlite
 const orderByResponseOrderOnlyClause = "ORDER BY tr.response_order ASC";
 const orderByRandomClause = isSqlite ? "RANDOM()" : "RAND()";
 
+/**
+ * Parse the JSON payload stored in trigger_response.response_function_parameters.
+ * @param {string|null|undefined} stored
+ * @returns {Record<string, unknown>|null}
+ */
+export function parseFunctionParameters(stored) {
+  if (stored == null || String(stored).trim() === "") return null;
+  try {
+    return JSON.parse(String(stored));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Serialize a parameters object for storage in trigger_response.response_function_parameters.
+ * @param {unknown} params
+ * @returns {string|null}
+ */
+export function serializeFunctionParametersForStorage(params) {
+  if (
+    params == null ||
+    typeof params !== "object" ||
+    Array.isArray(params)
+  )
+    return null;
+  return JSON.stringify(params);
+}
+
+/**
+ * Replace a row's raw response_function_parameters text with its parsed form (in place, returns row).
+ * @param {Record<string, unknown>} row
+ * @returns {Record<string, unknown>}
+ */
+function withParsedFunctionParameters(row) {
+  row.response_function_parameters = parseFunctionParameters(
+    row.response_function_parameters,
+  );
+  return row;
+}
+
 const WEIGHT_MIN = 0;
 const WEIGHT_MAX = 100;
 function clampWeight(value) {
@@ -35,14 +76,14 @@ export async function getAll() {
     ? "tr.response_order IS NULL"
     : "ISNULL(tr.response_order)";
   const [rows] = await db.query(
-    `SELECT tr.id, t.trigger_string, r.response_string, tr.response_order, tr.weight, rf.function_name AS response_function, t.selection_mode, t.created_at, t.id AS trigger_id, r.id AS response_id
+    `SELECT tr.id, t.trigger_string, r.response_string, tr.response_order, tr.weight, rf.function_name AS response_function, tr.response_function_parameters, t.selection_mode, t.created_at, t.id AS trigger_id, r.id AS response_id
      FROM trigger_response tr
      JOIN triggers t ON t.id = tr.trigger_id
      JOIN responses r ON r.id = tr.response_id
      LEFT JOIN trigger_response_functions rf ON rf.id = tr.response_function
      ORDER BY t.trigger_string, ${nullsOrder}, tr.response_order, tr.id`,
   );
-  return Array.isArray(rows) ? rows : [];
+  return Array.isArray(rows) ? rows.map(withParsedFunctionParameters) : [];
 }
 
 /**
@@ -51,7 +92,7 @@ export async function getAll() {
  */
 export async function getById(id) {
   const [rows] = await db.query(
-    `SELECT tr.id, t.trigger_string, r.response_string, tr.response_order, tr.weight, rf.function_name AS response_function, t.selection_mode, t.created_at, t.id AS trigger_id, r.id AS response_id
+    `SELECT tr.id, t.trigger_string, r.response_string, tr.response_order, tr.weight, rf.function_name AS response_function, tr.response_function_parameters, t.selection_mode, t.created_at, t.id AS trigger_id, r.id AS response_id
      FROM trigger_response tr
      JOIN triggers t ON t.id = tr.trigger_id
      JOIN responses r ON r.id = tr.response_id
@@ -59,7 +100,7 @@ export async function getById(id) {
      WHERE tr.id = ?`,
     [id],
   );
-  return rows && rows.length > 0 ? rows[0] : null;
+  return rows && rows.length > 0 ? withParsedFunctionParameters(rows[0]) : null;
 }
 
 /**
@@ -151,7 +192,7 @@ async function incrementSelectionFrequencies(
  */
 async function getRandomResponseByRandomSelection(triggerId) {
   const [rows] = await db.query(
-    `SELECT r.id, r.response_string, rf.function_name AS response_function, tr.response_function AS response_function_id, tr.id AS trigger_response_id
+    `SELECT r.id, r.response_string, rf.function_name AS response_function, tr.response_function AS response_function_id, tr.response_function_parameters, tr.id AS trigger_response_id
      FROM trigger_response tr
      JOIN responses r ON r.id = tr.response_id
      LEFT JOIN trigger_response_functions rf ON rf.id = tr.response_function
@@ -161,7 +202,7 @@ async function getRandomResponseByRandomSelection(triggerId) {
     [triggerId],
   );
   if (!rows || rows.length === 0) return null;
-  return rows[0];
+  return withParsedFunctionParameters(rows[0]);
 }
 
 /**
@@ -174,7 +215,7 @@ async function getRandomResponseByRandomSelection(triggerId) {
  */
 async function getWeightedResponseForTrigger(triggerId) {
   const [weightRows] = await db.query(
-    `SELECT r.id, r.response_string, COALESCE(tr.weight, 0) AS weight, rf.function_name AS response_function, tr.response_function AS response_function_id, tr.id AS trigger_response_id
+    `SELECT r.id, r.response_string, COALESCE(tr.weight, 0) AS weight, rf.function_name AS response_function, tr.response_function AS response_function_id, tr.response_function_parameters, tr.id AS trigger_response_id
      FROM trigger_response tr
      JOIN responses r ON r.id = tr.response_id
      LEFT JOIN trigger_response_functions rf ON rf.id = tr.response_function
@@ -183,7 +224,7 @@ async function getWeightedResponseForTrigger(triggerId) {
   );
   if (!weightRows || weightRows.length === 0) return null;
   const normalized = weightRows.map((row) => ({
-    ...row,
+    ...withParsedFunctionParameters(row),
     weight: clampWeight(row.weight),
   }));
   const maxWeight = Math.max(...normalized.map((r) => r.weight));
@@ -210,6 +251,7 @@ async function getWeightedResponseForTrigger(triggerId) {
     response_string: chosen.response_string,
     response_function: chosen.response_function,
     response_function_id: chosen.response_function_id,
+    response_function_parameters: chosen.response_function_parameters,
     trigger_response_id: chosen.trigger_response_id,
   };
 }
@@ -236,8 +278,8 @@ export async function getRandomResponse(trigger) {
   ).toLowerCase();
 
   if (selection_mode === "ordered") {
-    const [orderedRows] = await db.query(
-      `SELECT r.id, r.response_string, rf.function_name AS response_function, tr.response_function AS response_function_id, tr.id AS trigger_response_id, tr.response_order
+    const [orderedRowsRaw] = await db.query(
+      `SELECT r.id, r.response_string, rf.function_name AS response_function, tr.response_function AS response_function_id, tr.response_function_parameters, tr.id AS trigger_response_id, tr.response_order
        FROM trigger_response tr
        JOIN responses r ON r.id = tr.response_id
        LEFT JOIN trigger_response_functions rf ON rf.id = tr.response_function
@@ -245,7 +287,8 @@ export async function getRandomResponse(trigger) {
        ${orderByResponseOrderOnlyClause}`,
       [triggerId],
     );
-    if (!orderedRows || orderedRows.length === 0) return null;
+    if (!orderedRowsRaw || orderedRowsRaw.length === 0) return null;
+    const orderedRows = orderedRowsRaw.map(withParsedFunctionParameters);
     const lastOrder = await getLastUsedResponseOrder(triggerId);
     let chosen = orderedRows[0];
     if (lastOrder != null) {
@@ -268,6 +311,7 @@ export async function getRandomResponse(trigger) {
       response_string: chosen.response_string,
       trigger_response_id: chosen.trigger_response_id,
       response_function: chosen.response_function ?? null,
+      response_function_parameters: chosen.response_function_parameters ?? null,
     };
   }
 
@@ -282,6 +326,7 @@ export async function getRandomResponse(trigger) {
       response_string: result.response_string,
       trigger_response_id: result.trigger_response_id,
       response_function: result.response_function ?? null,
+      response_function_parameters: result.response_function_parameters ?? null,
     };
   }
 
@@ -300,6 +345,7 @@ export async function getRandomResponse(trigger) {
     response_string: result.response_string,
     trigger_response_id: result.trigger_response_id,
     response_function: result.response_function ?? null,
+    response_function_parameters: result.response_function_parameters ?? null,
   };
 }
 
@@ -461,6 +507,25 @@ export async function update(
 }
 
 /**
+ * Set (or clear) the JSON parameters payload passed to a link's response_function at execution.
+ * @param {number} id - Junction (trigger_response) id
+ * @param {Record<string, unknown>|null} parameters
+ * @returns {Promise<{ id: number, trigger_string: string, response_string: string, response_order: number|null, weight: number, response_function: string|null, response_function_parameters: Record<string, unknown>|null, selection_mode: string, created_at: string, trigger_id: number, response_id: number }|null>} null if the link doesn't exist
+ */
+export async function updateFunctionParameters(id, parameters) {
+  const [juncRows] = await db.query(
+    "SELECT id FROM trigger_response WHERE id = ?",
+    [id],
+  );
+  if (!juncRows || juncRows.length === 0) return null;
+  await db.query(
+    "UPDATE trigger_response SET response_function_parameters = ? WHERE id = ?",
+    [serializeFunctionParametersForStorage(parameters), id],
+  );
+  return getById(id);
+}
+
+/**
  * @param {number} id - Junction (trigger_response) id
  * @returns {Promise<boolean>}
  */
@@ -519,7 +584,7 @@ export async function getTriggerById(triggerId) {
   if (!tRows || tRows.length === 0) return null;
   const trigger = tRows[0];
   const [linkRows] = await db.query(
-    `SELECT tr.id AS linkId, tr.response_order AS response_order_val, tr.weight, rf.function_name AS response_function, r.id, r.response_string
+    `SELECT tr.id AS linkId, tr.response_order AS response_order_val, tr.weight, rf.function_name AS response_function, tr.response_function_parameters, r.id, r.response_string
      FROM trigger_response tr
      JOIN responses r ON r.id = tr.response_id
      LEFT JOIN trigger_response_functions rf ON rf.id = tr.response_function
@@ -533,6 +598,9 @@ export async function getTriggerById(triggerId) {
     order: r.response_order_val ?? null,
     weight: r.weight != null ? Number(r.weight) : null,
     response_function: r.response_function ?? null,
+    response_function_parameters: parseFunctionParameters(
+      r.response_function_parameters,
+    ),
     linkId: r.linkId,
   }));
   return {

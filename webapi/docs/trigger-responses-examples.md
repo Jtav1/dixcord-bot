@@ -176,6 +176,8 @@ Any response, in any selection_mode, may also carry a `response_function`. When 
 
 **Trigger response function handlers:** Handler functions must be defined in [`discord-bot/utilities/triggerResponseFunctions.js`](../../discord-bot/utilities/triggerResponseFunctions.js) (in the `RESPONSE_FUNCTIONS` map, keyed by the same `function_name` / `response_function` value). Catalog rows alone do nothing on the bot until a matching function exists there.
 
+**Function parameters:** A trigger_response link with a `response_function` set may also carry a `response_function_parameters` JSON object (stored on the link itself, not the shared function catalog, so the same function can be configured differently per trigger). It's returned alongside `response_function` from `GET /api/trigger-responses/random` and passed to the handler as `context.parameters`. Edit it via `PATCH /api/trigger-responses/{id}/parameters` — see below.
+
 ---
 
 ## List trigger response function catalog (bot hydrates function handlers)
@@ -203,6 +205,30 @@ curl -s -X POST "${BASE_URL}/api/trigger-responses/triggers" \
       { "response_string": "Try again.", "weight": 90 }
     ]
   }'
+```
+
+---
+
+## Set a trigger-response link's function parameters
+
+`id` here is the junction (`trigger_response`) row id, e.g. from `GET /api/trigger-responses/triggers/{id}` (`responses[].linkId`) or `GET /api/trigger-responses` / `POST|PUT /api/trigger-responses`:
+
+```bash
+curl -s -X PATCH "${BASE_URL}/api/trigger-responses/5/parameters" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "parameters": { "rollMax": 500, "timeoutSeconds": 180 }
+  }'
+```
+
+Clear a previously set payload:
+
+```bash
+curl -s -X PATCH "${BASE_URL}/api/trigger-responses/5/parameters" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{ "parameters": null }'
 ```
 
 ---

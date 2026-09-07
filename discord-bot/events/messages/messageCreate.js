@@ -73,14 +73,18 @@ const execute = async (message) => {
         contentStripped.includes(t.trigger_string),
       );
       if (matchedTrigger) {
-        const { response: triggerResponse, response_function } =
-          await getRandomResponseForTrigger(matchedTrigger, message.author.id);
+        const {
+          response: triggerResponse,
+          response_function,
+          response_function_parameters,
+        } = await getRandomResponseForTrigger(matchedTrigger, message.author.id);
         if (triggerResponse.length > 0) {
           if (response_function) {
             await executeResponseFunction(response_function, {
               message,
               client: message.client,
               responseText: triggerResponse,
+              parameters: response_function_parameters,
             });
           } else {
             await message.reply(triggerResponse);
