@@ -47,6 +47,7 @@ const router = express.Router();
  *                       response_order: { type: integer, nullable: true }
  *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
  *                       response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
+ *                       response_function_parameters: { type: object, nullable: true, description: JSON payload passed to response_function at dispatch time, or null. }
  *                       selection_mode: { type: string, enum: [random, ordered, weighted] }
  *                       created_at: { type: string }
  *       '401':
@@ -196,6 +197,7 @@ router.get("/triggers/list", authenticate, async (req, res) => {
  *                       order: { type: integer, nullable: true }
  *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
  *                       response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
+ *                       response_function_parameters: { type: object, nullable: true, description: JSON payload passed to response_function at dispatch time, or null. }
  *                       linkId: { type: integer, description: trigger_response junction row id }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
@@ -273,6 +275,7 @@ router.get("/triggers/responses", authenticate, async (req, res) => {
  *                       order: { type: integer, nullable: true }
  *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
  *                       response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
+ *                       response_function_parameters: { type: object, nullable: true, description: JSON payload passed to response_function at dispatch time, or null. }
  *                       linkId: { type: integer, description: trigger_response junction row id }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
@@ -363,6 +366,7 @@ router.get("/triggers/:id", authenticate, async (req, res) => {
  *                       order: { type: integer, nullable: true }
  *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
  *                       response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
+ *                       response_function_parameters: { type: object, nullable: true, description: JSON payload passed to response_function at dispatch time, or null. }
  *                       linkId: { type: integer, description: trigger_response junction row id }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
@@ -468,6 +472,7 @@ router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
  *                       order: { type: integer, nullable: true }
  *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
  *                       response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
+ *                       response_function_parameters: { type: object, nullable: true, description: JSON payload passed to response_function at dispatch time, or null. }
  *                       linkId: { type: integer, description: trigger_response junction row id }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
@@ -611,6 +616,12 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
  *                     Present only when the selected trigger_response link has a response_function
  *                     set (any selection_mode). When present, the caller should dispatch to the
  *                     named function instead of displaying `response` directly.
+ *                 response_function_parameters:
+ *                   type: object
+ *                   nullable: true
+ *                   description: >
+ *                     Present only when the selected link has a non-null response_function_parameters
+ *                     payload. Passed to the dispatched function as its execution config.
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -660,6 +671,9 @@ router.get("/random", authenticate, async (req, res) => {
       response: row.response_string,
       id: row.id,
       ...(row.response_function ? { response_function: row.response_function } : {}),
+      ...(row.response_function_parameters
+        ? { response_function_parameters: row.response_function_parameters }
+        : {}),
     });
   } catch (err) {
     console.error("GET /api/trigger-responses/random error:", err);
@@ -1074,6 +1088,7 @@ router.get("/history/:chatMemberId", authenticate, async (req, res) => {
  *                 response_order: { type: integer, nullable: true }
  *                 weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
  *                 response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
+ *                 response_function_parameters: { type: object, nullable: true, description: JSON payload passed to response_function at dispatch time, or null. }
  *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
  *                 created_at: { type: string }
  *       '400':
@@ -1155,6 +1170,7 @@ router.get("/:id", authenticate, async (req, res) => {
  *                 response_order: { type: integer, nullable: true }
  *                 weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
  *                 response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
+ *                 response_function_parameters: { type: object, nullable: true, description: JSON payload passed to response_function at dispatch time, or null. }
  *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
  *                 created_at: { type: string }
  *       '400':
@@ -1265,6 +1281,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  *                 response_order: { type: integer, nullable: true }
  *                 weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
  *                 response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
+ *                 response_function_parameters: { type: object, nullable: true, description: JSON payload passed to response_function at dispatch time, or null. }
  *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
  *                 created_at: { type: string }
  *       '400':
@@ -1327,6 +1344,99 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
     res
       .status(500)
       .json({ ok: false, error: "Failed to update trigger-response" });
+  }
+});
+
+/**
+ * PATCH /api/trigger-responses/:id/parameters
+ * Set (or clear) the JSON parameters payload passed to a link's response_function at execution.
+ * Body: { parameters: object|null }
+ * Auth: required (admin).
+ * @openapi
+ * /api/trigger-responses/{id}/parameters:
+ *   patch:
+ *     operationId: updateTriggerResponseParameters
+ *     tags: [Trigger Responses]
+ *     summary: Set a trigger-response link's function parameters
+ *     description: >
+ *       Requires the admin role. Kept separate from PUT /api/trigger-responses/{id} so a function's
+ *       execution config can be edited independently of the link's trigger/response/weight/selection
+ *       fields. Pass null to clear a previously set payload. Has no effect unless the link also has a
+ *       response_function set (see PUT /api/trigger-responses/{id}).
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [parameters]
+ *             properties:
+ *               parameters:
+ *                 type: object
+ *                 nullable: true
+ *                 description: Arbitrary JSON object passed to the dispatched function's handler, or null to clear.
+ *     responses:
+ *       '200':
+ *         description: The updated trigger-response link.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 id: { type: integer }
+ *                 trigger_string: { type: string }
+ *                 response_string: { type: string }
+ *                 response_order: { type: integer, nullable: true }
+ *                 weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                 response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
+ *                 response_function_parameters: { type: object, nullable: true, description: JSON payload passed to response_function at dispatch time, or null. }
+ *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
+ *                 created_at: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.patch("/:id/parameters", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ ok: false, error: "Invalid id" });
+    }
+    const { parameters } = req.body ?? {};
+    if (
+      parameters !== null &&
+      (typeof parameters !== "object" || Array.isArray(parameters))
+    ) {
+      return res.status(400).json({
+        ok: false,
+        error: "parameters must be a JSON object or null",
+      });
+    }
+    const row = await triggerResponses.updateFunctionParameters(id, parameters);
+    if (!row) {
+      return res
+        .status(404)
+        .json({ ok: false, error: "Trigger-response not found" });
+    }
+    res.json({ ok: true, ...row });
+  } catch (err) {
+    console.error("PATCH /api/trigger-responses/:id/parameters error:", err);
+    res
+      .status(500)
+      .json({ ok: false, error: "Failed to update trigger-response parameters" });
   }
 });
 

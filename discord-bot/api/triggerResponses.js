@@ -77,18 +77,23 @@ export const getTriggerResponseFunctionsList = async () => {
  * Uses GET /api/trigger-responses/random for all modes (random, ordered, weighted) so selection and frequency tracking happen on the server.
  * @param {string|{ trigger_string: string, selection_mode?: string }} triggerOrObject - Trigger string or object with trigger_string and selection_mode
  * @param {string} [discordUserId] - Discord snowflake of the user receiving the response, so the server can log trigger_response_user_history
- * @returns {Promise<{ response: string, response_function: string|null }>} Response payload or empty response if none (e.g. 404)
+ * @returns {Promise<{ response: string, response_function: string|null, response_function_parameters: Record<string, unknown>|null }>} Response payload or empty response if none (e.g. 404)
  */
 export const getRandomResponseForTrigger = async (
   triggerOrObject,
   discordUserId,
 ) => {
+  const empty = {
+    response: "",
+    response_function: null,
+    response_function_parameters: null,
+  };
   const triggerString =
     typeof triggerOrObject === "string"
       ? triggerOrObject?.trim()
       : triggerOrObject?.trigger_string?.trim();
 
-  if (!triggerString) return { response: "", response_function: null };
+  if (!triggerString) return empty;
 
   try {
     const { data } = await api.get("/api/trigger-responses/random", {
@@ -97,16 +102,23 @@ export const getRandomResponseForTrigger = async (
         ...(discordUserId ? { app: "discord", userId: discordUserId } : {}),
       },
     });
-    if (!data?.ok) return { response: "", response_function: null };
+    if (!data?.ok) return empty;
     const responseFunction =
       typeof data.response_function === "string" && data.response_function.trim()
         ? data.response_function.trim()
         : null;
+    const responseFunctionParameters =
+      data.response_function_parameters &&
+      typeof data.response_function_parameters === "object" &&
+      !Array.isArray(data.response_function_parameters)
+        ? data.response_function_parameters
+        : null;
     return {
       response: data.response ?? "",
       response_function: responseFunction,
+      response_function_parameters: responseFunctionParameters,
     };
   } catch (_) {
-    return { response: "", response_function: null };
+    return empty;
   }
 };

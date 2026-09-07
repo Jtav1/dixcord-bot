@@ -112,6 +112,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/trigger-responses/:id` | ✓ | One trigger-response link (junction) |
 | POST | `/api/trigger-responses` | ✓ | Create single trigger-response pair |
 | PUT | `/api/trigger-responses/:id` | ✓ | Update trigger-response link |
+| PATCH | `/api/trigger-responses/:id/parameters` | ✓ | Set/clear a link's response_function_parameters |
 | DELETE | `/api/trigger-responses/:id` | ✓ | Delete trigger-response link |
 | POST | `/api/leaderboards/plusplus` | ✓ | Top/bottom plusplus (body: `{ limit? }`) |
 | GET | `/api/leaderboards/plusplus/total?string=&type=word or user` | ✓ | Total for word or user |

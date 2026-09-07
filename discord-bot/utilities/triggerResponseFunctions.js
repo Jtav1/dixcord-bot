@@ -4,7 +4,7 @@
 
 import { timeoutMember } from "./timeoutMember.js";
 
-/** @typedef {{ message: import("discord.js").Message, client: import("discord.js").Client, responseText: string }} ResponseFunctionContext */
+/** @typedef {{ message: import("discord.js").Message, client: import("discord.js").Client, responseText: string, parameters?: Record<string, unknown>|null }} ResponseFunctionContext */
 
 /** @type {Array<{ id: number, response_function: string, fn: (context: ResponseFunctionContext) => Promise<void> }>} */
 let responseFunctionHandlers = [];
@@ -13,16 +13,17 @@ const defaultResponseFunction = async () => {};
 
 /** @type {Record<string, (context: ResponseFunctionContext) => Promise<void>>} */
 const RESPONSE_FUNCTIONS = {
-  TAL_timeout: async ({ message, responseText }) => {
-    // Pick random number 1-1000 inclusive
-    const roll = Math.floor(Math.random() * 1000) + 1;
+  TAL_timeout: async ({ message, responseText, parameters }) => {
+    const { rollMax = 1000, timeoutSeconds = 3 * 60 } = parameters ?? {};
+    // Pick random number 1-rollMax inclusive
+    const roll = Math.floor(Math.random() * rollMax) + 1;
     if (roll === 1) {
       if (typeof message.member?.timeout === "function") {
         try {
           await timeoutMember(
             message.member,
-            3 * 60, // 3 minutes in seconds
-            "Trigger response function: timeout for 3 minutes",
+            timeoutSeconds,
+            `Trigger response function: timeout for ${timeoutSeconds} seconds`,
           );
           await message.reply(
             "CURSE OF RA𓀀 𓀁 𓀂 𓀃 𓀄 𓀅 𓀆 𓀇 𓀈 𓀉 𓀊 𓀋 𓀌 𓀍 𓀎 𓀏 𓀐 𓀑 𓀒 𓀓 𓀔",

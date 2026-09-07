@@ -136,6 +136,7 @@ CREATE TABLE IF NOT EXISTS trigger_response (
   response_order INT NULL,
   weight INT NULL DEFAULT NULL,
   response_function INT NULL,
+  response_function_parameters TEXT NULL,
   frequency INT DEFAULT 0,
   FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE,
   FOREIGN KEY (response_id) REFERENCES responses(id) ON DELETE CASCADE,

@@ -775,6 +775,25 @@ export async function ensureSchemaMigrations() {
         "db: migration applied: added trigger_response.response_function FK constraint",
       );
     }
+
+    // trigger_response.response_function_parameters: per-link JSON config passed to the
+    // dispatched function at execution (e.g. TAL_timeout's roll odds/duration).
+    if (
+      !(await columnExists(
+        db,
+        "trigger_response",
+        "response_function_parameters",
+        isSqlite,
+      ))
+    ) {
+      await db.query(
+        "ALTER TABLE trigger_response ADD COLUMN response_function_parameters TEXT NULL",
+      );
+      applied.push("trigger_response.response_function_parameters column");
+      console.log(
+        "db: migration applied: added trigger_response.response_function_parameters column",
+      );
+    }
   }
 
   if (applied.length === 0) {

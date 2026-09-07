@@ -200,8 +200,40 @@ See also [trigger-responses-examples.md](trigger-responses-examples.md) for samp
   "ok": true,
   "response": "You won!",
   "id": 1,
-  "response_function": "TAL_timeout"
+  "response_function": "TAL_timeout",
+  "response_function_parameters": { "rollMax": 500, "timeoutSeconds": 180 }
 }
+```
+
+`response_function_parameters` is only present when the link has a non-null payload set (see `PATCH /api/trigger-responses/{id}/parameters` below).
+
+---
+
+## PATCH /api/trigger-responses/:id/parameters
+
+**200 OK**
+
+```json
+{
+  "ok": true,
+  "id": 5,
+  "trigger_id": 2,
+  "response_id": 3,
+  "trigger_string": "roll",
+  "response_string": "You won!",
+  "response_order": null,
+  "weight": 10,
+  "response_function": "TAL_timeout",
+  "response_function_parameters": { "rollMax": 500, "timeoutSeconds": 180 },
+  "selection_mode": "weighted",
+  "created_at": "2026-01-01T00:00:00.000Z"
+}
+```
+
+**404 Not Found**
+
+```json
+{ "ok": false, "error": "Trigger-response not found" }
 ```
 
 ---
