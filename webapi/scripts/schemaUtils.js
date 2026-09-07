@@ -57,6 +57,36 @@ export async function columnExists(db, table, column, isSqlite) {
 }
 
 /**
+ * Declared type of a column (e.g. "varchar", "int", "text", "integer"), lowercased.
+ * SQLite has no ALTER-safe way to introspect this via a plain SELECT other than reading back the
+ * table's stored CREATE TABLE text, since PRAGMA statements don't run through the query wrapper.
+ * @param {import('mysql2/promise').Pool | { query: Function }} db
+ * @param {string} table
+ * @param {string} column
+ * @param {boolean} isSqlite
+ * @returns {Promise<string|null>} null if the column (or table) doesn't exist.
+ */
+export async function getColumnDeclaredType(db, table, column, isSqlite) {
+  if (isSqlite) {
+    const [rows] = await db.query(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [table],
+    );
+    const ddl = rows?.[0]?.sql;
+    if (!ddl) return null;
+    const match = new RegExp(`[(,]\\s*${column}\\s+([A-Za-z]+)`, "i").exec(ddl);
+    return match ? match[1].toLowerCase() : null;
+  }
+  const [rows] = await db.query(
+    `SELECT DATA_TYPE FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [table, column],
+  );
+  const type = rows?.[0]?.DATA_TYPE;
+  return type ? String(type).toLowerCase() : null;
+}
+
+/**
  * @param {import('mysql2/promise').Pool | { query: Function }} db
  * @param {string} table
  * @param {string} constraintName

@@ -46,6 +46,7 @@ const router = express.Router();
  *                       response_string: { type: string }
  *                       response_order: { type: integer, nullable: true }
  *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                       response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
  *                       selection_mode: { type: string, enum: [random, ordered, weighted] }
  *                       created_at: { type: string }
  *       '401':
@@ -194,6 +195,7 @@ router.get("/triggers/list", authenticate, async (req, res) => {
  *                       response_string: { type: string }
  *                       order: { type: integer, nullable: true }
  *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                       response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
  *                       linkId: { type: integer, description: trigger_response junction row id }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
@@ -270,6 +272,7 @@ router.get("/triggers/responses", authenticate, async (req, res) => {
  *                       response_string: { type: string }
  *                       order: { type: integer, nullable: true }
  *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                       response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
  *                       linkId: { type: integer, description: trigger_response junction row id }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
@@ -359,6 +362,7 @@ router.get("/triggers/:id", authenticate, async (req, res) => {
  *                       response_string: { type: string }
  *                       order: { type: integer, nullable: true }
  *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                       response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
  *                       linkId: { type: integer, description: trigger_response junction row id }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
@@ -463,6 +467,7 @@ router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
  *                       response_string: { type: string }
  *                       order: { type: integer, nullable: true }
  *                       weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                       response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
  *                       linkId: { type: integer, description: trigger_response junction row id }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
@@ -1068,6 +1073,7 @@ router.get("/history/:chatMemberId", authenticate, async (req, res) => {
  *                 response_string: { type: string }
  *                 response_order: { type: integer, nullable: true }
  *                 weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                 response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
  *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
  *                 created_at: { type: string }
  *       '400':
@@ -1148,6 +1154,7 @@ router.get("/:id", authenticate, async (req, res) => {
  *                 response_string: { type: string }
  *                 response_order: { type: integer, nullable: true }
  *                 weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                 response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
  *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
  *                 created_at: { type: string }
  *       '400':
@@ -1257,6 +1264,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  *                 response_string: { type: string }
  *                 response_order: { type: integer, nullable: true }
  *                 weight: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+ *                 response_function: { type: string, nullable: true, description: Resolved trigger_response_functions.function_name for the row's response_function FK, or null. }
  *                 selection_mode: { type: string, enum: [random, ordered, weighted] }
  *                 created_at: { type: string }
  *       '400':

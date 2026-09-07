@@ -32,10 +32,12 @@ export async function fetchTriggerResponseFunctions() {
   const res = await fetch(`${API_BASE}/trigger-responses/functions`);
 
   if (!res.ok) {
-    throw new Error(`Failed to load trigger response functions (${res.status})`);
+    throw new Error(
+      `Failed to load trigger response functions (${res.status})`,
+    );
   }
 
-  const data = await parseJsonResponse(res, "Trigger response functions");
+  const data = await parseJsonResponse(res, "Trigger Fxs");
   if (!data?.ok) {
     throw new Error(data?.error || "Failed to load trigger response functions");
   }

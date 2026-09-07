@@ -895,6 +895,12 @@
                             "minimum": 0,
                             "maximum": 100
                           },
+                          "response_function": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
+                            "or null.": null
+                          },
                           "selection_mode": {
                             "type": "string",
                             "enum": [
@@ -1014,6 +1020,12 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 100
+                    },
+                    "response_function": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
+                      "or null.": null
                     },
                     "selection_mode": {
                       "type": "string",
@@ -1208,6 +1220,12 @@
                             "minimum": 0,
                             "maximum": 100
                           },
+                          "response_function": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
+                            "or null.": null
+                          },
                           "linkId": {
                             "type": "integer",
                             "description": "trigger_response junction row id"
@@ -1371,6 +1389,12 @@
                             "minimum": 0,
                             "maximum": 100
                           },
+                          "response_function": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
+                            "or null.": null
+                          },
                           "linkId": {
                             "type": "integer",
                             "description": "trigger_response junction row id"
@@ -1467,6 +1491,12 @@
                             "nullable": true,
                             "minimum": 0,
                             "maximum": 100
+                          },
+                          "response_function": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
+                            "or null.": null
                           },
                           "linkId": {
                             "type": "integer",
@@ -1615,6 +1645,12 @@
                             "nullable": true,
                             "minimum": 0,
                             "maximum": 100
+                          },
+                          "response_function": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
+                            "or null.": null
                           },
                           "linkId": {
                             "type": "integer",
@@ -2281,6 +2317,12 @@
                       "minimum": 0,
                       "maximum": 100
                     },
+                    "response_function": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
+                      "or null.": null
+                    },
                     "selection_mode": {
                       "type": "string",
                       "enum": [
@@ -2411,6 +2453,12 @@
                       "nullable": true,
                       "minimum": 0,
                       "maximum": 100
+                    },
+                    "response_function": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Resolved trigger_response_functions.function_name for the row's response_function FK",
+                      "or null.": null
                     },
                     "selection_mode": {
                       "type": "string",

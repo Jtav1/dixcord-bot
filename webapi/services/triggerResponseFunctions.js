@@ -24,16 +24,38 @@ export async function getAll() {
 
 /**
  * Increment frequency for a catalog function when it is invoked.
- * @param {string} functionName - function_name value from trigger_response.response_function
+ * @param {number} id - trigger_response_functions.id (trigger_response.response_function FK value)
  * @returns {Promise<boolean>} true if a row was updated
  */
-export async function incrementFrequency(functionName) {
-  if (!functionName || typeof functionName !== "string" || !functionName.trim()) {
-    return false;
-  }
+export async function incrementFrequencyById(id) {
+  const n = Number(id);
+  if (!Number.isFinite(n) || n <= 0) return false;
   const [result] = await db.query(
-    "UPDATE trigger_response_functions SET frequency = frequency + 1 WHERE function_name = ?",
-    [functionName.trim()],
+    "UPDATE trigger_response_functions SET frequency = frequency + 1 WHERE id = ?",
+    [n],
   );
   return (result?.affectedRows ?? result?.changes ?? 0) > 0;
+}
+
+/**
+ * Get or create a trigger_response_functions row by name, returning its id.
+ * Dedupes by function_name, mirroring how triggers/responses are get-or-created by string.
+ * @param {unknown} functionName
+ * @returns {Promise<number|null>} null when functionName is empty/not a string
+ */
+export async function getOrCreateFunctionId(functionName) {
+  const trimmed =
+    typeof functionName === "string" ? functionName.trim() : "";
+  if (!trimmed) return null;
+  const [rows] = await db.query(
+    "SELECT id FROM trigger_response_functions WHERE function_name = ?",
+    [trimmed],
+  );
+  if (rows && rows.length > 0) return Number(rows[0].id);
+  const [result] = await db.query(
+    "INSERT INTO trigger_response_functions (function_name) VALUES (?)",
+    [trimmed],
+  );
+  const id = result?.insertId ?? result?.lastInsertRowid ?? null;
+  return id == null ? null : Number(id);
 }

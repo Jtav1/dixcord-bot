@@ -198,23 +198,23 @@ const initializeDatabase = () => {
     )
   `);
   exec(`
+    CREATE TABLE IF NOT EXISTS trigger_response_functions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      function_name TEXT NOT NULL UNIQUE,
+      frequency INTEGER DEFAULT 0,
+      display_name TEXT NULL
+    )
+  `);
+  exec(`
     CREATE TABLE IF NOT EXISTS trigger_response (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       trigger_id INTEGER NOT NULL REFERENCES triggers(id) ON DELETE CASCADE,
       response_id INTEGER NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
       response_order INTEGER NULL,
       weight INTEGER NULL DEFAULT NULL CHECK (weight IS NULL OR (weight >= 0 AND weight <= 100)),
-      response_function TEXT NULL,
+      response_function INTEGER NULL REFERENCES trigger_response_functions(id) ON DELETE SET NULL,
       frequency INTEGER DEFAULT 0,
       UNIQUE (trigger_id, response_id)
-    )
-  `);
-  exec(`
-    CREATE TABLE IF NOT EXISTS trigger_response_functions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      function_name TEXT NOT NULL UNIQUE,
-      frequency INTEGER DEFAULT 0,
-      display_name TEXT NULL
     )
   `);
   exec(`
