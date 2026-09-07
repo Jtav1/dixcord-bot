@@ -121,6 +121,14 @@ CREATE TABLE IF NOT EXISTS responses (
   frequency INTEGER DEFAULT 0
 );
 
+-- Catalog of trigger response function keys (referenced by trigger_response.response_function)
+CREATE TABLE IF NOT EXISTS trigger_response_functions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  function_name TEXT NOT NULL UNIQUE,
+  frequency INTEGER DEFAULT 0,
+  display_name TEXT NULL
+);
+
 -- Junction: which responses belong to which trigger, with optional order and weight (0-100 or null)
 CREATE TABLE IF NOT EXISTS trigger_response (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -128,17 +136,9 @@ CREATE TABLE IF NOT EXISTS trigger_response (
   response_id INTEGER NOT NULL REFERENCES responses(id) ON DELETE CASCADE,
   response_order INTEGER NULL,
   weight INTEGER NULL DEFAULT NULL CHECK (weight IS NULL OR (weight >= 0 AND weight <= 100)),
-  response_function TEXT NULL,
+  response_function INTEGER NULL REFERENCES trigger_response_functions(id) ON DELETE SET NULL,
   frequency INTEGER DEFAULT 0,
   UNIQUE (trigger_id, response_id)
-);
-
--- Catalog of trigger response function keys (matched by trigger_response.response_function)
-CREATE TABLE IF NOT EXISTS trigger_response_functions (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  function_name TEXT NOT NULL UNIQUE,
-  frequency INTEGER DEFAULT 0,
-  display_name TEXT NULL
 );
 
 -- Round-robin state: last-used response_order per trigger (for ordered selection)

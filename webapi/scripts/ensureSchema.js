@@ -7,12 +7,34 @@ import db from "../config/db.js";
 import {
   columnExists,
   constraintExists,
+  getColumnDeclaredType,
   indexExists,
   isSqliteDb,
   tableExists,
 } from "./schemaUtils.js";
 
 const isSqlite = isSqliteDb();
+
+/**
+ * Get or create a trigger_response_functions row by name, returning its id.
+ * Used only to backfill trigger_response.response_function during the FK-id migration below.
+ * @param {import('mysql2/promise').Pool | { query: Function }} db
+ * @param {string} functionName
+ * @returns {Promise<number|null>}
+ */
+async function getOrCreateTriggerResponseFunctionId(db, functionName) {
+  const [rows] = await db.query(
+    "SELECT id FROM trigger_response_functions WHERE function_name = ?",
+    [functionName],
+  );
+  if (rows && rows.length > 0) return Number(rows[0].id);
+  const [result] = await db.query(
+    "INSERT INTO trigger_response_functions (function_name) VALUES (?)",
+    [functionName],
+  );
+  const id = result?.insertId ?? result?.lastInsertRowid ?? null;
+  return id == null ? null : Number(id);
+}
 
 /**
  * Run all pending migrations.
@@ -672,6 +694,85 @@ export async function ensureSchemaMigrations() {
       applied.push("trigger_response.response_function column");
       console.log(
         "db: migration applied: added trigger_response.response_function column",
+      );
+    }
+
+    // trigger_response.response_function: convert from a function-name string column to an INT
+    // FK referencing trigger_response_functions.id (skipped once it's already an integer type).
+    const responseFunctionType = await getColumnDeclaredType(
+      db,
+      "trigger_response",
+      "response_function",
+      isSqlite,
+    );
+    const isIntegerType = [
+      "int",
+      "integer",
+      "bigint",
+      "tinyint",
+      "smallint",
+      "mediumint",
+    ].includes(responseFunctionType);
+
+    if (!isIntegerType) {
+      const [nameRows] = await db.query(
+        "SELECT DISTINCT response_function AS name FROM trigger_response WHERE response_function IS NOT NULL AND response_function <> ''",
+      );
+      for (const row of nameRows || []) {
+        const name = String(row.name).trim();
+        if (!name) continue;
+        const functionId = await getOrCreateTriggerResponseFunctionId(db, name);
+        if (functionId == null) continue;
+        await db.query(
+          "UPDATE trigger_response SET response_function = ? WHERE response_function = ?",
+          [String(functionId), name],
+        );
+      }
+      await db.query(
+        "UPDATE trigger_response SET response_function = NULL WHERE response_function = ''",
+      );
+
+      if (isSqlite) {
+        await db.query(
+          "ALTER TABLE trigger_response ADD COLUMN response_function_id INTEGER NULL REFERENCES trigger_response_functions(id) ON DELETE SET NULL",
+        );
+        await db.query(
+          "UPDATE trigger_response SET response_function_id = CAST(response_function AS INTEGER) WHERE response_function IS NOT NULL",
+        );
+        await db.query(
+          "ALTER TABLE trigger_response DROP COLUMN response_function",
+        );
+        await db.query(
+          "ALTER TABLE trigger_response RENAME COLUMN response_function_id TO response_function",
+        );
+      } else {
+        await db.query(
+          "ALTER TABLE trigger_response MODIFY COLUMN response_function INT NULL",
+        );
+      }
+      applied.push(
+        "trigger_response.response_function converted to FK id referencing trigger_response_functions.id",
+      );
+      console.log(
+        "db: migration applied: converted trigger_response.response_function to FK id",
+      );
+    }
+
+    if (
+      !isSqlite &&
+      !(await constraintExists(
+        db,
+        "trigger_response",
+        "fk_trigger_response_response_function",
+        isSqlite,
+      ))
+    ) {
+      await db.query(
+        "ALTER TABLE trigger_response ADD CONSTRAINT fk_trigger_response_response_function FOREIGN KEY (response_function) REFERENCES trigger_response_functions(id) ON DELETE SET NULL",
+      );
+      applied.push("trigger_response.response_function FK constraint");
+      console.log(
+        "db: migration applied: added trigger_response.response_function FK constraint",
       );
     }
   }
