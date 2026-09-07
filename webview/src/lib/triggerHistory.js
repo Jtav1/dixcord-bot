@@ -27,6 +27,27 @@ async function parseJsonResponse(res, context) {
 }
 
 /**
+ * Fetch users who have at least one trigger-response history entry.
+ * @param {string} [app="discord"] Chat app id.
+ * @returns {Promise<Array<{ id: number, name: string, handle: string, platformUserId: string }>>}
+ */
+export async function fetchUsersWithTriggerHistory(app = "discord") {
+  const params = new URLSearchParams({ app });
+  const res = await fetch(`${API_BASE}/trigger-responses/history/users?${params}`);
+
+  if (!res.ok) {
+    throw new Error(`Failed to load trigger-history users (${res.status})`);
+  }
+
+  const data = await parseJsonResponse(res, "Trigger-history users");
+  if (!data?.ok) {
+    throw new Error(data?.error || "Failed to load trigger-history users");
+  }
+
+  return Array.isArray(data.users) ? data.users : [];
+}
+
+/**
  * Fetch one page of trigger-response usage history for one user from webapi.
  * @param {number|string} chatMemberId chat_member_mapping.id of the user.
  * @param {number} [offset=0] Rows to skip.

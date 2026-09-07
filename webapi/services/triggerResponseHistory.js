@@ -4,7 +4,11 @@
  */
 
 import db from "../config/db.js";
-import { getChatMemberMappingIdByPlatformUserId } from "./chatMemberMapping.js";
+import {
+  getChatMemberMappingIdByPlatformUserId,
+  isChatMemberAppSupported,
+} from "./chatMemberMapping.js";
+import { serializeUserMappingRow } from "./userMappings.js";
 
 /**
  * Record that a user received a given trigger_response selection.
@@ -79,4 +83,24 @@ export async function listTriggerResponseHistoryForUser(userId, opts = {}) {
   }));
 
   return { entries, total };
+}
+
+/**
+ * List chat_member_mapping rows for `app` that have at least one trigger-response history entry.
+ * @param {string} app - chat app key, e.g. "discord"
+ * @returns {Promise<Array<ReturnType<typeof serializeUserMappingRow>>>}
+ */
+export async function listUsersWithTriggerResponseHistory(app) {
+  if (!isChatMemberAppSupported(app)) return [];
+
+  const [rows] = await db.query(
+    `SELECT DISTINCT m.*
+     FROM chat_member_mapping m
+     INNER JOIN trigger_response_user_history h ON h.user_id = m.id
+     ORDER BY m.name ASC`,
+  );
+
+  return (Array.isArray(rows) ? rows : []).map((row) =>
+    serializeUserMappingRow(row, app),
+  );
 }

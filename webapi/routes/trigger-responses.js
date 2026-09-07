@@ -4,9 +4,13 @@ import * as triggerResponses from "../services/triggerResponses.js";
 import * as triggerResponseFunctions from "../services/triggerResponseFunctions.js";
 import {
   listTriggerResponseHistoryForUser,
+  listUsersWithTriggerResponseHistory,
   recordTriggerResponseUsage,
 } from "../services/triggerResponseHistory.js";
-import { resolveChatAppFromRequest } from "../utils/chatAppHttp.js";
+import {
+  CHAT_APP_PARAM_ERROR,
+  resolveChatAppFromRequest,
+} from "../utils/chatAppHttp.js";
 
 const router = express.Router();
 
@@ -886,6 +890,67 @@ router.get("/functions", authenticate, async (req, res) => {
     res
       .status(500)
       .json({ ok: false, error: "Failed to list trigger response functions" });
+  }
+});
+
+/**
+ * GET /api/trigger-responses/history/users
+ * List users (chat_member_mapping rows) who have at least one trigger-response history entry.
+ * Query: ?app=discord
+ * Auth: required. Registered before /history/:chatMemberId so "users" isn't shadowed by the id param route.
+ * @openapi
+ * /api/trigger-responses/history/users:
+ *   get:
+ *     operationId: listTriggerResponseHistoryUsers
+ *     tags: [Trigger Responses]
+ *     summary: List users who have trigger-response usage history
+ *     description: >
+ *       Users with zero trigger-response history entries are excluded, unlike GET /api/user-mappings
+ *       which lists every mapped user regardless of activity.
+ *     parameters:
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         description: Chat app to scope the mapping to. Currently only "discord" is supported.
+ *         schema: { type: string, enum: [discord] }
+ *     responses:
+ *       '200':
+ *         description: Users with at least one trigger-response history entry.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 users:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       name: { type: string }
+ *                       handle: { type: string }
+ *                       platformUserId: { type: string }
+ *                       app: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/history/users", authenticate, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+
+    const users = await listUsersWithTriggerResponseHistory(app);
+    res.json({ ok: true, users });
+  } catch (err) {
+    console.error("GET /api/trigger-responses/history/users error:", err);
+    res
+      .status(500)
+      .json({ ok: false, error: "Failed to list trigger-response history users" });
   }
 });
 

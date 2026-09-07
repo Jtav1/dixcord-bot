@@ -31,7 +31,7 @@
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import TriggerHistoryUsersList from "../components/TriggerHistoryUsersList.vue";
-import { fetchAllUserMappings } from "../lib/plusplusRankings.js";
+import { fetchUsersWithTriggerHistory } from "../lib/triggerHistory.js";
 
 const router = useRouter();
 
@@ -50,7 +50,7 @@ function onSelectUser(userId) {
 
 onMounted(async () => {
   try {
-    users.value = await fetchAllUserMappings("discord");
+    users.value = await fetchUsersWithTriggerHistory("discord");
   } catch (err) {
     error.value =
       err instanceof Error ? err.message : "Failed to load users";

@@ -3,6 +3,7 @@
  */
 
 import db from "../config/db.js";
+import { utcIsoToSqlDatetime } from "./scheduledMessages.js";
 
 const CACHE_VERSION_KEY = "cache_version";
 
@@ -61,9 +62,9 @@ export async function recordBotHeartbeat(payload) {
   const version = String(payload.version ?? "").trim();
   if (!guildId) return;
 
-  const readyAt = payload.readyAt ? new Date(payload.readyAt) : null;
-  const readyAtSql =
-    readyAt && !Number.isNaN(readyAt.getTime()) ? readyAt.toISOString() : null;
+  const readyAtSql = payload.readyAt
+    ? utcIsoToSqlDatetime(payload.readyAt)
+    : null;
   const memberCount = Number.isFinite(Number(payload.memberCount))
     ? Number(payload.memberCount)
     : null;

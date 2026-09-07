@@ -104,6 +104,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | PUT | `/api/trigger-responses/triggers/:id` | ✓ | Update trigger / responses |
 | GET | `/api/trigger-responses/random?trigger=&app=&userId=` | ✓ | One response for trigger (mode-aware); app+userId optionally logs trigger_response_user_history |
 | GET | `/api/trigger-responses/functions` | ✓ | Trigger response function catalog |
+| GET | `/api/trigger-responses/history/users?app=` | ✓ | Users with at least one trigger-response history entry |
 | GET | `/api/trigger-responses/history/:chatMemberId?limit=&offset=` | ✓ | Paginated trigger-response usage history for one user |
 | GET | `/api/trigger-responses/responses/:id` | ✓ | One response by id |
 | PUT | `/api/trigger-responses/responses/:id` | ✓ | Update response text |
