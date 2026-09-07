@@ -7,6 +7,7 @@
 
 import db from "../config/db.js";
 import { isChatMemberAppSupported } from "./chatMemberMapping.js";
+import { utcIsoToSqlDatetime } from "./scheduledMessages.js";
 
 /**
  * @param {unknown} value
@@ -51,7 +52,7 @@ export async function upsertGuildSnapshot({ app, guildId, guild, channels, roles
     toFiniteNumberOrNull(guild.boostCount),
     guild.verificationLevel ?? null,
     guild.preferredLocale ?? null,
-    guild.createdAt ?? null,
+    utcIsoToSqlDatetime(guild.createdAt),
   ];
 
   const [existing] = await db.query(
