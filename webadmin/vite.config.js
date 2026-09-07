@@ -1,4 +1,6 @@
+import vue from "@vitejs/plugin-vue";
 import { defineConfig, loadEnv } from "vite";
+import vuetify from "vite-plugin-vuetify";
 import { attachCachedWebapiAuthHeader } from "./lib/webapiAuth.js";
 import { webapiAuthProxyPlugin } from "./lib/webapiAuthProxyPlugin.js";
 
@@ -47,7 +49,7 @@ export default defineConfig(({ mode }) => {
   };
 
   return {
-    plugins: [webapiAuthProxyPlugin()],
+    plugins: [webapiAuthProxyPlugin(), vue(), vuetify({ autoImport: true })],
     server: {
       port,
       strictPort: true,

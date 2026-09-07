@@ -11,7 +11,8 @@ Internal-only: this app is never meant to be exposed to the internet.
 
 ## Stack
 
-- **Node.js** + **Vite** (dev/build)
+- **Vue 3** + **Vuetify 4** (frontend, styled to match [webview](../webview/))
+- **Vite** (dev/build)
 - **Express** (production static server + authenticated `/api` proxy)
 - **helmet** + per-IP rate limiting on `/api`
 - **dotenv** for config
