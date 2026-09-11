@@ -2,6 +2,7 @@ import * as api from "../../../api/client.js";
 import { messagePinner } from "./messagePinner.js";
 import { doplus, dominus } from "./plusplus.js";
 import { countEmoji, countRepost, uncountRepost } from "../../../api/emojis.js";
+import { incrementCounter } from "../../../utilities/metrics.js";
 
 /** Fetch a random pin quip from the API; returns fallback if unavailable. */
 async function getRandomPinQuip() {
@@ -52,6 +53,7 @@ export async function handleReactionAdd(reaction, user, options) {
 
   const message = await resolveMessage(reaction);
   if (!message) return;
+  incrementCounter("reactionsProcessedTotal");
 
   const emoji = reaction.emoji;
   if (!emoji) {
@@ -67,6 +69,7 @@ export async function handleReactionAdd(reaction, user, options) {
   if (pinSystemEnabled && pinReact && pinReact.count === pinThreshold) {
     const res = await messagePinner(message, pinReact, user, client);
     if (res) {
+      incrementCounter("pinsLoggedTotal");
       const randomReply = await getRandomPinQuip();
       message.reply(randomReply);
     }
@@ -104,7 +107,9 @@ export async function handleReactionAdd(reaction, user, options) {
     } else {
       try {
         await countEmoji(emoji.name, emoji.id, user.id);
+        incrementCounter("emojiCountedTotal");
       } catch (err) {
+        incrementCounter("apiCallErrorsTotal", "emojis");
         console.error(
           `bot: countEmoji failed for reaction emoji "${emoji.id ?? emoji.name}" on message ${message.id} from user ${user.id}: ${api.describeApiError(err)}`,
         );
@@ -115,11 +120,14 @@ export async function handleReactionAdd(reaction, user, options) {
   if (repostDetectionEnabled) {
     const repostReact = allReactions.get(repostEmojiId);
     if (repostReact) {
-      countRepost(message.author.id, message.id, user.id).catch((err) => {
-        console.error(
-          `bot: countRepost failed for message ${message.id} (accused ${message.author.id}, accuser ${user.id}): ${api.describeApiError(err)}`,
-        );
-      });
+      countRepost(message.author.id, message.id, user.id)
+        .then(() => incrementCounter("repostsDetectedTotal"))
+        .catch((err) => {
+          incrementCounter("apiCallErrorsTotal", "reposts");
+          console.error(
+            `bot: countRepost failed for message ${message.id} (accused ${message.author.id}, accuser ${user.id}): ${api.describeApiError(err)}`,
+          );
+        });
     }
   }
 }
@@ -136,6 +144,7 @@ export async function handleReactionRemove(reaction, user, options) {
 
   const message = await resolveMessage(reaction);
   if (!message) return;
+  incrementCounter("reactionsProcessedTotal");
 
   const emoji = reaction.emoji;
   if (!emoji) {

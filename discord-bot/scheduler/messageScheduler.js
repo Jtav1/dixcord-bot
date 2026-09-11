@@ -3,6 +3,7 @@ import {
   getDueScheduledMessagesForBot,
   markScheduledMessageSent,
 } from "../api/scheduledMessages.js";
+import { incrementCounter } from "../utilities/metrics.js";
 
 let scheduler = null;
 let dueMessagesJob = null;
@@ -30,7 +31,10 @@ export async function processDueScheduledMessages() {
           id: row.id,
           sentAtUtcIso: new Date().toISOString(),
         });
-        if (marked) sentCount++;
+        if (marked) {
+          sentCount++;
+          incrementCounter("scheduledMessagesSentTotal");
+        }
       } catch (err) {
         console.error(
           `scheduler: failed to send/mark scheduled message id=${row?.id}:`,

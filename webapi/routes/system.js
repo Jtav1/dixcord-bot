@@ -167,6 +167,7 @@ router.post("/invalidate-cache", authenticate, requireAdmin, async (req, res) =>
  *               memberCount: { type: integer, nullable: true, description: "Guild member count." }
  *               channelCount: { type: integer, nullable: true, description: "Cached guild channel count." }
  *               wsPingMs: { type: integer, nullable: true, description: "Discord gateway heartbeat latency in ms." }
+ *               metrics: { type: object, nullable: true, description: "Bot-internal cumulative counter snapshot (opaque; surfaced via GET /metrics)." }
  *     responses:
  *       '200':
  *         description: Heartbeat recorded.
@@ -200,6 +201,7 @@ router.post("/heartbeat", authenticate, async (req, res) => {
       memberCount: req.body?.memberCount,
       channelCount: req.body?.channelCount,
       wsPingMs: req.body?.wsPingMs,
+      metrics: req.body?.metrics,
     });
     res.json({ ok: true });
   } catch (err) {

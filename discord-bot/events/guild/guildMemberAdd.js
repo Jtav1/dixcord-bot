@@ -1,4 +1,5 @@
 import { importUserMappingList } from "../../api/userMapping.js";
+import { incrementCounter } from "../../utilities/metrics.js";
 
 const name = "guildMemberAdd";
 
@@ -20,6 +21,7 @@ const execute = async (member) => {
       discord_id: String(u.id),
     },
   ]);
+  incrementCounter("guildMemberJoinsTotal");
 };
 
 export const event = {

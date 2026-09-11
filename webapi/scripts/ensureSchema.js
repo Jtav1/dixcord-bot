@@ -120,7 +120,8 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: bot_status table already exists");
   }
 
-  // bot_status: session/health columns (ready_at, member_count, channel_count, ws_ping_ms)
+  // bot_status: session/health columns (ready_at, member_count, channel_count, ws_ping_ms,
+  // metrics_json - the bot's cumulative counter snapshot from its most recent heartbeat)
   if (await tableExists(db, "bot_status", isSqlite)) {
     const botStatusColumns = isSqlite
       ? [
@@ -128,12 +129,14 @@ export async function ensureSchemaMigrations() {
           { name: "member_count", sql: "member_count INTEGER NULL" },
           { name: "channel_count", sql: "channel_count INTEGER NULL" },
           { name: "ws_ping_ms", sql: "ws_ping_ms INTEGER NULL" },
+          { name: "metrics_json", sql: "metrics_json TEXT NULL" },
         ]
       : [
           { name: "ready_at", sql: "ready_at TIMESTAMP NULL" },
           { name: "member_count", sql: "member_count INT NULL" },
           { name: "channel_count", sql: "channel_count INT NULL" },
           { name: "ws_ping_ms", sql: "ws_ping_ms INT NULL" },
+          { name: "metrics_json", sql: "metrics_json TEXT NULL" },
         ];
 
     for (const col of botStatusColumns) {

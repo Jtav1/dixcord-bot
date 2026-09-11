@@ -192,7 +192,8 @@ CREATE TABLE IF NOT EXISTS bot_status (
   ready_at TEXT NULL,
   member_count INTEGER NULL,
   channel_count INTEGER NULL,
-  ws_ping_ms INTEGER NULL
+  ws_ping_ms INTEGER NULL,
+  metrics_json TEXT NULL
 );
 
 CREATE TABLE IF NOT EXISTS system_state (

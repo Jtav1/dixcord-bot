@@ -53,8 +53,19 @@ export async function incrementCacheVersion() {
 }
 
 /**
+ * Serialize the bot's cumulative counter snapshot for storage in bot_status.metrics_json.
+ * @param {unknown} metrics
+ * @returns {string|null}
+ */
+function serializeBotMetricsForStorage(metrics) {
+  if (metrics == null || typeof metrics !== "object" || Array.isArray(metrics))
+    return null;
+  return JSON.stringify(metrics);
+}
+
+/**
  * Record bot heartbeat.
- * @param {{ guildId: string, version: string, readyAt?: string|null, memberCount?: number|null, channelCount?: number|null, wsPingMs?: number|null }} payload
+ * @param {{ guildId: string, version: string, readyAt?: string|null, memberCount?: number|null, channelCount?: number|null, wsPingMs?: number|null, metrics?: Record<string, unknown>|null }} payload
  * @returns {Promise<void>}
  */
 export async function recordBotHeartbeat(payload) {
@@ -74,6 +85,7 @@ export async function recordBotHeartbeat(payload) {
   const wsPingMs = Number.isFinite(Number(payload.wsPingMs))
     ? Number(payload.wsPingMs)
     : null;
+  const metricsJson = serializeBotMetricsForStorage(payload.metrics);
 
   const [rows] = await db.query(
     "SELECT id FROM bot_status WHERE guild_id = ?",
@@ -83,15 +95,15 @@ export async function recordBotHeartbeat(payload) {
   if (rows && rows.length > 0) {
     await db.query(
       `UPDATE bot_status
-       SET version = ?, last_seen_at = CURRENT_TIMESTAMP, ready_at = ?, member_count = ?, channel_count = ?, ws_ping_ms = ?
+       SET version = ?, last_seen_at = CURRENT_TIMESTAMP, ready_at = ?, member_count = ?, channel_count = ?, ws_ping_ms = ?, metrics_json = ?
        WHERE guild_id = ?`,
-      [version, readyAtSql, memberCount, channelCount, wsPingMs, guildId],
+      [version, readyAtSql, memberCount, channelCount, wsPingMs, metricsJson, guildId],
     );
   } else {
     await db.query(
-      `INSERT INTO bot_status (guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms)
-       VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?)`,
-      [guildId, version, readyAtSql, memberCount, channelCount, wsPingMs],
+      `INSERT INTO bot_status (guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms, metrics_json)
+       VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?)`,
+      [guildId, version, readyAtSql, memberCount, channelCount, wsPingMs, metricsJson],
     );
   }
 }
