@@ -4,6 +4,10 @@
 
 import * as api from "./client.js";
 import { guildId, version } from "../configVars.js";
+import {
+  getMetricsSnapshot,
+  incrementCounter,
+} from "../utilities/metrics.js";
 
 const HEARTBEAT_INTERVAL_MS = 60000;
 
@@ -26,6 +30,7 @@ export async function sendHeartbeat() {
     memberCount: guild?.memberCount ?? null,
     channelCount: guild?.channels.cache.size ?? null,
     wsPingMs: heartbeatClient?.ws.ping ?? null,
+    metrics: getMetricsSnapshot(),
   });
 }
 
@@ -54,6 +59,7 @@ export function startHeartbeat(client, readyAt) {
     try {
       await sendHeartbeat();
     } catch (err) {
+      incrementCounter("heartbeatSendErrorsTotal");
       console.error("Heartbeat error:", err);
     }
   };

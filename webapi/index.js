@@ -8,6 +8,7 @@ import { apiReference } from "@scalar/express-api-reference";
 import db from "./config/db.js";
 import { ensureSchemaMigrations } from "./scripts/ensureSchema.js";
 import { buildOpenApiSpec } from "./lib/openapi.js";
+import { buildMetricsText } from "./services/metrics.js";
 import authRoutes from "./routes/auth.js";
 import userRoutes from "./routes/users.js";
 import botResponsesRoutes from "./routes/bot-responses.js";
@@ -433,6 +434,60 @@ app.get("/", publicLimiter, (req, res) => {
  *                 status: { type: string, enum: [ok] }
  */
 app.get("/health", publicLimiter, (req, res) => res.json({ status: "ok" }));
+
+/**
+ * Reject unless the request carries the shared METRICS_TOKEN as a bearer token. Not the same as
+ * authenticate() (JWTs are short-lived and unsuitable for a static Prometheus scrape config).
+ */
+function requireMetricsToken(req, res, next) {
+  const token = process.env.METRICS_TOKEN;
+  if (!token) {
+    console.warn("webapi: METRICS_TOKEN not set; /metrics is disabled.");
+    return res
+      .status(503)
+      .json({ ok: false, error: "Metrics endpoint not configured" });
+  }
+  if (req.headers.authorization !== `Bearer ${token}`) {
+    return res
+      .status(401)
+      .json({ ok: false, error: "Invalid or missing metrics token" });
+  }
+  next();
+}
+
+/**
+ * @openapi
+ * /metrics:
+ *   get:
+ *     operationId: getMetrics
+ *     tags: [System]
+ *     summary: Prometheus metrics exposition
+ *     description: >
+ *       Requires a `METRICS_TOKEN` bearer token (set via the METRICS_TOKEN env var), not a JWT -
+ *       intended for a static Prometheus scrape_config, not interactive API clients. Returns 503
+ *       if METRICS_TOKEN is unset.
+ *     security: []
+ *     responses:
+ *       '200':
+ *         description: Prometheus text exposition format.
+ *         content:
+ *           text/plain:
+ *             schema: { type: string }
+ *       '401':
+ *         description: Missing or invalid metrics token.
+ *       '503':
+ *         description: METRICS_TOKEN not configured.
+ */
+app.get("/metrics", publicLimiter, requireMetricsToken, async (req, res) => {
+  try {
+    const { text, contentType } = await buildMetricsText();
+    res.set("Content-Type", contentType);
+    res.send(text);
+  } catch (err) {
+    console.error("GET /metrics error:", err);
+    res.status(500).send("Failed to build metrics");
+  }
+});
 
 const openApiSpec = buildOpenApiSpec();
 

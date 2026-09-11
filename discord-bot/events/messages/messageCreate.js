@@ -29,6 +29,7 @@ import {
   isStickerTrackingEnabled,
   isPlusPlusEnabled,
 } from "../../configStore.js";
+import { incrementCounter } from "../../utilities/metrics.js";
 
 const name = "messageCreate";
 
@@ -36,6 +37,7 @@ const execute = async (message) => {
   let response = "";
 
   if (!message.author.bot && !(message.author.id === clientId)) {
+    incrementCounter("messagesProcessedTotal");
     await emojiDetector(message);
     if (isStickerTrackingEnabled()) await stickerDetector(message);
     if (isPlusPlusEnabled()) await plusMinusMsg(message);
@@ -59,6 +61,7 @@ const execute = async (message) => {
         const twitFixReply = await getLinkFixerResponse(message.content ?? "");
         if (twitFixReply.length > 0) {
           response = twitFixReply;
+          incrementCounter("linkFixerTriggeredTotal");
         }
       }
     }
@@ -73,6 +76,7 @@ const execute = async (message) => {
         contentStripped.includes(t.trigger_string),
       );
       if (matchedTrigger) {
+        incrementCounter("triggerResponsesMatchedTotal");
         const {
           response: triggerResponse,
           response_function,
@@ -108,6 +112,7 @@ const execute = async (message) => {
         });
 
         if (!parsedReminder.ok) {
+          incrementCounter("reminderParseFailuresTotal");
           console.log(
             "bot: scheduler parse failure:",
             parsedReminder.error,
@@ -144,6 +149,7 @@ const execute = async (message) => {
             return;
           }
           await message.react("✅").catch(() => null);
+          incrementCounter("remindersCreatedTotal");
         } catch (err) {
           console.log("bot: scheduler create failure:", err);
           await message.react("❌").catch(() => null);
@@ -155,6 +161,7 @@ const execute = async (message) => {
         message.content.endsWith("?")
       ) {
         response = await getFortuneResponse();
+        incrementCounter("eightBallResponsesTotal");
       }
     }
 

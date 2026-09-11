@@ -3,21 +3,28 @@ import {
   minusminus,
   recordPlusMinusFromMessage,
 } from "../../../api/plusplus.js";
+import { incrementCounter } from "../../../utilities/metrics.js";
 
 /** Used by reaction handler only (user votes). */
 export const doplus = async (string, typestr, voterid) => {
   if (typestr !== "user" || string === voterid) return;
-  plusplus(string, typestr, voterid).catch((err) => {
-    console.log("bot: plusplus error", err);
-  });
+  plusplus(string, typestr, voterid)
+    .then(() => incrementCounter("plusplusVotesTotal"))
+    .catch((err) => {
+      incrementCounter("apiCallErrorsTotal", "plusplus");
+      console.log("bot: plusplus error", err);
+    });
 };
 
 /** Used by reaction handler only (user votes). */
 export const dominus = async (string, typestr, voterid) => {
   if (typestr !== "user" || string === voterid) return;
-  minusminus(string, typestr, voterid).catch((err) => {
-    console.log("bot: minusminus error", err);
-  });
+  minusminus(string, typestr, voterid)
+    .then(() => incrementCounter("plusplusVotesTotal"))
+    .catch((err) => {
+      incrementCounter("apiCallErrorsTotal", "plusplus");
+      console.log("bot: minusminus error", err);
+    });
 };
 
 /**

@@ -31,6 +31,7 @@ import {
   handleReactionAdd,
   handleReactionRemove,
 } from "./events/messages/utilities/reactionHandler.js";
+import { incrementCounter } from "./utilities/metrics.js";
 
 const client = new Client({
   intents: [
@@ -126,7 +127,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   try {
     await runCommand.execute(interaction);
+    incrementCounter("commandsTotal", runCommand.cmdName);
   } catch (e) {
+    incrementCounter("commandErrorsTotal", runCommand.cmdName);
     console.log("bot: command execution error");
   }
 });
@@ -187,7 +190,25 @@ client.on(
 );
 
 client.on(Events.Error, async (error) => {
+  incrementCounter("discordClientErrorsTotal");
   console.error("Discord Client Error: ", error);
+});
+
+client.on(Events.GuildCreate, async () => {
+  incrementCounter("discordGuildJoinsTotal");
+});
+
+client.on(Events.GuildDelete, async () => {
+  incrementCounter("discordGuildLeavesTotal");
+});
+
+client.on("rateLimit", async () => {
+  incrementCounter("discordRateLimitHitsTotal");
+});
+
+client.on("shardError", async (error) => {
+  incrementCounter("discordShardErrorsTotal");
+  console.error("Discord Shard Error: ", error);
 });
 
 await client.login(token).then(() => {

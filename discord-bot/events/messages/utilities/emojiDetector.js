@@ -9,6 +9,7 @@ import {
   isEmojiTrackingEnabled,
 } from "../../../configStore.js";
 import { doplus, dominus } from "./plusplus.js";
+import { incrementCounter } from "../../../utilities/metrics.js";
 
 /**
  * Detect and record emoji usage in a message's text content. Also applies a single +/- vote
@@ -54,7 +55,9 @@ export const emojiDetector = async (rawMessage) => {
     } else if (emojiTrackingEnabled) {
       try {
         await countEmoji(emo.name, emo.id, rawMessage.author.id);
+        incrementCounter("emojiCountedTotal");
       } catch (err) {
+        incrementCounter("apiCallErrorsTotal", "emojis");
         console.error(
           `bot: countEmoji failed for emoji "${emo.id ?? emo.name}" in message ${rawMessage.id} from user ${rawMessage.author.id}: ${describeApiError(err)}`,
         );

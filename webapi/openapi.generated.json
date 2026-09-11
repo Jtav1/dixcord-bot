@@ -2950,6 +2950,11 @@
                     "type": "integer",
                     "nullable": true,
                     "description": "Discord gateway heartbeat latency in ms."
+                  },
+                  "metrics": {
+                    "type": "object",
+                    "nullable": true,
+                    "description": "Bot-internal cumulative counter snapshot (opaque; surfaced via GET /metrics)."
                   }
                 }
               }
@@ -8949,6 +8954,35 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "getMetrics",
+        "tags": [
+          "System"
+        ],
+        "summary": "Prometheus metrics exposition",
+        "description": "Requires a `METRICS_TOKEN` bearer token (set via the METRICS_TOKEN env var), not a JWT - intended for a static Prometheus scrape_config, not interactive API clients. Returns 503 if METRICS_TOKEN is unset.\n",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Prometheus text exposition format.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid metrics token."
+          },
+          "503": {
+            "description": "METRICS_TOKEN not configured."
           }
         }
       }
