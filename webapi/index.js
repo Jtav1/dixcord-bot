@@ -7,6 +7,8 @@ import bcrypt from "bcryptjs";
 import { apiReference } from "@scalar/express-api-reference";
 import db from "./config/db.js";
 import { ensureSchemaMigrations } from "./scripts/ensureSchema.js";
+import { guildConfigIsEmpty, seedDefaultConfigForGuild } from "./services/guildConfig.js";
+import { CONFIG_METADATA } from "./services/configMetadata.js";
 import { buildOpenApiSpec } from "./lib/openapi.js";
 import { buildMetricsText } from "./services/metrics.js";
 import authRoutes from "./routes/auth.js";
@@ -149,6 +151,25 @@ async function ensureWebViewUser() {
     console.error("Failed to ensure web-view user:", err);
     throw err;
   }
+}
+
+/**
+ * Dev convenience: seed guild_config for DISCORD_GUILD_ID from SEED_CONFIG_* env values.
+ * Skipped in production and whenever guild_config already has any rows (not just first launch).
+ * @returns {Promise<void>}
+ */
+async function seedDevGuildConfig() {
+  if (process.env.NODE_ENV === "production") return;
+  const guildId = process.env.DISCORD_GUILD_ID;
+  if (!guildId) return;
+  if (!(await guildConfigIsEmpty())) return;
+  const overrides = Object.keys(CONFIG_METADATA)
+    .map((config) => ({ config, envValue: process.env[`SEED_CONFIG_${config.toUpperCase()}`] }))
+    .filter(({ envValue }) => envValue !== undefined)
+    .map(({ config, envValue }) => ({ config, value: envValue }));
+  if (overrides.length === 0) return;
+  await seedDefaultConfigForGuild("discord", guildId, overrides);
+  console.log(`webapi: dev-seeded guild_config for discord/${guildId} from SEED_CONFIG_* env vars`);
 }
 
 /**
@@ -563,6 +584,7 @@ app.use((err, req, res, next) => {
 });
 
 await ensureSchemaMigrations();
+await seedDevGuildConfig();
 await ensureAdminUser();
 await ensureBotUser();
 await ensureWebViewUser();

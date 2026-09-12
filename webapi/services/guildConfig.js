@@ -118,3 +118,12 @@ export async function guildConfigExistsFor(app, guildId) {
   );
   return Array.isArray(rows) && rows.length > 0;
 }
+
+/**
+ * Whether guild_config has any rows at all, across every app/guild (used to guard dev-mode seeding).
+ * @returns {Promise<boolean>}
+ */
+export async function guildConfigIsEmpty() {
+  const [rows] = await db.query("SELECT config FROM guild_config LIMIT 1");
+  return !(Array.isArray(rows) && rows.length > 0);
+}

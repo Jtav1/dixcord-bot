@@ -54,8 +54,12 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 | `CORS_ORIGINS` | legacy defaults if unset | Comma-separated hostnames or full origins allowed for CORS |
 | `API_RATE_LIMIT_MAX` | `300` | Authenticated API requests per minute per IP |
 | `PIN_FILES_DIR` | `../discord-bot/files` | Shared directory for pin attachment files |
+| `DISCORD_GUILD_ID` | unset | Dev-only: guild to seed `guild_config` for on first boot (see below) |
+| `SEED_CONFIG_<KEY>` | unset | Dev-only: value for `guild_config`'s `<key>` (uppercased) when seeding on first boot |
 
 Service usernames (`ADMIN_USERNAME`, `BOT_USERNAME`, `WEBVIEW_USERNAME`) must be set or the process refuses to start cleanly for those accounts.
+
+On boot, if `NODE_ENV != production`, `DISCORD_GUILD_ID` is set, and `guild_config` has zero rows anywhere (true first launch, not per-guild), webapi seeds `guild_config` for that guild from any `SEED_CONFIG_<KEY>` env vars present (falling back to each key's `defaultValue` from `services/configMetadata.js` for the rest). This never runs again once `guild_config` has any rows.
 
 ---
 
