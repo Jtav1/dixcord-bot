@@ -10,19 +10,19 @@
       </v-app-bar-title>
 
       <v-tabs
-        :model-value="activeTab"
+        :model-value="activeClientKey"
         class="app-tabs"
         color="primary"
         show-arrows
       >
         <v-tab
-          v-for="tab in tabs"
-          :key="tab.route"
-          :value="tab.route"
-          :to="tab.route"
+          v-for="client in CLIENTS"
+          :key="client.key"
+          :value="client.key"
+          :to="clientHomePath(client)"
           class="text-none"
         >
-          {{ tab.label }}
+          {{ client.label }}
         </v-tab>
       </v-tabs>
 
@@ -31,11 +31,25 @@
       <ThemeToggle />
     </v-app-bar>
 
+    <v-navigation-drawer class="app-drawer" permanent width="256">
+      <v-list nav density="comfortable">
+        <v-list-item
+          v-for="feature in activeFeatures"
+          :key="feature.key"
+          :to="`/${activeClientKey}/${feature.key}`"
+          :prepend-icon="feature.icon"
+          :title="feature.label"
+        />
+      </v-list>
+    </v-navigation-drawer>
+
     <v-main class="app-main">
       <v-container class="py-8">
         <slot />
       </v-container>
     </v-main>
+
+    <GlobalSnackbar />
   </v-app>
 </template>
 
@@ -43,15 +57,26 @@
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import ThemeToggle from "./ThemeToggle.vue";
-
-/** @type {{ label: string, route: string }[]} */
-const tabs = [{ label: "Home", route: "/" }];
+import GlobalSnackbar from "./GlobalSnackbar.vue";
+import { CLIENTS } from "../nav/clients.js";
 
 const route = useRoute();
 
-const activeTab = computed(
-  () => tabs.find((tab) => route.path.startsWith(tab.route))?.route,
+const activeClientKey = computed(
+  () => CLIENTS.find((client) => route.path.startsWith(`/${client.key}`))?.key,
 );
+
+const activeFeatures = computed(
+  () => CLIENTS.find((client) => client.key === activeClientKey.value)?.features ?? [],
+);
+
+/**
+ * @param {{ key: string, features: { key: string }[] }} client
+ * @returns {string}
+ */
+function clientHomePath(client) {
+  return `/${client.key}/${client.features[0]?.key ?? ""}`;
+}
 </script>
 
 <style scoped>
@@ -71,6 +96,13 @@ const activeTab = computed(
 .app-tabs {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.app-drawer {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(var(--v-theme-surface), 0.75) !important;
+  border-right: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
 }
 
 .app-main {
