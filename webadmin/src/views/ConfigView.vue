@@ -19,18 +19,13 @@
     </header>
 
     <v-alert v-if="error" type="error" variant="tonal" class="mb-6" :text="error" />
-    <v-alert
-      v-if="guildWarning"
-      type="info"
-      variant="tonal"
-      class="mb-6"
-      :text="guildWarning"
-    />
 
     <v-skeleton-loader v-if="loading" type="card@2" class="mb-6" />
 
     <ConfigSettingsForm
-      v-else
+      v-else-if="currentApp && currentGuildId"
+      :app="currentApp"
+      :guild-id="currentGuildId"
       :entries="entries"
       :channels="channels"
       :roles="roles"
@@ -84,7 +79,10 @@ const error = ref("");
 /** @type {import("vue").Ref<Array<{config:string,value:string,description:string|null,type:string,requiresBotRestart:boolean,deprecated:boolean}>>} */
 const entries = ref([]);
 
-const guildWarning = ref("");
+/** @type {import("vue").Ref<string|null>} */
+const currentApp = ref(null);
+/** @type {import("vue").Ref<string|null>} */
+const currentGuildId = ref(null);
 /** @type {import("vue").Ref<Array<{id:string,name:string}>>} */
 const channels = ref([]);
 /** @type {import("vue").Ref<Array<{id:string,name:string}>>} */
@@ -99,34 +97,23 @@ const linkFixerChecked = ref(false);
 const linkFixerResult = ref("");
 
 /**
- * Load config entries; failure here blocks the form.
+ * Config is per-(app, guildId), so resolve the synced guild first, then load its config.
  * @returns {Promise<void>}
  */
 async function loadConfig() {
   loading.value = true;
   error.value = "";
   try {
-    entries.value = await fetchConfigEntries();
+    const snapshot = await fetchGuildSnapshot();
+    currentApp.value = snapshot.guild.app;
+    currentGuildId.value = snapshot.guild.guildId;
+    channels.value = snapshot.channels;
+    roles.value = snapshot.roles;
+    entries.value = await fetchConfigEntries(currentApp.value, currentGuildId.value);
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load config";
   } finally {
     loading.value = false;
-  }
-}
-
-/**
- * Load channel/role names for config pickers; failure only degrades to plain text inputs.
- * @returns {Promise<void>}
- */
-async function loadGuild() {
-  try {
-    const snapshot = await fetchGuildSnapshot();
-    channels.value = snapshot.channels;
-    roles.value = snapshot.roles;
-  } catch (err) {
-    guildWarning.value =
-      "No synced guild data available yet — channel/role fields will accept raw IDs only.";
-    console.warn("Failed to load guild snapshot:", err);
   }
 }
 
@@ -183,6 +170,5 @@ async function onTryLinkFixer() {
 
 onMounted(() => {
   void loadConfig();
-  void loadGuild();
 });
 </script>

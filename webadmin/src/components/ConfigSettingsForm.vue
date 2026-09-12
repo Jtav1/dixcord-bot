@@ -95,6 +95,8 @@ import { updateConfigValue } from "../lib/config.js";
 import { useSnackbar } from "../composables/useSnackbar.js";
 
 const props = defineProps({
+  app: { type: String, required: true },
+  guildId: { type: String, required: true },
   entries: { type: Array, required: true },
   channels: { type: Array, default: () => [] },
   roles: { type: Array, default: () => [] },
@@ -203,7 +205,7 @@ async function saveSetting(entry) {
   const value = serializeDraft(entry.config);
   savingKey.value = entry.config;
   try {
-    await updateConfigValue(entry.config, value);
+    await updateConfigValue(props.app, props.guildId, entry.config, value);
     savedValues[entry.config] = value;
     notify(`Saved ${entry.config}`);
   } catch (err) {
@@ -224,7 +226,7 @@ async function saveFlag(entry, enabled) {
   const value = String(enabled);
   savingKey.value = entry.config;
   try {
-    await updateConfigValue(entry.config, value);
+    await updateConfigValue(props.app, props.guildId, entry.config, value);
     draft[entry.config] = value;
     savedValues[entry.config] = value;
     notify(`Saved ${entry.config}`);
