@@ -1,15 +1,42 @@
 import express from "express";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
-import db from "../config/db.js";
-import { enrichConfigEntries } from "../services/configMetadata.js";
+import {
+  createGuildConfigKey,
+  deleteGuildConfigKey,
+  listGuildConfig,
+  setGuildConfigValue,
+} from "../services/guildConfig.js";
 import { recordAudit } from "../services/auditLog.js";
 import { incrementCacheVersion } from "../services/systemStatus.js";
+import {
+  CHAT_APP_PARAM_ERROR,
+  resolveChatAppFromRequest,
+} from "../utils/chatAppHttp.js";
 
 const router = express.Router();
 
+const GUILD_ID_PARAM_ERROR = {
+  ok: false,
+  error: "Parameter \"guildId\" is required",
+};
+
+/**
+ * Resolve app + guildId from a request (query for GET, body for mutations).
+ * @param {import("express").Request} req
+ * @returns {{ ok: true, app: string, guildId: string } | { ok: false, status: number, error: string }}
+ */
+function resolveGuildScope(req) {
+  const app = resolveChatAppFromRequest(req);
+  if (!app) return { ok: false, status: 400, error: CHAT_APP_PARAM_ERROR.error };
+  const guildId = String(req.body?.guildId ?? req.query?.guildId ?? "").trim();
+  if (!guildId) return { ok: false, status: 400, error: GUILD_ID_PARAM_ERROR.error };
+  return { ok: true, app, guildId };
+}
+
 /**
  * GET /api/config
- * Returns all rows from the configurations table with metadata.
+ * Returns all configuration rows for one server, with metadata.
+ * Query: { app, guildId }
  * Response: { config, entries, entriesWithMeta }
  * Auth: required.
  * @openapi
@@ -17,10 +44,19 @@ const router = express.Router();
  *   get:
  *     operationId: listConfig
  *     tags: [Config]
- *     summary: List all configuration entries
+ *     summary: List all configuration entries for one server
+ *     parameters:
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         schema: { type: string, enum: [discord] }
+ *       - name: guildId
+ *         in: query
+ *         required: true
+ *         schema: { type: string }
  *     responses:
  *       '200':
- *         description: All configuration entries, keyed by name and with metadata.
+ *         description: All configuration entries for this server, keyed by name and with metadata.
  *         content:
  *           application/json:
  *             schema:
@@ -49,6 +85,8 @@ const router = express.Router();
  *                       type: { type: string }
  *                       requiresBotRestart: { type: boolean }
  *                       deprecated: { type: boolean }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
@@ -56,12 +94,9 @@ const router = express.Router();
  */
 router.get("/", authenticate, async (req, res) => {
   try {
-    const [rows] = await db.query("SELECT config, value FROM configurations");
-    const entries = Array.isArray(rows) ? rows : [];
-    const config = Object.fromEntries(
-      entries.map((row) => [row.config, row.value ?? ""]),
-    );
-    const entriesWithMeta = enrichConfigEntries(entries);
+    const scope = resolveGuildScope(req);
+    if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
+    const { config, entries, entriesWithMeta } = await listGuildConfig(scope.app, scope.guildId);
     res.json({ ok: true, config, entries, entriesWithMeta });
   } catch (err) {
     console.error("GET /api/config error:", err);
@@ -71,15 +106,15 @@ router.get("/", authenticate, async (req, res) => {
 
 /**
  * POST /api/config
- * Create a new configuration key.
- * Body: { config: string, value?: string }
+ * Create a new configuration key for a server.
+ * Body: { app, guildId, config: string, value?: string }
  * Auth: admin required.
  * @openapi
  * /api/config:
  *   post:
  *     operationId: createConfig
  *     tags: [Config]
- *     summary: Create a new configuration key
+ *     summary: Create a new configuration key for a server
  *     description: Requires the admin role.
  *     requestBody:
  *       required: true
@@ -87,8 +122,10 @@ router.get("/", authenticate, async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [config]
+ *             required: [app, guildId, config]
  *             properties:
+ *               app: { type: string, enum: [discord] }
+ *               guildId: { type: string }
  *               config: { type: string, description: "Configuration key name." }
  *               value: { type: string }
  *     responses:
@@ -109,7 +146,7 @@ router.get("/", authenticate, async (req, res) => {
  *       '403':
  *         $ref: '#/components/responses/ForbiddenRole'
  *       '409':
- *         description: A configuration entry with this key already exists.
+ *         description: A configuration entry with this key already exists for this server.
  *         content:
  *           application/json:
  *             schema:
@@ -119,9 +156,11 @@ router.get("/", authenticate, async (req, res) => {
  */
 router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
+    const scope = resolveGuildScope(req);
+    if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
+
     const configName = String(req.body?.config ?? "").trim();
     const value = req.body?.value ?? "";
-
     if (!configName) {
       return res.status(400).json({
         ok: false,
@@ -129,22 +168,15 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
       });
     }
 
-    const [existing] = await db.query(
-      "SELECT config FROM configurations WHERE config = ?",
-      [configName],
-    );
-    if (existing && existing.length > 0) {
+    const created = await createGuildConfigKey(scope.app, scope.guildId, configName, String(value));
+    if (!created) {
       return res.status(409).json({
         ok: false,
-        error: "Configuration key already exists",
+        error: "Configuration key already exists for this server",
       });
     }
 
-    await db.query(
-      "INSERT INTO configurations (config, value) VALUES (?, ?)",
-      [configName, String(value)],
-    );
-    await recordAudit(req.user.id, "create", "configurations", configName, {
+    await recordAudit(req.user.id, "create", "guild_config", `${scope.app}/${scope.guildId}/${configName}`, {
       value,
     });
     await incrementCacheVersion();
@@ -158,24 +190,26 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
 
 /**
  * PUT /api/config
- * Update a configuration value by name. Only updates if the config key exists.
- * Body: { config: string, value: string }
+ * Update a configuration value for a server. Only updates if the config key already exists.
+ * Body: { app, guildId, config: string, value: string }
  * Auth: admin required.
  * @openapi
  * /api/config:
  *   put:
  *     operationId: updateConfig
  *     tags: [Config]
- *     summary: Update a configuration value by name
- *     description: Requires the admin role. Only updates if the config key already exists.
+ *     summary: Update a configuration value for a server
+ *     description: Requires the admin role. Only updates if the config key already exists for this server.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [config]
+ *             required: [app, guildId, config]
  *             properties:
+ *               app: { type: string, enum: [discord] }
+ *               guildId: { type: string }
  *               config: { type: string, description: "Configuration key name." }
  *               value: { type: string }
  *     responses:
@@ -202,6 +236,9 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  */
 router.put("/", authenticate, requireAdmin, async (req, res) => {
   try {
+    const scope = resolveGuildScope(req);
+    if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
+
     const { config: configName, value } = req.body ?? {};
     if (configName == null || configName === "") {
       return res.status(400).json({
@@ -209,43 +246,44 @@ router.put("/", authenticate, requireAdmin, async (req, res) => {
         error: "Body must include 'config' (configuration name)",
       });
     }
-    const [result] = await db.query(
-      "UPDATE configurations SET value = ? WHERE config = ?",
-      [value ?? "", String(configName)],
-    );
-    const affected = result?.affectedRows ?? result?.changes ?? 0;
-    if (affected === 0) {
-      return res
-        .status(404)
-        .json({ ok: false, error: "Configuration item not found" });
+    const updated = await setGuildConfigValue(scope.app, scope.guildId, String(configName), value ?? "");
+    if (!updated) {
+      return res.status(404).json({ ok: false, error: "Configuration item not found" });
     }
-    await recordAudit(req.user.id, "update", "configurations", configName, {
+    await recordAudit(req.user.id, "update", "guild_config", `${scope.app}/${scope.guildId}/${configName}`, {
       value: value ?? "",
     });
     await incrementCacheVersion();
     res.json({ ok: true, config: String(configName), value: value ?? "" });
   } catch (err) {
     console.error("PUT /api/config error:", err);
-    res
-      .status(500)
-      .json({ ok: false, error: "Failed to update configuration" });
+    res.status(500).json({ ok: false, error: "Failed to update configuration" });
   }
 });
 
 /**
  * DELETE /api/config/:key
- * Delete a configuration key.
+ * Delete a configuration key for a server.
+ * Query: { app, guildId }
  * Auth: admin required.
  * @openapi
  * /api/config/{key}:
  *   delete:
  *     operationId: deleteConfig
  *     tags: [Config]
- *     summary: Delete a configuration key
+ *     summary: Delete a configuration key for a server
  *     description: Requires the admin role.
  *     parameters:
  *       - name: key
  *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         schema: { type: string, enum: [discord] }
+ *       - name: guildId
+ *         in: query
  *         required: true
  *         schema: { type: string }
  *     responses:
@@ -270,28 +308,23 @@ router.put("/", authenticate, requireAdmin, async (req, res) => {
  */
 router.delete("/:key", authenticate, requireAdmin, async (req, res) => {
   try {
+    const scope = resolveGuildScope(req);
+    if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
+
     const configName = String(req.params.key ?? "").trim();
     if (!configName) {
       return res.status(400).json({ ok: false, error: "Invalid config key" });
     }
-    const [result] = await db.query(
-      "DELETE FROM configurations WHERE config = ?",
-      [configName],
-    );
-    const affected = result?.affectedRows ?? result?.changes ?? 0;
-    if (affected === 0) {
-      return res
-        .status(404)
-        .json({ ok: false, error: "Configuration item not found" });
+    const deleted = await deleteGuildConfigKey(scope.app, scope.guildId, configName);
+    if (!deleted) {
+      return res.status(404).json({ ok: false, error: "Configuration item not found" });
     }
-    await recordAudit(req.user.id, "delete", "configurations", configName, {});
+    await recordAudit(req.user.id, "delete", "guild_config", `${scope.app}/${scope.guildId}/${configName}`, {});
     await incrementCacheVersion();
     res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/config/:key error:", err);
-    res
-      .status(500)
-      .json({ ok: false, error: "Failed to delete configuration" });
+    res.status(500).json({ ok: false, error: "Failed to delete configuration" });
   }
 });
 

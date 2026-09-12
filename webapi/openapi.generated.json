@@ -2725,6 +2725,26 @@
           "System"
         ],
         "summary": "Get system and bot health status",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "discord"
+            },
+            "description": "Together with guildId, scopes `status.bot` to one server. Omit for the most-recently-seen server across all of them."
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "System status.",
@@ -2771,7 +2791,11 @@
                         "bot": {
                           "type": "object",
                           "nullable": true,
+                          "description": "One server's status — see the `app`/`guildId` query params for how it's selected.",
                           "properties": {
+                            "app": {
+                              "type": "string"
+                            },
                             "guildId": {
                               "type": "string"
                             },
@@ -2808,6 +2832,50 @@
                               "type": "integer",
                               "nullable": true,
                               "description": "Discord gateway heartbeat latency in ms as of the last heartbeat."
+                            }
+                          }
+                        },
+                        "bots": {
+                          "type": "array",
+                          "description": "Every known server's status, same shape as `bot`.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "app": {
+                                "type": "string"
+                              },
+                              "guildId": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "lastSeenAt": {
+                                "type": "string"
+                              },
+                              "online": {
+                                "type": "boolean"
+                              },
+                              "readyAt": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "uptimeSeconds": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "memberCount": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "channelCount": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "wsPingMs": {
+                                "type": "integer",
+                                "nullable": true
+                              }
                             }
                           }
                         }
@@ -2921,10 +2989,17 @@
               "schema": {
                 "type": "object",
                 "required": [
+                  "app",
                   "guildId",
                   "version"
                 ],
                 "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
                   "guildId": {
                     "type": "string"
                   },
@@ -7568,6 +7643,282 @@
         }
       }
     },
+    "/api/guild-members/sync": {
+      "post": {
+        "operationId": "syncGuildMembers",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "Push a full server membership list",
+        "description": "Full-replace: deletes and reinserts every guild_members row for this (app, guildId). Entries whose platformUserId isn't yet known to chat_member_mapping are skipped (best-effort) rather than failing the whole sync.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "members"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "discord"
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "members": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "platformUserId"
+                      ],
+                      "properties": {
+                        "platformUserId": {
+                          "type": "string"
+                        },
+                        "nickname": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "guild_roles.id values held in this server."
+                        },
+                        "joinedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sync result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "imported": {
+                      "type": "integer"
+                    },
+                    "skipped": {
+                      "type": "integer",
+                      "description": "Entries skipped because platformUserId wasn't found in chat_member_mapping."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members/user/{chatMemberMappingId}": {
+      "get": {
+        "operationId": "listServersForUser",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "List every server a given internal user id belongs to",
+        "description": "Reverse lookup for chat_member_mapping.id, joined with guild_info for display name. This is the primitive a cross-server feature (e.g. delivering a reminder to every server a user is in) would use; registered before any bare /{id} route so this literal \"user\" segment isn't shadowed.\n",
+        "parameters": [
+          {
+            "name": "chatMemberMappingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Servers this user belongs to.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "servers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "app": {
+                            "type": "string"
+                          },
+                          "guildId": {
+                            "type": "string"
+                          },
+                          "guildName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "nickname": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "joinedAt": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members": {
+      "get": {
+        "operationId": "listGuildMembers",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "List one server's members",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "discord"
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Members of this server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "chat_member_mapping.id"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "handle": {
+                            "type": "string"
+                          },
+                          "platformUserId": {
+                            "type": "string"
+                          },
+                          "nickname": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "joinedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "syncedAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/events/plusplus": {
       "get": {
         "operationId": "listPlusplusEvents",
@@ -8268,10 +8619,31 @@
         "tags": [
           "Config"
         ],
-        "summary": "List all configuration entries",
+        "summary": "List all configuration entries for one server",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "discord"
+              ]
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "All configuration entries, keyed by name and with metadata.",
+            "description": "All configuration entries for this server, keyed by name and with metadata.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8336,6 +8708,9 @@
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
@@ -8349,7 +8724,7 @@
         "tags": [
           "Config"
         ],
-        "summary": "Create a new configuration key",
+        "summary": "Create a new configuration key for a server",
         "description": "Requires the admin role.",
         "requestBody": {
           "required": true,
@@ -8358,9 +8733,20 @@
               "schema": {
                 "type": "object",
                 "required": [
+                  "app",
+                  "guildId",
                   "config"
                 ],
                 "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
                   "config": {
                     "type": "string",
                     "description": "Configuration key name."
@@ -8408,7 +8794,7 @@
             "$ref": "#/components/responses/ForbiddenRole"
           },
           "409": {
-            "description": "A configuration entry with this key already exists.",
+            "description": "A configuration entry with this key already exists for this server.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8427,8 +8813,8 @@
         "tags": [
           "Config"
         ],
-        "summary": "Update a configuration value by name",
-        "description": "Requires the admin role. Only updates if the config key already exists.",
+        "summary": "Update a configuration value for a server",
+        "description": "Requires the admin role. Only updates if the config key already exists for this server.",
         "requestBody": {
           "required": true,
           "content": {
@@ -8436,9 +8822,20 @@
               "schema": {
                 "type": "object",
                 "required": [
+                  "app",
+                  "guildId",
                   "config"
                 ],
                 "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
                   "config": {
                     "type": "string",
                     "description": "Configuration key name."
@@ -8500,12 +8897,31 @@
         "tags": [
           "Config"
         ],
-        "summary": "Delete a configuration key",
+        "summary": "Delete a configuration key for a server",
         "description": "Requires the admin role.",
         "parameters": [
           {
             "name": "key",
             "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "discord"
+              ]
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
             "required": true,
             "schema": {
               "type": "string"

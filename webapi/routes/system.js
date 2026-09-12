@@ -7,12 +7,18 @@ import {
   recordBotHeartbeat,
 } from "../services/systemStatus.js";
 import { recordAudit } from "../services/auditLog.js";
+import {
+  CHAT_APP_PARAM_ERROR,
+  resolveChatAppFromRequest,
+} from "../utils/chatAppHttp.js";
 
 const router = express.Router();
 
 /**
  * GET /api/system/status
  * System and bot health status.
+ * Query: { app?, guildId? } — when both given, `status.bot` is that server's status;
+ * otherwise it's the most-recently-seen server across all of them (unchanged behavior).
  * Auth: required (admin, bot, or webview).
  * @openapi
  * /api/system/status:
@@ -20,6 +26,16 @@ const router = express.Router();
  *     operationId: getSystemStatus
  *     tags: [System]
  *     summary: Get system and bot health status
+ *     parameters:
+ *       - name: app
+ *         in: query
+ *         required: false
+ *         schema: { type: string, example: discord }
+ *         description: Together with guildId, scopes `status.bot` to one server. Omit for the most-recently-seen server across all of them.
+ *       - name: guildId
+ *         in: query
+ *         required: false
+ *         schema: { type: string }
  *     responses:
  *       '200':
  *         description: System status.
@@ -41,7 +57,9 @@ const router = express.Router();
  *                     bot:
  *                       type: object
  *                       nullable: true
+ *                       description: "One server's status — see the `app`/`guildId` query params for how it's selected."
  *                       properties:
+ *                         app: { type: string }
  *                         guildId: { type: string }
  *                         version: { type: string }
  *                         lastSeenAt: { type: string }
@@ -51,6 +69,22 @@ const router = express.Router();
  *                         memberCount: { type: integer, nullable: true, description: "Guild member count as of the last heartbeat." }
  *                         channelCount: { type: integer, nullable: true, description: "Cached guild channel count as of the last heartbeat." }
  *                         wsPingMs: { type: integer, nullable: true, description: "Discord gateway heartbeat latency in ms as of the last heartbeat." }
+ *                     bots:
+ *                       type: array
+ *                       description: Every known server's status, same shape as `bot`.
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           app: { type: string }
+ *                           guildId: { type: string }
+ *                           version: { type: string }
+ *                           lastSeenAt: { type: string }
+ *                           online: { type: boolean }
+ *                           readyAt: { type: string, nullable: true }
+ *                           uptimeSeconds: { type: integer, nullable: true }
+ *                           memberCount: { type: integer, nullable: true }
+ *                           channelCount: { type: integer, nullable: true }
+ *                           wsPingMs: { type: integer, nullable: true }
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
@@ -58,7 +92,10 @@ const router = express.Router();
  */
 router.get("/status", authenticate, async (req, res) => {
   try {
-    const status = await getSystemStatus();
+    const status = await getSystemStatus({
+      app: typeof req.query.app === "string" ? req.query.app : undefined,
+      guildId: typeof req.query.guildId === "string" ? req.query.guildId : undefined,
+    });
     res.json({ ok: true, status });
   } catch (err) {
     console.error("GET /api/system/status error:", err);
@@ -144,8 +181,8 @@ router.post("/invalidate-cache", authenticate, requireAdmin, async (req, res) =>
 
 /**
  * POST /api/system/heartbeat
- * Bot heartbeat (guild id, version, and optional session/health fields).
- * Body: { guildId, version, readyAt?, memberCount?, channelCount?, wsPingMs? }
+ * Bot heartbeat (app, guild id, version, and optional session/health fields).
+ * Body: { app, guildId, version, readyAt?, memberCount?, channelCount?, wsPingMs? }
  * Auth: required (bot or admin).
  * @openapi
  * /api/system/heartbeat:
@@ -159,8 +196,9 @@ router.post("/invalidate-cache", authenticate, requireAdmin, async (req, res) =>
  *         application/json:
  *           schema:
  *             type: object
- *             required: [guildId, version]
+ *             required: [app, guildId, version]
  *             properties:
+ *               app: { type: string, enum: [discord] }
  *               guildId: { type: string }
  *               version: { type: string }
  *               readyAt: { type: string, nullable: true, description: "When the bot's current gateway session became ready. Send the same value on every heartbeat within one process lifetime; only changes on restart." }
@@ -186,6 +224,8 @@ router.post("/invalidate-cache", authenticate, requireAdmin, async (req, res) =>
  */
 router.post("/heartbeat", authenticate, async (req, res) => {
   try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
     const guildId = String(req.body?.guildId ?? "").trim();
     const version = String(req.body?.version ?? "").trim();
     if (!guildId || !version) {
@@ -195,6 +235,7 @@ router.post("/heartbeat", authenticate, async (req, res) => {
       });
     }
     await recordBotHeartbeat({
+      app,
       guildId,
       version,
       readyAt: req.body?.readyAt,

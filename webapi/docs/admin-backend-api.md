@@ -52,12 +52,14 @@ Routes added for admin panel backend preparation. **Write** routes require admin
 
 ## Config (extended)
 
+Per-`(app, guildId)`: each server a community operates gets its own fully independent config, auto-seeded with defaults when first registered via `POST /api/guild/sync`.
+
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/config` | admin or bot | Includes `entriesWithMeta` |
-| POST | `/api/config` | admin | Create key `{ config, value }` |
-| PUT | `/api/config` | admin | Update existing key |
-| DELETE | `/api/config/:key` | admin | Delete key |
+| GET | `/api/config?app=&guildId=` | admin or bot | Includes `entriesWithMeta` |
+| POST | `/api/config` | admin | Create key `{ app, guildId, config, value }` |
+| PUT | `/api/config` | admin | Update existing key `{ app, guildId, config, value }` |
+| DELETE | `/api/config/:key?app=&guildId=` | admin | Delete key |
 
 ## Pin history
 
@@ -69,10 +71,10 @@ Routes added for admin panel backend preparation. **Write** routes require admin
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| GET | `/api/system/status` | admin, bot, or webview | Webapi, DB, cache version, bot heartbeat |
+| GET | `/api/system/status?app=&guildId=` | admin, bot, or webview | Webapi, DB, cache version, bot heartbeat; `status.bot` scoped to one server when both params given, `status.bots` always lists every known server |
 | GET | `/api/system/cache-version` | admin or bot | Current cache version for polling |
 | POST | `/api/system/invalidate-cache` | admin | Bump cache version |
-| POST | `/api/system/heartbeat` | admin or bot | `{ guildId, version, lastReadyAt? }` |
+| POST | `/api/system/heartbeat` | admin or bot | `{ app, guildId, version, lastReadyAt? }` |
 
 ## Statistics
 

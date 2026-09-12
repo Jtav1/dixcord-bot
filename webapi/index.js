@@ -27,6 +27,7 @@ import eventsRoutes from "./routes/events.js";
 import auditLogRoutes from "./routes/audit-log.js";
 import statisticsRoutes from "./routes/statistics.js";
 import guildRoutes from "./routes/guild.js";
+import guildMembersRoutes from "./routes/guild-members.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -287,10 +288,10 @@ app.get("/", publicLimiter, (req, res) => {
       config: {
         authRequired: true,
         adminRoutes: [
-          "GET /api/config (includes entriesWithMeta)",
-          "POST /api/config (body: { config, value })",
-          "PUT /api/config (body: { config, value })",
-          "DELETE /api/config/:key",
+          "GET /api/config?app=&guildId= (includes entriesWithMeta, per-server)",
+          "POST /api/config (body: { app, guildId, config, value })",
+          "PUT /api/config (body: { app, guildId, config, value })",
+          "DELETE /api/config/:key?app=&guildId=",
         ],
       },
       eightBallResponses: {
@@ -329,10 +330,10 @@ app.get("/", publicLimiter, (req, res) => {
       system: {
         authRequired: true,
         routes: [
-          "GET /api/system/status (admin, bot, or webview)",
+          "GET /api/system/status?app=&guildId= (admin, bot, or webview)",
           "GET /api/system/cache-version",
           "POST /api/system/invalidate-cache (admin)",
-          "POST /api/system/heartbeat (body: { guildId, version })",
+          "POST /api/system/heartbeat (body: { app?, guildId, version })",
         ],
       },
       statistics: {
@@ -356,6 +357,14 @@ app.get("/", publicLimiter, (req, res) => {
         routes: [
           "GET /api/guild?app=&guildId=",
           "POST /api/guild/sync (body: { app, guildId, guild, channels, roles })",
+        ],
+      },
+      guildMembers: {
+        authRequired: true,
+        routes: [
+          "GET /api/guild-members?app=&guildId=",
+          "GET /api/guild-members/user/:chatMemberMappingId",
+          "POST /api/guild-members/sync (body: { app, guildId, members })",
         ],
       },
       botResponses: {
@@ -544,6 +553,7 @@ app.use("/api/events", eventsRoutes);
 app.use("/api/audit-log", auditLogRoutes);
 app.use("/api/statistics", statisticsRoutes);
 app.use("/api/guild", guildRoutes);
+app.use("/api/guild-members", guildMembersRoutes);
 
 app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 

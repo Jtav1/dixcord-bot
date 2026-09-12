@@ -8,6 +8,7 @@
 import db from "../config/db.js";
 import { isChatMemberAppSupported } from "./chatMemberMapping.js";
 import { utcIsoToSqlDatetime } from "./scheduledMessages.js";
+import { seedDefaultConfigForGuild } from "./guildConfig.js";
 
 /**
  * @param {unknown} value
@@ -75,6 +76,8 @@ export async function upsertGuildSnapshot({ app, guildId, guild, channels, roles
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [app, gid, ...fields],
     );
+    // Brand-new server: give it a full, independent config set immediately.
+    await seedDefaultConfigForGuild(app, gid);
   }
 
   await db.query("DELETE FROM guild_channels WHERE app = ? AND guild_id = ?", [app, gid]);

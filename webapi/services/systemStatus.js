@@ -64,14 +64,15 @@ function serializeBotMetricsForStorage(metrics) {
 }
 
 /**
- * Record bot heartbeat.
- * @param {{ guildId: string, version: string, readyAt?: string|null, memberCount?: number|null, channelCount?: number|null, wsPingMs?: number|null, metrics?: Record<string, unknown>|null }} payload
+ * Record bot heartbeat for one (app, guild_id) server.
+ * @param {{ app: string, guildId: string, version: string, readyAt?: string|null, memberCount?: number|null, channelCount?: number|null, wsPingMs?: number|null, metrics?: Record<string, unknown>|null }} payload
  * @returns {Promise<void>}
  */
 export async function recordBotHeartbeat(payload) {
+  const app = String(payload.app ?? "").trim();
   const guildId = String(payload.guildId ?? "").trim();
   const version = String(payload.version ?? "").trim();
-  if (!guildId) return;
+  if (!app || !guildId) return;
 
   const readyAtSql = payload.readyAt
     ? utcIsoToSqlDatetime(payload.readyAt)
@@ -88,31 +89,62 @@ export async function recordBotHeartbeat(payload) {
   const metricsJson = serializeBotMetricsForStorage(payload.metrics);
 
   const [rows] = await db.query(
-    "SELECT id FROM bot_status WHERE guild_id = ?",
-    [guildId],
+    "SELECT id FROM bot_status WHERE app = ? AND guild_id = ?",
+    [app, guildId],
   );
 
   if (rows && rows.length > 0) {
     await db.query(
       `UPDATE bot_status
        SET version = ?, last_seen_at = CURRENT_TIMESTAMP, ready_at = ?, member_count = ?, channel_count = ?, ws_ping_ms = ?, metrics_json = ?
-       WHERE guild_id = ?`,
-      [version, readyAtSql, memberCount, channelCount, wsPingMs, metricsJson, guildId],
+       WHERE app = ? AND guild_id = ?`,
+      [version, readyAtSql, memberCount, channelCount, wsPingMs, metricsJson, app, guildId],
     );
   } else {
     await db.query(
-      `INSERT INTO bot_status (guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms, metrics_json)
-       VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?)`,
-      [guildId, version, readyAtSql, memberCount, channelCount, wsPingMs, metricsJson],
+      `INSERT INTO bot_status (app, guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms, metrics_json)
+       VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?)`,
+      [app, guildId, version, readyAtSql, memberCount, channelCount, wsPingMs, metricsJson],
     );
   }
 }
 
 /**
- * Get system status for admin monitoring.
- * @returns {Promise<{ webapi: string, db: string, dbType: string, cacheVersion: string, webapiUptimeSeconds: number, webapiMemoryRssBytes: number, bot: object|null }>}
+ * Map a raw bot_status row to the response shape used by both `bot` and `bots`.
+ * @param {Record<string, unknown>} botRow
+ * @returns {object}
  */
-export async function getSystemStatus() {
+function formatBotStatusRow(botRow) {
+  const lastSeen = new Date(botRow.last_seen_at);
+  const ageMs = Date.now() - lastSeen.getTime();
+  const readyAt = botRow.ready_at ? new Date(botRow.ready_at) : null;
+  const uptimeSeconds =
+    readyAt && !Number.isNaN(readyAt.getTime())
+      ? Math.max(0, Math.floor((Date.now() - readyAt.getTime()) / 1000))
+      : null;
+  return {
+    app: String(botRow.app),
+    guildId: String(botRow.guild_id),
+    version: String(botRow.version),
+    lastSeenAt: botRow.last_seen_at,
+    online: ageMs < 120_000,
+    readyAt: botRow.ready_at ?? null,
+    uptimeSeconds,
+    memberCount: botRow.member_count == null ? null : Number(botRow.member_count),
+    channelCount: botRow.channel_count == null ? null : Number(botRow.channel_count),
+    wsPingMs: botRow.ws_ping_ms == null ? null : Number(botRow.ws_ping_ms),
+  };
+}
+
+/**
+ * Get system status for admin monitoring. `bot` keeps its existing single-row behavior
+ * (the matching server when app+guildId are given, else the most-recently-seen server
+ * across all of them) for backward compatibility; `bots` additionally lists every known
+ * server's status.
+ * @param {{ app?: string, guildId?: string }} [filter]
+ * @returns {Promise<{ webapi: string, db: string, dbType: string, cacheVersion: string, webapiUptimeSeconds: number, webapiMemoryRssBytes: number, bot: object|null, bots: object[] }>}
+ */
+export async function getSystemStatus({ app, guildId } = {}) {
   let dbStatus = "ok";
   try {
     await db.query("SELECT 1");
@@ -124,31 +156,15 @@ export async function getSystemStatus() {
   const cacheVersion = await getCacheVersion();
 
   const [botRows] = await db.query(
-    "SELECT guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms FROM bot_status ORDER BY last_seen_at DESC LIMIT 1",
+    "SELECT app, guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms FROM bot_status ORDER BY last_seen_at DESC",
   );
-  const botRow = botRows?.[0] ?? null;
+  const bots = (botRows ?? []).map(formatBotStatusRow);
 
   let bot = null;
-  if (botRow) {
-    const lastSeen = new Date(botRow.last_seen_at);
-    const ageMs = Date.now() - lastSeen.getTime();
-    const readyAt = botRow.ready_at ? new Date(botRow.ready_at) : null;
-    const uptimeSeconds =
-      readyAt && !Number.isNaN(readyAt.getTime())
-        ? Math.max(0, Math.floor((Date.now() - readyAt.getTime()) / 1000))
-        : null;
-    bot = {
-      guildId: String(botRow.guild_id),
-      version: String(botRow.version),
-      lastSeenAt: botRow.last_seen_at,
-      online: ageMs < 120_000,
-      readyAt: botRow.ready_at ?? null,
-      uptimeSeconds,
-      memberCount: botRow.member_count == null ? null : Number(botRow.member_count),
-      channelCount:
-        botRow.channel_count == null ? null : Number(botRow.channel_count),
-      wsPingMs: botRow.ws_ping_ms == null ? null : Number(botRow.ws_ping_ms),
-    };
+  if (app && guildId) {
+    bot = bots.find((row) => row.app === app && row.guildId === String(guildId)) ?? null;
+  } else {
+    bot = bots[0] ?? null;
   }
 
   return {
@@ -159,5 +175,6 @@ export async function getSystemStatus() {
     webapiUptimeSeconds: Math.floor(process.uptime()),
     webapiMemoryRssBytes: process.memoryUsage().rss,
     bot,
+    bots,
   };
 }
