@@ -186,14 +186,16 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE TABLE IF NOT EXISTS bot_status (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  guild_id TEXT NOT NULL UNIQUE,
+  app TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
   version TEXT NOT NULL,
   last_seen_at TEXT DEFAULT (datetime('now')),
   ready_at TEXT NULL,
   member_count INTEGER NULL,
   channel_count INTEGER NULL,
   ws_ping_ms INTEGER NULL,
-  metrics_json TEXT NULL
+  metrics_json TEXT NULL,
+  UNIQUE (app, guild_id)
 );
 
 CREATE TABLE IF NOT EXISTS system_state (
@@ -247,3 +249,28 @@ CREATE TABLE IF NOT EXISTS guild_roles (
 );
 
 CREATE INDEX IF NOT EXISTS idx_guild_roles_guild ON guild_roles (app, guild_id);
+
+-- Per-(app, guild_id) configuration/feature-flags; each server gets its own fully
+-- independent set, superseding the single global `configurations` table above.
+CREATE TABLE IF NOT EXISTS guild_config (
+  app TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
+  config TEXT NOT NULL,
+  value TEXT NULL,
+  PRIMARY KEY (app, guild_id, config)
+);
+
+-- Per-(app, guild_id, chat_member_mapping_id) server membership: nickname/roles/joined-at
+-- held in that server. chat_member_mapping stays the single global cross-server identity.
+CREATE TABLE IF NOT EXISTS guild_members (
+  app TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
+  chat_member_mapping_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  nickname TEXT NULL,
+  roles TEXT NULL,
+  joined_at TEXT NULL,
+  synced_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (app, guild_id, chat_member_mapping_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_guild_members_user ON guild_members (chat_member_mapping_id);

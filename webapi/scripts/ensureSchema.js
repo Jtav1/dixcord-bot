@@ -12,6 +12,7 @@ import {
   isSqliteDb,
   tableExists,
 } from "./schemaUtils.js";
+import { guildConfigExistsFor, seedDefaultConfigForGuild } from "../services/guildConfig.js";
 
 const isSqlite = isSqliteDb();
 
@@ -93,24 +94,28 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: audit_log table already exists");
   }
 
-  // bot_status table
+  // bot_status table (app-scoped; existing installs migrated below)
   if (!(await tableExists(db, "bot_status", isSqlite))) {
     if (isSqlite) {
       await db.query(`
         CREATE TABLE bot_status (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          guild_id TEXT NOT NULL UNIQUE,
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
           version TEXT NOT NULL,
-          last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP
+          last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (app, guild_id)
         )
       `);
     } else {
       await db.query(`
         CREATE TABLE bot_status (
           id INT AUTO_INCREMENT PRIMARY KEY,
-          guild_id VARCHAR(32) NOT NULL UNIQUE,
+          app VARCHAR(20) NOT NULL,
+          guild_id VARCHAR(32) NOT NULL,
           version VARCHAR(50) NOT NULL,
-          last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+          last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uniq_bot_status_app_guild (app, guild_id)
         )
       `);
     }
@@ -120,8 +125,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: bot_status table already exists");
   }
 
-  // bot_status: session/health columns (ready_at, member_count, channel_count, ws_ping_ms,
-  // metrics_json - the bot's cumulative counter snapshot from its most recent heartbeat)
+  // bot_status: session/health columns from the most recent heartbeat
   if (await tableExists(db, "bot_status", isSqlite)) {
     const botStatusColumns = isSqlite
       ? [
@@ -146,6 +150,44 @@ export async function ensureSchemaMigrations() {
         console.log(`db: migration applied: added bot_status.${col.name} column`);
       }
     }
+  }
+
+  // bot_status: add `app` column + composite (app, guild_id) uniqueness; backfill existing rows to 'discord'
+  if ((await tableExists(db, "bot_status", isSqlite)) && !(await columnExists(db, "bot_status", "app", isSqlite))) {
+    if (isSqlite) {
+      // SQLite can't drop/alter a UNIQUE column constraint in place; rebuild the table.
+      await db.query(`
+        CREATE TABLE bot_status_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          version TEXT NOT NULL,
+          last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          ready_at TEXT NULL,
+          member_count INTEGER NULL,
+          channel_count INTEGER NULL,
+          ws_ping_ms INTEGER NULL,
+          metrics_json TEXT NULL,
+          UNIQUE (app, guild_id)
+        )
+      `);
+      await db.query(`
+        INSERT INTO bot_status_new
+          (id, app, guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms, metrics_json)
+        SELECT id, 'discord', guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms, metrics_json
+        FROM bot_status
+      `);
+      await db.query("DROP TABLE bot_status");
+      await db.query("ALTER TABLE bot_status_new RENAME TO bot_status");
+    } else {
+      await db.query("ALTER TABLE bot_status ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE bot_status SET app = 'discord' WHERE app IS NULL");
+      await db.query("ALTER TABLE bot_status MODIFY COLUMN app VARCHAR(20) NOT NULL");
+      await db.query("ALTER TABLE bot_status DROP INDEX guild_id");
+      await db.query("ALTER TABLE bot_status ADD UNIQUE KEY uniq_bot_status_app_guild (app, guild_id)");
+    }
+    applied.push("bot_status.app column + composite unique(app, guild_id)");
+    console.log("db: migration applied: added bot_status.app column and (app, guild_id) uniqueness");
   }
 
   // system_state table
@@ -318,6 +360,99 @@ export async function ensureSchemaMigrations() {
     );
     applied.push("guild_roles.idx_guild_roles_guild index");
     console.log("db: migration applied: created guild_roles.idx_guild_roles_guild index");
+  }
+
+  // guild_config table: per-(app, guild_id) config, superseding the global `configurations` table
+  if (!(await tableExists(db, "guild_config", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_config (
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          config TEXT NOT NULL,
+          value TEXT NULL,
+          PRIMARY KEY (app, guild_id, config)
+        )
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE guild_config (
+          app VARCHAR(20) NOT NULL,
+          guild_id VARCHAR(64) NOT NULL,
+          config VARCHAR(255) NOT NULL,
+          value VARCHAR(255) NULL,
+          PRIMARY KEY (app, guild_id, config)
+        )
+      `);
+    }
+    applied.push("guild_config table");
+    console.log("db: migration applied: created guild_config table");
+  } else {
+    console.log("db: schema ok: guild_config table already exists");
+  }
+
+  // One-time backfill: seed guild_config for every known server from global `configurations`/defaults
+  if (await tableExists(db, "guild_config", isSqlite)) {
+    const [existingGuilds] = await db.query("SELECT app, guild_id FROM guild_info");
+    const [globalConfigRows] = await db.query("SELECT config, value FROM configurations");
+    const globalOverrides = Array.isArray(globalConfigRows) ? globalConfigRows : [];
+    for (const guild of existingGuilds ?? []) {
+      if (await guildConfigExistsFor(guild.app, guild.guild_id)) continue;
+      await seedDefaultConfigForGuild(guild.app, guild.guild_id, globalOverrides);
+      applied.push(`guild_config backfill for ${guild.app}/${guild.guild_id}`);
+      console.log(
+        `db: migration applied: seeded guild_config for ${guild.app}/${guild.guild_id}`,
+      );
+    }
+  }
+
+  // guild_members table: per-server membership (nickname/roles/joined-at) keyed off chat_member_mapping
+  if (!(await tableExists(db, "guild_members", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_members (
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          chat_member_mapping_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          nickname TEXT NULL,
+          roles TEXT NULL,
+          joined_at TEXT NULL,
+          synced_at TEXT DEFAULT (datetime('now')),
+          PRIMARY KEY (app, guild_id, chat_member_mapping_id)
+        )
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE guild_members (
+          app VARCHAR(20) NOT NULL,
+          guild_id VARCHAR(64) NOT NULL,
+          chat_member_mapping_id INT NOT NULL,
+          nickname VARCHAR(255) NULL,
+          roles TEXT NULL,
+          joined_at DATETIME NULL,
+          synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (app, guild_id, chat_member_mapping_id),
+          KEY idx_guild_members_user (chat_member_mapping_id),
+          CONSTRAINT fk_guild_members_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
+        )
+      `);
+    }
+    applied.push("guild_members table");
+    console.log("db: migration applied: created guild_members table");
+  } else {
+    console.log("db: schema ok: guild_members table already exists");
+  }
+
+  if (
+    isSqlite &&
+    (await tableExists(db, "guild_members", isSqlite)) &&
+    !(await indexExists(db, "guild_members", "idx_guild_members_user", isSqlite))
+  ) {
+    await db.query(
+      "CREATE INDEX idx_guild_members_user ON guild_members (chat_member_mapping_id)",
+    );
+    applied.push("guild_members.idx_guild_members_user index");
+    console.log("db: migration applied: created guild_members.idx_guild_members_user index");
   }
 
   // pin_history expanded metadata (author, message snapshot, pinners)

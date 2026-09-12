@@ -11,7 +11,7 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 - **Auth & users** – Login (JWT); register disabled; profile get/update/delete. Bootstraps service accounts from env (`admin`, `bot`, `webview`).
 - **Bot responses** – Random 8-ball fortunes; social link fixer.
 - **Message processing** – Emoji/sticker usage, plus/minus scoring, repost tracking, pin check/log, emoji/sticker import.
-- **Config** – Key/value bot settings (pin threshold, emoji IDs, channels, feature on/off toggles, etc.).
+- **Config** – Per-`(app, guildId)` key/value bot settings (pin threshold, emoji IDs, channels, feature on/off toggles, etc.); each server a community operates gets its own fully independent set, auto-seeded with defaults when first registered via guild sync.
 - **Link replacements** – CRUD for source_host → target_host rewrite rules.
 - **Pin quips** – CRUD + random quip for pin reactions.
 - **Trigger–responses** – Triggers with selection modes (`random`, `ordered` round-robin, `weighted`), responses, junction links, trigger response function catalog, frequency tracking, per-user usage history. See [trigger-responses-examples.md](trigger-responses-examples.md).
@@ -21,6 +21,7 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 - **Pin history** – Paginated pin log (and shared pin file storage via `PIN_FILES_DIR`).
 - **System** – Health, status, cache version / invalidate, bot heartbeat.
 - **Guild** – App/guild-scoped snapshot of platform-client guild metadata, channels, roles, and the emoji/sticker catalog; pushed periodically by a platform client (discord-bot today), read by admin panel/webview.
+- **Guild members** – App/guild-scoped server membership (nickname, roles held, joined-at) per `chat_member_mapping` identity; the identity itself stays global/cross-server, this just tracks per-server presentation. Includes a reverse lookup ("every server this user belongs to") for future cross-server delivery features.
 - **Statistics** – Aggregate counts across tracking tables (used by web-view).
 - **Scheduled messages** – Create/list/update/delete reminders for bot delivery; admin scope for moderation.
 - **Events & audit** – Raw plusplus/repost events; admin audit log.
@@ -81,10 +82,10 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/message-processing/sticker-import` | ✓ | Sync server sticker list |
 | POST | `/api/message-processing/pin-check` | ✓ | Check if message already pinned (body: `{ messageId }`) |
 | POST | `/api/message-processing/pin-log` | ✓ | Log message as pinned (body: `{ messageId }`) |
-| GET | `/api/config` | ✓ | All configuration entries (includes `entriesWithMeta`) |
-| POST | `/api/config` | admin | Create config key (body: `{ config, value }`) |
-| PUT | `/api/config` | admin | Update one config (body: `{ config, value }`) |
-| DELETE | `/api/config/:key` | admin | Delete config key |
+| GET | `/api/config?app=&guildId=` | ✓ | All configuration entries for one server (includes `entriesWithMeta`) |
+| POST | `/api/config` | admin | Create config key for a server (body: `{ app, guildId, config, value }`) |
+| PUT | `/api/config` | admin | Update one config for a server (body: `{ app, guildId, config, value }`) |
+| DELETE | `/api/config/:key?app=&guildId=` | admin | Delete config key for a server |
 | GET | `/api/link-replacements` | ✓ | List all link replacements |
 | GET | `/api/link-replacements/:id` | ✓ | Get one link replacement |
 | POST | `/api/link-replacements` | ✓ | Create (body: `{ source_host, target_host }`) |
@@ -128,12 +129,15 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/user-mappings?app=discord` | ✓ | List user mappings |
 | GET | `/api/pin-history` | ✓ | Pin history log |
 | GET | `/api/statistics` | ✓ | Aggregate usage statistics |
-| GET | `/api/system/status` | ✓ | System and bot status |
+| GET | `/api/system/status?app=&guildId=` | ✓ | System and bot status; `status.bot` scoped to one server when both params given, else most-recently-seen; `status.bots` always lists every known server |
 | GET | `/api/system/cache-version` | ✓ | Cache version for bot polling |
 | POST | `/api/system/invalidate-cache` | admin | Bump cache version |
-| POST | `/api/system/heartbeat` | ✓ | Bot heartbeat |
+| POST | `/api/system/heartbeat` | ✓ | Bot heartbeat (body: `{ app, guildId, version }`) |
 | GET | `/api/guild?app=&guildId=` | ✓ | Synced guild metadata, channels, roles, emoji/sticker catalog |
-| POST | `/api/guild/sync` | ✓ | Push a full guild snapshot (body: `{ app, guildId, guild, channels, roles }`) |
+| POST | `/api/guild/sync` | ✓ | Push a full guild snapshot (body: `{ app, guildId, guild, channels, roles }`); auto-seeds default config for brand-new servers |
+| GET | `/api/guild-members?app=&guildId=` | ✓ | List one server's members (joined with chat_member_mapping) |
+| GET | `/api/guild-members/user/:chatMemberMappingId` | ✓ | Every server a given internal user id belongs to |
+| POST | `/api/guild-members/sync` | ✓ | Push a full server membership list (body: `{ app, guildId, members }`) |
 | GET | `/api/events/plusplus` | ✓ | Raw plusplus events |
 | GET | `/api/events/reposts` | ✓ | Raw repost events |
 | GET | `/api/audit-log` | admin | Audit log |
@@ -172,6 +176,7 @@ Example JSON responses for each API route category:
 | **Leaderboards** | [leaderboards-response-examples.md](leaderboards-response-examples.md) | Plusplus, emoji, repost |
 | **Admin backend** | [admin-backend-api.md](admin-backend-api.md) | New admin-panel backend routes |
 | **Guild** | [guild-response-examples.md](guild-response-examples.md) | Guild metadata, channels, roles, emoji/sticker catalog |
+| **Guild Members** | [guild-members-response-examples.md](guild-members-response-examples.md) | Per-server membership sync/list, reverse user→servers lookup |
 
 ## Request examples (cURL)
 
