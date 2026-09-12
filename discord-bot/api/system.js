@@ -24,6 +24,7 @@ let heartbeatReadyAt = null;
 export async function sendHeartbeat() {
   const guild = heartbeatClient?.guilds.cache.get(guildId) ?? null;
   await api.post("/api/system/heartbeat", {
+    app: "discord",
     guildId,
     version,
     readyAt: heartbeatReadyAt?.toISOString() ?? null,
