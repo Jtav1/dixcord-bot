@@ -1,6 +1,5 @@
 /**
- * Per-(app, guild_id) configuration: each chat server a community operates gets its own
- * fully independent config/feature-flag set, seeded with defaults on first registration.
+ * Per-(app, guild_id) configuration/feature-flags, seeded with defaults on first registration.
  */
 
 import db from "../config/db.js";
@@ -88,11 +87,9 @@ export async function deleteGuildConfigKey(app, guildId, config) {
 
 /**
  * Seed every known config key's default value for a server, skipping keys already present.
- * Used both when a brand-new server is first synced and by the one-time migration backfill.
  * @param {string} app
  * @param {string} guildId
- * @param {Array<{config:string,value:string}>} [overrides] Values to use instead of the
- *   metadata default, when available (e.g. the pre-migration global config's current values).
+ * @param {Array<{config:string,value:string}>} [overrides] Values to use instead of the default
  * @returns {Promise<void>}
  */
 export async function seedDefaultConfigForGuild(app, guildId, overrides = []) {

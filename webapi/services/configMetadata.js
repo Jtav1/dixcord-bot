@@ -120,9 +120,7 @@ export const CONFIG_METADATA = Object.freeze({
 });
 
 /**
- * Default config entries for a brand-new server: one {config,value} pair per known key,
- * from each key's defaultValue. Single source of truth for seeding a new (app, guild_id)'s
- * guild_config rows, whether at first-sync time or during a one-time migration backfill.
+ * Default {config, value} entries for seeding a new server's guild_config rows.
  * @returns {Array<{ config: string, value: string }>}
  */
 export function getDefaultConfigEntries() {

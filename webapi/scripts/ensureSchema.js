@@ -94,10 +94,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: audit_log table already exists");
   }
 
-  // bot_status table (app-scoped from the start for fresh installs, with no runtime default —
-  // every heartbeat must explicitly say which platform it's for. Existing installs are
-  // migrated below to add the `app` column, backfilled to 'discord' as a one-time historical
-  // fact (it's the only platform that has ever existed), and fix the unique constraint.)
+  // bot_status table (app-scoped; existing installs migrated below)
   if (!(await tableExists(db, "bot_status", isSqlite))) {
     if (isSqlite) {
       await db.query(`
@@ -128,8 +125,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: bot_status table already exists");
   }
 
-  // bot_status: session/health columns (ready_at, member_count, channel_count, ws_ping_ms,
-  // metrics_json - the bot's cumulative counter snapshot from its most recent heartbeat)
+  // bot_status: session/health columns from the most recent heartbeat
   if (await tableExists(db, "bot_status", isSqlite)) {
     const botStatusColumns = isSqlite
       ? [
@@ -156,11 +152,7 @@ export async function ensureSchemaMigrations() {
     }
   }
 
-  // bot_status: add `app` column + composite (app, guild_id) uniqueness for installs that
-  // predate this change. Existing rows are backfilled to 'discord' as a one-time historical
-  // fact (it's the only platform that has ever existed) via an explicit UPDATE, not a column
-  // default — going forward, every heartbeat must say which platform it's for; there's no
-  // silent fallback.
+  // bot_status: add `app` column + composite (app, guild_id) uniqueness; backfill existing rows to 'discord'
   if ((await tableExists(db, "bot_status", isSqlite)) && !(await columnExists(db, "bot_status", "app", isSqlite))) {
     if (isSqlite) {
       // SQLite can't drop/alter a UNIQUE column constraint in place; rebuild the table.
@@ -370,8 +362,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: created guild_roles.idx_guild_roles_guild index");
   }
 
-  // guild_config table (per-(app, guild_id) configuration/feature-flags; each server gets
-  // its own fully independent set, superseding the single global `configurations` table)
+  // guild_config table: per-(app, guild_id) config, superseding the global `configurations` table
   if (!(await tableExists(db, "guild_config", isSqlite))) {
     if (isSqlite) {
       await db.query(`
@@ -400,9 +391,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: guild_config table already exists");
   }
 
-  // One-time backfill: give every already-known server its own config, seeded from the
-  // (now-superseded) global `configurations` table's current values where present, else
-  // from CONFIG_METADATA defaults. Guarded per-(app,guild_id) so it only ever runs once.
+  // One-time backfill: seed guild_config for every known server from global `configurations`/defaults
   if (await tableExists(db, "guild_config", isSqlite)) {
     const [existingGuilds] = await db.query("SELECT app, guild_id FROM guild_info");
     const [globalConfigRows] = await db.query("SELECT config, value FROM configurations");
@@ -417,9 +406,7 @@ export async function ensureSchemaMigrations() {
     }
   }
 
-  // guild_members table (per-(app, guild_id, chat_member_mapping_id) server membership:
-  // nickname/roles/joined-at held in that server. chat_member_mapping stays the single
-  // global cross-server identity these rows hang off of.)
+  // guild_members table: per-server membership (nickname/roles/joined-at) keyed off chat_member_mapping
   if (!(await tableExists(db, "guild_members", isSqlite))) {
     if (isSqlite) {
       await db.query(`

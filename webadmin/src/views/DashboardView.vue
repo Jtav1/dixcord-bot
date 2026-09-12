@@ -316,27 +316,24 @@ const responseFunctions = ref([]);
 const updatedAt = ref("");
 
 /**
- * Map a status string to a Vuetify color token.
- * @param {string} value Status value (e.g. "ok", "error").
- * @returns {string} Vuetify color name.
+ * @param {string} value
+ * @returns {string} Vuetify color token.
  */
 function statusColor(value) {
   return value === "ok" ? "success" : "error";
 }
 
 /**
- * Format a status string for display.
- * @param {string} value Status value.
- * @returns {string} Human-readable label.
+ * @param {string} value
+ * @returns {string}
  */
 function formatStatus(value) {
   return value === "ok" ? "Operational" : "Error";
 }
 
 /**
- * Format an ISO timestamp for display.
- * @param {string} iso ISO date string.
- * @returns {string} Locale-formatted date/time.
+ * @param {string} iso
+ * @returns {string}
  */
 function formatTimestamp(iso) {
   const date = new Date(iso);
@@ -345,9 +342,8 @@ function formatTimestamp(iso) {
 }
 
 /**
- * Format a whole number of seconds as a compact "Xh Ym" / "Xd Yh" duration.
- * @param {number} totalSeconds Duration in seconds.
- * @returns {string} Human-readable duration.
+ * @param {number} totalSeconds
+ * @returns {string} Compact "Xh Ym" / "Xd Yh" duration.
  */
 function formatDuration(totalSeconds) {
   const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
@@ -362,9 +358,8 @@ function formatDuration(totalSeconds) {
 }
 
 /**
- * Format a byte count as a human-readable size (e.g. "128.4 MB").
- * @param {number} bytes Byte count.
- * @returns {string} Human-readable size.
+ * @param {number} bytes
+ * @returns {string} Human-readable size (e.g. "128.4 MB").
  */
 function formatBytes(bytes) {
   const n = Number(bytes) || 0;
@@ -380,16 +375,14 @@ function formatBytes(bytes) {
 }
 
 /**
- * Format a numeric count for display.
- * @param {number} value Count or sum value.
- * @returns {string} Locale-formatted number string.
+ * @param {number} value
+ * @returns {string}
  */
 function formatCount(value) {
   return Number(value).toLocaleString();
 }
 
 /**
- * Load system status from webapi.
  * @returns {Promise<void>}
  */
 async function loadStatus() {
@@ -407,7 +400,6 @@ async function loadStatus() {
 }
 
 /**
- * Load aggregate statistics from webapi.
  * @returns {Promise<void>}
  */
 async function loadStatistics() {

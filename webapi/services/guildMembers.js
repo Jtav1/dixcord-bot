@@ -1,7 +1,5 @@
 /**
- * Per-(app, guild_id, chat_member_mapping_id) server membership: nickname/roles/joined-at
- * held in that server. chat_member_mapping stays the single global cross-server identity
- * these rows hang off of.
+ * Per-(app, guild_id, chat_member_mapping_id) server membership: nickname/roles/joined-at.
  */
 
 import db from "../config/db.js";
@@ -12,9 +10,7 @@ import {
 import { utcIsoToSqlDatetime } from "./scheduledMessages.js";
 
 /**
- * Full-replace sync of one server's membership list, matching the guild_channels/guild_roles
- * delete-then-reinsert pattern. Entries whose platformUserId can't be resolved to an existing
- * chat_member_mapping row are skipped (best-effort), not treated as a failure of the whole sync.
+ * Full-replace sync of one server's membership list; unresolvable members are skipped, not fatal.
  * @param {string} app
  * @param {string} guildId
  * @param {Array<{ platformUserId: string, nickname?: string|null, roles?: string[], joinedAt?: string|null }>} members

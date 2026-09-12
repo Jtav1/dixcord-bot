@@ -1,6 +1,5 @@
 /**
- * Client/feature navigation tree. Top tabs = one per client; left nav = one
- * per feature within the active client. Adding a client is purely additive.
+ * Client/feature navigation tree: top tabs per client, left nav per feature.
  * @type {{ key: string, label: string, features: { key: string, label: string, icon: string }[] }[]}
  */
 export const CLIENTS = [

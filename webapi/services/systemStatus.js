@@ -137,10 +137,7 @@ function formatBotStatusRow(botRow) {
 }
 
 /**
- * Get system status for admin monitoring. `bot` keeps its existing single-row behavior
- * (the matching server when app+guildId are given, else the most-recently-seen server
- * across all of them) for backward compatibility; `bots` additionally lists every known
- * server's status.
+ * Get system status for admin monitoring. `bot` is the matching or most-recently-seen server; `bots` lists all.
  * @param {{ app?: string, guildId?: string }} [filter]
  * @returns {Promise<{ webapi: string, db: string, dbType: string, cacheVersion: string, webapiUptimeSeconds: number, webapiMemoryRssBytes: number, bot: object|null, bots: object[] }>}
  */
