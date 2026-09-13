@@ -92,7 +92,7 @@ Response `statistics` object fields:
 - `triggers` — row count in `triggers`
 - `responses` — row count in `responses`
 - `triggerResponseFrequencySum` — sum of `frequency` in `trigger_response`
-- `repostTracking` — row count in `user_repost_tracking`
+- `repostTracking` — row count in `member_repost_tracking`
 
 ## Scheduled messages (admin scope)
 

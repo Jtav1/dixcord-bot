@@ -280,7 +280,7 @@ export async function getTopEmoji(limit) {
 }
 
 /**
- * Paginated per-user emoji usage totals from user_emoji_tracking (emojis only, excludes stickers).
+ * Paginated per-user emoji usage totals from member_emoji_tracking (emojis only, excludes stickers).
  * @param {number} [limit] Max rows per page (default 50, max 50).
  * @param {number} [offset] Rows to skip (default 0).
  * @param {string} app - e.g. "discord"
@@ -295,7 +295,7 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
 
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT uet.userid) AS total
-     FROM user_emoji_tracking uet
+     FROM member_emoji_tracking uet
      INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
      WHERE ${EMOJI_FREQUENCY_WHERE}`,
   );
@@ -303,7 +303,7 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
 
   const [rows] = await db.query(
     `SELECT cm.\`${idCol}\` AS userid, cm.name, SUM(uet.frequency) AS total
-     FROM user_emoji_tracking uet
+     FROM member_emoji_tracking uet
      INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
      INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
      WHERE ${EMOJI_FREQUENCY_WHERE}
@@ -356,7 +356,7 @@ export async function listStickerFrequency(limit, offset = 0) {
 }
 
 /**
- * Paginated per-user sticker usage totals from user_emoji_tracking (stickers only).
+ * Paginated per-user sticker usage totals from member_emoji_tracking (stickers only).
  * @param {number} [limit] Max rows per page (default 50, max 50).
  * @param {number} [offset] Rows to skip (default 0).
  * @param {string} app - e.g. "discord"
@@ -371,7 +371,7 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
 
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT uet.userid) AS total
-     FROM user_emoji_tracking uet
+     FROM member_emoji_tracking uet
      INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
      WHERE ${STICKER_FREQUENCY_WHERE}`,
   );
@@ -379,7 +379,7 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
 
   const [rows] = await db.query(
     `SELECT cm.\`${idCol}\` AS userid, cm.name, SUM(uet.frequency) AS total
-     FROM user_emoji_tracking uet
+     FROM member_emoji_tracking uet
      INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
      INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
      WHERE ${STICKER_FREQUENCY_WHERE}
@@ -399,7 +399,7 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
   };
 }
 
-// --- Repost (user_repost_tracking) ---
+// --- Repost (member_repost_tracking) ---
 
 /**
  * @param {number} [limit]
@@ -426,7 +426,7 @@ export async function getTopReposters(limit, app, range = {}) {
   params.push(n);
   const [rows] = await db.query(
     `SELECT cm.\`${idCol}\` AS userid, COUNT(*) AS count
-     FROM user_repost_tracking r
+     FROM member_repost_tracking r
      INNER JOIN chat_member_mapping cm ON r.userid = cm.id
      ${where}
      GROUP BY cm.\`${idCol}\`, cm.id
@@ -450,7 +450,7 @@ export async function getRepostsForUser(userId, app) {
   if (mid == null) return { userId: String(userId), count: 0 };
 
   const [rows] = await db.query(
-    "SELECT COUNT(*) AS count FROM user_repost_tracking WHERE userid = ?",
+    "SELECT COUNT(*) AS count FROM member_repost_tracking WHERE userid = ?",
     [mid],
   );
   const count = rows?.[0]?.count ?? 0;

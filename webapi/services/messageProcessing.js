@@ -73,7 +73,7 @@ async function ensureAndIncrementEmoji(
 }
 
 /**
- * Upsert user_emoji_tracking. DB-agnostic: SELECT then INSERT or UPDATE.
+ * Upsert member_emoji_tracking. DB-agnostic: SELECT then INSERT or UPDATE.
  * @param {number} chatMemberMappingId - chat_member_mapping.id
  * @private
  */
@@ -81,18 +81,18 @@ async function upsertUserEmoji(chatMemberMappingId, emojiId) {
   if (chatMemberMappingId == null || !emojiId) return;
 
   const [rows] = await db.query(
-    "SELECT frequency FROM user_emoji_tracking WHERE userid = ? AND emoid = ?",
+    "SELECT frequency FROM member_emoji_tracking WHERE userid = ? AND emoid = ?",
     [chatMemberMappingId, emojiId],
   );
 
   if (rows && rows.length > 0) {
     await db.query(
-      "UPDATE user_emoji_tracking SET frequency = frequency + 1 WHERE userid = ? AND emoid = ?",
+      "UPDATE member_emoji_tracking SET frequency = frequency + 1 WHERE userid = ? AND emoid = ?",
       [chatMemberMappingId, emojiId],
     );
   } else {
     await db.query(
-      "INSERT INTO user_emoji_tracking (userid, emoid, frequency) VALUES (?, ?, 1)",
+      "INSERT INTO member_emoji_tracking (userid, emoid, frequency) VALUES (?, ?, 1)",
       [chatMemberMappingId, emojiId],
     );
   }
@@ -386,18 +386,18 @@ export async function countRepost(payload) {
 
   if (repost === 1) {
     const [existing] = await db.query(
-      "SELECT 1 FROM user_repost_tracking WHERE userid = ? AND msgid = ? AND accuser = ?",
+      "SELECT 1 FROM member_repost_tracking WHERE userid = ? AND msgid = ? AND accuser = ?",
       [authorId, msgid, accuserId],
     );
     if (existing && existing.length > 0) {
       const now = new Date().toISOString().slice(0, 19).replace("T", " ");
       await db.query(
-        "UPDATE user_repost_tracking SET msgcontents = ?, timestamp = ? WHERE userid = ? AND msgid = ? AND accuser = ?",
+        "UPDATE member_repost_tracking SET msgcontents = ?, timestamp = ? WHERE userid = ? AND msgid = ? AND accuser = ?",
         [msgcontents || null, now, authorId, msgid, accuserId],
       );
     } else {
       await db.query(
-        "INSERT INTO user_repost_tracking (userid, msgid, accuser, msgcontents) VALUES (?, ?, ?, ?)",
+        "INSERT INTO member_repost_tracking (userid, msgid, accuser, msgcontents) VALUES (?, ?, ?, ?)",
         [authorId, msgid, accuserId, msgcontents || null],
       );
     }
@@ -406,7 +406,7 @@ export async function countRepost(payload) {
 
   if (repost === -1) {
     const [result] = await db.query(
-      "DELETE FROM user_repost_tracking WHERE msgid = ? AND accuser = ?",
+      "DELETE FROM member_repost_tracking WHERE msgid = ? AND accuser = ?",
       [msgid, accuserId],
     );
     const deleted = result?.affectedRows ?? result?.changes ?? 0;

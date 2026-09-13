@@ -36,7 +36,7 @@ const router = express.Router();
  *     tags: [Message Processing]
  *     summary: Record emoji usage in a message
  *     description: >
- *       Increments emoji_frequency / user_emoji_tracking for each emoji in the message.
+ *       Increments emoji_frequency / member_emoji_tracking for each emoji in the message.
  *       If isReply is true and the emojis are exactly one configured plusplus/minusminus emoji,
  *       also records a single +/- vote for repliedUserId instead of counting it as emoji usage.
  *     requestBody:
@@ -113,7 +113,7 @@ router.post("/emoji-count", authenticate, async (req, res) => {
  *     tags: [Message Processing]
  *     summary: Record sticker usage in a message
  *     description: >
- *       Increments emoji_frequency (type='sticker') / user_emoji_tracking for each sticker in the
+ *       Increments emoji_frequency (type='sticker') / member_emoji_tracking for each sticker in the
  *       message. Unlike emoji-count, there is no plus/minus branch — Discord has no reply-with-sticker
  *       vote mechanism.
  *     requestBody:
@@ -287,7 +287,7 @@ router.post("/plusminus", authenticate, async (req, res) => {
  *     tags: [Message Processing]
  *     summary: Record or withdraw a repost accusation
  *     description: >
- *       repost=1 upserts a row in user_repost_tracking keyed on (userid, msgid, accuser).
+ *       repost=1 upserts a row in member_repost_tracking keyed on (userid, msgid, accuser).
  *       repost=-1 deletes the row(s) for that (msgid, accuser).
  *     requestBody:
  *       required: true

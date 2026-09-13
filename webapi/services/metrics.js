@@ -130,7 +130,7 @@ export async function buildMetricsText() {
     "webapi_trigger_response_frequency_total",
     "Sum of trigger_response.frequency across all links.",
   ).set(stats.triggerResponseFrequencySum);
-  gauge("webapi_repost_tracking_total", "Rows in user_repost_tracking.").set(
+  gauge("webapi_repost_tracking_total", "Rows in member_repost_tracking.").set(
     stats.repostTracking,
   );
 

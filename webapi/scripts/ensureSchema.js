@@ -76,6 +76,29 @@ export async function ensureSchemaMigrations() {
     }
   }
 
+  // member_emoji_tracking table (formerly user_emoji_tracking): rows are keyed on
+  // chat_member_mapping, i.e. a server member, not a webapi user account.
+  if (await tableExists(db, "member_emoji_tracking", isSqlite)) {
+    console.log("db: schema ok: member_emoji_tracking table already exists");
+  } else if (await tableExists(db, "user_emoji_tracking", isSqlite)) {
+    await db.query("ALTER TABLE user_emoji_tracking RENAME TO member_emoji_tracking");
+    applied.push("user_emoji_tracking table renamed to member_emoji_tracking");
+    console.log(
+      "db: migration applied: renamed user_emoji_tracking table to member_emoji_tracking",
+    );
+  }
+
+  // member_repost_tracking table (formerly user_repost_tracking): same rationale as above.
+  if (await tableExists(db, "member_repost_tracking", isSqlite)) {
+    console.log("db: schema ok: member_repost_tracking table already exists");
+  } else if (await tableExists(db, "user_repost_tracking", isSqlite)) {
+    await db.query("ALTER TABLE user_repost_tracking RENAME TO member_repost_tracking");
+    applied.push("user_repost_tracking table renamed to member_repost_tracking");
+    console.log(
+      "db: migration applied: renamed user_repost_tracking table to member_repost_tracking",
+    );
+  }
+
   // audit_log table
   if (!(await tableExists(db, "audit_log", isSqlite))) {
     if (isSqlite) {

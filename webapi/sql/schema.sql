@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS pin_history (
   CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
 );
 
-CREATE TABLE IF NOT EXISTS user_emoji_tracking (
+CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
   userid INT NOT NULL,
   emoid VARCHAR(255) NOT NULL,
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   CONSTRAINT fk_user_emoji_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS user_repost_tracking (
+CREATE TABLE IF NOT EXISTS member_repost_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
   userid INT NOT NULL,
   msgid VARCHAR(500) NOT NULL,

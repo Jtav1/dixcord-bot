@@ -114,7 +114,7 @@ export async function listRepostEvents(opts = {}) {
   const whereClause = where.length ? ` WHERE ${where.join(" AND ")}` : "";
 
   const [countRows] = await db.query(
-    `SELECT COUNT(*) AS total FROM user_repost_tracking r${whereClause}`,
+    `SELECT COUNT(*) AS total FROM member_repost_tracking r${whereClause}`,
     params,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
@@ -123,7 +123,7 @@ export async function listRepostEvents(opts = {}) {
     `SELECT r.id, r.msgid, r.msgcontents, r.timestamp,
             cm_u.\`${idCol}\` AS userid_platform_id,
             cm_a.\`${idCol}\` AS accuser_platform_id
-     FROM user_repost_tracking r
+     FROM member_repost_tracking r
      INNER JOIN chat_member_mapping cm_u ON r.userid = cm_u.id
      INNER JOIN chat_member_mapping cm_a ON r.accuser = cm_a.id
      ${whereClause}
@@ -159,7 +159,7 @@ export async function getEmojiStatsForUser(userId, app, limit) {
   if (mid == null) return [];
 
   const sql = `SELECT uet.emoid, ef.emoji, uet.frequency, ef.animated
-     FROM user_emoji_tracking uet
+     FROM member_emoji_tracking uet
      INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
      WHERE uet.userid = ? AND (${EMOJI_FREQUENCY_WHERE})
      ORDER BY uet.frequency DESC`;
@@ -197,7 +197,7 @@ export async function getStickerStatsForUser(userId, app, limit) {
   if (mid == null) return [];
 
   const sql = `SELECT uet.emoid, ef.emoji, uet.frequency
-     FROM user_emoji_tracking uet
+     FROM member_emoji_tracking uet
      INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
      WHERE uet.userid = ? AND (${STICKER_FREQUENCY_WHERE})
      ORDER BY uet.frequency DESC`;

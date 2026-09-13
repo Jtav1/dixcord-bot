@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS sticker_frequency (
   frequency INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS user_emoji_tracking (
+CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   emoid TEXT NOT NULL,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   UNIQUE (userid, emoid)
 );
 
-CREATE TABLE IF NOT EXISTS user_repost_tracking (
+CREATE TABLE IF NOT EXISTS member_repost_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   msgid TEXT NOT NULL,
