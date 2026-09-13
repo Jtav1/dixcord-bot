@@ -1,6 +1,7 @@
 import express from "express";
 import { authenticate, requireAdmin, requireOwnGuildOrAdmin } from "../middleware/auth.js";
 import {
+  listAllGuildMembers,
   listGuildMembers,
   listServersForUser,
   listUnlinkedGuildMembers,
@@ -11,23 +12,23 @@ const router = express.Router();
 
 /**
  * POST /api/guild-members/sync
- * Full-replace sync of one server's membership list.
- * Body: { app, guildId, members: [{ platformUserId, nickname?, roles?, joinedAt? }] }
+ * Upsert one server's membership list.
+ * Body: { app, guildId, members: [{ platformUserId, handle?, nickname?, roles?, joinedAt? }] }
  * Auth: required. A guild-scoped bot account may only sync its own guildId.
  * @openapi
  * /api/guild-members/sync:
  *   post:
  *     operationId: syncGuildMembers
  *     tags: [Guild Members]
- *     summary: Push a full server membership list
+ *     summary: Upsert a server's membership list
  *     description: >
- *       Full-replace: deletes and reinserts every guild_members row for this (app, guildId).
- *       Every member is always inserted; an entry whose platformUserId isn't yet known to
- *       chat_member_mapping is inserted unlinked (chat_member_mapping_id null) rather than
- *       dropped — this never creates chat_member_mapping rows itself, only links to existing
- *       ones. See GET /api/guild-members/unlinked for the admin follow-up. A guild-scoped bot
- *       account (users.guild_id set) may only sync its own guildId; admin and unrestricted
- *       (guild_id null) accounts may sync any guildId.
+ *       Upserts each member keyed on (app, guildId, platformUserId), safe to call with either
+ *       a full periodic roster push or a single incremental member (e.g. a join event) — never
+ *       deletes, so a member who has left the guild keeps their row as a historical record.
+ *       Never creates or links chat_member_mapping/member_aliases rows — identity linking is a
+ *       separate, manual, future admin action. A guild-scoped bot account (users.guild_id set)
+ *       may only sync its own guildId; admin and unrestricted (guild_id null) accounts may sync
+ *       any guildId.
  *     requestBody:
  *       required: true
  *       content:
@@ -45,6 +46,7 @@ const router = express.Router();
  *                   required: [platformUserId]
  *                   properties:
  *                     platformUserId: { type: string }
+ *                     handle: { type: string, nullable: true, description: "Discord username." }
  *                     nickname: { type: string, nullable: true }
  *                     roles: { type: array, items: { type: string }, description: "guild_roles.id values held in this server." }
  *                     joinedAt: { type: string, format: date-time, nullable: true }
@@ -57,8 +59,7 @@ const router = express.Router();
  *               type: object
  *               properties:
  *                 ok: { type: boolean, enum: [true] }
- *                 imported: { type: integer, description: "Every row written, linked or not." }
- *                 unlinked: { type: integer, description: "Of the imported rows, how many had no chat_member_mapping match yet." }
+ *                 imported: { type: integer, description: "Every row upserted." }
  *                 skipped: { type: integer, description: "Entries dropped because they had no platformUserId at all (malformed input)." }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
@@ -79,7 +80,6 @@ router.post("/sync", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
     res.json({
       ok: true,
       imported: result.imported,
-      unlinked: result.unlinked,
       skipped: result.skipped,
     });
   } catch (err) {
@@ -151,7 +151,7 @@ router.get("/user/:chatMemberMappingId", authenticate, async (req, res) => {
 
 /**
  * GET /api/guild-members/unlinked?app=&guildId=
- * List guild_members rows with no resolved chat_member_mapping_id yet.
+ * List guild_members rows with no resolved identity link (no member_aliases row) yet.
  * Auth: admin required.
  * @openapi
  * /api/guild-members/unlinked:
@@ -160,8 +160,9 @@ router.get("/user/:chatMemberMappingId", authenticate, async (req, res) => {
  *     tags: [Guild Members]
  *     summary: List membership rows with no resolved identity link
  *     description: >
- *       Admin manual-link workflow: these rows were synced but couldn't be matched to an
- *       existing chat_member_mapping row. Read-only; linking/merging is a future capability.
+ *       Admin manual-link workflow: these rows were synced but have no member_aliases row
+ *       linking them to a chat_member_mapping identity. Read-only; linking/merging is a
+ *       future capability.
  *     parameters:
  *       - name: app
  *         in: query
@@ -188,6 +189,7 @@ router.get("/user/:chatMemberMappingId", authenticate, async (req, res) => {
  *                       app: { type: string }
  *                       guildId: { type: string }
  *                       platformUserId: { type: string }
+ *                       handle: { type: string, nullable: true }
  *                       nickname: { type: string, nullable: true }
  *                       roles: { type: array, items: { type: string } }
  *                       joinedAt: { type: string, nullable: true }
@@ -215,14 +217,15 @@ router.get("/unlinked", authenticate, requireAdmin, async (req, res) => {
 
 /**
  * GET /api/guild-members?app=&guildId=
- * List one server's members.
+ * List one server's members, or (when guildId is omitted) every member across all guilds
+ * for that app, deduplicated by platformUserId.
  * Auth: required. A guild-scoped bot account may only list its own guildId.
  * @openapi
  * /api/guild-members:
  *   get:
  *     operationId: listGuildMembers
  *     tags: [Guild Members]
- *     summary: List one server's members
+ *     summary: List one server's members, or every server's deduplicated by platformUserId
  *     parameters:
  *       - name: app
  *         in: query
@@ -230,7 +233,8 @@ router.get("/unlinked", authenticate, requireAdmin, async (req, res) => {
  *         schema: { type: string, example: discord }
  *       - name: guildId
  *         in: query
- *         required: true
+ *         required: false
+ *         description: When omitted, returns every member across all guilds for this app, deduplicated by platformUserId (most-recently-synced alias wins).
  *         schema: { type: string }
  *     responses:
  *       '200':
@@ -267,8 +271,7 @@ router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
   try {
     const { app, guildId } = req.query;
     const gid = String(guildId ?? "").trim();
-    if (!gid) return res.status(400).json({ ok: false, error: "guildId is required" });
-    const members = await listGuildMembers(app, gid);
+    const members = gid ? await listGuildMembers(app, gid) : await listAllGuildMembers(app);
     if (members == null) {
       return res.status(400).json({ ok: false, error: "Unsupported or missing app" });
     }

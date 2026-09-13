@@ -6,7 +6,6 @@
 
 import db from "../config/db.js";
 import {
-  CHAT_MEMBER_APP_CONFIG,
   isChatMemberAppSupported,
   requireChatMemberMappingId,
   UNKNOWN_CHAT_MEMBER_ERROR,
@@ -467,63 +466,6 @@ export async function importGuildAssetFrequencyList(items, assetKind) {
       await db.query(
         "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 0, 0, ?)",
         [emoid, name, "sticker"],
-      );
-    }
-    imported++;
-  }
-  return { ok: true, imported };
-}
-
-// --- User mapping import (per-app handle/id columns on chat_member_mapping) ---
-
-/** @deprecated Use isChatMemberAppSupported from ./chatMemberMapping.js */
-export const isChatMemberImportAppSupported = isChatMemberAppSupported;
-
-/**
- * Bulk insert-if-new rows into chat_member_mapping. Conflict target is the app's id column
- * (unique). First writer wins: an existing row's name/handle is never overwritten by a later
- * sync (from the same or a different guild), so identity stays sticky to whoever claims it first.
- * @param {Array<Record<string, unknown>>} users
- * @param {string} app - e.g. `"discord"` (only supported value today)
- * @returns {Promise<{ ok: boolean, imported?: number, error?: string }>}
- */
-export async function importUserMappingList(users, app) {
-  if (!Array.isArray(users))
-    return { ok: false, error: "users must be an array" };
-  if (!isChatMemberAppSupported(app)) {
-    return {
-      ok: false,
-      error: 'Unsupported app; currently only "discord" is accepted.',
-    };
-  }
-
-  const cfg = CHAT_MEMBER_APP_CONFIG[app];
-  const hc = cfg.handleColumn;
-  const ic = cfg.idColumn;
-  const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
-  let imported = 0;
-
-  for (const u of users) {
-    if (u == null) continue;
-    const platformId = String(cfg.pickId(u) ?? "").trim();
-    const name = String(u.name ?? "").trim();
-    const handle = String(cfg.pickHandle(u) ?? "").trim();
-    if (!platformId || !name || !handle) continue;
-
-    if (isSqlite) {
-      await db.query(
-        `INSERT INTO chat_member_mapping (name, \`${hc}\`, \`${ic}\`) VALUES (?, ?, ?)
-         ON CONFLICT(\`${ic}\`) DO NOTHING`,
-        [name, handle, platformId],
-      );
-    } else {
-      // Not INSERT IGNORE: that would also swallow an unrelated name/handle unique-collision
-      // against a different row. `id = id` is a genuine no-op that still resolves the conflict
-      // on the id column alone.
-      await db.query(
-        `INSERT INTO chat_member_mapping (name, \`${hc}\`, \`${ic}\`) VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE id = id`,
-        [name, handle, platformId],
       );
     }
     imported++;

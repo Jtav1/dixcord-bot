@@ -3,7 +3,7 @@
     <header class="view-header mb-6 d-flex align-center justify-space-between flex-wrap ga-4">
       <div>
         <h1 class="text-h4 font-weight-bold mb-2">User Mappings</h1>
-        <p class="text-body-1 text-medium-emphasis">Discord user identity directory</p>
+        <p class="text-body-1 text-medium-emphasis">Canonical identity directory</p>
       </div>
       <v-btn color="primary" variant="tonal" prepend-icon="mdi-plus" @click="openCreate">
         New Mapping
@@ -12,7 +12,7 @@
 
     <v-text-field
       v-model="search"
-      label="Search name, handle, or platform user id"
+      label="Search name"
       density="comfortable"
       variant="outlined"
       prepend-inner-icon="mdi-magnify"
@@ -41,9 +41,7 @@
       <v-card class="glass-card">
         <v-card-title class="text-h6">{{ editing ? "Edit Mapping" : "New Mapping" }}</v-card-title>
         <v-card-text>
-          <v-text-field v-model="form.name" label="Display name" class="mb-3" />
-          <v-text-field v-model="form.handle" label="Handle" class="mb-3" />
-          <v-text-field v-model="form.platformUserId" label="Discord user ID" />
+          <v-text-field v-model="form.name" label="Display name" />
         </v-card-text>
         <v-card-actions>
           <v-spacer />
@@ -81,8 +79,6 @@ const { notify } = useSnackbar();
 
 const headers = [
   { title: "Name", key: "name" },
-  { title: "Handle", key: "handle" },
-  { title: "Platform User ID", key: "platformUserId" },
 ];
 
 const search = ref("");
@@ -103,7 +99,7 @@ function onSearchInput() {
 const dialogOpen = ref(false);
 const saving = ref(false);
 const editing = ref(null);
-const form = reactive({ name: "", handle: "", platformUserId: "" });
+const form = reactive({ name: "" });
 
 const confirmOpen = ref(false);
 const deleting = ref(false);
@@ -115,20 +111,16 @@ const pendingDelete = ref(null);
 function openCreate() {
   editing.value = null;
   form.name = "";
-  form.handle = "";
-  form.platformUserId = "";
   dialogOpen.value = true;
 }
 
 /**
- * @param {{id:number,name:string,handle:string,platformUserId:string}} item
+ * @param {{id:number,name:string}} item
  * @returns {void}
  */
 function openEdit(item) {
   editing.value = item;
   form.name = item.name;
-  form.handle = item.handle;
-  form.platformUserId = item.platformUserId;
   dialogOpen.value = true;
 }
 
@@ -136,17 +128,13 @@ function openEdit(item) {
  * @returns {Promise<void>}
  */
 async function onSave() {
-  if (!form.name.trim() || !form.handle.trim() || !form.platformUserId.trim()) {
-    notify("Name, handle, and platform user ID are required", { color: "error" });
+  if (!form.name.trim()) {
+    notify("Name is required", { color: "error" });
     return;
   }
   saving.value = true;
   try {
-    const fields = {
-      name: form.name.trim(),
-      handle: form.handle.trim(),
-      platformUserId: form.platformUserId.trim(),
-    };
+    const fields = { name: form.name.trim() };
     if (editing.value) {
       await updateUserMapping(editing.value.id, fields);
       notify("Mapping updated");

@@ -17,11 +17,11 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 - **Trigger–responses** – Triggers with selection modes (`random`, `ordered` round-robin, `weighted`), responses, junction links, trigger response function catalog, frequency tracking, per-user usage history. See [trigger-responses-examples.md](trigger-responses-examples.md).
 - **Leaderboards** – Plusplus, emoji, and repost rankings and per-user totals.
 - **Eight-ball responses** – Fortune string catalog (admin writes).
-- **User mappings** – Discord member ↔ display mapping.
+- **User mappings** – Bare canonical identity (`id`, `name`) for `chat_member_mapping`; linking it to a person's per-guild `guild_members` aliases is a separate, future admin action.
 - **Pin history** – Paginated pin log (and shared pin file storage via `PIN_FILES_DIR`).
 - **System** – Health, status, cache version / invalidate, bot heartbeat.
 - **Guild** – App/guild-scoped snapshot of platform-client guild metadata, channels, roles, and the emoji/sticker catalog; pushed periodically by a platform client (discord-bot today), read by admin panel/webview.
-- **Guild members** – App/guild-scoped server membership (nickname, roles held, joined-at), keyed on the platform's own user id. The `chat_member_mapping` identity link is optional: a member synced before (or without) a matching identity is stored unlinked rather than dropped — see `GET /api/guild-members/unlinked` for the admin follow-up. Includes a reverse lookup ("every server this user belongs to") for future cross-server delivery features.
+- **Guild members** – App/guild-scoped server membership (Discord handle, nickname, roles held, joined-at), keyed on the platform's own user id. Sync only ever upserts `guild_members` — it never creates or removes rows and never touches `chat_member_mapping`/`member_aliases`; linking a member to a canonical identity is a separate, manual admin action — see `GET /api/guild-members/unlinked` for the admin follow-up. Includes a reverse lookup ("every server this user belongs to") for future cross-server delivery features.
 - **Service accounts** – Admin-only provisioning of extra `bot`/`webview` accounts, optionally bound to one `guildId`; a guild-bound bot account can only call guild-scoped routes for its own guild (`admin` and unrestricted accounts are never scope-limited).
 - **Statistics** – Aggregate counts across tracking tables (used by web-view).
 - **Scheduled messages** – Create/list/update/delete reminders for bot delivery; admin scope for moderation.
@@ -131,7 +131,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/leaderboards/emoji/user/:userId?app=discord` | ✓ | Per-user emoji stats |
 | GET | `/api/eight-ball-responses` | ✓ | List eight-ball responses |
 | POST | `/api/eight-ball-responses` | admin | Create eight-ball response |
-| GET | `/api/user-mappings?app=discord` | ✓ | List user mappings |
+| GET | `/api/user-mappings?app=discord` | ✓ | List user mappings (id, name only) |
 | GET | `/api/pin-history` | ✓ | Pin history log |
 | GET | `/api/statistics` | ✓ | Aggregate usage statistics |
 | GET | `/api/system/status?app=&guildId=` | ✓ | System and bot status; `status.bot` scoped to one server when both params given, else most-recently-seen; `status.bots` always lists every known server |
@@ -140,10 +140,10 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/system/heartbeat` | ✓ | Bot heartbeat (body: `{ app, guildId, version }`) |
 | GET | `/api/guild?app=&guildId=` | ✓ | Synced guild metadata, channels, roles, emoji/sticker catalog |
 | POST | `/api/guild/sync` | ✓ | Push a full guild snapshot (body: `{ app, guildId, guild, channels, roles }`); auto-seeds default config for brand-new servers |
-| GET | `/api/guild-members?app=&guildId=` | ✓ | List one server's members (left-joined with chat_member_mapping; unlinked members have null id/name/handle) |
+| GET | `/api/guild-members?app=&guildId=` | ✓ | List one server's members (guildId optional: omit for all-guilds dedup lookup); unlinked members have null id/name |
 | GET | `/api/guild-members/user/:chatMemberMappingId` | ✓ | Every server a given internal user id belongs to |
-| GET | `/api/guild-members/unlinked?app=&guildId=` | admin | Membership rows with no resolved chat_member_mapping link yet |
-| POST | `/api/guild-members/sync` | ✓ | Push a full server membership list (body: `{ app, guildId, members }`); unresolvable members are inserted unlinked, not dropped |
+| GET | `/api/guild-members/unlinked?app=&guildId=` | admin | Membership rows with no member_aliases link yet |
+| POST | `/api/guild-members/sync` | ✓ | Upsert a server's membership list (body: `{ app, guildId, members }`); never removes members, safe for a full roster or a single incremental push |
 | GET | `/api/events/plusplus` | ✓ | Raw plusplus events |
 | GET | `/api/events/reposts` | ✓ | Raw repost events |
 | GET | `/api/audit-log` | admin | Audit log |

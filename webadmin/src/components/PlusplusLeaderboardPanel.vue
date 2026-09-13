@@ -69,7 +69,7 @@
 import { onMounted, ref } from "vue";
 import UserIdentityDisclosure from "./UserIdentityDisclosure.vue";
 import { fetchPlusplusLeaderboard, fetchPlusplusTopVoters } from "../lib/leaderboards.js";
-import { fetchUserMappings } from "../lib/userMappings.js";
+import { fetchAllGuildMembers } from "../lib/guildMembers.js";
 
 const loading = ref(true);
 const error = ref("");
@@ -77,7 +77,7 @@ const limit = ref(10);
 const top = ref([]);
 const bottom = ref([]);
 const topVoters = ref([]);
-/** @type {import("vue").Ref<Map<string, object>>} chat_member_mapping rows keyed by platformUserId. */
+/** @type {import("vue").Ref<Map<string, object>>} guild_members rows (cross-guild, deduplicated) keyed by platformUserId. */
 const mappingByPlatformId = ref(new Map());
 
 /**
@@ -104,10 +104,10 @@ async function load() {
 onMounted(async () => {
   await load();
   try {
-    const { items } = await fetchUserMappings({ limit: 200 });
+    const items = await fetchAllGuildMembers({ app: "discord" });
     mappingByPlatformId.value = new Map(items.map((item) => [item.platformUserId, item]));
   } catch (err) {
-    console.warn("Failed to load user mappings for top voters:", err);
+    console.warn("Failed to load guild members for top voters:", err);
   }
 });
 </script>

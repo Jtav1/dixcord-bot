@@ -8,10 +8,21 @@
 
 import db from "../config/db.js";
 import {
-  getChatMemberIdColumn,
   getChatMemberMappingIdByPlatformUserId,
   isChatMemberAppSupported,
 } from "./chatMemberMapping.js";
+
+/**
+ * Correlated subquery picking one representative guild_members.platform_user_id for a
+ * chat_member_mapping id — the most-recently-synced linked alias. A chat_member_mapping can
+ * have multiple aliases (multiple guilds); this picks one for display purposes. Portable
+ * across MySQL/SQLite (no window functions).
+ * @param {string} mappingIdExpr - SQL expression for the chat_member_mapping.id to resolve
+ * @returns {string}
+ */
+export function representativePlatformIdSubquery(mappingIdExpr) {
+  return `(SELECT gm.platform_user_id FROM guild_members gm JOIN member_aliases ma ON ma.guild_member_id = gm.id WHERE ma.chat_member_mapping_id = ${mappingIdExpr} ORDER BY gm.synced_at DESC LIMIT 1)`;
+}
 
 /**
  * Normalize limit from API request (number or string). Clamps to [1, max].
@@ -70,19 +81,15 @@ function buildPlusplusTimeClause(range = {}) {
  */
 async function aggregatePlusPlusLeaderboard(app, range = {}) {
   if (!isChatMemberAppSupported(app)) return [];
-  const idCol = getChatMemberIdColumn(app);
   const { clause, params } = buildPlusplusTimeClause(range);
+  const representativeId = representativePlatformIdSubquery("CAST(pt.string AS INTEGER)");
 
   let [results] = await db.query(
     `SELECT
         pt.type AS typestr,
         SUM(pt.value) AS total,
         CASE
-            WHEN pt.type = 'user' THEN (
-                SELECT cmm.\`${idCol}\` 
-                FROM chat_member_mapping cmm
-                WHERE cmm.id = CAST(pt.string AS INTEGER) 
-            )
+            WHEN pt.type = 'user' THEN ${representativeId}
             ELSE pt.string
         END AS string
       FROM plusplus_tracking pt
@@ -158,7 +165,6 @@ export async function getPlusPlusVoteHistoryByRowId(rowId, type = "word", app) {
   if (!rowId || (type !== "word" && type !== "user")) return null;
   if (!isChatMemberAppSupported(app)) return null;
 
-  const idCol = getChatMemberIdColumn(app);
   const typestr = type === "user" ? "user" : "word";
   let stringKey;
 
@@ -173,9 +179,8 @@ export async function getPlusPlusVoteHistoryByRowId(rowId, type = "word", app) {
   }
 
   const [rows] = await db.query(
-    `SELECT pt.id, pt.value, pt.timestamp, cm_v.\`${idCol}\` AS voter_platform_id
+    `SELECT pt.id, pt.value, pt.timestamp, ${representativePlatformIdSubquery("pt.voter")} AS voter_platform_id
      FROM plusplus_tracking pt
-     LEFT JOIN chat_member_mapping cm_v ON pt.voter = cm_v.id
      WHERE pt.type = ? AND pt.string = ?
      ORDER BY pt.timestamp ASC, pt.id ASC`,
     [typestr, stringKey],
@@ -223,13 +228,12 @@ export async function getPlusPlusVotesByVoter(voterId, app) {
  */
 export async function getPlusPlusTopVoters(limit, app) {
   if (!isChatMemberAppSupported(app)) return [];
-  const idCol = getChatMemberIdColumn(app);
   const n = parseLimit(limit, 3, 50);
   const [rows] = await db.query(
-    `SELECT cm.\`${idCol}\` AS voter, COUNT(*) AS total
+    `SELECT ${representativePlatformIdSubquery("cm.id")} AS voter, COUNT(*) AS total
      FROM plusplus_tracking p
      INNER JOIN chat_member_mapping cm ON p.voter = cm.id
-     GROUP BY cm.\`${idCol}\`, cm.id
+     GROUP BY cm.id
      ORDER BY total DESC
      LIMIT ?`,
     [n],
@@ -289,7 +293,6 @@ export async function getTopEmoji(limit) {
 export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
   if (!isChatMemberAppSupported(app)) return { rows: [], total: 0 };
 
-  const idCol = getChatMemberIdColumn(app);
   const n = parseLimit(limit, 50, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
@@ -302,12 +305,12 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT cm.\`${idCol}\` AS userid, cm.name, SUM(uet.frequency) AS total
+    `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid, cm.name, SUM(uet.frequency) AS total
      FROM member_emoji_tracking uet
      INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
      INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
      WHERE ${EMOJI_FREQUENCY_WHERE}
-     GROUP BY cm.\`${idCol}\`, cm.id, cm.name
+     GROUP BY cm.id, cm.name
      ORDER BY total DESC
      LIMIT ? OFFSET ?`,
     [n, off],
@@ -365,7 +368,6 @@ export async function listStickerFrequency(limit, offset = 0) {
 export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
   if (!isChatMemberAppSupported(app)) return { rows: [], total: 0 };
 
-  const idCol = getChatMemberIdColumn(app);
   const n = parseLimit(limit, 50, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
@@ -378,12 +380,12 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT cm.\`${idCol}\` AS userid, cm.name, SUM(uet.frequency) AS total
+    `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid, cm.name, SUM(uet.frequency) AS total
      FROM member_emoji_tracking uet
      INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
      INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
      WHERE ${STICKER_FREQUENCY_WHERE}
-     GROUP BY cm.\`${idCol}\`, cm.id, cm.name
+     GROUP BY cm.id, cm.name
      ORDER BY total DESC
      LIMIT ? OFFSET ?`,
     [n, off],
@@ -408,7 +410,6 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
  */
 export async function getTopReposters(limit, app, range = {}) {
   if (!isChatMemberAppSupported(app)) return [];
-  const idCol = getChatMemberIdColumn(app);
   const n = parseLimit(limit, 5, 50);
   const parts = [];
   const params = [];
@@ -425,11 +426,11 @@ export async function getTopReposters(limit, app, range = {}) {
   const where = parts.length ? ` WHERE ${parts.join(" AND ")}` : "";
   params.push(n);
   const [rows] = await db.query(
-    `SELECT cm.\`${idCol}\` AS userid, COUNT(*) AS count
+    `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid, COUNT(*) AS count
      FROM member_repost_tracking r
      INNER JOIN chat_member_mapping cm ON r.userid = cm.id
      ${where}
-     GROUP BY cm.\`${idCol}\`, cm.id
+     GROUP BY cm.id
      ORDER BY count DESC
      LIMIT ?`,
     params,

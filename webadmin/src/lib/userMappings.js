@@ -1,9 +1,9 @@
 import { apiFetch, apiFetchJson } from "./http.js";
 
 /**
- * Paginated, searchable list of user mappings.
+ * Paginated, searchable list of user mappings (bare canonical identity: id + name).
  * @param {{ limit?: number, offset?: number, search?: string }} [options]
- * @returns {Promise<{ items: Array<{id:number,name:string,handle:string,platformUserId:string,app:string}>, total: number }>}
+ * @returns {Promise<{ items: Array<{id:number,name:string}>, total: number }>}
  */
 export async function fetchUserMappings({ limit = 25, offset = 0, search = "" } = {}) {
   const params = new URLSearchParams({ app: "discord", limit: String(limit), offset: String(offset) });
@@ -13,7 +13,7 @@ export async function fetchUserMappings({ limit = 25, offset = 0, search = "" } 
 }
 
 /**
- * @param {{ name: string, handle: string, platformUserId: string }} fields
+ * @param {{ name: string }} fields
  * @returns {Promise<object>}
  */
 export async function createUserMapping(fields) {
@@ -28,7 +28,7 @@ export async function createUserMapping(fields) {
 
 /**
  * @param {number} id
- * @param {{ name?: string, handle?: string, platformUserId?: string }} fields
+ * @param {{ name?: string }} fields
  * @returns {Promise<object>}
  */
 export async function updateUserMapping(id, fields) {

@@ -1,26 +1,19 @@
-import { importUserMappingList } from "../../api/userMapping.js";
+import { syncSingleGuildMember } from "../../api/guildMembers.js";
 import { incrementCounter } from "../../utilities/metrics.js";
 
 const name = "guildMemberAdd";
 
 /**
- * Sync a newly-joined member into chat_member_mapping immediately.
- * Without this, a member who joins after boot and reacts/sends an emoji before any other
- * sync runs is unknown to webapi, which rejects the emoji-count call and previously crashed
- * the bot (see countEmoji/countSticker error handling in emojiDetector.js/stickerDetector.js).
+ * Sync a newly-joined member into guild_members immediately, without waiting for the next
+ * periodic sync. Does not create or link a chat_member_mapping identity — that's always a
+ * separate, manual admin action, so a brand-new member stays unresolved for other features
+ * (e.g. emoji/plusplus tracking) until an admin links them.
  * @param {import('discord.js').GuildMember} member
  */
 const execute = async (member) => {
   if (member.user.bot) return;
 
-  const u = member.user;
-  await importUserMappingList([
-    {
-      name: String(member.displayName || u.globalName || u.username || u.id),
-      discord_handle: String(u.username ?? ""),
-      discord_id: String(u.id),
-    },
-  ]);
+  await syncSingleGuildMember(member);
   incrementCounter("guildMemberJoinsTotal");
 };
 

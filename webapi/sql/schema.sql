@@ -14,9 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS chat_member_mapping (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL UNIQUE,
-  discord_handle VARCHAR(255) NOT NULL UNIQUE,
-  discord_id VARCHAR(255) NOT NULL UNIQUE
+  name VARCHAR(255) NOT NULL UNIQUE
 );
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
@@ -265,19 +263,34 @@ CREATE TABLE IF NOT EXISTS guild_config (
   PRIMARY KEY (app, guild_id, config)
 );
 
--- Per-(app, guild_id, platform_user_id) server membership: nickname/roles/joined-at held in
--- that server. chat_member_mapping stays the single global cross-server identity; the link is
--- optional (NULL until an admin/sync resolves it) so membership is never lost to an unknown id.
+-- Per-(app, guild_id, platform_user_id) server membership: Discord handle/nickname/roles/
+-- joined-at held in that server. chat_member_mapping stays the single global cross-server
+-- identity; the link to it lives in member_aliases (one identity, many guild_member aliases),
+-- not here, and is never set by sync — linking is a manual admin action (future work).
 CREATE TABLE IF NOT EXISTS guild_members (
+  id INT AUTO_INCREMENT PRIMARY KEY,
   app VARCHAR(20) NOT NULL,
   guild_id VARCHAR(64) NOT NULL,
   platform_user_id VARCHAR(64) NOT NULL,
-  chat_member_mapping_id INT NULL,
+  handle VARCHAR(255) NULL,
   nickname VARCHAR(255) NULL,
   roles TEXT NULL,
   joined_at DATETIME NULL,
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (app, guild_id, platform_user_id),
-  KEY idx_guild_members_user (chat_member_mapping_id),
-  CONSTRAINT fk_guild_members_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
+  UNIQUE KEY uniq_guild_members_app_guild_platform (app, guild_id, platform_user_id),
+  KEY idx_guild_members_app_guild (app, guild_id)
+);
+
+-- Links one chat_member_mapping identity to many guild_members rows (one-to-many). A
+-- guild_member row is "unlinked" until an admin creates this row (see GET
+-- /api/guild-members/unlinked) — sync never creates or touches this table.
+CREATE TABLE IF NOT EXISTS member_aliases (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  chat_member_mapping_id INT NOT NULL,
+  guild_member_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_member_aliases_guild_member (guild_member_id),
+  KEY idx_member_aliases_chat_member (chat_member_mapping_id),
+  CONSTRAINT fk_member_aliases_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  CONSTRAINT fk_member_aliases_guild_member FOREIGN KEY (guild_member_id) REFERENCES guild_members(id) ON DELETE CASCADE
 );

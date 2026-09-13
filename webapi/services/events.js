@@ -4,11 +4,10 @@
 
 import db from "../config/db.js";
 import {
-  getChatMemberIdColumn,
   getChatMemberMappingIdByPlatformUserId,
   isChatMemberAppSupported,
 } from "./chatMemberMapping.js";
-import { parseLimit } from "./leaderboards.js";
+import { parseLimit, representativePlatformIdSubquery } from "./leaderboards.js";
 
 /**
  * Parse optional ISO datetime query param to SQL datetime string.
@@ -31,7 +30,6 @@ export async function listPlusplusEvents(opts = {}) {
   const app = opts.app ?? "discord";
   if (!isChatMemberAppSupported(app)) return { events: [], total: 0 };
 
-  const idCol = getChatMemberIdColumn(app);
   const limit = parseLimit(opts.limit, 50, 200);
   const offset = Math.max(0, opts.offset ?? 0);
   const fromSql = parseFromTo(opts.from);
@@ -57,9 +55,8 @@ export async function listPlusplusEvents(opts = {}) {
 
   const [rows] = await db.query(
     `SELECT pt.id, pt.type, pt.string, pt.value, pt.timestamp,
-            cm_v.\`${idCol}\` AS voter_platform_id
+            ${representativePlatformIdSubquery("pt.voter")} AS voter_platform_id
      FROM plusplus_tracking pt
-     LEFT JOIN chat_member_mapping cm_v ON pt.voter = cm_v.id
      ${whereClause}
      ORDER BY pt.timestamp DESC, pt.id DESC
      LIMIT ? OFFSET ?`,
@@ -87,7 +84,6 @@ export async function listRepostEvents(opts = {}) {
   const app = opts.app ?? "discord";
   if (!isChatMemberAppSupported(app)) return { events: [], total: 0 };
 
-  const idCol = getChatMemberIdColumn(app);
   const limit = parseLimit(opts.limit, 50, 200);
   const offset = Math.max(0, opts.offset ?? 0);
   const fromSql = parseFromTo(opts.from);
@@ -121,11 +117,9 @@ export async function listRepostEvents(opts = {}) {
 
   const [rows] = await db.query(
     `SELECT r.id, r.msgid, r.msgcontents, r.timestamp,
-            cm_u.\`${idCol}\` AS userid_platform_id,
-            cm_a.\`${idCol}\` AS accuser_platform_id
+            ${representativePlatformIdSubquery("r.userid")} AS userid_platform_id,
+            ${representativePlatformIdSubquery("r.accuser")} AS accuser_platform_id
      FROM member_repost_tracking r
-     INNER JOIN chat_member_mapping cm_u ON r.userid = cm_u.id
-     INNER JOIN chat_member_mapping cm_a ON r.accuser = cm_a.id
      ${whereClause}
      ORDER BY r.timestamp DESC, r.id DESC
      LIMIT ? OFFSET ?`,
@@ -136,8 +130,8 @@ export async function listRepostEvents(opts = {}) {
     id: Number(row.id),
     msgid: String(row.msgid),
     msgcontents: row.msgcontents,
-    useridPlatformId: String(row.userid_platform_id),
-    accuserPlatformId: String(row.accuser_platform_id),
+    useridPlatformId: row.userid_platform_id != null ? String(row.userid_platform_id) : null,
+    accuserPlatformId: row.accuser_platform_id != null ? String(row.accuser_platform_id) : null,
     timestamp: row.timestamp,
   }));
 

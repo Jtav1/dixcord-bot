@@ -30,7 +30,7 @@ const router = express.Router();
  *       - name: app
  *         in: query
  *         required: true
- *         description: Chat app to scope the mapping to. Currently only "discord" is supported.
+ *         description: Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently only "discord" is supported.
  *         schema: { type: string, enum: [discord] }
  *       - name: limit
  *         in: query
@@ -45,7 +45,7 @@ const router = express.Router();
  *       - name: search
  *         in: query
  *         required: false
- *         description: Case-insensitive substring match against name, handle, or platform user id.
+ *         description: Case-insensitive substring match against name.
  *         schema: { type: string }
  *     responses:
  *       '200':
@@ -63,9 +63,6 @@ const router = express.Router();
  *                     properties:
  *                       id: { type: integer }
  *                       name: { type: string }
- *                       handle: { type: string }
- *                       platformUserId: { type: string }
- *                       app: { type: string }
  *                 total: { type: integer }
  *                 limit: { type: integer }
  *                 offset: { type: integer }
@@ -85,7 +82,7 @@ router.get("/", authenticate, async (req, res) => {
     const offset = req.query.offset != null ? parseInt(req.query.offset, 10) : 0;
     const search = req.query.search;
 
-    const { rows, total } = await listUserMappings(app, { limit, offset, search });
+    const { rows, total } = await listUserMappings({ limit, offset, search });
     res.json({ ok: true, userMappings: rows, total, limit, offset });
   } catch (err) {
     console.error("GET /api/user-mappings error:", err);
@@ -112,7 +109,7 @@ router.get("/", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         description: Chat app to scope the mapping to. Currently only "discord" is supported.
+ *         description: Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently only "discord" is supported.
  *         schema: { type: string, enum: [discord] }
  *     responses:
  *       '200':
@@ -128,9 +125,6 @@ router.get("/", authenticate, async (req, res) => {
  *                   properties:
  *                     id: { type: integer }
  *                     name: { type: string }
- *                     handle: { type: string }
- *                     platformUserId: { type: string }
- *                     app: { type: string }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -150,7 +144,7 @@ router.get("/:id", authenticate, async (req, res) => {
       return res.status(400).json({ ok: false, error: "Invalid id" });
     }
 
-    const row = await getUserMappingById(app, id);
+    const row = await getUserMappingById(id);
     if (!row) {
       return res.status(404).json({ ok: false, error: "User mapping not found" });
     }
@@ -164,7 +158,7 @@ router.get("/:id", authenticate, async (req, res) => {
 /**
  * POST /api/user-mappings
  * Create a user mapping.
- * Body: { app, name, handle, platformUserId }
+ * Body: { app, name }
  * Auth: admin required.
  * @openapi
  * /api/user-mappings:
@@ -172,22 +166,22 @@ router.get("/:id", authenticate, async (req, res) => {
  *     operationId: createUserMapping
  *     tags: [User Mappings]
  *     summary: Create a user mapping
- *     description: Requires the admin role. `platformUserId` may also be sent as `discord_id` for backward compatibility.
+ *     description: >
+ *       Requires the admin role. Creates a bare identity (id + name) with no guild_members
+ *       aliases linked yet — linking is a separate, future admin action.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [app, name, handle, platformUserId]
+ *             required: [app, name]
  *             properties:
  *               app:
  *                 type: string
  *                 enum: [discord]
- *                 description: Chat app to scope the mapping to. Currently only "discord" is supported.
+ *                 description: Chat app, validated but otherwise unused. Currently only "discord" is supported.
  *               name: { type: string }
- *               handle: { type: string }
- *               platformUserId: { type: string }
  *     responses:
  *       '201':
  *         description: Created user mapping.
@@ -202,9 +196,6 @@ router.get("/:id", authenticate, async (req, res) => {
  *                   properties:
  *                     id: { type: integer }
  *                     name: { type: string }
- *                     handle: { type: string }
- *                     platformUserId: { type: string }
- *                     app: { type: string }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -220,30 +211,25 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
     if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
 
     const name = String(req.body?.name ?? "").trim();
-    const handle = String(req.body?.handle ?? "").trim();
-    const platformUserId = String(
-      req.body?.platformUserId ?? req.body?.discord_id ?? "",
-    ).trim();
-
-    if (!name || !handle || !platformUserId) {
+    if (!name) {
       return res.status(400).json({
         ok: false,
-        error: "name, handle, and platformUserId are required",
+        error: "name is required",
       });
     }
 
-    const id = await createUserMapping(app, { name, handle, platformUserId });
+    const id = await createUserMapping({ name });
     if (id == null) {
       return res.status(500).json({ ok: false, error: "Failed to create user mapping" });
     }
 
-    const row = await getUserMappingById(app, id);
+    const row = await getUserMappingById(id);
     await recordAudit(req.user.id, "create", "chat_member_mapping", id, { name });
     res.status(201).json({ ok: true, userMapping: row });
   } catch (err) {
     console.error("POST /api/user-mappings error:", err);
     const msg = err.code === "ER_DUP_ENTRY" || String(err.message).includes("UNIQUE")
-      ? "Duplicate name, handle, or platform user id"
+      ? "Duplicate name"
       : "Failed to create user mapping";
     res.status(400).json({ ok: false, error: msg });
   }
@@ -252,7 +238,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
 /**
  * PUT /api/user-mappings/:id
  * Update a user mapping.
- * Body: { app, name?, handle?, platformUserId? }
+ * Body: { app, name }
  * Auth: admin required.
  * @openapi
  * /api/user-mappings/{id}:
@@ -260,7 +246,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  *     operationId: updateUserMapping
  *     tags: [User Mappings]
  *     summary: Update a user mapping
- *     description: Requires the admin role. Provide at least one of name, handle, or platformUserId. `platformUserId` may also be sent as `discord_id`.
+ *     description: Requires the admin role.
  *     parameters:
  *       - name: id
  *         in: path
@@ -272,15 +258,13 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [app]
+ *             required: [app, name]
  *             properties:
  *               app:
  *                 type: string
  *                 enum: [discord]
- *                 description: Chat app to scope the mapping to. Currently only "discord" is supported.
+ *                 description: Chat app, validated but otherwise unused. Currently only "discord" is supported.
  *               name: { type: string }
- *               handle: { type: string }
- *               platformUserId: { type: string }
  *     responses:
  *       '200':
  *         description: Updated user mapping.
@@ -295,9 +279,6 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  *                   properties:
  *                     id: { type: integer }
  *                     name: { type: string }
- *                     handle: { type: string }
- *                     platformUserId: { type: string }
- *                     app: { type: string }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -319,24 +300,20 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
       return res.status(400).json({ ok: false, error: "Invalid id" });
     }
 
-    const updated = await updateUserMapping(id, app, {
-      name: req.body?.name,
-      handle: req.body?.handle,
-      platformUserId: req.body?.platformUserId ?? req.body?.discord_id,
-    });
+    const updated = await updateUserMapping(id, { name: req.body?.name });
 
     if (!updated) {
-      const existing = await getUserMappingById(app, id);
+      const existing = await getUserMappingById(id);
       if (!existing) {
         return res.status(404).json({ ok: false, error: "User mapping not found" });
       }
       return res.status(400).json({
         ok: false,
-        error: "Provide name, handle, and/or platformUserId to update",
+        error: "Provide name to update",
       });
     }
 
-    const row = await getUserMappingById(app, id);
+    const row = await getUserMappingById(id);
     await recordAudit(req.user.id, "update", "chat_member_mapping", id, {});
     res.json({ ok: true, userMapping: row });
   } catch (err) {
@@ -365,7 +342,7 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         description: Chat app to scope the mapping to. Currently only "discord" is supported.
+ *         description: Chat app, validated but otherwise unused. Currently only "discord" is supported.
  *         schema: { type: string, enum: [discord] }
  *     responses:
  *       '200':
@@ -397,7 +374,7 @@ router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
       return res.status(400).json({ ok: false, error: "Invalid id" });
     }
 
-    const existing = await getUserMappingById(app, id);
+    const existing = await getUserMappingById(id);
     if (!existing) {
       return res.status(404).json({ ok: false, error: "User mapping not found" });
     }

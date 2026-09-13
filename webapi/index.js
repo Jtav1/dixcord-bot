@@ -384,9 +384,9 @@ app.get("/", publicLimiter, (req, res) => {
       guildMembers: {
         authRequired: true,
         routes: [
-          "GET /api/guild-members?app=&guildId=",
+          "GET /api/guild-members?app=&guildId= (guildId optional: omit for all-guilds dedup lookup)",
           "GET /api/guild-members/user/:chatMemberMappingId",
-          "POST /api/guild-members/sync (body: { app, guildId, members })",
+          "POST /api/guild-members/sync (body: { app, guildId, members }); upserts, never removes members",
         ],
         adminRoutes: ["GET /api/guild-members/unlinked?app=&guildId="],
       },
@@ -413,7 +413,6 @@ app.get("/", publicLimiter, (req, res) => {
           "POST /api/message-processing/count-repost",
           "POST /api/message-processing/emoji-import",
           "POST /api/message-processing/sticker-import",
-          "POST /api/message-processing/user-mapping-import",
           "POST /api/message-processing/pin-check",
           "POST /api/message-processing/pin-log",
         ],

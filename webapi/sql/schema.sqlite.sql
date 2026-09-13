@@ -20,9 +20,7 @@ CREATE TRIGGER IF NOT EXISTS users_updated_at
 
 CREATE TABLE IF NOT EXISTS chat_member_mapping (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
-  discord_handle TEXT NOT NULL UNIQUE,
-  discord_id TEXT NOT NULL UNIQUE
+  name TEXT NOT NULL UNIQUE
 );
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
@@ -261,19 +259,33 @@ CREATE TABLE IF NOT EXISTS guild_config (
   PRIMARY KEY (app, guild_id, config)
 );
 
--- Per-(app, guild_id, platform_user_id) server membership: nickname/roles/joined-at held in
--- that server. chat_member_mapping stays the single global cross-server identity; the link is
--- optional (NULL until an admin/sync resolves it) so membership is never lost to an unknown id.
+-- Per-(app, guild_id, platform_user_id) server membership: Discord handle/nickname/roles/
+-- joined-at held in that server. chat_member_mapping stays the single global cross-server
+-- identity; the link to it lives in member_aliases (one identity, many guild_member aliases),
+-- not here, and is never set by sync — linking is a manual admin action (future work).
 CREATE TABLE IF NOT EXISTS guild_members (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   app TEXT NOT NULL,
   guild_id TEXT NOT NULL,
   platform_user_id TEXT NOT NULL,
-  chat_member_mapping_id INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+  handle TEXT NULL,
   nickname TEXT NULL,
   roles TEXT NULL,
   joined_at TEXT NULL,
   synced_at TEXT DEFAULT (datetime('now')),
-  PRIMARY KEY (app, guild_id, platform_user_id)
+  UNIQUE (app, guild_id, platform_user_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_guild_members_user ON guild_members (chat_member_mapping_id);
+CREATE INDEX IF NOT EXISTS idx_guild_members_app_guild ON guild_members (app, guild_id);
+
+-- Links one chat_member_mapping identity to many guild_members rows (one-to-many). A
+-- guild_member row is "unlinked" until an admin creates this row (see GET
+-- /api/guild-members/unlinked) — sync never creates or touches this table.
+CREATE TABLE IF NOT EXISTS member_aliases (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  chat_member_mapping_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  guild_member_id INTEGER NOT NULL UNIQUE REFERENCES guild_members(id) ON DELETE CASCADE,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_member_aliases_chat_member ON member_aliases (chat_member_mapping_id);

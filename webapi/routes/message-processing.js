@@ -7,7 +7,6 @@ import {
   recordPlusMinusReaction,
   countRepost,
   importGuildAssetFrequencyList,
-  importUserMappingList,
   isMessageAlreadyPinned,
   logPinnedMessage,
 } from "../services/messageProcessing.js";
@@ -475,78 +474,6 @@ router.post("/sticker-import", authenticate, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to import sticker list" });
-  }
-});
-
-/**
- * POST /api/message-processing/user-mapping-import
- * Insert-if-new Discord users into chat_member_mapping (mirrors bot api/userMapping.js).
- * Body: { app: "discord", users: Array<{ name, discord_handle, discord_id }> }
- * Response: { ok: true, imported: number }
- * Auth: required.
- * @openapi
- * /api/message-processing/user-mapping-import:
- *   post:
- *     operationId: importUserMapping
- *     tags: [Message Processing]
- *     summary: Bulk insert-if-new cross-app user identity mappings
- *     description: >
- *       Inserts rows into chat_member_mapping keyed on the app's platform id column
- *       (discord_id for app "discord"). First writer wins: if a row already exists for that
- *       platform id, its name/handle are left untouched (not overwritten) by this call.
- *       Rows missing name/handle/id are skipped.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [app, users]
- *             properties:
- *               app: { type: string, enum: [discord] }
- *               users:
- *                 type: array
- *                 items:
- *                   type: object
- *                   properties:
- *                     name: { type: string }
- *                     discord_handle: { type: string }
- *                     discord_id: { type: string, description: "Discord snowflake." }
- *     responses:
- *       '200':
- *         description: User mappings synced.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok: { type: boolean, enum: [true] }
- *                 imported: { type: integer, description: "Rows processed (inserted if new, left untouched if already present; malformed rows not counted)." }
- *       '400':
- *         description: users is not an array, or app is unsupported.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       '401':
- *         $ref: '#/components/responses/Unauthorized'
- *       '500':
- *         $ref: '#/components/responses/ServerError'
- */
-router.post("/user-mapping-import", authenticate, async (req, res) => {
-  try {
-    const { users, app } = req.body ?? {};
-    const result = await importUserMappingList(users, app);
-    if (!result.ok) {
-      return res.status(400).json({
-        ok: false,
-        error: result.error ?? "Invalid user mapping import request",
-      });
-    }
-    res.json({ ok: true, imported: result.imported ?? 0 });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ ok: false, error: "Failed to import user mapping" });
   }
 });
 
