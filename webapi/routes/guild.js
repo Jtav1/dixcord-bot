@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, requireOwnGuildOrAdmin } from "../middleware/auth.js";
 import { getGuildSnapshot, upsertGuildSnapshot } from "../services/guildInfo.js";
 
 const router = express.Router();
@@ -70,7 +70,7 @@ router.get("/", authenticate, async (req, res) => {
  * Push a full guild snapshot (metadata, channels, roles) from a platform client. Fully
  * replaces that app/guildId's channels and roles rows.
  * Body: { app: string, guildId: string, guild: object, channels: Array<object>, roles: Array<object> }
- * Auth: required.
+ * Auth: required. A guild-scoped bot account may only sync its own guildId.
  * @openapi
  * /api/guild/sync:
  *   post:
@@ -103,10 +103,12 @@ router.get("/", authenticate, async (req, res) => {
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
  *       '500':
  *         $ref: '#/components/responses/ServerError'
  */
-router.post("/sync", authenticate, async (req, res) => {
+router.post("/sync", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
   try {
     const { app, guildId, guild, channels, roles } = req.body ?? {};
     const result = await upsertGuildSnapshot({ app, guildId, guild, channels, roles });

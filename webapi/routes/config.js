@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate, requireAdmin } from "../middleware/auth.js";
+import { authenticate, requireAdmin, requireOwnGuildOrAdmin } from "../middleware/auth.js";
 import {
   createGuildConfigKey,
   deleteGuildConfigKey,
@@ -38,7 +38,7 @@ function resolveGuildScope(req) {
  * Returns all configuration rows for one server, with metadata.
  * Query: { app, guildId }
  * Response: { config, entries, entriesWithMeta }
- * Auth: required.
+ * Auth: required. A guild-scoped bot account may only read its own guildId.
  * @openapi
  * /api/config:
  *   get:
@@ -89,10 +89,12 @@ function resolveGuildScope(req) {
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
  *       '500':
  *         $ref: '#/components/responses/ServerError'
  */
-router.get("/", authenticate, async (req, res) => {
+router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
   try {
     const scope = resolveGuildScope(req);
     if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });

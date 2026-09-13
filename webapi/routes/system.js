@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate, requireAdmin } from "../middleware/auth.js";
+import { authenticate, requireAdmin, requireOwnGuildOrAdmin } from "../middleware/auth.js";
 import {
   getSystemStatus,
   getCacheVersion,
@@ -183,7 +183,7 @@ router.post("/invalidate-cache", authenticate, requireAdmin, async (req, res) =>
  * POST /api/system/heartbeat
  * Bot heartbeat (app, guild id, version, and optional session/health fields).
  * Body: { app, guildId, version, readyAt?, memberCount?, channelCount?, wsPingMs? }
- * Auth: required (bot or admin).
+ * Auth: required (bot or admin). A guild-scoped bot account may only heartbeat its own guildId.
  * @openapi
  * /api/system/heartbeat:
  *   post:
@@ -219,10 +219,12 @@ router.post("/invalidate-cache", authenticate, requireAdmin, async (req, res) =>
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
  *       '500':
  *         $ref: '#/components/responses/ServerError'
  */
-router.post("/heartbeat", authenticate, async (req, res) => {
+router.post("/heartbeat", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
   try {
     const app = resolveChatAppFromRequest(req);
     if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);

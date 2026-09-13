@@ -21,7 +21,8 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 - **Pin history** – Paginated pin log (and shared pin file storage via `PIN_FILES_DIR`).
 - **System** – Health, status, cache version / invalidate, bot heartbeat.
 - **Guild** – App/guild-scoped snapshot of platform-client guild metadata, channels, roles, and the emoji/sticker catalog; pushed periodically by a platform client (discord-bot today), read by admin panel/webview.
-- **Guild members** – App/guild-scoped server membership (nickname, roles held, joined-at) per `chat_member_mapping` identity; the identity itself stays global/cross-server, this just tracks per-server presentation. Includes a reverse lookup ("every server this user belongs to") for future cross-server delivery features.
+- **Guild members** – App/guild-scoped server membership (nickname, roles held, joined-at), keyed on the platform's own user id. The `chat_member_mapping` identity link is optional: a member synced before (or without) a matching identity is stored unlinked rather than dropped — see `GET /api/guild-members/unlinked` for the admin follow-up. Includes a reverse lookup ("every server this user belongs to") for future cross-server delivery features.
+- **Service accounts** – Admin-only provisioning of extra `bot`/`webview` accounts, optionally bound to one `guildId`; a guild-bound bot account can only call guild-scoped routes for its own guild (`admin` and unrestricted accounts are never scope-limited).
 - **Statistics** – Aggregate counts across tracking tables (used by web-view).
 - **Scheduled messages** – Create/list/update/delete reminders for bot delivery; admin scope for moderation.
 - **Events & audit** – Raw plusplus/repost events; admin audit log.
@@ -139,13 +140,17 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/system/heartbeat` | ✓ | Bot heartbeat (body: `{ app, guildId, version }`) |
 | GET | `/api/guild?app=&guildId=` | ✓ | Synced guild metadata, channels, roles, emoji/sticker catalog |
 | POST | `/api/guild/sync` | ✓ | Push a full guild snapshot (body: `{ app, guildId, guild, channels, roles }`); auto-seeds default config for brand-new servers |
-| GET | `/api/guild-members?app=&guildId=` | ✓ | List one server's members (joined with chat_member_mapping) |
+| GET | `/api/guild-members?app=&guildId=` | ✓ | List one server's members (left-joined with chat_member_mapping; unlinked members have null id/name/handle) |
 | GET | `/api/guild-members/user/:chatMemberMappingId` | ✓ | Every server a given internal user id belongs to |
-| POST | `/api/guild-members/sync` | ✓ | Push a full server membership list (body: `{ app, guildId, members }`) |
+| GET | `/api/guild-members/unlinked?app=&guildId=` | admin | Membership rows with no resolved chat_member_mapping link yet |
+| POST | `/api/guild-members/sync` | ✓ | Push a full server membership list (body: `{ app, guildId, members }`); unresolvable members are inserted unlinked, not dropped |
 | GET | `/api/events/plusplus` | ✓ | Raw plusplus events |
 | GET | `/api/events/reposts` | ✓ | Raw repost events |
 | GET | `/api/audit-log` | admin | Audit log |
 | GET | `/api/scheduled-messages?scope=admin` | admin | All scheduled messages |
+| GET | `/api/service-accounts?role=&guildId=` | admin | List service accounts |
+| POST | `/api/service-accounts` | admin | Create a bot/webview account (body: `{ email, password, name, role, guildId? }`) |
+| DELETE | `/api/service-accounts/:id` | admin | Delete a bot/webview account |
 
 See [admin-backend-api.md](admin-backend-api.md) for full admin route documentation.
 

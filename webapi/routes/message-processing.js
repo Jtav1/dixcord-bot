@@ -480,7 +480,7 @@ router.post("/sticker-import", authenticate, async (req, res) => {
 
 /**
  * POST /api/message-processing/user-mapping-import
- * Upsert Discord users into chat_member_mapping (mirrors bot api/userMapping.js).
+ * Insert-if-new Discord users into chat_member_mapping (mirrors bot api/userMapping.js).
  * Body: { app: "discord", users: Array<{ name, discord_handle, discord_id }> }
  * Response: { ok: true, imported: number }
  * Auth: required.
@@ -489,10 +489,12 @@ router.post("/sticker-import", authenticate, async (req, res) => {
  *   post:
  *     operationId: importUserMapping
  *     tags: [Message Processing]
- *     summary: Bulk upsert cross-app user identity mappings
+ *     summary: Bulk insert-if-new cross-app user identity mappings
  *     description: >
- *       Upserts rows into chat_member_mapping keyed on the app's platform id column
- *       (discord_id for app "discord"). Rows missing name/handle/id are skipped.
+ *       Inserts rows into chat_member_mapping keyed on the app's platform id column
+ *       (discord_id for app "discord"). First writer wins: if a row already exists for that
+ *       platform id, its name/handle are left untouched (not overwritten) by this call.
+ *       Rows missing name/handle/id are skipped.
  *     requestBody:
  *       required: true
  *       content:
@@ -519,7 +521,7 @@ router.post("/sticker-import", authenticate, async (req, res) => {
  *               type: object
  *               properties:
  *                 ok: { type: boolean, enum: [true] }
- *                 imported: { type: integer, description: "Rows upserted (skipped rows not counted)." }
+ *                 imported: { type: integer, description: "Rows processed (inserted if new, left untouched if already present; malformed rows not counted)." }
  *       '400':
  *         description: users is not an array, or app is unsupported.
  *         content:

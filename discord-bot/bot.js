@@ -26,6 +26,7 @@ import {
 import { startCacheVersionPoller } from "./api/cacheRefresh.js";
 import { startHeartbeat } from "./api/system.js";
 import { startGuildInfoSync } from "./api/guildInfo.js";
+import { startGuildMembersSync } from "./api/guildMembers.js";
 import { startMessageScheduler } from "./scheduler/messageScheduler.js";
 import {
   handleReactionAdd,
@@ -150,6 +151,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   startCacheVersionPoller();
   startHeartbeat(readyClient, readyClient.readyAt);
   startGuildInfoSync(readyClient);
+  startGuildMembersSync(readyClient);
 
   console.log(
     `bot: Ready! Logged in as ${readyClient.user.tag} at ${new Date().toLocaleString()}`,

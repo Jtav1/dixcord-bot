@@ -116,7 +116,7 @@ export function isWebviewAllowedRoute(method, pathname) {
  */
 async function loadUserWithRole(userId) {
   const [rows] = await db.query(
-    "SELECT id, email, name, created_at, role FROM users WHERE id = ?",
+    "SELECT id, email, name, created_at, role, guild_id FROM users WHERE id = ?",
     [userId],
   );
   if (!rows || rows.length === 0) return null;
@@ -126,6 +126,10 @@ async function loadUserWithRole(userId) {
     role:
       user.role != null && String(user.role).trim() !== ""
         ? String(user.role).trim()
+        : null,
+    guild_id:
+      user.guild_id != null && String(user.guild_id).trim() !== ""
+        ? String(user.guild_id).trim()
         : null,
   };
 }
@@ -197,6 +201,33 @@ export function requireBotOrAdmin(req, res, next) {
     return res
       .status(403)
       .json({ ok: false, error: "Bot or admin access required" });
+  }
+  next();
+}
+
+/**
+ * Require the request's guildId to match this account's own guild_id, unless the account is
+ * admin (always bypasses) or unrestricted (guild_id === null, always bypasses). Reads guildId
+ * from req.body.guildId, falling back to req.query.guildId (matches the existing app/guildId
+ * resolution pattern in routes/config.js). Applies to any non-admin role with a bound guild_id,
+ * not just bot, so a webview account could be scoped the same way later for free.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
+export function requireOwnGuildOrAdmin(req, res, next) {
+  if (isAdminRole(req.user?.role)) return next();
+  if (req.user?.guild_id == null) return next();
+  const requestGuildId = String(req.body?.guildId ?? req.query?.guildId ?? "").trim();
+  if (!requestGuildId) {
+    return res
+      .status(400)
+      .json({ ok: false, error: "guildId is required for this scoped service account" });
+  }
+  if (requestGuildId !== req.user.guild_id) {
+    return res
+      .status(403)
+      .json({ ok: false, error: "Forbidden: guildId does not match this service account's guild" });
   }
   next();
 }

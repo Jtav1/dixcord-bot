@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   name TEXT,
   role TEXT NOT NULL DEFAULT 'admin',
+  guild_id TEXT NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );
@@ -260,17 +261,19 @@ CREATE TABLE IF NOT EXISTS guild_config (
   PRIMARY KEY (app, guild_id, config)
 );
 
--- Per-(app, guild_id, chat_member_mapping_id) server membership: nickname/roles/joined-at
--- held in that server. chat_member_mapping stays the single global cross-server identity.
+-- Per-(app, guild_id, platform_user_id) server membership: nickname/roles/joined-at held in
+-- that server. chat_member_mapping stays the single global cross-server identity; the link is
+-- optional (NULL until an admin/sync resolves it) so membership is never lost to an unknown id.
 CREATE TABLE IF NOT EXISTS guild_members (
   app TEXT NOT NULL,
   guild_id TEXT NOT NULL,
-  chat_member_mapping_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  platform_user_id TEXT NOT NULL,
+  chat_member_mapping_id INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
   nickname TEXT NULL,
   roles TEXT NULL,
   joined_at TEXT NULL,
   synced_at TEXT DEFAULT (datetime('now')),
-  PRIMARY KEY (app, guild_id, chat_member_mapping_id)
+  PRIMARY KEY (app, guild_id, platform_user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_guild_members_user ON guild_members (chat_member_mapping_id);

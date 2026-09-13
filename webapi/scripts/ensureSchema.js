@@ -60,6 +60,22 @@ export async function ensureSchemaMigrations() {
     }
   }
 
+  // users.guild_id column: scopes a bot (or webview) service account to one guild; NULL means
+  // unrestricted (preserves existing single-bot deployments after upgrade).
+  if (await tableExists(db, "users", isSqlite)) {
+    if (!(await columnExists(db, "users", "guild_id", isSqlite))) {
+      await db.query(
+        isSqlite
+          ? "ALTER TABLE users ADD COLUMN guild_id TEXT NULL"
+          : "ALTER TABLE users ADD COLUMN guild_id VARCHAR(64) NULL",
+      );
+      applied.push("users.guild_id column");
+      console.log("db: migration applied: added users.guild_id column");
+    } else {
+      console.log("db: schema ok: users.guild_id column already exists");
+    }
+  }
+
   // audit_log table
   if (!(await tableExists(db, "audit_log", isSqlite))) {
     if (isSqlite) {
@@ -406,19 +422,21 @@ export async function ensureSchemaMigrations() {
     }
   }
 
-  // guild_members table: per-server membership (nickname/roles/joined-at) keyed off chat_member_mapping
+  // guild_members table: per-server membership (nickname/roles/joined-at) keyed off platform_user_id,
+  // optionally linked to chat_member_mapping (NULL until resolved, so membership is never lost).
   if (!(await tableExists(db, "guild_members", isSqlite))) {
     if (isSqlite) {
       await db.query(`
         CREATE TABLE guild_members (
           app TEXT NOT NULL,
           guild_id TEXT NOT NULL,
-          chat_member_mapping_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          platform_user_id TEXT NOT NULL,
+          chat_member_mapping_id INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
           nickname TEXT NULL,
           roles TEXT NULL,
           joined_at TEXT NULL,
           synced_at TEXT DEFAULT (datetime('now')),
-          PRIMARY KEY (app, guild_id, chat_member_mapping_id)
+          PRIMARY KEY (app, guild_id, platform_user_id)
         )
       `);
     } else {
@@ -426,14 +444,15 @@ export async function ensureSchemaMigrations() {
         CREATE TABLE guild_members (
           app VARCHAR(20) NOT NULL,
           guild_id VARCHAR(64) NOT NULL,
-          chat_member_mapping_id INT NOT NULL,
+          platform_user_id VARCHAR(64) NOT NULL,
+          chat_member_mapping_id INT NULL,
           nickname VARCHAR(255) NULL,
           roles TEXT NULL,
           joined_at DATETIME NULL,
           synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (app, guild_id, chat_member_mapping_id),
+          PRIMARY KEY (app, guild_id, platform_user_id),
           KEY idx_guild_members_user (chat_member_mapping_id),
-          CONSTRAINT fk_guild_members_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
+          CONSTRAINT fk_guild_members_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
         )
       `);
     }
@@ -441,6 +460,73 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: created guild_members table");
   } else {
     console.log("db: schema ok: guild_members table already exists");
+  }
+
+  // guild_members: platform_user_id + nullable chat_member_mapping_id migration. Old shape had
+  // chat_member_mapping_id NOT NULL as part of the PK; new shape keys on platform_user_id instead
+  // so a member can be recorded before (or without ever) being resolved to an identity. Only
+  // discord/discord_id exists in CHAT_MEMBER_APP_CONFIG today, so hardcoding it for this one-time
+  // backfill is fine — every pre-existing row necessarily has a match since the old column was NOT NULL.
+  if (
+    (await tableExists(db, "guild_members", isSqlite)) &&
+    !(await columnExists(db, "guild_members", "platform_user_id", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_members_new (
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          platform_user_id TEXT NOT NULL,
+          chat_member_mapping_id INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+          nickname TEXT NULL,
+          roles TEXT NULL,
+          joined_at TEXT NULL,
+          synced_at TEXT DEFAULT (datetime('now')),
+          PRIMARY KEY (app, guild_id, platform_user_id)
+        )
+      `);
+      await db.query(`
+        INSERT INTO guild_members_new
+          (app, guild_id, platform_user_id, chat_member_mapping_id, nickname, roles, joined_at, synced_at)
+        SELECT gm.app, gm.guild_id, cmm.discord_id, gm.chat_member_mapping_id,
+               gm.nickname, gm.roles, gm.joined_at, gm.synced_at
+        FROM guild_members gm
+        JOIN chat_member_mapping cmm ON cmm.id = gm.chat_member_mapping_id
+      `);
+      await db.query("DROP TABLE guild_members");
+      await db.query("ALTER TABLE guild_members_new RENAME TO guild_members");
+    } else {
+      await db.query("ALTER TABLE guild_members ADD COLUMN platform_user_id VARCHAR(64) NULL");
+      await db.query(`
+        UPDATE guild_members gm
+        JOIN chat_member_mapping cmm ON cmm.id = gm.chat_member_mapping_id
+        SET gm.platform_user_id = cmm.discord_id
+      `);
+      await db.query(
+        "ALTER TABLE guild_members MODIFY COLUMN platform_user_id VARCHAR(64) NOT NULL",
+      );
+      if (
+        await constraintExists(db, "guild_members", "fk_guild_members_chat_member", isSqlite)
+      ) {
+        await db.query(
+          "ALTER TABLE guild_members DROP FOREIGN KEY fk_guild_members_chat_member",
+        );
+      }
+      await db.query("ALTER TABLE guild_members DROP PRIMARY KEY");
+      await db.query(
+        "ALTER TABLE guild_members ADD PRIMARY KEY (app, guild_id, platform_user_id)",
+      );
+      await db.query(
+        "ALTER TABLE guild_members MODIFY COLUMN chat_member_mapping_id INT NULL",
+      );
+      await db.query(
+        "ALTER TABLE guild_members ADD CONSTRAINT fk_guild_members_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE SET NULL",
+      );
+    }
+    applied.push("guild_members: platform_user_id + nullable chat_member_mapping_id migration");
+    console.log(
+      "db: migration applied: guild_members platform_user_id/nullable-link migration",
+    );
   }
 
   if (

@@ -480,7 +480,9 @@ export async function importGuildAssetFrequencyList(items, assetKind) {
 export const isChatMemberImportAppSupported = isChatMemberAppSupported;
 
 /**
- * Bulk upsert rows into chat_member_mapping. Conflict target is the app’s id column (unique).
+ * Bulk insert-if-new rows into chat_member_mapping. Conflict target is the app's id column
+ * (unique). First writer wins: an existing row's name/handle is never overwritten by a later
+ * sync (from the same or a different guild), so identity stays sticky to whoever claims it first.
  * @param {Array<Record<string, unknown>>} users
  * @param {string} app - e.g. `"discord"` (only supported value today)
  * @returns {Promise<{ ok: boolean, imported?: number, error?: string }>}
@@ -511,17 +513,16 @@ export async function importUserMappingList(users, app) {
     if (isSqlite) {
       await db.query(
         `INSERT INTO chat_member_mapping (name, \`${hc}\`, \`${ic}\`) VALUES (?, ?, ?)
-         ON CONFLICT(\`${ic}\`) DO UPDATE SET
-           name = excluded.name,
-           \`${hc}\` = excluded.${hc}`,
+         ON CONFLICT(\`${ic}\`) DO NOTHING`,
         [name, handle, platformId],
       );
     } else {
+      // Not INSERT IGNORE: that would also swallow an unrelated name/handle unique-collision
+      // against a different row. `id = id` is a genuine no-op that still resolves the conflict
+      // on the id column alone.
       await db.query(
         `INSERT INTO chat_member_mapping (name, \`${hc}\`, \`${ic}\`) VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           name = VALUES(name),
-           \`${hc}\` = VALUES(${hc})`,
+         ON DUPLICATE KEY UPDATE id = id`,
         [name, handle, platformId],
       );
     }

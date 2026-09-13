@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   name VARCHAR(255),
   role VARCHAR(20) NOT NULL DEFAULT 'admin',
+  guild_id VARCHAR(64) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
@@ -264,17 +265,19 @@ CREATE TABLE IF NOT EXISTS guild_config (
   PRIMARY KEY (app, guild_id, config)
 );
 
--- Per-(app, guild_id, chat_member_mapping_id) server membership: nickname/roles/joined-at
--- held in that server. chat_member_mapping stays the single global cross-server identity.
+-- Per-(app, guild_id, platform_user_id) server membership: nickname/roles/joined-at held in
+-- that server. chat_member_mapping stays the single global cross-server identity; the link is
+-- optional (NULL until an admin/sync resolves it) so membership is never lost to an unknown id.
 CREATE TABLE IF NOT EXISTS guild_members (
   app VARCHAR(20) NOT NULL,
   guild_id VARCHAR(64) NOT NULL,
-  chat_member_mapping_id INT NOT NULL,
+  platform_user_id VARCHAR(64) NOT NULL,
+  chat_member_mapping_id INT NULL,
   nickname VARCHAR(255) NULL,
   roles TEXT NULL,
   joined_at DATETIME NULL,
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (app, guild_id, chat_member_mapping_id),
+  PRIMARY KEY (app, guild_id, platform_user_id),
   KEY idx_guild_members_user (chat_member_mapping_id),
-  CONSTRAINT fk_guild_members_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
+  CONSTRAINT fk_guild_members_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
 );

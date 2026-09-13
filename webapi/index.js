@@ -30,6 +30,7 @@ import auditLogRoutes from "./routes/audit-log.js";
 import statisticsRoutes from "./routes/statistics.js";
 import guildRoutes from "./routes/guild.js";
 import guildMembersRoutes from "./routes/guild-members.js";
+import serviceAccountsRoutes from "./routes/service-accounts.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -387,6 +388,15 @@ app.get("/", publicLimiter, (req, res) => {
           "GET /api/guild-members/user/:chatMemberMappingId",
           "POST /api/guild-members/sync (body: { app, guildId, members })",
         ],
+        adminRoutes: ["GET /api/guild-members/unlinked?app=&guildId="],
+      },
+      serviceAccounts: {
+        authRequired: true,
+        adminRoutes: [
+          "GET /api/service-accounts?role=&guildId=",
+          "POST /api/service-accounts (body: { email, password, name, role, guildId? })",
+          "DELETE /api/service-accounts/:id",
+        ],
       },
       botResponses: {
         authRequired: true,
@@ -575,6 +585,7 @@ app.use("/api/audit-log", auditLogRoutes);
 app.use("/api/statistics", statisticsRoutes);
 app.use("/api/guild", guildRoutes);
 app.use("/api/guild-members", guildMembersRoutes);
+app.use("/api/service-accounts", serviceAccountsRoutes);
 
 app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 
