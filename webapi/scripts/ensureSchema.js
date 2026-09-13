@@ -640,36 +640,60 @@ export async function ensureSchemaMigrations() {
   }
 
   // Backfill guild_members.handle from chat_member_mapping.discord_handle (the OLD table's own
-  // column name — unrelated to the rename above) via the OLD chat_member_mapping_id link, before
-  // that column disappears from chat_member_mapping below. Gated on chat_member_mapping still
-  // having discord_handle, so this is skippable/idempotent once that column is dropped.
+  // column name — unrelated to the rename above), matching directly on
+  // chat_member_mapping.discord_id = guild_members.platform_user_id — the authoritative identity
+  // match still available in production at this point — rather than the old
+  // guild_members.chat_member_mapping_id link, which may be unset for rows synced through a path
+  // that never established it. Deliberately re-runs on every boot (WHERE handle IS NULL makes it
+  // cheap once caught up): guild_members may still be empty or partially synced on the very boot
+  // that first creates it (this migration runs before the bot ever gets a chance to sync — see
+  // the member_aliases backfill below for the same reasoning), so this keeps catching newly
+  // synced members for as long as chat_member_mapping.discord_handle/discord_id still exist.
+  // Those columns are intentionally NOT auto-dropped anywhere in this file (see below) — that is
+  // a deliberate separate, manually-triggered step once production data is confirmed backfilled.
   if (
     (await tableExists(db, "guild_members", isSqlite)) &&
-    (await columnExists(db, "guild_members", "chat_member_mapping_id", isSqlite)) &&
-    (await columnExists(db, "chat_member_mapping", "discord_handle", isSqlite))
+    (await columnExists(db, "chat_member_mapping", "discord_handle", isSqlite)) &&
+    (await columnExists(db, "chat_member_mapping", "discord_id", isSqlite))
   ) {
+    let handleResult;
     if (isSqlite) {
-      await db.query(`
+      [handleResult] = await db.query(`
         UPDATE guild_members
         SET handle = (
-          SELECT cmm.discord_handle FROM chat_member_mapping cmm WHERE cmm.id = guild_members.chat_member_mapping_id
+          SELECT cmm.discord_handle FROM chat_member_mapping cmm WHERE cmm.discord_id = guild_members.platform_user_id
         )
-        WHERE chat_member_mapping_id IS NOT NULL AND handle IS NULL
+        WHERE handle IS NULL
+          AND EXISTS (SELECT 1 FROM chat_member_mapping cmm WHERE cmm.discord_id = guild_members.platform_user_id)
       `);
     } else {
-      await db.query(`
+      [handleResult] = await db.query(`
         UPDATE guild_members gm
-        JOIN chat_member_mapping cmm ON cmm.id = gm.chat_member_mapping_id
+        JOIN chat_member_mapping cmm ON cmm.discord_id = gm.platform_user_id
         SET gm.handle = cmm.discord_handle
-        WHERE gm.chat_member_mapping_id IS NOT NULL AND gm.handle IS NULL
+        WHERE gm.handle IS NULL
       `);
     }
-    applied.push("guild_members.handle backfill from chat_member_mapping");
-    console.log("db: migration applied: backfilled guild_members.handle");
+    const handleUpdatedCount = handleResult?.affectedRows ?? handleResult?.changes ?? 0;
+    if (handleUpdatedCount > 0) {
+      applied.push(
+        `guild_members.handle backfill via chat_member_mapping.discord_id match (${handleUpdatedCount} row(s))`,
+      );
+      console.log(
+        `db: migration applied: backfilled ${handleUpdatedCount} guild_members.handle row(s) via discord_id match`,
+      );
+    } else {
+      console.log("db: schema ok: guild_members.handle backfill has no new matches to add");
+    }
   }
 
   // member_aliases table: links one chat_member_mapping identity to many guild_members rows.
-  // Backfilled from the OLD guild_members.chat_member_mapping_id link (dropped in the next step).
+  // Table creation is one-time; the backfill that populates it is a separate step below that
+  // re-runs on every boot, since guild_members may still be empty (or only partially synced) on
+  // this very boot — this migration runs before the bot ever gets a chance to sync (webapi's
+  // /health, which gates the bot's own container start, isn't reachable until after this whole
+  // function returns). A one-shot backfill tied to table creation would permanently miss anyone
+  // who joins guild_members on a later boot.
   if (!(await tableExists(db, "member_aliases", isSqlite))) {
     if (isSqlite) {
       await db.query(`
@@ -697,14 +721,40 @@ export async function ensureSchemaMigrations() {
         )
       `);
     }
-    if (await columnExists(db, "guild_members", "chat_member_mapping_id", isSqlite)) {
-      await db.query(`
-        INSERT INTO member_aliases (chat_member_mapping_id, guild_member_id)
-        SELECT chat_member_mapping_id, id FROM guild_members WHERE chat_member_mapping_id IS NOT NULL
-      `);
+    applied.push("member_aliases table");
+    console.log("db: migration applied: created member_aliases table");
+  }
+
+  // member_aliases backfill: matches chat_member_mapping.discord_id directly against
+  // guild_members.platform_user_id — the authoritative identity data production already has —
+  // rather than the old guild_members.chat_member_mapping_id link, which may be unset for rows
+  // synced through a path that never established it (e.g. the current sync code, which never
+  // auto-links at all). A given discord_id is unique on chat_member_mapping, so this matches at
+  // most one identity per guild_members row; one identity can still gain many aliases (one per
+  // guild). Deliberately re-runs on every boot via the NOT EXISTS guard (cheap once caught up),
+  // for as long as chat_member_mapping.discord_id still exists — see the note above on why a
+  // one-shot backfill isn't sufficient. Only logged when it actually inserts something, so a
+  // fully-caught-up boot doesn't spam "migration applied" forever.
+  if (
+    (await tableExists(db, "member_aliases", isSqlite)) &&
+    (await columnExists(db, "chat_member_mapping", "discord_id", isSqlite))
+  ) {
+    const [result] = await db.query(`
+      INSERT INTO member_aliases (chat_member_mapping_id, guild_member_id)
+      SELECT cmm.id, gm.id
+      FROM guild_members gm
+      JOIN chat_member_mapping cmm ON cmm.discord_id = gm.platform_user_id
+      WHERE NOT EXISTS (SELECT 1 FROM member_aliases ma WHERE ma.guild_member_id = gm.id)
+    `);
+    const insertedCount = result?.affectedRows ?? result?.changes ?? 0;
+    if (insertedCount > 0) {
+      applied.push(`member_aliases backfill via chat_member_mapping.discord_id match (${insertedCount} row(s))`);
+      console.log(
+        `db: migration applied: backfilled ${insertedCount} member_aliases row(s) via discord_id match`,
+      );
+    } else {
+      console.log("db: schema ok: member_aliases backfill has no new matches to add");
     }
-    applied.push("member_aliases table + backfill from guild_members.chat_member_mapping_id");
-    console.log("db: migration applied: created member_aliases table and backfilled it");
   }
 
   // Drop guild_members.chat_member_mapping_id: superseded by member_aliases.
@@ -729,39 +779,28 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: dropped guild_members.chat_member_mapping_id");
   }
 
-  // Drop chat_member_mapping.discord_handle/discord_id: moved to guild_members above. Any
-  // chat_member_mapping row with zero linked guild_members rows at this point loses its
-  // handle/id permanently (no source to backfill from) — rare, accepted, not solved here.
-  if (await columnExists(db, "chat_member_mapping", "discord_handle", isSqlite)) {
-    if (isSqlite) {
-      // Several tables (member_aliases, plusplus_tracking, member_emoji_tracking,
-      // member_repost_tracking, trigger_response_user_history, scheduled_messages, pin_history)
-      // FK-reference chat_member_mapping(id), some ON DELETE CASCADE. foreign_keys enforcement
-      // defaults ON in this SQLite build, so the DROP TABLE below (required to rebuild a table
-      // with a UNIQUE column removed) would cascade-delete rows in every one of them the moment
-      // the old table is dropped — even though it's immediately recreated with the same ids.
-      // Disable enforcement for just this rebuild so those rows survive untouched.
-      await db.query("PRAGMA foreign_keys = OFF");
-      try {
-        await db.query(`
-          CREATE TABLE chat_member_mapping_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE
-          )
-        `);
-        await db.query("INSERT INTO chat_member_mapping_new (id, name) SELECT id, name FROM chat_member_mapping");
-        await db.query("DROP TABLE chat_member_mapping");
-        await db.query("ALTER TABLE chat_member_mapping_new RENAME TO chat_member_mapping");
-      } finally {
-        await db.query("PRAGMA foreign_keys = ON");
-      }
-    } else {
-      await db.query("ALTER TABLE chat_member_mapping DROP COLUMN discord_handle");
-      await db.query("ALTER TABLE chat_member_mapping DROP COLUMN discord_id");
-    }
-    applied.push("chat_member_mapping.discord_handle/discord_id columns dropped");
-    console.log("db: migration applied: dropped chat_member_mapping.discord_handle/discord_id");
-  }
+  // chat_member_mapping.discord_handle/discord_id are DELIBERATELY NOT auto-dropped here.
+  // Production has existing chat_member_mapping rows but guild_members is net new — this
+  // migration always runs before the bot ever gets a chance to sync (see the member_aliases
+  // backfill above), so guild_members may still be empty or only partially populated on the very
+  // boot these columns would otherwise be dropped on. Since they're the only remaining source
+  // for the member_aliases backfill above, dropping them automatically on some unpredictable
+  // boot risks permanently losing the ability to link anyone who hasn't synced into
+  // guild_members yet. Once production is confirmed to have backfilled member_aliases as
+  // expected (e.g. checking its row count against guild_members), drop these columns via a
+  // separate, explicit, manually-triggered migration step — do not re-add this as an automatic
+  // step without re-solving the ordering problem described above.
+  //
+  // That future step, when ready, is exactly what used to run here:
+  //   MySQL:  ALTER TABLE chat_member_mapping DROP COLUMN discord_handle;
+  //           ALTER TABLE chat_member_mapping DROP COLUMN discord_id;
+  //   SQLite: rebuild the table without those columns (both are UNIQUE, so SQLite's
+  //           DROP COLUMN can't remove them directly) — wrap in
+  //           PRAGMA foreign_keys = OFF / ON, since several tables (member_aliases,
+  //           plusplus_tracking, member_emoji_tracking, member_repost_tracking,
+  //           trigger_response_user_history, scheduled_messages, pin_history) FK-reference
+  //           chat_member_mapping(id), some ON DELETE CASCADE, and foreign_keys enforcement
+  //           defaults ON in this SQLite build — see git history for the exact statements.
 
   // pin_history expanded metadata (author, message snapshot, pinners)
   if (await tableExists(db, "pin_history", isSqlite)) {
