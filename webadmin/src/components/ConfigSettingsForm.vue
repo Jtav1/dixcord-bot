@@ -41,8 +41,8 @@
             v-if="isRolePicker(entry.config)"
             v-model="draft[entry.config]"
             :items="roleItems"
-            item-title="title"
-            item-value="value"
+            item-title="name"
+            item-value="id"
             multiple
             chips
             closable-chips
@@ -52,7 +52,14 @@
             :placeholder="roleItems.length ? undefined : 'No synced roles — enter role IDs'"
           >
             <template #chip="{ item, props: chipProps }">
-              <v-chip v-bind="chipProps" variant="outlined" :text="item.title" :style="roleChipStyle(item.color)" />
+              <v-chip v-bind="chipProps" variant="outlined" :text="roleLabel(item)" :style="roleChipStyle(item)" />
+            </template>
+            <template #item="{ item, props: itemProps }">
+              <v-list-item v-bind="itemProps">
+                <template #title>
+                  <span :style="roleChipStyle(item)">{{ roleLabel(item) }}</span>
+                </template>
+              </v-list-item>
             </template>
           </v-combobox>
           <v-combobox
@@ -150,15 +157,40 @@ const channelItems = computed(() =>
     value: channel.id,
   })),
 );
-const roleItems = computed(() =>
-  props.roles.map((role) => ({ title: role.name, value: role.id, color: role.color })),
-);
+/** Role objects as returned by GET /api/guild ({id,name,color,position,mentionable,hoisted}). */
+const roleItems = computed(() => props.roles);
+/** id -> role object, for resolving already-selected chip values back to their role. */
+const roleById = computed(() => new Map(props.roles.map((role) => [role.id, role])));
 
 /**
- * @param {string|null|undefined} color Hex color, or null/undefined if the role has none.
+ * VCombobox hardcodes returnObject: true, and its item-matching explicitly skips the items
+ * list whenever the model value is a string (see Vuetify's list-items transformIn) — so
+ * already-selected chips, bound to bare role-id strings, never resolve to the item object on
+ * their own. Look the id up ourselves; a miss means the admin free-typed an id with no synced
+ * role behind it.
+ * @param {object|string} item
+ * @returns {object|null}
+ */
+function resolveRole(item) {
+  if (typeof item === "string") return roleById.value.get(item) ?? null;
+  return item ?? null;
+}
+
+/**
+ * @param {object|string} item
+ * @returns {string}
+ */
+function roleLabel(item) {
+  const role = resolveRole(item);
+  return role ? role.name : typeof item === "string" ? item : "";
+}
+
+/**
+ * @param {object|string} item
  * @returns {Record<string, string>}
  */
-function roleChipStyle(color) {
+function roleChipStyle(item) {
+  const color = resolveRole(item)?.color;
   return color ? { color, borderColor: color } : {};
 }
 

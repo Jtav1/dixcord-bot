@@ -85,7 +85,7 @@ const currentApp = ref(null);
 const currentGuildId = ref(null);
 /** @type {import("vue").Ref<Array<{id:string,name:string}>>} */
 const channels = ref([]);
-/** @type {import("vue").Ref<Array<{id:string,name:string}>>} */
+/** @type {import("vue").Ref<Array<{id:string,name:string,color:string|null,position:number|null,mentionable:boolean|null,hoisted:boolean|null}>>} */
 const roles = ref([]);
 
 const invalidating = ref(false);
