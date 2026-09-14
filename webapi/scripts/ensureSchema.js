@@ -977,6 +977,7 @@ export async function ensureSchemaMigrations() {
     "plusplus_enabled",
     "repost_detection_enabled",
     "pin_system_enabled",
+    "twitter_fix_enabled",
   ];
   for (const key of featureToggleKeys) {
     const [rows] = await db.query(

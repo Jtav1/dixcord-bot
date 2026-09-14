@@ -60,7 +60,7 @@ export async function getById(id) {
 export async function create(source_host, target_host) {
   const [result] = await db.query(
     "INSERT INTO link_replacements (source_host, target_host) VALUES (?, ?)",
-    [source_host, target_host]
+    [source_host.toLowerCase(), target_host.toLowerCase()]
   );
   return result?.insertId ?? result?.lastInsertRowid ?? null;
 }
@@ -75,11 +75,11 @@ export async function update(id, { source_host, target_host }) {
   const values = [];
   if (source_host !== undefined) {
     updates.push("source_host = ?");
-    values.push(source_host);
+    values.push(source_host.toLowerCase());
   }
   if (target_host !== undefined) {
     updates.push("target_host = ?");
-    values.push(target_host);
+    values.push(target_host.toLowerCase());
   }
   if (updates.length === 0) return false;
   values.push(id);

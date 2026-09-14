@@ -11,14 +11,16 @@ export async function testFortune() {
 
 /**
  * Test the social-link fixer against a sample message (diagnostic for twitter_fix_enabled).
+ * @param {string} app
+ * @param {string} guildId
  * @param {string} message
  * @returns {Promise<string>} Empty string if no fix applied.
  */
-export async function testLinkFixer(message) {
+export async function testLinkFixer(app, guildId, message) {
   const data = await apiFetchJson(
     "POST",
     "/bot-responses/link-fixer",
-    { message },
+    { app, guildId, message },
     "Link fixer",
   );
   return data.response;

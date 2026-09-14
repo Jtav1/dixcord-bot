@@ -161,7 +161,11 @@ async function onTryLinkFixer() {
   linkFixerLoading.value = true;
   linkFixerChecked.value = false;
   try {
-    linkFixerResult.value = await testLinkFixer(linkFixerInput.value);
+    linkFixerResult.value = await testLinkFixer(
+      currentApp.value,
+      currentGuildId.value,
+      linkFixerInput.value,
+    );
     linkFixerChecked.value = true;
   } catch (err) {
     notify(err instanceof Error ? err.message : "Failed to test link fixer", {

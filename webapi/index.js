@@ -402,7 +402,7 @@ app.get("/", publicLimiter, (req, res) => {
         authRequired: true,
         routes: [
           "POST /api/bot-responses/fortune",
-          "POST /api/bot-responses/link-fixer (body: { message })",
+          "POST /api/bot-responses/link-fixer (body: { message, app, guildId })",
         ],
       },
       messageProcessing: {

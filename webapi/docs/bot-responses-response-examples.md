@@ -24,6 +24,8 @@
 
 ## POST /api/bot-responses/link-fixer
 
+Body: `{ message, app, guildId }`. `twitter_fix_enabled` is read from that server's `guild_config`.
+
 **200 OK** (link was fixed)
 
 ```json

@@ -79,7 +79,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | PUT | `/api/users/me` | ✓ | Update profile (name, password) |
 | DELETE | `/api/users/me` | ✓ | Delete account |
 | POST | `/api/bot-responses/fortune` | ✓ | Random 8-ball fortune |
-| POST | `/api/bot-responses/link-fixer` | ✓ | Fix embed-friendly link (body: `{ message }`) |
+| POST | `/api/bot-responses/link-fixer` | ✓ | Fix embed-friendly link (body: `{ message, app, guildId }`) |
 | POST | `/api/message-processing/emoji-count` | ✓ | Record emoji usage / +/- reply |
 | POST | `/api/message-processing/plusminus` | ✓ | Record plus/minus (message or reaction) |
 | POST | `/api/message-processing/count-repost` | ✓ | Record or withdraw repost accusation |

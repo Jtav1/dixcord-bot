@@ -9761,15 +9761,28 @@
           "Bot Responses"
         ],
         "summary": "Rewrite a social link to an embed-friendly host if triggered",
-        "description": "Returns an empty response string when the message does not contain a supported trigger/link combination.",
+        "description": "Returns an empty response string when the message does not contain a supported trigger/link combination, or when twitter_fix_enabled is off for this server.",
         "requestBody": {
-          "required": false,
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "app",
+                  "guildId"
+                ],
                 "properties": {
                   "message": {
+                    "type": "string"
+                  },
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
+                  "guildId": {
                     "type": "string"
                   }
                 }
@@ -9798,6 +9811,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
