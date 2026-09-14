@@ -43,6 +43,7 @@
             :items="roleItems"
             item-title="name"
             item-value="id"
+            :return-object="false"
             multiple
             chips
             closable-chips
@@ -68,6 +69,7 @@
             :items="channelItems"
             item-title="title"
             item-value="value"
+            :return-object="false"
             density="comfortable"
             variant="outlined"
             hide-details
@@ -159,30 +161,17 @@ const channelItems = computed(() =>
 );
 /** Role objects as returned by GET /api/guild ({id,name,color,position,mentionable,hoisted}). */
 const roleItems = computed(() => props.roles);
-/** id -> role object, for resolving already-selected chip values back to their role. */
-const roleById = computed(() => new Map(props.roles.map((role) => [role.id, role])));
 
 /**
- * VCombobox hardcodes returnObject: true, and its item-matching explicitly skips the items
- * list whenever the model value is a string (see Vuetify's list-items transformIn) — so
- * already-selected chips, bound to bare role-id strings, never resolve to the item object on
- * their own. Look the id up ourselves; a miss means the admin free-typed an id with no synced
- * role behind it.
- * @param {object|string} item
- * @returns {object|null}
- */
-function resolveRole(item) {
-  if (typeof item === "string") return roleById.value.get(item) ?? null;
-  return item ?? null;
-}
-
-/**
+ * VCombobox items are either a matched role object (`return-object="false"` is required for
+ * this — without it, Vuetify's own item-matching skips the lookup whenever the model value is a
+ * string, so a role never resolves to its item), or (freeSolo, when nothing is synced) a bare
+ * string the admin typed directly — handle both.
  * @param {object|string} item
  * @returns {string}
  */
 function roleLabel(item) {
-  const role = resolveRole(item);
-  return role ? role.name : typeof item === "string" ? item : "";
+  return typeof item === "string" ? item : (item?.name ?? "");
 }
 
 /**
@@ -190,7 +179,7 @@ function roleLabel(item) {
  * @returns {Record<string, string>}
  */
 function roleChipStyle(item) {
-  const color = resolveRole(item)?.color;
+  const color = typeof item === "string" ? null : item?.color;
   return color ? { color, borderColor: color } : {};
 }
 

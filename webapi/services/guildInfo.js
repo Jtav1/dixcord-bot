@@ -82,6 +82,51 @@ export async function attachRoleObjects(rows, { app: fallbackApp } = {}) {
 }
 
 /**
+ * Batch-resolve raw channel id strings into their full guild_channels row, mirroring
+ * attachRoleObjects for roles. A channel id with no matching guild_channels row (deleted or
+ * never synced) resolves to a placeholder ({ id, name: null, ... }) so the id stays visible
+ * instead of silently disappearing.
+ * @param {Array<Record<string, unknown> & { channelIds?: unknown[], app?: string }>} rows
+ * @param {{ app?: string }} [options] Fallback app for rows that don't carry their own `app` column.
+ * @returns {Promise<Array<Record<string, unknown>>>}
+ */
+export async function attachChannelObjects(rows, { app: fallbackApp } = {}) {
+  const idSet = new Set();
+  for (const row of rows) {
+    for (const id of row.channelIds ?? []) idSet.add(String(id));
+  }
+
+  let byAppId = new Map();
+  if (idSet.size > 0) {
+    const ids = [...idSet];
+    const placeholders = ids.map(() => "?").join(",");
+    const [channelRows] = await db.query(
+      `SELECT app, id, name, type, position, parent_id AS parentId FROM guild_channels WHERE id IN (${placeholders})`,
+      ids,
+    );
+    byAppId = new Map((channelRows ?? []).map((c) => [`${c.app}:${c.id}`, c]));
+  }
+
+  return rows.map((row) => {
+    const app = row.app ?? fallbackApp;
+    const channelIds = (row.channelIds ?? []).map((id) => {
+      const key = `${app}:${String(id)}`;
+      return (
+        byAppId.get(key) ?? {
+          id: String(id),
+          app,
+          name: null,
+          type: null,
+          position: null,
+          parentId: null,
+        }
+      );
+    });
+    return { ...row, channelIds };
+  });
+}
+
+/**
  * Upsert a full guild snapshot: guild_info row, and a full replace of that guild's
  * guild_channels/guild_roles rows.
  * @param {{ app: string, guildId: string, guild: Record<string, unknown>, channels: Array<Record<string, unknown>>, roles: Array<Record<string, unknown>> }} payload
