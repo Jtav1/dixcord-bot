@@ -63,6 +63,7 @@ const router = express.Router();
  *                     properties:
  *                       id: { type: integer }
  *                       name: { type: string }
+ *                       discordHandle: { type: string, description: "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row." }
  *                 total: { type: integer }
  *                 limit: { type: integer }
  *                 offset: { type: integer }
@@ -125,6 +126,7 @@ router.get("/", authenticate, async (req, res) => {
  *                   properties:
  *                     id: { type: integer }
  *                     name: { type: string }
+ *                     discordHandle: { type: string, description: "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row." }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -196,6 +198,7 @@ router.get("/:id", authenticate, async (req, res) => {
  *                   properties:
  *                     id: { type: integer }
  *                     name: { type: string }
+ *                     discordHandle: { type: string, description: "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row." }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -279,6 +282,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  *                   properties:
  *                     id: { type: integer }
  *                     name: { type: string }
+ *                     discordHandle: { type: string, description: "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row." }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':

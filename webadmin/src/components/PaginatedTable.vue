@@ -8,26 +8,37 @@
       <v-table class="glass-card">
         <thead>
           <tr>
+            <th v-if="$slots.expanded" style="width: 40px" />
             <th v-for="header in headers" :key="header.key">{{ header.title }}</th>
             <th v-if="$slots.actions" class="text-right">Actions</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!items.length">
-            <td :colspan="headers.length + ($slots.actions ? 1 : 0)" class="text-medium-emphasis">
+            <td :colspan="colspan" class="text-medium-emphasis">
               {{ emptyText }}
             </td>
           </tr>
-          <tr v-for="item in items" :key="item[itemKey]">
-            <td v-for="header in headers" :key="header.key">
-              <slot :name="`cell-${header.key}`" :item="item">
-                {{ item[header.key] }}
-              </slot>
-            </td>
-            <td v-if="$slots.actions" class="text-right">
-              <slot name="actions" :item="item" />
-            </td>
-          </tr>
+          <template v-for="item in items" :key="item[itemKey]">
+            <tr>
+              <td v-if="$slots.expanded" style="cursor: pointer" @click="toggleExpanded(item[itemKey])">
+                <v-icon :icon="isExpanded(item[itemKey]) ? 'mdi-chevron-up' : 'mdi-chevron-down'" size="20" />
+              </td>
+              <td v-for="header in headers" :key="header.key">
+                <slot :name="`cell-${header.key}`" :item="item">
+                  {{ item[header.key] }}
+                </slot>
+              </td>
+              <td v-if="$slots.actions" class="text-right">
+                <slot name="actions" :item="item" />
+              </td>
+            </tr>
+            <tr v-if="$slots.expanded && isExpanded(item[itemKey])">
+              <td :colspan="colspan" class="pa-0">
+                <slot name="expanded" :item="item" />
+              </td>
+            </tr>
+          </template>
         </tbody>
       </v-table>
 
@@ -45,7 +56,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed, ref, useSlots } from "vue";
+
+const props = defineProps({
   headers: { type: Array, required: true },
   items: { type: Array, required: true },
   loading: { type: Boolean, default: false },
@@ -57,4 +70,31 @@ defineProps({
 });
 
 const emit = defineEmits(["update:page"]);
+
+const slots = useSlots();
+
+const colspan = computed(
+  () => props.headers.length + (slots.actions ? 1 : 0) + (slots.expanded ? 1 : 0),
+);
+
+const expandedKeys = ref(new Set());
+
+/**
+ * @param {unknown} key
+ * @returns {boolean}
+ */
+function isExpanded(key) {
+  return expandedKeys.value.has(key);
+}
+
+/**
+ * @param {unknown} key
+ * @returns {void}
+ */
+function toggleExpanded(key) {
+  const next = new Set(expandedKeys.value);
+  if (next.has(key)) next.delete(key);
+  else next.add(key);
+  expandedKeys.value = next;
+}
 </script>

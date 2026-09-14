@@ -6,15 +6,18 @@
 import db from "../config/db.js";
 
 /**
- * Serialize a mapping row for API responses.
+ * Serialize a mapping row for API responses. `discordHandle` is included only when the
+ * (legacy, not-auto-dropped) chat_member_mapping.discord_handle column exists and is non-null
+ * for this row — SELECT * naturally omits the property when the column doesn't exist.
  * @param {Record<string, unknown>} row
- * @returns {{ id: number, name: string }}
+ * @returns {{ id: number, name: string, discordHandle?: string }}
  */
 export function serializeUserMappingRow(row) {
-  return {
-    id: Number(row.id),
-    name: String(row.name),
-  };
+  const result = { id: Number(row.id), name: String(row.name) };
+  if (row.discord_handle != null) {
+    result.discordHandle = String(row.discord_handle);
+  }
+  return result;
 }
 
 /**

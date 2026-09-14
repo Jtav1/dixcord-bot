@@ -70,6 +70,26 @@ const definition = {
           error: { type: "string" },
         },
       },
+      GuildRole: {
+        type: "object",
+        description:
+          "A resolved guild_roles row — the shape every webapi response uses for a role, in " +
+          "place of a bare role id. If the id has no matching guild_roles row (deleted or never " +
+          "synced), only id/app are populated and the rest are null.",
+        properties: {
+          id: { type: "string", description: "Discord role snowflake." },
+          app: { type: "string" },
+          name: { type: "string", nullable: true },
+          color: {
+            type: "string",
+            nullable: true,
+            description: "Hex color (e.g. \"#5865f2\"), or null if the role has no color set.",
+          },
+          position: { type: "integer", nullable: true },
+          mentionable: { type: "boolean", nullable: true },
+          hoisted: { type: "boolean", nullable: true },
+        },
+      },
     },
     responses: {
       Unauthorized: {

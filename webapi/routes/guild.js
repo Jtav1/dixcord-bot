@@ -37,7 +37,7 @@ const router = express.Router();
  *                 ok: { type: boolean, enum: [true] }
  *                 guild: { type: object }
  *                 channels: { type: array, items: { type: object } }
- *                 roles: { type: array, items: { type: object } }
+ *                 roles: { type: array, items: { $ref: '#/components/schemas/GuildRole' } }
  *                 emojis: { type: array, items: { type: object } }
  *                 stickers: { type: array, items: { type: object } }
  *                 syncedAt: { type: string }

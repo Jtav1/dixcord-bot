@@ -20,6 +20,68 @@ function toFiniteNumberOrNull(value) {
 }
 
 /**
+ * Discord reports #000000 for a role with no color set (the hex form of color int 0), not a
+ * real color — normalize that (and any falsy value) to null so a non-null `color` always means
+ * the role actually has one set.
+ * @param {unknown} color
+ * @returns {string|null}
+ */
+function normalizeRoleColor(color) {
+  if (!color) return null;
+  const hex = String(color).toLowerCase();
+  return hex === "#000000" ? null : hex;
+}
+
+/**
+ * Batch-resolve raw role id strings (as stored on guild_members.roles) into their full
+ * guild_roles row. The single point every webapi response should go through before returning
+ * a "role" — never emit a bare role id. A role id with no matching guild_roles row (deleted or
+ * never synced) resolves to a placeholder ({ id, name: null, ... }) so the id stays visible
+ * instead of silently disappearing.
+ * @param {Array<Record<string, unknown> & { roles?: unknown[], app?: string }>} rows
+ * @param {{ app?: string }} [options] Fallback app for rows that don't carry their own `app` column.
+ * @returns {Promise<Array<Record<string, unknown>>>}
+ */
+export async function attachRoleObjects(rows, { app: fallbackApp } = {}) {
+  const idSet = new Set();
+  for (const row of rows) {
+    for (const id of row.roles ?? []) idSet.add(String(id));
+  }
+
+  let byAppId = new Map();
+  if (idSet.size > 0) {
+    const ids = [...idSet];
+    const placeholders = ids.map(() => "?").join(",");
+    const [roleRows] = await db.query(
+      `SELECT app, id, name, color, position, mentionable, hoisted FROM guild_roles WHERE id IN (${placeholders})`,
+      ids,
+    );
+    byAppId = new Map(
+      (roleRows ?? []).map((r) => [`${r.app}:${r.id}`, { ...r, color: normalizeRoleColor(r.color) }]),
+    );
+  }
+
+  return rows.map((row) => {
+    const app = row.app ?? fallbackApp;
+    const roles = (row.roles ?? []).map((id) => {
+      const key = `${app}:${String(id)}`;
+      return (
+        byAppId.get(key) ?? {
+          id: String(id),
+          app,
+          name: null,
+          color: null,
+          position: null,
+          mentionable: null,
+          hoisted: null,
+        }
+      );
+    });
+    return { ...row, roles };
+  });
+}
+
+/**
  * Upsert a full guild snapshot: guild_info row, and a full replace of that guild's
  * guild_channels/guild_roles rows.
  * @param {{ app: string, guildId: string, guild: Record<string, unknown>, channels: Array<Record<string, unknown>>, roles: Array<Record<string, unknown>> }} payload
@@ -155,7 +217,7 @@ export async function getGuildSnapshot({ app, guildId } = {}) {
     [resolvedApp, resolvedGuildId],
   );
   const [roleRows] = await db.query(
-    "SELECT id, name, color, position, mentionable, hoisted FROM guild_roles WHERE app = ? AND guild_id = ? ORDER BY position DESC",
+    "SELECT app, id, name, color, position, mentionable, hoisted FROM guild_roles WHERE app = ? AND guild_id = ? ORDER BY position DESC",
     [resolvedApp, resolvedGuildId],
   );
   const [emojiRows] = await db.query(
@@ -181,7 +243,7 @@ export async function getGuildSnapshot({ app, guildId } = {}) {
       createdAt: info.guild_created_at,
     },
     channels: channelRows ?? [],
-    roles: roleRows ?? [],
+    roles: (roleRows ?? []).map((r) => ({ ...r, color: normalizeRoleColor(r.color) })),
     emojis: emojiRows ?? [],
     stickers: stickerRows ?? [],
     syncedAt: info.synced_at,

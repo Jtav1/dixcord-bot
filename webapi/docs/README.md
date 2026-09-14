@@ -131,7 +131,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/leaderboards/emoji/user/:userId?app=discord` | ✓ | Per-user emoji stats |
 | GET | `/api/eight-ball-responses` | ✓ | List eight-ball responses |
 | POST | `/api/eight-ball-responses` | admin | Create eight-ball response |
-| GET | `/api/user-mappings?app=discord` | ✓ | List user mappings (id, name only) |
+| GET | `/api/user-mappings?app=discord` | ✓ | List user mappings (id, name, and discordHandle if that legacy column exists and is non-null) |
 | GET | `/api/pin-history` | ✓ | Pin history log |
 | GET | `/api/statistics` | ✓ | Aggregate usage statistics |
 | GET | `/api/system/status?app=&guildId=` | ✓ | System and bot status; `status.bot` scoped to one server when both params given, else most-recently-seen; `status.bots` always lists every known server |
@@ -142,7 +142,11 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/guild/sync` | ✓ | Push a full guild snapshot (body: `{ app, guildId, guild, channels, roles }`); auto-seeds default config for brand-new servers |
 | GET | `/api/guild-members?app=&guildId=` | ✓ | List one server's members (guildId optional: omit for all-guilds dedup lookup); unlinked members have null id/name |
 | GET | `/api/guild-members/user/:chatMemberMappingId` | ✓ | Every server a given internal user id belongs to |
-| GET | `/api/guild-members/unlinked?app=&guildId=` | admin | Membership rows with no member_aliases link yet |
+| GET | `/api/guild-members/unlinked?app=&guildId=&search=` | admin | Membership rows with no member_aliases link yet |
+| GET | `/api/guild-members/all?app=&guildId=&search=` | admin | Every membership row, linked or not, for the manual-link picker (includes linkedMappingId/Name) |
+| GET | `/api/guild-members/aliases/:chatMemberMappingId` | admin | Membership rows currently linked (member_aliases) to this identity |
+| POST | `/api/guild-members/:guildMemberId/link` | admin | Link (or move) a guild_member to a chat_member_mapping identity (body: `{ chatMemberMappingId }`) |
+| DELETE | `/api/guild-members/:guildMemberId/link` | admin | Unlink a guild_member from its identity |
 | POST | `/api/guild-members/sync` | ✓ | Upsert a server's membership list (body: `{ app, guildId, members }`); never removes members, safe for a full roster or a single incremental push |
 | GET | `/api/events/plusplus` | ✓ | Raw plusplus events |
 | GET | `/api/events/reposts` | ✓ | Raw repost events |

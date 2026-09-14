@@ -50,7 +50,11 @@
             variant="outlined"
             hide-details
             :placeholder="roleItems.length ? undefined : 'No synced roles — enter role IDs'"
-          />
+          >
+            <template #chip="{ item, props: chipProps }">
+              <v-chip v-bind="chipProps" variant="outlined" :text="item.title" :style="roleChipStyle(item.color)" />
+            </template>
+          </v-combobox>
           <v-combobox
             v-else-if="isChannelPicker(entry.config)"
             v-model="draft[entry.config]"
@@ -147,8 +151,16 @@ const channelItems = computed(() =>
   })),
 );
 const roleItems = computed(() =>
-  props.roles.map((role) => ({ title: role.name, value: role.id })),
+  props.roles.map((role) => ({ title: role.name, value: role.id, color: role.color })),
 );
+
+/**
+ * @param {string|null|undefined} color Hex color, or null/undefined if the role has none.
+ * @returns {Record<string, string>}
+ */
+function roleChipStyle(color) {
+  return color ? { color, borderColor: color } : {};
+}
 
 /**
  * @param {string} value JSON-array-of-ids string, e.g. `'["1","2"]'`.
