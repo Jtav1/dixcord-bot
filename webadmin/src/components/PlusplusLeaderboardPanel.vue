@@ -22,7 +22,13 @@
           <v-list density="compact" class="bg-transparent">
             <v-list-item v-for="(row, i) in top" :key="`top-${i}`">
               <v-list-item-title>
-                {{ i + 1 }}. {{ row.string }}
+                {{ i + 1 }}.
+                <UserIdentityDisclosure
+                  v-if="row.typestr === 'user'"
+                  :mapping="mappingByPlatformId.get(row.string)"
+                  :platform-user-id="row.string"
+                />
+                <template v-else>{{ row.string }}</template>
                 <v-chip size="x-small" class="ml-1" variant="tonal">{{ row.typestr }}</v-chip>
               </v-list-item-title>
               <template #append>{{ row.total }}</template>
@@ -37,7 +43,13 @@
           <v-list density="compact" class="bg-transparent">
             <v-list-item v-for="(row, i) in bottom" :key="`bottom-${i}`">
               <v-list-item-title>
-                {{ i + 1 }}. {{ row.string }}
+                {{ i + 1 }}.
+                <UserIdentityDisclosure
+                  v-if="row.typestr === 'user'"
+                  :mapping="mappingByPlatformId.get(row.string)"
+                  :platform-user-id="row.string"
+                />
+                <template v-else>{{ row.string }}</template>
                 <v-chip size="x-small" class="ml-1" variant="tonal">{{ row.typestr }}</v-chip>
               </v-list-item-title>
               <template #append>{{ row.total }}</template>

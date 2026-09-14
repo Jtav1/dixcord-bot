@@ -221,6 +221,7 @@ import {
   updateTriggerResponseLinkFields,
   updateTriggerSelectionMode,
 } from "../lib/triggerResponses.js";
+import { defaultParametersFor } from "../lib/triggerResponseFunctions.js";
 
 const SELECTION_MODES = ["random", "ordered", "weighted"];
 
@@ -501,14 +502,22 @@ async function onCreateTrigger() {
 }
 
 /**
+ * Opens with the response's existing parameters if it has any. Otherwise, pre-fills a blank
+ * template shaped for whichever function is currently selected in the Function dropdown (which
+ * may be an unsaved change, so this reads the live draft, not the last-saved response) — so an
+ * admin who's never touched this dialog can see what keys the function expects.
  * @param {{ linkId: number, response_function_parameters: object|null }} response
  * @returns {void}
  */
 function openParametersDialog(response) {
   parametersTargetLinkId.value = response.linkId;
-  parametersDraft.value = response.response_function_parameters
-    ? JSON.stringify(response.response_function_parameters, null, 2)
-    : "";
+  if (response.response_function_parameters) {
+    parametersDraft.value = JSON.stringify(response.response_function_parameters, null, 2);
+  } else {
+    const selectedFunction = responseDrafts[response.linkId]?.response_function;
+    const defaults = defaultParametersFor(selectedFunction);
+    parametersDraft.value = defaults ? JSON.stringify(defaults, null, 2) : "";
+  }
   parametersError.value = "";
   parametersDialogOpen.value = true;
 }
