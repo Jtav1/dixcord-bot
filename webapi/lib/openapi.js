@@ -90,6 +90,38 @@ const definition = {
           hoisted: { type: "boolean", nullable: true },
         },
       },
+      EmojiFrequency: {
+        type: "object",
+        description:
+          "A resolved emoji_frequency row — the shape every webapi response uses for an emoji " +
+          "or sticker, in place of a bare emoid. If the emoid has no matching emoji_frequency " +
+          "row (deleted), only emoid is populated and the rest are null.",
+        properties: {
+          emoid: { type: "string", description: "Discord emoji/sticker snowflake, or the literal unicode character for a built-in emoji." },
+          app: { type: "string", nullable: true },
+          emoji: { type: "string", nullable: true, description: "Display name (custom emoji/sticker) or the unicode character itself." },
+          frequency: { type: "integer", nullable: true, description: "Global usage count for this emoid." },
+          animated: { type: "integer", nullable: true, enum: [0, 1, null] },
+          type: { type: "string", nullable: true, enum: ["emoji", "sticker", null] },
+        },
+      },
+      ConfigEmojiValue: {
+        type: "object",
+        description:
+          "Resolved value of an \"emoji\"-typed config entry (pin_emoji, plusplus_emoji, " +
+          "minusminus_emoji, repost_emoji). If the stored value matches a synced emoji_frequency " +
+          "row, this is that row (app is the real app name). If it's freeform text an admin typed " +
+          "by hand that was never synced, app/emoid are null and `emoji` holds the raw text — " +
+          "comparisons should fall back to matching that string (see emojisMatch).",
+        properties: {
+          emoid: { type: "string", nullable: true },
+          app: { type: "string", nullable: true },
+          emoji: { type: "string", nullable: true },
+          frequency: { type: "integer", nullable: true },
+          animated: { type: "integer", nullable: true, enum: [0, 1, null] },
+          type: { type: "string", nullable: true, enum: ["emoji", "sticker", null] },
+        },
+      },
     },
     responses: {
       Unauthorized: {

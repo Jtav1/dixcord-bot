@@ -3,7 +3,7 @@
     <v-col cols="12" md="6">
       <h3 class="text-subtitle-1 font-weight-bold mb-2">Top Stickers</h3>
       <PaginatedTable
-        :headers="[{ title: 'Sticker', key: 'emoji' }, { title: 'Uses', key: 'frequency' }]"
+        :headers="[{ title: 'Sticker', key: 'name' }, { title: 'Uses', key: 'uses' }]"
         :items="stickerItems"
         :loading="stickerLoading"
         :error="stickerError"
@@ -11,7 +11,10 @@
         :total-pages="stickerTotalPages"
         empty-text="No sticker usage yet."
         @update:page="loadStickers"
-      />
+      >
+        <template #cell-name="{ item }">{{ item.emoji.emoji ?? item.emoji.emoid }}</template>
+        <template #cell-uses="{ item }">{{ item.emoji.frequency }}</template>
+      </PaginatedTable>
     </v-col>
     <v-col cols="12" md="6">
       <h3 class="text-subtitle-1 font-weight-bold mb-2">Top Users</h3>

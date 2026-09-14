@@ -10,6 +10,8 @@ import {
   requireChatMemberMappingId,
   UNKNOWN_CHAT_MEMBER_ERROR,
 } from "./chatMemberMapping.js";
+import { emojisMatch, resolveConfigEmojiValue } from "./emojiFrequency.js";
+import { getGuildConfigValue } from "./guildConfig.js";
 import { normalizePinLogPayload } from "./pinHistory.js";
 
 /**
@@ -32,10 +34,12 @@ function requireChatAppFromPayload(payload) {
 /**
  * Ensure emoji_frequency has a row for this emoji; increment frequency.
  * If no row exists, insert one with frequency 1.
+ * @param {string} app - e.g. "discord"; emoji_frequency.app has no default, so this is required on insert.
  * @param {string} [emojiType] - Type from request (e.g. 'emoji'); if missing, type is stored as null.
  * @private
  */
 async function ensureAndIncrementEmoji(
+  app,
   emojiId,
   emojiName,
   emojiAnimated,
@@ -64,8 +68,8 @@ async function ensureAndIncrementEmoji(
   } else {
     if (emojiId.length > 0 && emojiName.length > 0) {
       await db.query(
-        "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 1, ?, ?)",
-        [id, name, animated, type],
+        "INSERT INTO emoji_frequency (app, emoid, emoji, frequency, animated, type) VALUES (?, ?, ?, 1, ?, ?)",
+        [app, id, name, animated, type],
       );
     }
   }
@@ -98,8 +102,23 @@ async function upsertUserEmoji(chatMemberMappingId, emojiId) {
 }
 
 /**
+ * @param {{ id?: unknown, name?: unknown }} e - one entry from a countEmoji payload's `emojis` array
+ * @param {string} app
+ * @returns {{ app: string, emoid: string, emoji: string }}
+ * @private
+ */
+function toEmojiObject(e, app) {
+  const name = String(e?.name ?? "");
+  return {
+    app,
+    emoid: e?.id != null ? String(e.id) : name,
+    emoji: name,
+  };
+}
+
+/**
  * Record emoji usage from a message. Optionally records a +/- vote when replying with one plus/minus emoji.
- * @param {object} payload - { app: string, authorId: string (snowflake), emojis: Array<{ name, id? }>, isReply?, repliedUserId? }
+ * @param {object} payload - { app: string, guildId: string, authorId: string (snowflake), emojis: Array<{ name, id? }>, isReply?, repliedUserId? }
  * @returns {Promise<{ ok: boolean, applied?: string, error?: string }>}
  */
 export async function countEmoji(payload) {
@@ -114,35 +133,24 @@ export async function countEmoji(payload) {
     repliedUserId = null,
   } = payload;
 
-  // Fetch plusplus_emoji and minusminus_emoji config values from the database
-  // Assume db.query returns [rows] as in previous functions
-  const [plusRows] = await db.query(
-    "SELECT value FROM configurations WHERE config = 'plusplus_emoji'",
-  );
+  const guildId = String(payload.guildId ?? "").trim();
+  if (!guildId) return { ok: false, error: "guildId is required" };
 
-  const [minusRows] = await db.query(
-    "SELECT value FROM configurations WHERE config = 'minusminus_emoji'",
-  );
-
-  const plusEmojiId =
-    plusRows && plusRows.length > 0 ? String(plusRows[0].value) : null;
-  const minusEmojiId =
-    minusRows && minusRows.length > 0 ? String(minusRows[0].value) : null;
+  // plusplus_emoji/minusminus_emoji are per-guild (guild_config), resolved into emoji objects
+  // (see resolveConfigEmojiValue) so freeform/never-synced values still compare correctly.
+  const [plusValue, minusValue] = await Promise.all([
+    getGuildConfigValue(chatApp, guildId, "plusplus_emoji"),
+    getGuildConfigValue(chatApp, guildId, "minusminus_emoji"),
+  ]);
+  const plusEmoji = await resolveConfigEmojiValue(chatApp, plusValue);
+  const minusEmoji = await resolveConfigEmojiValue(chatApp, minusValue);
 
   if (!authorId || !Array.isArray(emojis) || emojis.length === 0) {
     return { ok: false };
   }
 
-  const plusCount = emojis.filter(
-    (e) =>
-      (e.id && String(e.id) === plusEmojiId) ||
-      (e.name && e.name === plusEmojiId),
-  ).length;
-  const minusCount = emojis.filter(
-    (e) =>
-      (e.id && String(e.id) === minusEmojiId) ||
-      (e.name && e.name === minusEmojiId),
-  ).length;
+  const plusCount = emojis.filter((e) => emojisMatch(toEmojiObject(e, chatApp), plusEmoji)).length;
+  const minusCount = emojis.filter((e) => emojisMatch(toEmojiObject(e, chatApp), minusEmoji)).length;
 
   const doPlusMinus = isReply && repliedUserId && plusCount + minusCount === 1;
 
@@ -175,7 +183,7 @@ export async function countEmoji(payload) {
   for (const em of emojis) {
     const name = String(em.name ?? "?");
     const id = em.id != null ? String(em.id) : name;
-    await ensureAndIncrementEmoji(id, name, em.animated, em.type);
+    await ensureAndIncrementEmoji(chatApp, id, name, em.animated, em.type);
     if (id && authorId) {
       await upsertUserEmoji(authorMap.id, id);
     }
@@ -206,7 +214,7 @@ export async function countSticker(payload) {
   for (const st of stickers) {
     const name = String(st.name ?? "?");
     const id = st.id != null ? String(st.id) : name;
-    await ensureAndIncrementEmoji(id, name, false, "sticker");
+    await ensureAndIncrementEmoji(chatApp, id, name, false, "sticker");
     if (id && authorId) {
       await upsertUserEmoji(authorMap.id, id);
     }
@@ -420,14 +428,16 @@ export async function countRepost(payload) {
 /**
  * Sync guild custom emojis or stickers into `emoji_frequency`.
  * Rows are distinguished by `emoji_frequency.type`: `"emoji"` or `"sticker"` (not Discord API subtype).
- * Deletes only zero-frequency rows of the same asset kind, then inserts missing ids with frequency 0.
+ * Deletes only zero-frequency rows of the same asset kind (and app), then inserts missing ids with frequency 0.
  * @param {Array<{ id: string, name: string, animated?: boolean }>} items - From guild.emojis / guild.stickers
  * @param {"emoji"|"sticker"} assetKind
+ * @param {string} app - e.g. "discord"; emoji_frequency.app has no default, so this is required on insert.
  * @returns {Promise<{ ok: boolean, imported?: number }>} imported = new rows added (existing emoids skipped)
  */
-export async function importGuildAssetFrequencyList(items, assetKind) {
+export async function importGuildAssetFrequencyList(items, assetKind, app) {
   if (!Array.isArray(items)) return { ok: false };
   if (assetKind !== "emoji" && assetKind !== "sticker") return { ok: false };
+  if (!isChatMemberAppSupported(app)) return { ok: false };
 
   const list = items.filter(
     (e) => e != null && (e.id != null || e.name != null),
@@ -435,11 +445,13 @@ export async function importGuildAssetFrequencyList(items, assetKind) {
 
   if (assetKind === "emoji") {
     await db.query(
-      "DELETE FROM emoji_frequency WHERE frequency = 0 AND (type = 'emoji' OR type IS NULL)",
+      "DELETE FROM emoji_frequency WHERE frequency = 0 AND (type = 'emoji' OR type IS NULL) AND app = ?",
+      [app],
     );
   } else {
     await db.query(
-      "DELETE FROM emoji_frequency WHERE frequency = 0 AND type = 'sticker'",
+      "DELETE FROM emoji_frequency WHERE frequency = 0 AND type = 'sticker' AND app = ?",
+      [app],
     );
   }
 
@@ -459,13 +471,13 @@ export async function importGuildAssetFrequencyList(items, assetKind) {
     if (assetKind === "emoji") {
       const animated = e.animated ? 1 : 0;
       await db.query(
-        "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 0, ?, ?)",
-        [emoid, name, animated, "emoji"],
+        "INSERT INTO emoji_frequency (app, emoid, emoji, frequency, animated, type) VALUES (?, ?, ?, 0, ?, ?)",
+        [app, emoid, name, animated, "emoji"],
       );
     } else {
       await db.query(
-        "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 0, 0, ?)",
-        [emoid, name, "sticker"],
+        "INSERT INTO emoji_frequency (app, emoid, emoji, frequency, animated, type) VALUES (?, ?, ?, 0, 0, ?)",
+        [app, emoid, name, "sticker"],
       );
     }
     imported++;

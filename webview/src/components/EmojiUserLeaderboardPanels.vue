@@ -77,22 +77,22 @@
                   <tbody>
                     <tr
                       v-for="row in statsFor(entry)"
-                      :key="row.emoid"
+                      :key="row.emoji.emoid"
                     >
                       <td class="sample-col">
                         <div
                           class="emoji-sample-cell"
-                          :title="emojiDisplayName(row)"
+                          :title="emojiDisplayName(row.emoji)"
                         >
                           <span
-                            v-if="!isCustomDiscordEmoji(row)"
+                            v-if="!isCustomDiscordEmoji(row.emoji)"
                             class="emoji-sample emoji-sample--unicode"
                             aria-hidden="true"
                           >
-                            {{ row.emoji }}
+                            {{ row.emoji.emoji }}
                           </span>
                           <v-icon
-                            v-else-if="isImageMissing(row)"
+                            v-else-if="isImageMissing(row.emoji)"
                             icon="mdi-emoticon-outline"
                             size="24"
                             class="text-medium-emphasis"
@@ -100,16 +100,16 @@
                           />
                           <img
                             v-else
-                            :src="emojiImageUrl(row)"
-                            :alt="emojiDisplayName(row)"
+                            :src="emojiImageUrl(row.emoji)"
+                            :alt="emojiDisplayName(row.emoji)"
                             class="emoji-sample emoji-sample--image"
                             width="24"
                             height="24"
-                            @error="markImageMissing(row)"
+                            @error="markImageMissing(row.emoji)"
                           />
                         </div>
                       </td>
-                      <td class="text-body-2">{{ emojiDisplayName(row) }}</td>
+                      <td class="text-body-2">{{ emojiDisplayName(row.emoji) }}</td>
                       <td class="text-body-2 text-right frequency-col">
                         {{ formatFrequency(row.frequency) }}
                       </td>
@@ -270,12 +270,12 @@ function formatFrequency(value) {
 }
 
 /**
- * Record a failed image load for a custom emoji row.
- * @param {{ emoid?: string|number }} row Emoji stats row.
+ * Record a failed image load for a custom emoji.
+ * @param {{ emoid?: string|number }} emoji Resolved emoji object (emoji_frequency row).
  * @returns {void}
  */
-function markImageMissing(row) {
-  const id = String(row.emoid ?? "");
+function markImageMissing(emoji) {
+  const id = String(emoji?.emoid ?? "");
   if (!id) return;
   const next = new Set(missingImageIds.value);
   next.add(id);
@@ -284,11 +284,11 @@ function markImageMissing(row) {
 
 /**
  * Whether a custom emoji image failed to load.
- * @param {{ emoid?: string|number }} row Emoji stats row.
+ * @param {{ emoid?: string|number }} emoji Resolved emoji object (emoji_frequency row).
  * @returns {boolean}
  */
-function isImageMissing(row) {
-  return missingImageIds.value.has(String(row.emoid ?? ""));
+function isImageMissing(emoji) {
+  return missingImageIds.value.has(String(emoji?.emoid ?? ""));
 }
 
 /**

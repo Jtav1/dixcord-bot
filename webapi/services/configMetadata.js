@@ -11,8 +11,8 @@ export const CONFIG_METADATA = Object.freeze({
     defaultValue: "1",
   },
   pin_emoji: {
-    description: "Emoji name or ID used for pin reactions",
-    type: "string",
+    description: "Emoji used for pin reactions",
+    type: "emoji",
     requiresBotRestart: false,
     defaultValue: "",
   },
@@ -23,8 +23,8 @@ export const CONFIG_METADATA = Object.freeze({
     defaultValue: "",
   },
   repost_emoji: {
-    description: "Discord emoji ID for repost accusation reactions",
-    type: "string",
+    description: "Emoji used for repost accusation reactions",
+    type: "emoji",
     requiresBotRestart: false,
     defaultValue: "",
   },
@@ -36,14 +36,14 @@ export const CONFIG_METADATA = Object.freeze({
     defaultValue: "",
   },
   plusplus_emoji: {
-    description: "Discord emoji ID for plus votes",
-    type: "string",
+    description: "Emoji used for plus votes",
+    type: "emoji",
     requiresBotRestart: false,
     defaultValue: "",
   },
   minusminus_emoji: {
-    description: "Discord emoji ID for minus votes",
-    type: "string",
+    description: "Emoji used for minus votes",
+    type: "emoji",
     requiresBotRestart: false,
     defaultValue: "",
   },
@@ -118,6 +118,19 @@ export const CONFIG_METADATA = Object.freeze({
     defaultValue: "",
   },
 });
+
+const CONFIG_KEY_ORDER = Object.keys(CONFIG_METADATA);
+
+/**
+ * Display-order index for a config key, matching CONFIG_METADATA's declaration order above
+ * (e.g. plusplus_emoji before minusminus_emoji). Unknown keys sort last.
+ * @param {string} config
+ * @returns {number}
+ */
+export function configDisplayOrder(config) {
+  const index = CONFIG_KEY_ORDER.indexOf(config);
+  return index === -1 ? CONFIG_KEY_ORDER.length : index;
+}
 
 /**
  * Default {config, value} entries for seeding a new server's guild_config rows.

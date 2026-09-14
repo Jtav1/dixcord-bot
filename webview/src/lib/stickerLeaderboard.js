@@ -36,7 +36,7 @@ async function parseJsonResponse(res, context) {
  * Fetch one page of the sticker usage leaderboard from webapi.
  * @param {number} [offset=0] Rows to skip.
  * @param {number} [limit=STICKER_PAGE_SIZE] Page size (max 50).
- * @returns {Promise<{ entries: Array<{ emoji: string, frequency: number, emoid: string }>, total: number, limit: number, offset: number }>}
+ * @returns {Promise<{ entries: Array<{ emoji: { emoid: string, app: string, emoji: string, frequency: number, animated: number, type: string } }>, total: number, limit: number, offset: number }>} each row's `emoji` is the full emoji_frequency row — use `.emoji.emoji` for the name, `.emoji.frequency` for its count.
  */
 export async function fetchStickerLeaderboardPage(
   offset = 0,
@@ -102,7 +102,7 @@ export async function fetchStickerUserLeaderboardPage(
  * Fetch full per-user sticker frequency breakdown from webapi.
  * @param {string} userId Discord snowflake.
  * @param {string} [app="discord"] Chat app id.
- * @returns {Promise<Array<{ emoid: string, emoji: string, frequency: number }>>}
+ * @returns {Promise<Array<{ frequency: number, emoji: { emoid: string, app: string, emoji: string, frequency: number, animated: number, type: string } }>>} `frequency` is this user's own usage count; `emoji` is the full emoji_frequency row (its own `frequency` is the sticker's global count, a different number).
  */
 export async function fetchUserStickerStats(userId, app = "discord") {
   const params = new URLSearchParams({ app });
@@ -124,19 +124,19 @@ export async function fetchUserStickerStats(userId, app = "discord") {
 
 /**
  * Local image URL for a sticker (every row is a custom asset, unlike emoji which can be unicode).
- * @param {{ emoji?: string }} row Sticker leaderboard row.
+ * @param {{ emoji?: string }|null|undefined} emoji Resolved emoji object (emoji_frequency row).
  * @returns {string}
  */
-export function stickerImageUrl(row) {
-  const name = String(row?.emoji ?? "");
+export function stickerImageUrl(emoji) {
+  const name = String(emoji?.emoji ?? "");
   return `/files/Stickers/${encodeURIComponent(name)}.png`;
 }
 
 /**
  * Human-readable sticker label for the name column.
- * @param {{ emoji?: string }} row Sticker leaderboard row.
+ * @param {{ emoji?: string }|null|undefined} emoji Resolved emoji object (emoji_frequency row).
  * @returns {string}
  */
-export function stickerDisplayName(row) {
-  return String(row?.emoji ?? "");
+export function stickerDisplayName(emoji) {
+  return String(emoji?.emoji ?? "");
 }

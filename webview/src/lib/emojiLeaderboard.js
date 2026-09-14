@@ -33,7 +33,7 @@ async function parseJsonResponse(res, context) {
  * Fetch one page of the emoji usage leaderboard from webapi.
  * @param {number} [offset=0] Rows to skip.
  * @param {number} [limit=EMOJI_PAGE_SIZE] Page size (max 50).
- * @returns {Promise<{ entries: Array<{ emoji: string, frequency: number, emoid: string, animated: number }>, total: number, limit: number, offset: number }>}
+ * @returns {Promise<{ entries: Array<{ emoji: { emoid: string, app: string, emoji: string, frequency: number, animated: number, type: string } }>, total: number, limit: number, offset: number }>} each row's `emoji` is the full emoji_frequency row — use `.emoji.emoji` for the name, `.emoji.frequency` for its count.
  */
 export async function fetchEmojiLeaderboardPage(
   offset = 0,
@@ -99,7 +99,7 @@ export async function fetchEmojiUserLeaderboardPage(
  * Fetch full per-user emoji frequency breakdown from webapi.
  * @param {string} userId Discord snowflake.
  * @param {string} [app="discord"] Chat app id.
- * @returns {Promise<Array<{ emoid: string, emoji: string, frequency: number, animated: boolean|number }>>}
+ * @returns {Promise<Array<{ frequency: number, emoji: { emoid: string, app: string, emoji: string, frequency: number, animated: boolean|number, type: string } }>>} `frequency` is this user's own usage count; `emoji` is the full emoji_frequency row (its own `frequency` is the emoji's global count, a different number).
  */
 export async function fetchUserEmojiStats(userId, app = "discord") {
   const params = new URLSearchParams({ app });
@@ -136,33 +136,33 @@ export function resolveUserLabel(entry, nameMap) {
 }
 
 /**
- * Whether a leaderboard row is a custom Discord emoji (numeric emoid).
- * @param {{ emoid?: string|number }} row Emoji leaderboard row.
+ * Whether a resolved emoji is a custom Discord emoji (numeric emoid), as opposed to unicode.
+ * @param {{ emoid?: string|number|null }|null|undefined} emoji Resolved emoji object (emoji_frequency row).
  * @returns {boolean}
  */
-export function isCustomDiscordEmoji(row) {
-  return !Number.isNaN(Number(row?.emoid));
+export function isCustomDiscordEmoji(emoji) {
+  return !Number.isNaN(Number(emoji?.emoid));
 }
 
 /**
  * Local image URL for a custom Discord emoji, or null for unicode emojis.
- * @param {{ emoji?: string, emoid?: string|number, animated?: number|boolean }} row Emoji leaderboard row.
+ * @param {{ emoji?: string, emoid?: string|number|null, animated?: number|boolean }|null|undefined} emoji Resolved emoji object (emoji_frequency row).
  * @returns {string|null}
  */
-export function emojiImageUrl(row) {
-  if (!isCustomDiscordEmoji(row)) return null;
+export function emojiImageUrl(emoji) {
+  if (!isCustomDiscordEmoji(emoji)) return null;
 
-  const name = String(row.emoji ?? "");
-  const ext = row.animated ? "gif" : "png";
+  const name = String(emoji.emoji ?? "");
+  const ext = emoji.animated ? "gif" : "png";
   return `/files/Emojis/${encodeURIComponent(name)}.${ext}`;
 }
 
 /**
  * Human-readable emoji label for the name column.
- * @param {{ emoji?: string, emoid?: string|number }} row Emoji leaderboard row.
+ * @param {{ emoji?: string, emoid?: string|number|null }|null|undefined} emoji Resolved emoji object (emoji_frequency row).
  * @returns {string}
  */
-export function emojiDisplayName(row) {
-  const name = String(row.emoji ?? "");
-  return isCustomDiscordEmoji(row) ? `:${name}:` : name;
+export function emojiDisplayName(emoji) {
+  const name = String(emoji?.emoji ?? "");
+  return isCustomDiscordEmoji(emoji) ? `:${name}:` : name;
 }

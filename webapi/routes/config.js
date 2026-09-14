@@ -65,24 +65,39 @@ function resolveGuildScope(req) {
  *                 ok: { type: boolean, enum: [true] }
  *                 config:
  *                   type: object
- *                   description: Map of config name to value.
- *                   additionalProperties: { type: string }
+ *                   description: >
+ *                     Map of config name to value. "emoji"-typed keys (pin_emoji,
+ *                     plusplus_emoji, minusminus_emoji, repost_emoji) resolve to a
+ *                     ConfigEmojiValue object (or null if unset) instead of a plain string.
+ *                   additionalProperties:
+ *                     oneOf:
+ *                       - { type: string }
+ *                       - { $ref: '#/components/schemas/ConfigEmojiValue' }
+ *                       - { type: "null" }
  *                 entries:
  *                   type: array
  *                   items:
  *                     type: object
  *                     properties:
  *                       config: { type: string }
- *                       value: { type: string }
+ *                       value:
+ *                         oneOf:
+ *                           - { type: string }
+ *                           - { $ref: '#/components/schemas/ConfigEmojiValue' }
+ *                           - { type: "null" }
  *                 entriesWithMeta:
  *                   type: array
  *                   items:
  *                     type: object
  *                     properties:
  *                       config: { type: string }
- *                       value: { type: string }
+ *                       value:
+ *                         oneOf:
+ *                           - { type: string }
+ *                           - { $ref: '#/components/schemas/ConfigEmojiValue' }
+ *                           - { type: "null" }
  *                       description: { type: string, nullable: true }
- *                       type: { type: string }
+ *                       type: { type: string, description: "e.g. string, integer, boolean, json, emoji." }
  *                       requiresBotRestart: { type: boolean }
  *                       deprecated: { type: boolean }
  *       '400':

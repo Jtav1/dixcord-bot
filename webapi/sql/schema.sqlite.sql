@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
 );
 
 CREATE TABLE IF NOT EXISTS emoji_frequency (
+  app TEXT NOT NULL,
   emoid TEXT PRIMARY KEY,
   emoji TEXT NOT NULL,
   frequency INTEGER NOT NULL DEFAULT 0,

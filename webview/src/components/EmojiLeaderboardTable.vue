@@ -28,24 +28,24 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(entry, index) in entries" :key="entry.emoid">
+          <tr v-for="(entry, index) in entries" :key="entry.emoji.emoid">
             <td class="text-body-2 rank-col">
               {{ offset + index + 1 }}
             </td>
             <td class="sample-col">
               <div
                 class="emoji-sample-cell"
-                :title="emojiDisplayName(entry)"
+                :title="emojiDisplayName(entry.emoji)"
               >
                 <span
-                  v-if="!isCustomDiscordEmoji(entry)"
+                  v-if="!isCustomDiscordEmoji(entry.emoji)"
                   class="emoji-sample emoji-sample--unicode"
                   aria-hidden="true"
                 >
-                  {{ entry.emoji }}
+                  {{ entry.emoji.emoji }}
                 </span>
                 <v-icon
-                  v-else-if="isImageMissing(entry)"
+                  v-else-if="isImageMissing(entry.emoji)"
                   icon="mdi-emoticon-outline"
                   size="32"
                   class="text-medium-emphasis"
@@ -53,18 +53,18 @@
                 />
                 <img
                   v-else
-                  :src="emojiImageUrl(entry)"
-                  :alt="emojiDisplayName(entry)"
+                  :src="emojiImageUrl(entry.emoji)"
+                  :alt="emojiDisplayName(entry.emoji)"
                   class="emoji-sample emoji-sample--image"
                   width="32"
                   height="32"
-                  @error="markImageMissing(entry)"
+                  @error="markImageMissing(entry.emoji)"
                 />
               </div>
             </td>
-            <td class="text-body-2">{{ emojiDisplayName(entry) }}</td>
+            <td class="text-body-2">{{ emojiDisplayName(entry.emoji) }}</td>
             <td class="text-body-2 text-right frequency-col">
-              {{ formatFrequency(entry.frequency) }}
+              {{ formatFrequency(entry.emoji.frequency) }}
             </td>
           </tr>
         </tbody>
@@ -152,12 +152,12 @@ function formatFrequency(value) {
 }
 
 /**
- * Record a failed image load for a custom emoji row.
- * @param {{ emoid?: string|number }} entry Emoji leaderboard row.
+ * Record a failed image load for a custom emoji.
+ * @param {{ emoid?: string|number }} emoji Resolved emoji object (emoji_frequency row).
  * @returns {void}
  */
-function markImageMissing(entry) {
-  const id = String(entry.emoid ?? "");
+function markImageMissing(emoji) {
+  const id = String(emoji?.emoid ?? "");
   if (!id) return;
   const next = new Set(missingImageIds.value);
   next.add(id);
@@ -166,11 +166,11 @@ function markImageMissing(entry) {
 
 /**
  * Whether a custom emoji image failed to load.
- * @param {{ emoid?: string|number }} entry Emoji leaderboard row.
+ * @param {{ emoid?: string|number }} emoji Resolved emoji object (emoji_frequency row).
  * @returns {boolean}
  */
-function isImageMissing(entry) {
-  return missingImageIds.value.has(String(entry.emoid ?? ""));
+function isImageMissing(emoji) {
+  return missingImageIds.value.has(String(emoji?.emoid ?? ""));
 }
 </script>
 

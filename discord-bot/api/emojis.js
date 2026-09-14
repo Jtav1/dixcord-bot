@@ -1,4 +1,5 @@
 import * as api from "./client.js";
+import { guildId } from "../configVars.js";
 
 /**
  * Sync server emoji list with the web API.
@@ -15,12 +16,14 @@ export const importEmojiList = async (emojiObjectList) => {
     animated: Boolean(e.animated),
     type: "emoji",
   }));
-  await api.post("/api/message-processing/emoji-import", { emojis });
+  await api.post("/api/message-processing/emoji-import", { app: "discord", emojis });
   console.log("bot: emoji import via webapi complete");
 };
 
 /**
  * Record emoji usage. POST /api/message-processing/emoji-count
+ * guildId (this bot's own, from configVars) is required so webapi can resolve this server's
+ * plusplus_emoji/minusminus_emoji from guild_config for the reply-vote comparison.
  * @param {string} emojiName - Emoji name
  * @param {string} [emojiId] - Emoji ID (optional for unicode)
  * @param {string|null} [userid] - User who used the emoji (author/reactor)
@@ -33,6 +36,7 @@ export const countEmoji = async (emojiName, emojiId, userid = null) => {
   if (emojis.length === 0) return;
   await api.post("/api/message-processing/emoji-count", {
     app: "discord",
+    guildId,
     authorId,
     emojis,
   });
@@ -41,7 +45,7 @@ export const countEmoji = async (emojiName, emojiId, userid = null) => {
 /**
  * Top used emojis. POST /api/leaderboards/emoji
  * @param {number} number - Limit (default 5, max 50)
- * @returns {Promise<Array<{ emoji: string, frequency: number, emoid: string, animated?: number }>>}
+ * @returns {Promise<Array<{ emoji: { emoid: string, app: string, emoji: string, frequency: number, animated: number, type: string } }>>} `emoji` is the full emoji_frequency row.
  */
 export const getTopEmoji = async (number = 5) => {
   const { data } = await api.post("/api/leaderboards/emoji", {

@@ -3,6 +3,7 @@ import { messagePinner } from "./messagePinner.js";
 import { doplus, dominus } from "./plusplus.js";
 import { countEmoji, countRepost, uncountRepost } from "../../../api/emojis.js";
 import { incrementCounter } from "../../../utilities/metrics.js";
+import { emojisMatch, toEmojiObject } from "../../../utilities/emojiCompare.js";
 
 /** Fetch a random pin quip from the API; returns fallback if unavailable. */
 async function getRandomPinQuip() {
@@ -35,7 +36,7 @@ async function resolveMessage(reaction) {
  * Handle messageReactionAdd: pin threshold, plus/minus votes, emoji counting, repost counting.
  * @param {MessageReaction} reaction
  * @param {User} user
- * @param {{ client: Client, pinEmoji: string, pinThreshold: number, plusEmoji: string, minusEmoji: string, repostEmojiId: string, pinSystemEnabled: boolean, plusPlusEnabled: boolean, emojiTrackingEnabled: boolean, repostDetectionEnabled: boolean }} options
+ * @param {{ client: Client, pinEmoji: object|null, pinThreshold: number, plusEmoji: object|null, minusEmoji: object|null, repostEmojiId: object|null, pinSystemEnabled: boolean, plusPlusEnabled: boolean, emojiTrackingEnabled: boolean, repostDetectionEnabled: boolean }} options - the *Emoji options are resolved emoji objects (see configStore.js), not bare strings.
  */
 export async function handleReactionAdd(reaction, user, options) {
   const {
@@ -62,9 +63,12 @@ export async function handleReactionAdd(reaction, user, options) {
     );
     return;
   }
+  const emojiObj = toEmojiObject(emoji);
 
   const allReactions = message.reactions.valueOf();
-  const pinReact = allReactions.get(pinEmoji);
+  const pinReact = pinEmoji
+    ? [...allReactions.values()].find((r) => emojisMatch(toEmojiObject(r.emoji), pinEmoji))
+    : null;
 
   if (pinSystemEnabled && pinReact && pinReact.count === pinThreshold) {
     const res = await messagePinner(message, pinReact, user, client);
@@ -77,7 +81,7 @@ export async function handleReactionAdd(reaction, user, options) {
 
   if (
     plusPlusEnabled &&
-    (emoji.id === plusEmoji || emoji.name === plusEmoji) &&
+    emojisMatch(emojiObj, plusEmoji) &&
     user.id !== message.author.id
   ) {
     await doplus(message.author.id, "user", user.id);
@@ -85,7 +89,7 @@ export async function handleReactionAdd(reaction, user, options) {
 
   if (
     plusPlusEnabled &&
-    (emoji.id === minusEmoji || emoji.name === minusEmoji) &&
+    emojisMatch(emojiObj, minusEmoji) &&
     user.id !== message.author.id
   ) {
     await dominus(message.author.id, "user", user.id);
@@ -93,9 +97,9 @@ export async function handleReactionAdd(reaction, user, options) {
 
   if (
     emojiTrackingEnabled &&
-    emoji.name !== pinEmoji &&
-    emoji.id !== plusEmoji &&
-    emoji.id !== minusEmoji
+    !emojisMatch(emojiObj, pinEmoji) &&
+    !emojisMatch(emojiObj, plusEmoji) &&
+    !emojisMatch(emojiObj, minusEmoji)
   ) {
     if (reaction.partial) {
       // A partial reaction's emoji data isn't fully cached - typically a custom emoji from a
@@ -117,18 +121,15 @@ export async function handleReactionAdd(reaction, user, options) {
     }
   }
 
-  if (repostDetectionEnabled) {
-    const repostReact = allReactions.get(repostEmojiId);
-    if (repostReact) {
-      countRepost(message.author.id, message.id, user.id)
-        .then(() => incrementCounter("repostsDetectedTotal"))
-        .catch((err) => {
-          incrementCounter("apiCallErrorsTotal", "reposts");
-          console.error(
-            `bot: countRepost failed for message ${message.id} (accused ${message.author.id}, accuser ${user.id}): ${api.describeApiError(err)}`,
-          );
-        });
-    }
+  if (repostDetectionEnabled && emojisMatch(emojiObj, repostEmojiId)) {
+    countRepost(message.author.id, message.id, user.id)
+      .then(() => incrementCounter("repostsDetectedTotal"))
+      .catch((err) => {
+        incrementCounter("apiCallErrorsTotal", "reposts");
+        console.error(
+          `bot: countRepost failed for message ${message.id} (accused ${message.author.id}, accuser ${user.id}): ${api.describeApiError(err)}`,
+        );
+      });
   }
 }
 
@@ -136,7 +137,7 @@ export async function handleReactionAdd(reaction, user, options) {
  * Handle messageReactionRemove: uncount repost, reverse plus/minus votes.
  * @param {MessageReaction} reaction
  * @param {User} user
- * @param {{ plusEmoji: string, minusEmoji: string, repostEmojiId: string, plusPlusEnabled: boolean, repostDetectionEnabled: boolean }} options
+ * @param {{ plusEmoji: object|null, minusEmoji: object|null, repostEmojiId: object|null, plusPlusEnabled: boolean, repostDetectionEnabled: boolean }} options - the *Emoji options are resolved emoji objects (see configStore.js), not bare strings.
  */
 export async function handleReactionRemove(reaction, user, options) {
   const { plusEmoji, minusEmoji, repostEmojiId, plusPlusEnabled, repostDetectionEnabled } =
@@ -153,8 +154,9 @@ export async function handleReactionRemove(reaction, user, options) {
     );
     return;
   }
+  const emojiObj = toEmojiObject(emoji);
 
-  if (repostDetectionEnabled && emoji.id === repostEmojiId) {
+  if (repostDetectionEnabled && emojisMatch(emojiObj, repostEmojiId)) {
     uncountRepost(message.author.id, message.id, user.id).catch((err) => {
       console.error(
         `bot: uncountRepost failed for message ${message.id} (accused ${message.author.id}, accuser ${user.id}): ${api.describeApiError(err)}`,
@@ -164,7 +166,7 @@ export async function handleReactionRemove(reaction, user, options) {
 
   if (
     plusPlusEnabled &&
-    (emoji.id === plusEmoji || emoji.name === plusEmoji) &&
+    emojisMatch(emojiObj, plusEmoji) &&
     user.id !== message.author.id
   ) {
     await dominus(message.author.id, "user", user.id);
@@ -172,7 +174,7 @@ export async function handleReactionRemove(reaction, user, options) {
 
   if (
     plusPlusEnabled &&
-    (emoji.id === minusEmoji || emoji.name === minusEmoji) &&
+    emojisMatch(emojiObj, minusEmoji) &&
     user.id !== message.author.id
   ) {
     await doplus(message.author.id, "user", user.id);

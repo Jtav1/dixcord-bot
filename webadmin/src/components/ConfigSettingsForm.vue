@@ -75,6 +75,18 @@
             hide-details
             :placeholder="channelItems.length ? undefined : 'No synced channels — enter a channel ID'"
           />
+          <v-combobox
+            v-else-if="isEmojiPicker(entry.config)"
+            v-model="draft[entry.config]"
+            :items="emojiItems"
+            item-title="emoji"
+            item-value="emoid"
+            :return-object="false"
+            density="comfortable"
+            variant="outlined"
+            hide-details
+            :placeholder="emojiItems.length ? undefined : 'No synced emojis — type an emoji, or paste a custom emoji ID'"
+          />
           <v-text-field
             v-else
             v-model="draft[entry.config]"
@@ -113,6 +125,7 @@ const props = defineProps({
   entries: { type: Array, required: true },
   channels: { type: Array, default: () => [] },
   roles: { type: Array, default: () => [] },
+  emojis: { type: Array, default: () => [] },
 });
 
 const { notify } = useSnackbar();
@@ -122,6 +135,12 @@ const CHANNEL_KEYS = new Set([
   "pin_channel_id",
   "announce_channel_id",
   "user_mapping_import_channel_id",
+]);
+const EMOJI_KEYS = new Set([
+  "pin_emoji",
+  "plusplus_emoji",
+  "minusminus_emoji",
+  "repost_emoji",
 ]);
 
 /** @type {Record<string, string|string[]>} Editable form state, keyed by config name. */
@@ -137,10 +156,17 @@ watch(
     if (seeded || !entries?.length) return;
     seeded = true;
     for (const entry of entries) {
-      savedValues[entry.config] = entry.value;
-      draft[entry.config] = ROLE_LIST_KEYS.has(entry.config)
-        ? safeParseIdArray(entry.value)
-        : entry.value;
+      if (ROLE_LIST_KEYS.has(entry.config)) {
+        savedValues[entry.config] = entry.value;
+        draft[entry.config] = safeParseIdArray(entry.value);
+      } else if (EMOJI_KEYS.has(entry.config)) {
+        const raw = emojiValueToString(entry.value);
+        savedValues[entry.config] = raw;
+        draft[entry.config] = raw;
+      } else {
+        savedValues[entry.config] = entry.value;
+        draft[entry.config] = entry.value;
+      }
     }
   },
   { immediate: true },
@@ -161,6 +187,23 @@ const channelItems = computed(() =>
 );
 /** Role objects as returned by GET /api/guild ({id,name,color,position,mentionable,hoisted}). */
 const roleItems = computed(() => props.roles);
+/** Emoji objects as returned by GET /api/guild ({emoid,app,emoji,frequency,animated,type}), scoped to this app and excluding stickers, sorted alphabetically by display name. */
+const emojiItems = computed(() =>
+  [...props.emojis].sort((a, b) => (a.emoji ?? "").localeCompare(b.emoji ?? "")),
+);
+
+/**
+ * Reconstruct the raw guild_config.value string from a resolved ConfigEmojiValue object (see
+ * webapi's resolveConfigEmojiValue): emoid if it matched a synced emoji_frequency row, else the
+ * freeform `emoji` text that was typed by hand. Used both to seed the combobox's plain-string
+ * v-model and to compare against the saved value for dirty-checking.
+ * @param {{emoid:string|null,emoji:string|null}|null} value
+ * @returns {string}
+ */
+function emojiValueToString(value) {
+  if (value == null) return "";
+  return String(value.emoid ?? value.emoji ?? "");
+}
 
 /**
  * VCombobox items are either a matched role object (`return-object="false"` is required for
@@ -210,6 +253,14 @@ function isRolePicker(config) {
  */
 function isChannelPicker(config) {
   return CHANNEL_KEYS.has(config);
+}
+
+/**
+ * @param {string} config
+ * @returns {boolean}
+ */
+function isEmojiPicker(config) {
+  return EMOJI_KEYS.has(config);
 }
 
 /**

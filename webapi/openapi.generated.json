@@ -159,6 +159,88 @@
             "nullable": true
           }
         }
+      },
+      "EmojiFrequency": {
+        "type": "object",
+        "description": "A resolved emoji_frequency row — the shape every webapi response uses for an emoji or sticker, in place of a bare emoid. If the emoid has no matching emoji_frequency row (deleted), only emoid is populated and the rest are null.",
+        "properties": {
+          "emoid": {
+            "type": "string",
+            "description": "Discord emoji/sticker snowflake, or the literal unicode character for a built-in emoji."
+          },
+          "app": {
+            "type": "string",
+            "nullable": true
+          },
+          "emoji": {
+            "type": "string",
+            "nullable": true,
+            "description": "Display name (custom emoji/sticker) or the unicode character itself."
+          },
+          "frequency": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Global usage count for this emoid."
+          },
+          "animated": {
+            "type": "integer",
+            "nullable": true,
+            "enum": [
+              0,
+              1,
+              null
+            ]
+          },
+          "type": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "emoji",
+              "sticker",
+              null
+            ]
+          }
+        }
+      },
+      "ConfigEmojiValue": {
+        "type": "object",
+        "description": "Resolved value of an \"emoji\"-typed config entry (pin_emoji, plusplus_emoji, minusminus_emoji, repost_emoji). If the stored value matches a synced emoji_frequency row, this is that row (app is the real app name). If it's freeform text an admin typed by hand that was never synced, app/emoid are null and `emoji` holds the raw text — comparisons should fall back to matching that string (see emojisMatch).",
+        "properties": {
+          "emoid": {
+            "type": "string",
+            "nullable": true
+          },
+          "app": {
+            "type": "string",
+            "nullable": true
+          },
+          "emoji": {
+            "type": "string",
+            "nullable": true
+          },
+          "frequency": {
+            "type": "integer",
+            "nullable": true
+          },
+          "animated": {
+            "type": "integer",
+            "nullable": true,
+            "enum": [
+              0,
+              1,
+              null
+            ]
+          },
+          "type": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "emoji",
+              "sticker",
+              null
+            ]
+          }
+        }
       }
     },
     "responses": {
@@ -5252,7 +5334,7 @@
           "Message Processing"
         ],
         "summary": "Record emoji usage in a message",
-        "description": "Increments emoji_frequency / member_emoji_tracking for each emoji in the message. If isReply is true and the emojis are exactly one configured plusplus/minusminus emoji, also records a single +/- vote for repliedUserId instead of counting it as emoji usage.\n",
+        "description": "Increments emoji_frequency / member_emoji_tracking for each emoji in the message. If isReply is true and the emojis are exactly one configured plusplus/minusminus emoji (guild_config, resolved via resolveConfigEmojiValue and compared with emojisMatch), also records a single +/- vote for repliedUserId instead of counting it as emoji usage.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -5261,6 +5343,7 @@
                 "type": "object",
                 "required": [
                   "app",
+                  "guildId",
                   "authorId",
                   "emojis"
                 ],
@@ -5270,6 +5353,10 @@
                     "enum": [
                       "discord"
                     ]
+                  },
+                  "guildId": {
+                    "type": "string",
+                    "description": "Needed to resolve this server's plusplus_emoji/minusminus_emoji from guild_config."
                   },
                   "authorId": {
                     "type": "string",
@@ -5330,7 +5417,7 @@
             }
           },
           "400": {
-            "description": "Missing/invalid app parameter, or repliedUserId is not a known chat member.",
+            "description": "Missing/invalid app parameter, missing guildId, or repliedUserId is not a known chat member.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5341,6 +5428,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenBotOrAdmin"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -5703,7 +5793,7 @@
           "Message Processing"
         ],
         "summary": "Sync the guild's custom emoji catalog",
-        "description": "Deletes zero-frequency emoji_frequency rows (type 'emoji' or NULL), then inserts any emoji ids not already present with frequency 0.\n",
+        "description": "Deletes zero-frequency emoji_frequency rows (type 'emoji' or NULL) for this app, then inserts any emoji ids not already present with frequency 0.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -5711,9 +5801,16 @@
               "schema": {
                 "type": "object",
                 "required": [
+                  "app",
                   "emojis"
                 ],
                 "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
                   "emojis": {
                     "type": "array",
                     "items": {
@@ -5760,7 +5857,7 @@
             }
           },
           "400": {
-            "description": "emojis is not an array.",
+            "description": "Missing/invalid app, or emojis is not an array.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5785,7 +5882,7 @@
           "Message Processing"
         ],
         "summary": "Sync the guild's sticker catalog",
-        "description": "Deletes zero-frequency emoji_frequency rows of type 'sticker', then inserts any sticker ids not already present with frequency 0.\n",
+        "description": "Deletes zero-frequency emoji_frequency rows of type 'sticker' for this app, then inserts any sticker ids not already present with frequency 0.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -5793,9 +5890,16 @@
               "schema": {
                 "type": "object",
                 "required": [
+                  "app",
                   "stickers"
                 ],
                 "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
                   "stickers": {
                     "type": "array",
                     "items": {
@@ -5839,7 +5943,7 @@
             }
           },
           "400": {
-            "description": "stickers is not an array.",
+            "description": "Missing/invalid app, or stickers is not an array.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6934,20 +7038,7 @@
                         "type": "object",
                         "properties": {
                           "emoji": {
-                            "type": "string"
-                          },
-                          "frequency": {
-                            "type": "integer"
-                          },
-                          "emoid": {
-                            "type": "string"
-                          },
-                          "animated": {
-                            "type": "integer",
-                            "enum": [
-                              0,
-                              1
-                            ]
+                            "$ref": "#/components/schemas/EmojiFrequency"
                           }
                         }
                       }
@@ -7129,15 +7220,7 @@
                         "type": "object",
                         "properties": {
                           "emoji": {
-                            "type": "string",
-                            "description": "Sticker name."
-                          },
-                          "frequency": {
-                            "type": "integer"
-                          },
-                          "emoid": {
-                            "type": "string",
-                            "description": "Sticker id."
+                            "$ref": "#/components/schemas/EmojiFrequency"
                           }
                         }
                       }
@@ -7505,17 +7588,12 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "emoid": {
-                            "type": "string"
+                          "frequency": {
+                            "type": "integer",
+                            "description": "This user's own usage count (member_emoji_tracking); not the emoji's global count."
                           },
                           "emoji": {
-                            "type": "string"
-                          },
-                          "frequency": {
-                            "type": "integer"
-                          },
-                          "animated": {
-                            "type": "boolean"
+                            "$ref": "#/components/schemas/EmojiFrequency"
                           }
                         }
                       }
@@ -7611,15 +7689,12 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "emoid": {
-                            "type": "string"
+                          "frequency": {
+                            "type": "integer",
+                            "description": "This user's own usage count (member_emoji_tracking); not the sticker's global count."
                           },
                           "emoji": {
-                            "type": "string",
-                            "description": "Sticker name."
-                          },
-                          "frequency": {
-                            "type": "integer"
+                            "$ref": "#/components/schemas/EmojiFrequency"
                           }
                         }
                       }
@@ -8856,14 +8931,8 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "emoid": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "frequency": {
-                            "type": "integer"
+                          "emoji": {
+                            "$ref": "#/components/schemas/EmojiFrequency"
                           }
                         }
                       }
@@ -9302,9 +9371,19 @@
                     },
                     "config": {
                       "type": "object",
-                      "description": "Map of config name to value.",
+                      "description": "Map of config name to value. \"emoji\"-typed keys (pin_emoji, plusplus_emoji, minusminus_emoji, repost_emoji) resolve to a ConfigEmojiValue object (or null if unset) instead of a plain string.\n",
                       "additionalProperties": {
-                        "type": "string"
+                        "oneOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "$ref": "#/components/schemas/ConfigEmojiValue"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "entries": {
@@ -9316,7 +9395,17 @@
                             "type": "string"
                           },
                           "value": {
-                            "type": "string"
+                            "oneOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "$ref": "#/components/schemas/ConfigEmojiValue"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         }
                       }
@@ -9330,14 +9419,25 @@
                             "type": "string"
                           },
                           "value": {
-                            "type": "string"
+                            "oneOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "$ref": "#/components/schemas/ConfigEmojiValue"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "description": {
                             "type": "string",
                             "nullable": true
                           },
                           "type": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "e.g. string, integer, boolean, json, emoji."
                           },
                           "requiresBotRestart": {
                             "type": "boolean"

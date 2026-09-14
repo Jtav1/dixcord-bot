@@ -99,6 +99,43 @@ export async function ensureSchemaMigrations() {
     );
   }
 
+  // emoji_frequency.app column: mirrors guild_channels/guild_roles' app column, for future
+  // multi-platform support. No DEFAULT — every insert/update must specify it explicitly going
+  // forward (see services/messageProcessing.js). This backfill of 'discord' is a ONE-TIME
+  // migration for rows that existed before this column was added, not a general default — only
+  // "discord" is supported today, so every pre-existing row is safely known to be a discord row.
+  if (
+    (await tableExists(db, "emoji_frequency", isSqlite)) &&
+    !(await columnExists(db, "emoji_frequency", "app", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE emoji_frequency_new (
+          app TEXT NOT NULL,
+          emoid TEXT PRIMARY KEY,
+          emoji TEXT NOT NULL,
+          frequency INTEGER NOT NULL DEFAULT 0,
+          animated INTEGER DEFAULT 0,
+          type TEXT DEFAULT NULL
+        )
+      `);
+      await db.query(`
+        INSERT INTO emoji_frequency_new (app, emoid, emoji, frequency, animated, type)
+        SELECT 'discord', emoid, emoji, frequency, animated, type FROM emoji_frequency
+      `);
+      await db.query("DROP TABLE emoji_frequency");
+      await db.query("ALTER TABLE emoji_frequency_new RENAME TO emoji_frequency");
+    } else {
+      await db.query("ALTER TABLE emoji_frequency ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE emoji_frequency SET app = 'discord' WHERE app IS NULL");
+      await db.query("ALTER TABLE emoji_frequency MODIFY COLUMN app VARCHAR(20) NOT NULL");
+    }
+    applied.push("emoji_frequency.app column (backfilled 'discord' for pre-existing rows)");
+    console.log(
+      "db: migration applied: added emoji_frequency.app column, backfilled 'discord' for pre-existing rows",
+    );
+  }
+
   // audit_log table
   if (!(await tableExists(db, "audit_log", isSqlite))) {
     if (isSqlite) {

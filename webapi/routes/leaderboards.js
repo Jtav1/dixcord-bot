@@ -403,10 +403,7 @@ router.post("/plusplus/top-voters", authenticate, async (req, res) => {
  *                   items:
  *                     type: object
  *                     properties:
- *                       emoji: { type: string }
- *                       frequency: { type: integer }
- *                       emoid: { type: string }
- *                       animated: { type: integer, enum: [0, 1] }
+ *                       emoji: { $ref: '#/components/schemas/EmojiFrequency' }
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
@@ -533,9 +530,7 @@ router.post("/emoji/users", authenticate, async (req, res) => {
  *                   items:
  *                     type: object
  *                     properties:
- *                       emoji: { type: string, description: "Sticker name." }
- *                       frequency: { type: integer }
- *                       emoid: { type: string, description: "Sticker id." }
+ *                       emoji: { $ref: '#/components/schemas/EmojiFrequency' }
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
@@ -790,10 +785,8 @@ router.get("/repost/user/:userId", authenticate, async (req, res) => {
  *                   items:
  *                     type: object
  *                     properties:
- *                       emoid: { type: string }
- *                       emoji: { type: string }
- *                       frequency: { type: integer }
- *                       animated: { type: boolean }
+ *                       frequency: { type: integer, description: "This user's own usage count (member_emoji_tracking); not the emoji's global count." }
+ *                       emoji: { $ref: '#/components/schemas/EmojiFrequency' }
  *       '400':
  *         description: Missing/invalid app parameter.
  *         content:
@@ -864,9 +857,8 @@ router.get("/emoji/user/:userId", authenticate, async (req, res) => {
  *                   items:
  *                     type: object
  *                     properties:
- *                       emoid: { type: string }
- *                       emoji: { type: string, description: "Sticker name." }
- *                       frequency: { type: integer }
+ *                       frequency: { type: integer, description: "This user's own usage count (member_emoji_tracking); not the sticker's global count." }
+ *                       emoji: { $ref: '#/components/schemas/EmojiFrequency' }
  *       '400':
  *         description: Missing/invalid app parameter.
  *         content:

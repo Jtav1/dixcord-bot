@@ -11,6 +11,7 @@ import {
   getChatMemberMappingIdByPlatformUserId,
   isChatMemberAppSupported,
 } from "./chatMemberMapping.js";
+import { attachEmojiObjects } from "./emojiFrequency.js";
 
 /**
  * Correlated subquery picking one representative guild_members.platform_user_id for a
@@ -249,7 +250,7 @@ const EMOJI_FREQUENCY_WHERE = "type = 'emoji' OR type IS NULL";
  * Paginated emoji usage leaderboard from emoji_frequency (emojis only, excludes stickers).
  * @param {number} [limit] Max rows per page (default 5, max 50).
  * @param {number} [offset] Rows to skip (default 0).
- * @returns {Promise<{ rows: Array<{ emoji: string, frequency: number, emoid: string, animated: number }>, total: number }>}
+ * @returns {Promise<{ rows: Array<{ emoji: object }>, total: number }>} `emoji` is the full emoji_frequency row (see attachEmojiObjects).
  */
 export async function listEmojiFrequency(limit, offset = 0) {
   const n = parseLimit(limit, 5, 50);
@@ -261,14 +262,14 @@ export async function listEmojiFrequency(limit, offset = 0) {
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT emoji, frequency, emoid, animated FROM emoji_frequency
+    `SELECT emoid FROM emoji_frequency
      WHERE ${EMOJI_FREQUENCY_WHERE}
      ORDER BY frequency DESC LIMIT ? OFFSET ?`,
     [n, off],
   );
 
   return {
-    rows: Array.isArray(rows) ? rows : [],
+    rows: await attachEmojiObjects(Array.isArray(rows) ? rows : []),
     total,
   };
 }
@@ -276,7 +277,7 @@ export async function listEmojiFrequency(limit, offset = 0) {
 /**
  * Top used emojis (backward-compatible wrapper for Discord bot).
  * @param {number} [limit]
- * @returns {Promise<Array<{ emoji, frequency, emoid, animated }>>}
+ * @returns {Promise<Array<{ emoji: object }>>} `emoji` is the full emoji_frequency row (see attachEmojiObjects).
  */
 export async function getTopEmoji(limit) {
   const { rows } = await listEmojiFrequency(limit, 0);
@@ -334,7 +335,7 @@ const STICKER_FREQUENCY_WHERE = "type = 'sticker'";
  * Paginated sticker usage leaderboard from emoji_frequency (stickers only).
  * @param {number} [limit] Max rows per page (default 5, max 50).
  * @param {number} [offset] Rows to skip (default 0).
- * @returns {Promise<{ rows: Array<{ emoji: string, frequency: number, emoid: string }>, total: number }>}
+ * @returns {Promise<{ rows: Array<{ emoji: object }>, total: number }>} `emoji` is the full emoji_frequency row (see attachEmojiObjects).
  */
 export async function listStickerFrequency(limit, offset = 0) {
   const n = parseLimit(limit, 5, 50);
@@ -346,14 +347,14 @@ export async function listStickerFrequency(limit, offset = 0) {
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT emoji, frequency, emoid FROM emoji_frequency
+    `SELECT emoid FROM emoji_frequency
      WHERE ${STICKER_FREQUENCY_WHERE}
      ORDER BY frequency DESC LIMIT ? OFFSET ?`,
     [n, off],
   );
 
   return {
-    rows: Array.isArray(rows) ? rows : [],
+    rows: await attachEmojiObjects(Array.isArray(rows) ? rows : []),
     total,
   };
 }

@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, requireOwnGuildOrAdmin } from "../middleware/auth.js";
 import {
   countEmoji,
   countSticker,
@@ -22,12 +22,13 @@ const router = express.Router();
  * Record emoji usage in a message (and optionally a single +/- vote when replying).
  * Body: {
  *   app: "discord",
+ *   guildId: string,
  *   authorId: string,
  *   emojis: Array<{ name: string, id?: string, type?: string }>,
  *   isReply?: boolean,
  *   repliedUserId?: string,
  * }
- * Auth: required.
+ * Auth: required. A guild-scoped bot account may only post for its own guildId.
  * @openapi
  * /api/message-processing/emoji-count:
  *   post:
@@ -36,17 +37,19 @@ const router = express.Router();
  *     summary: Record emoji usage in a message
  *     description: >
  *       Increments emoji_frequency / member_emoji_tracking for each emoji in the message.
- *       If isReply is true and the emojis are exactly one configured plusplus/minusminus emoji,
- *       also records a single +/- vote for repliedUserId instead of counting it as emoji usage.
+ *       If isReply is true and the emojis are exactly one configured plusplus/minusminus emoji
+ *       (guild_config, resolved via resolveConfigEmojiValue and compared with emojisMatch), also
+ *       records a single +/- vote for repliedUserId instead of counting it as emoji usage.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [app, authorId, emojis]
+ *             required: [app, guildId, authorId, emojis]
  *             properties:
  *               app: { type: string, enum: [discord] }
+ *               guildId: { type: string, description: "Needed to resolve this server's plusplus_emoji/minusminus_emoji from guild_config." }
  *               authorId: { type: string, description: "Discord snowflake of the message author." }
  *               emojis:
  *                 type: array
@@ -74,17 +77,19 @@ const router = express.Router();
  *                   enum: [plus, minus]
  *                   description: Present only when isReply triggered a single +/- vote instead of emoji counting.
  *       '400':
- *         description: Missing/invalid app parameter, or repliedUserId is not a known chat member.
+ *         description: Missing/invalid app parameter, missing guildId, or repliedUserId is not a known chat member.
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
  *       '500':
  *         $ref: '#/components/responses/ServerError'
  */
-router.post("/emoji-count", authenticate, async (req, res) => {
+router.post("/emoji-count", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
   try {
     if (!resolveChatAppFromRequest(req)) {
       return res.status(400).json(CHAT_APP_PARAM_ERROR);
@@ -343,8 +348,8 @@ router.post("/count-repost", authenticate, async (req, res) => {
 /**
  * POST /api/message-processing/emoji-import
  * Sync server emoji list (mirrors bot api/emojis.js POST to this route).
- * Deletes zero-frequency emoji rows (type 'emoji' or NULL), then inserts any missing ids into emoji_frequency with type 'emoji'.
- * Body: { emojis: Array<{ id: string, name: string, animated?: boolean }> }
+ * Deletes zero-frequency emoji rows (type 'emoji' or NULL) for this app, then inserts any missing ids into emoji_frequency with type 'emoji'.
+ * Body: { app: "discord", emojis: Array<{ id: string, name: string, animated?: boolean }> }
  * Response: { ok: true, imported: number }
  * Auth: required.
  * @openapi
@@ -354,16 +359,17 @@ router.post("/count-repost", authenticate, async (req, res) => {
  *     tags: [Message Processing]
  *     summary: Sync the guild's custom emoji catalog
  *     description: >
- *       Deletes zero-frequency emoji_frequency rows (type 'emoji' or NULL), then inserts any
- *       emoji ids not already present with frequency 0.
+ *       Deletes zero-frequency emoji_frequency rows (type 'emoji' or NULL) for this app, then
+ *       inserts any emoji ids not already present with frequency 0.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [emojis]
+ *             required: [app, emojis]
  *             properties:
+ *               app: { type: string, enum: [discord] }
  *               emojis:
  *                 type: array
  *                 items:
@@ -383,7 +389,7 @@ router.post("/count-repost", authenticate, async (req, res) => {
  *                 ok: { type: boolean, enum: [true] }
  *                 imported: { type: integer, description: "New rows added; existing emoji ids are skipped." }
  *       '400':
- *         description: emojis is not an array.
+ *         description: Missing/invalid app, or emojis is not an array.
  *         content:
  *           application/json:
  *             schema:
@@ -395,8 +401,11 @@ router.post("/count-repost", authenticate, async (req, res) => {
  */
 router.post("/emoji-import", authenticate, async (req, res) => {
   try {
-    const { emojis } = req.body ?? {};
-    const result = await importGuildAssetFrequencyList(emojis, "emoji");
+    if (!resolveChatAppFromRequest(req)) {
+      return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    }
+    const { app, emojis } = req.body ?? {};
+    const result = await importGuildAssetFrequencyList(emojis, "emoji", app);
     if (!result.ok) {
       return res
         .status(400)
@@ -412,8 +421,8 @@ router.post("/emoji-import", authenticate, async (req, res) => {
 /**
  * POST /api/message-processing/sticker-import
  * Sync server sticker list (like emoji-import; no animated field).
- * Deletes zero-frequency sticker rows in emoji_frequency (type 'sticker'), then inserts any missing ids with type 'sticker'.
- * Body: { stickers: Array<{ id: string, name: string }> }
+ * Deletes zero-frequency sticker rows in emoji_frequency (type 'sticker') for this app, then inserts any missing ids with type 'sticker'.
+ * Body: { app: "discord", stickers: Array<{ id: string, name: string }> }
  * Response: { ok: true, imported: number }
  * Auth: required.
  * @openapi
@@ -423,16 +432,17 @@ router.post("/emoji-import", authenticate, async (req, res) => {
  *     tags: [Message Processing]
  *     summary: Sync the guild's sticker catalog
  *     description: >
- *       Deletes zero-frequency emoji_frequency rows of type 'sticker', then inserts any
- *       sticker ids not already present with frequency 0.
+ *       Deletes zero-frequency emoji_frequency rows of type 'sticker' for this app, then inserts
+ *       any sticker ids not already present with frequency 0.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [stickers]
+ *             required: [app, stickers]
  *             properties:
+ *               app: { type: string, enum: [discord] }
  *               stickers:
  *                 type: array
  *                 items:
@@ -451,7 +461,7 @@ router.post("/emoji-import", authenticate, async (req, res) => {
  *                 ok: { type: boolean, enum: [true] }
  *                 imported: { type: integer, description: "New rows added; existing sticker ids are skipped." }
  *       '400':
- *         description: stickers is not an array.
+ *         description: Missing/invalid app, or stickers is not an array.
  *         content:
  *           application/json:
  *             schema:
@@ -463,8 +473,11 @@ router.post("/emoji-import", authenticate, async (req, res) => {
  */
 router.post("/sticker-import", authenticate, async (req, res) => {
   try {
-    const { stickers } = req.body ?? {};
-    const result = await importGuildAssetFrequencyList(stickers, "sticker");
+    if (!resolveChatAppFromRequest(req)) {
+      return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    }
+    const { app, stickers } = req.body ?? {};
+    const result = await importGuildAssetFrequencyList(stickers, "sticker", app);
     if (!result.ok) {
       return res
         .status(400)

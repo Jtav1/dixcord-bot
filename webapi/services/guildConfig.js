@@ -3,21 +3,44 @@
  */
 
 import db from "../config/db.js";
-import { enrichConfigEntries, getDefaultConfigEntries } from "./configMetadata.js";
+import {
+  CONFIG_METADATA,
+  configDisplayOrder,
+  enrichConfigEntries,
+  getDefaultConfigEntries,
+} from "./configMetadata.js";
+import { resolveConfigEmojiValue } from "./emojiFrequency.js";
 
 /**
- * List all config entries for one server, enriched with type/description/restart metadata.
+ * List all config entries for one server, enriched with type/description/restart metadata, in
+ * CONFIG_METADATA's declared display order (not raw DB row order, which has no defined order).
+ * "emoji"-typed entries (pin_emoji, plusplus_emoji, minusminus_emoji, repost_emoji) get their
+ * raw stored value resolved into an emoji object (see resolveConfigEmojiValue) instead of the
+ * bare string — the single point every webapi response returns an emoji through.
  * @param {string} app
  * @param {string} guildId
- * @returns {Promise<{ config: Record<string,string>, entries: Array<{config:string,value:string}>, entriesWithMeta: Array<object> }>}
+ * @returns {Promise<{ config: Record<string, string|object|null>, entries: Array<{config:string,value:string|object|null}>, entriesWithMeta: Array<object> }>}
  */
 export async function listGuildConfig(app, guildId) {
   const [rows] = await db.query(
     "SELECT config, value FROM guild_config WHERE app = ? AND guild_id = ?",
     [app, guildId],
   );
-  const entries = Array.isArray(rows) ? rows : [];
-  const config = Object.fromEntries(entries.map((row) => [row.config, row.value ?? ""]));
+  const rawEntries = (Array.isArray(rows) ? rows : []).sort(
+    (a, b) => configDisplayOrder(a.config) - configDisplayOrder(b.config),
+  );
+
+  const entries = await Promise.all(
+    rawEntries.map(async (row) => ({
+      config: row.config,
+      value:
+        CONFIG_METADATA[row.config]?.type === "emoji"
+          ? await resolveConfigEmojiValue(app, row.value)
+          : (row.value ?? ""),
+    })),
+  );
+
+  const config = Object.fromEntries(entries.map((row) => [row.config, row.value]));
   return { config, entries, entriesWithMeta: enrichConfigEntries(entries) };
 }
 

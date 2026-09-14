@@ -3,7 +3,7 @@
     <v-col cols="12" md="6">
       <h3 class="text-subtitle-1 font-weight-bold mb-2">Top Emojis</h3>
       <PaginatedTable
-        :headers="[{ title: 'Emoji', key: 'emoji' }, { title: 'Uses', key: 'frequency' }]"
+        :headers="[{ title: 'Emoji', key: 'name' }, { title: 'Uses', key: 'uses' }]"
         :items="emojiItems"
         :loading="emojiLoading"
         :error="emojiError"
@@ -11,7 +11,10 @@
         :total-pages="emojiTotalPages"
         empty-text="No emoji usage yet."
         @update:page="loadEmoji"
-      />
+      >
+        <template #cell-name="{ item }">{{ item.emoji.emoji ?? item.emoji.emoid }}</template>
+        <template #cell-uses="{ item }">{{ item.emoji.frequency }}</template>
+      </PaginatedTable>
     </v-col>
     <v-col cols="12" md="6">
       <h3 class="text-subtitle-1 font-weight-bold mb-2">Top Users</h3>

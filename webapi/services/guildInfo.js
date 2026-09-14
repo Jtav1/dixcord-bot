@@ -266,7 +266,8 @@ export async function getGuildSnapshot({ app, guildId } = {}) {
     [resolvedApp, resolvedGuildId],
   );
   const [emojiRows] = await db.query(
-    "SELECT emoid, emoji, frequency, animated, type FROM emoji_frequency",
+    "SELECT app, emoid, emoji, frequency, animated, type FROM emoji_frequency WHERE app = ? AND (type = 'emoji' OR type IS NULL)",
+    [resolvedApp],
   );
   const [stickerRows] = await db.query(
     "SELECT stickerid, name, frequency FROM sticker_frequency",

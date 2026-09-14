@@ -14,16 +14,17 @@ const execute = async (interaction) => {
   let top5 = await getTopEmoji(5);
 
   let emoStr = "Top 5 most used emojis:\n\n";
-  top5.forEach((em, idx) => {
+  top5.forEach((entry, idx) => {
     let num = idx + 1;
+    const emoji = entry.emoji;
 
-    const emoIsCustom = !isNaN(Number(em.emoid));
+    const emoIsCustom = !isNaN(Number(emoji.emoid));
 
     //prettier-ignore
-    emoStr += '\n\t' + num + ' - ' + 
-    (emoIsCustom ? "\\:" + em.emoji + "\\: " : em.emoji) + ' - ' + 
-    (emoIsCustom ? (em.animated ? ' <a:' : ' <:') + em.emoji + ':' + em.emoid + '> - ' : '' ) +
-    em.frequency;
+    emoStr += '\n\t' + num + ' - ' +
+    (emoIsCustom ? "\\:" + emoji.emoji + "\\: " : emoji.emoji) + ' - ' +
+    (emoIsCustom ? (emoji.animated ? ' <a:' : ' <:') + emoji.emoji + ':' + emoji.emoid + '> - ' : '' ) +
+    emoji.frequency;
   });
 
   const emojiEmbed = new EmbedBuilder()

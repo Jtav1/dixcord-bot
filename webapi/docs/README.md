@@ -83,8 +83,8 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/message-processing/emoji-count` | ✓ | Record emoji usage / +/- reply |
 | POST | `/api/message-processing/plusminus` | ✓ | Record plus/minus (message or reaction) |
 | POST | `/api/message-processing/count-repost` | ✓ | Record or withdraw repost accusation |
-| POST | `/api/message-processing/emoji-import` | ✓ | Sync server emoji list |
-| POST | `/api/message-processing/sticker-import` | ✓ | Sync server sticker list |
+| POST | `/api/message-processing/emoji-import` | ✓ | Sync server emoji list (body: `{ app, emojis }`) |
+| POST | `/api/message-processing/sticker-import` | ✓ | Sync server sticker list (body: `{ app, stickers }`) |
 | POST | `/api/message-processing/pin-check` | ✓ | Check if message already pinned (body: `{ messageId }`) |
 | POST | `/api/message-processing/pin-log` | ✓ | Log message as pinned (body: `{ messageId }`) |
 | GET | `/api/config?app=&guildId=` | ✓ | All configuration entries for one server (includes `entriesWithMeta`) |

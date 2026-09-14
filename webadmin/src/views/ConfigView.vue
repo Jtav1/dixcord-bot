@@ -29,6 +29,7 @@
       :entries="entries"
       :channels="channels"
       :roles="roles"
+      :emojis="emojis"
       class="mb-6"
     />
 
@@ -87,6 +88,8 @@ const currentGuildId = ref(null);
 const channels = ref([]);
 /** @type {import("vue").Ref<Array<{id:string,name:string,color:string|null,position:number|null,mentionable:boolean|null,hoisted:boolean|null}>>} */
 const roles = ref([]);
+/** @type {import("vue").Ref<Array<{emoid:string,app:string,emoji:string,frequency:number,animated:number,type:string}>>} */
+const emojis = ref([]);
 
 const invalidating = ref(false);
 const fortuneLoading = ref(false);
@@ -109,6 +112,7 @@ async function loadConfig() {
     currentGuildId.value = snapshot.guild.guildId;
     channels.value = snapshot.channels;
     roles.value = snapshot.roles;
+    emojis.value = snapshot.emojis;
     entries.value = await fetchConfigEntries(currentApp.value, currentGuildId.value);
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Failed to load config";
