@@ -206,10 +206,10 @@ async function getRandomResponseByRandomSelection(triggerId) {
 }
 
 /**
- * Weighted selection: roll 1-100; if roll >= maxWeight pick from responses with weight >= maxWeight,
- * else pick from responses with weight < maxWeight; then return one at random from that subset.
- * A chosen response may carry response_function (a named function key); the caller is responsible for
- * dispatching to it instead of replying directly when present.
+ * Weighted selection: pick a response with probability proportional to its weight
+ * (weight / sum of all weights for the trigger). Falls back to a uniform pick if every
+ * response has weight 0. A chosen response may carry response_function (a named function
+ * key); the caller is responsible for dispatching to it instead of replying directly when present.
  * @param {number} triggerId
  * @returns {Promise<{ id: number, response_string: string, response_function: string|null, response_function_id: number|null }|null>}
  */
@@ -227,19 +227,19 @@ async function getWeightedResponseForTrigger(triggerId) {
     ...withParsedFunctionParameters(row),
     weight: clampWeight(row.weight),
   }));
-  const maxWeight = Math.max(...normalized.map((r) => r.weight));
+  const totalWeight = normalized.reduce((sum, r) => sum + r.weight, 0);
 
-  const roll = 100 - (Math.floor(Math.random() * 100) + 1);
-
-  let candidates =
-    roll < maxWeight
-      ? normalized.filter((r) => r.weight >= maxWeight)
-      : normalized.filter((r) => r.weight < maxWeight);
-
-  if (candidates.length === 0) {
-    candidates = normalized.filter((r) => r.weight >= maxWeight);
+  let chosen;
+  if (totalWeight <= 0) {
+    chosen = normalized[Math.floor(Math.random() * normalized.length)];
+  } else {
+    let roll = Math.random() * totalWeight;
+    chosen = normalized.find((r) => {
+      roll -= r.weight;
+      return roll < 0;
+    });
+    if (!chosen) chosen = normalized[normalized.length - 1];
   }
-  const chosen = candidates[Math.floor(Math.random() * candidates.length)];
   if (!chosen) return null;
   await incrementSelectionFrequencies(
     triggerId,
