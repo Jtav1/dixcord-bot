@@ -76,7 +76,7 @@
                 >
                   <td class="text-body-2">{{ formatTimestamp(vote.timestamp) }}</td>
                   <td class="text-body-2">
-                    {{ resolveVoterLabel(vote.voterPlatformId, voterNameMapFor(entry)) }}
+                    {{ resolveVoterLabel(vote.voterPlatformId, nameMap) }}
                   </td>
                   <td
                     class="text-body-2 text-right font-weight-bold"
@@ -120,7 +120,6 @@ import { ref, watch } from "vue";
 import {
   VOTE_HISTORY_PAGE_SIZE,
   fetchPlusPlusVoteHistory,
-  fetchUserMappingsForPlatformIds,
   leaderboardEntryKey,
   resolveEntryLabel,
   resolveVoterLabel,
@@ -155,7 +154,7 @@ const props = defineProps({
 });
 
 const expandedKey = ref(null);
-/** @type {import('vue').Ref<Map<string, { votes: Array<object>, total: number, voterNameMap: Map<string, string> }>>} */
+/** @type {import('vue').Ref<Map<string, { votes: Array<object>, total: number }>>} */
 const historyCache = ref(new Map());
 /** @type {import('vue').Ref<string|null>} */
 const historyLoadingKey = ref(null);
@@ -196,18 +195,10 @@ function historyErrorFor(entry) {
 
 /**
  * @param {{ string: string, typestr: string }} entry Leaderboard row.
- * @returns {{ votes: Array<object>, total: number, voterNameMap: Map<string, string> }|undefined}
+ * @returns {{ votes: Array<object>, total: number }|undefined}
  */
 function historyFor(entry) {
   return historyCache.value.get(entryKey(entry));
-}
-
-/**
- * @param {{ string: string, typestr: string }} entry Leaderboard row.
- * @returns {Map<string, string>}
- */
-function voterNameMapFor(entry) {
-  return historyFor(entry)?.voterNameMap ?? props.nameMap;
 }
 
 /**
@@ -279,28 +270,11 @@ async function loadVoteHistory(entry) {
 
   try {
     const history = await fetchPlusPlusVoteHistory(entry.string, entry.typestr);
-    const voterIds = [
-      ...new Set(
-        history.votes
-          .map((vote) => vote.voterPlatformId)
-          .filter((id) => id != null && id !== ""),
-      ),
-    ];
-
-    const voterNameMap = new Map(props.nameMap);
-    const missingIds = voterIds.filter((id) => !voterNameMap.has(String(id)));
-    if (missingIds.length > 0) {
-      const voterMappings = await fetchUserMappingsForPlatformIds(missingIds);
-      for (const row of voterMappings) {
-        voterNameMap.set(String(row.platformUserId), String(row.name));
-      }
-    }
 
     const nextCache = new Map(historyCache.value);
     nextCache.set(key, {
       votes: history.votes,
       total: history.total,
-      voterNameMap,
     });
     historyCache.value = nextCache;
 

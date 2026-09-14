@@ -68,7 +68,7 @@ import PlusPlusLeaderboardPanels from "../components/PlusPlusLeaderboardPanels.v
 import {
   LEADERBOARD_LIMIT,
   buildUserNameMap,
-  fetchAllUserMappings,
+  fetchAllGuildMembers,
   fetchPlusPlusLeaderboard,
 } from "../lib/plusplusRankings.js";
 
@@ -88,14 +88,14 @@ async function loadRankings() {
   error.value = "";
 
   try {
-    const [leaderboard, userMappings] = await Promise.all([
+    const [leaderboard, members] = await Promise.all([
       fetchPlusPlusLeaderboard(LEADERBOARD_LIMIT),
-      fetchAllUserMappings("discord"),
+      fetchAllGuildMembers("discord"),
     ]);
 
     top.value = leaderboard.top;
     bottom.value = leaderboard.bottom;
-    nameMap.value = buildUserNameMap(userMappings);
+    nameMap.value = buildUserNameMap(members);
     updatedAt.value = new Date().toLocaleString();
   } catch (err) {
     error.value =

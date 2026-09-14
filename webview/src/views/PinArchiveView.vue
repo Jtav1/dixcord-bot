@@ -50,7 +50,11 @@ import {
   buildMappingIdNameMap,
   fetchPinHistoryPage,
 } from "../lib/pinArchive.js";
-import { fetchAllUserMappings, buildUserNameMap } from "../lib/plusplusRankings.js";
+import {
+  buildUserNameMap,
+  fetchAllGuildMembers,
+  fetchAllUserMappings,
+} from "../lib/plusplusRankings.js";
 
 const loading = ref(true);
 const error = ref("");
@@ -100,9 +104,12 @@ function onPageChange(nextPage) {
 
 onMounted(async () => {
   try {
-    const userMappings = await fetchAllUserMappings("discord");
+    const [userMappings, members] = await Promise.all([
+      fetchAllUserMappings("discord"),
+      fetchAllGuildMembers("discord"),
+    ]);
     nameMap.value = buildMappingIdNameMap(userMappings);
-    platformNameMap.value = buildUserNameMap(userMappings);
+    platformNameMap.value = buildUserNameMap(members);
   } catch {
     // Name resolution is best-effort.
   }
