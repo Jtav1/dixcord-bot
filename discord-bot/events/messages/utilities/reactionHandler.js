@@ -4,6 +4,7 @@ import { doplus, dominus } from "./plusplus.js";
 import { countEmoji, countRepost, uncountRepost } from "../../../api/emojis.js";
 import { incrementCounter } from "../../../utilities/metrics.js";
 import { emojisMatch, toEmojiObject } from "../../../utilities/emojiCompare.js";
+import { announceMilestones } from "../../../utilities/milestoneNotifier.js";
 
 /** Fetch a random pin quip from the API; returns fallback if unavailable. */
 async function getRandomPinQuip() {
@@ -72,10 +73,11 @@ export async function handleReactionAdd(reaction, user, options) {
 
   if (pinSystemEnabled && pinReact && pinReact.count === pinThreshold) {
     const res = await messagePinner(message, pinReact, user, client);
-    if (res) {
+    if (res.sent) {
       incrementCounter("pinsLoggedTotal");
       const randomReply = await getRandomPinQuip();
       message.reply(randomReply);
+      await announceMilestones(message, res.milestones);
     }
   }
 
@@ -84,7 +86,8 @@ export async function handleReactionAdd(reaction, user, options) {
     emojisMatch(emojiObj, plusEmoji) &&
     user.id !== message.author.id
   ) {
-    await doplus(message.author.id, "user", user.id);
+    const milestones = await doplus(message.author.id, "user", user.id);
+    await announceMilestones(message, milestones);
   }
 
   if (
@@ -92,7 +95,8 @@ export async function handleReactionAdd(reaction, user, options) {
     emojisMatch(emojiObj, minusEmoji) &&
     user.id !== message.author.id
   ) {
-    await dominus(message.author.id, "user", user.id);
+    const milestones = await dominus(message.author.id, "user", user.id);
+    await announceMilestones(message, milestones);
   }
 
   if (
@@ -110,8 +114,9 @@ export async function handleReactionAdd(reaction, user, options) {
       );
     } else {
       try {
-        await countEmoji(emoji.name, emoji.id, user.id);
+        const milestones = await countEmoji(emoji.name, emoji.id, user.id);
         incrementCounter("emojiCountedTotal");
+        await announceMilestones(message, milestones);
       } catch (err) {
         incrementCounter("apiCallErrorsTotal", "emojis");
         console.error(
@@ -123,7 +128,10 @@ export async function handleReactionAdd(reaction, user, options) {
 
   if (repostDetectionEnabled && emojisMatch(emojiObj, repostEmojiId)) {
     countRepost(message.author.id, message.id, user.id)
-      .then(() => incrementCounter("repostsDetectedTotal"))
+      .then((milestones) => {
+        incrementCounter("repostsDetectedTotal");
+        return announceMilestones(message, milestones);
+      })
       .catch((err) => {
         incrementCounter("apiCallErrorsTotal", "reposts");
         console.error(
@@ -169,7 +177,8 @@ export async function handleReactionRemove(reaction, user, options) {
     emojisMatch(emojiObj, plusEmoji) &&
     user.id !== message.author.id
   ) {
-    await dominus(message.author.id, "user", user.id);
+    const milestones = await dominus(message.author.id, "user", user.id);
+    await announceMilestones(message, milestones);
   }
 
   if (
@@ -177,6 +186,7 @@ export async function handleReactionRemove(reaction, user, options) {
     emojisMatch(emojiObj, minusEmoji) &&
     user.id !== message.author.id
   ) {
-    await doplus(message.author.id, "user", user.id);
+    const milestones = await doplus(message.author.id, "user", user.id);
+    await announceMilestones(message, milestones);
   }
 }

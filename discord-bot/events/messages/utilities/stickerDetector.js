@@ -1,6 +1,7 @@
 import { describeApiError } from "../../../api/client.js";
 import { countSticker } from "../../../api/stickers.js";
 import { incrementCounter } from "../../../utilities/metrics.js";
+import { announceMilestones } from "../../../utilities/milestoneNotifier.js";
 
 /**
  * Detect and record sticker usage in a message.
@@ -14,8 +15,9 @@ export const stickerDetector = async (rawMessage) => {
   // sticker were ever sent more than once in one message.
   for (const sticker of rawMessage.stickers.values()) {
     try {
-      await countSticker(sticker.name, sticker.id, rawMessage.author.id);
+      const milestones = await countSticker(sticker.name, sticker.id, rawMessage.author.id);
       incrementCounter("stickerCountedTotal");
+      await announceMilestones(rawMessage, milestones);
     } catch (err) {
       incrementCounter("apiCallErrorsTotal", "stickers");
       console.error(

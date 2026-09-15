@@ -290,3 +290,26 @@ CREATE TABLE IF NOT EXISTS member_aliases (
 );
 
 CREATE INDEX IF NOT EXISTS idx_member_aliases_chat_member ON member_aliases (chat_member_mapping_id);
+
+-- Admin-defined usage-stat thresholds. `type` is the fine-grained metric key (see
+-- webapi/services/milestoneTypes.js), `item` scopes it to one entity (null = global), `object`
+-- is a free-form display category, not used for matching.
+CREATE TABLE IF NOT EXISTS milestones (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  quantity INTEGER NOT NULL,
+  type TEXT NOT NULL,
+  item TEXT NULL,
+  message TEXT NOT NULL,
+  object TEXT NOT NULL,
+  achieved INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_milestones_lookup ON milestones(type, item, achieved);
+
+CREATE TRIGGER IF NOT EXISTS milestones_updated_at
+  AFTER UPDATE ON milestones WHEN OLD.updated_at = NEW.updated_at
+  BEGIN
+    UPDATE milestones SET updated_at = datetime('now') WHERE id = NEW.id;
+  END;

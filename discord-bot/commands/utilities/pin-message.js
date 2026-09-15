@@ -1,6 +1,7 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import * as api from "../../api/client.js";
 import { sendPinAlert } from "../../events/messages/utilities/messagePinner.js";
+import { announceMilestones } from "../../utilities/milestoneNotifier.js";
 import { getPinMessageRoleIds } from "../../configStore.js";
 
 // Guild slash commands: after changing command definitions, run from discord-bot:
@@ -70,13 +71,14 @@ const execute = async (interaction) => {
     throw e;
   }
 
-  const sent = await sendPinAlert(targetMessage, interaction.client, [
+  const result = await sendPinAlert(targetMessage, interaction.client, [
     interaction.user.id,
   ]);
 
-  if (sent) {
+  if (result.sent) {
     const quip = await getRandomPinQuip();
     await targetMessage.reply(quip);
+    await announceMilestones(targetMessage, result.milestones);
     await interaction.editReply({
       content: "Pin alert sent for that message.",
     });
