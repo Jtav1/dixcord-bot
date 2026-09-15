@@ -94,6 +94,23 @@ curl -s -X POST "${BASE_URL}/api/trigger-responses/triggers" \
 
 ---
 
+## Bulk-link triggers and responses (cross product)
+
+Links every trigger string to every response string; existing pairs are skipped, not duplicated:
+
+```bash
+curl -s -X POST "${BASE_URL}/api/trigger-responses/bulk" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "trigger_strings": ["hello", "hi", "hey"],
+    "response_strings": ["Hi there!", "Hello!"],
+    "selection_mode": "random"
+  }'
+```
+
+---
+
 ## Update a trigger (selection_mode and/or response order / new responses)
 
 Set selection_mode and set order for existing links (use `id` = linkId from GET trigger):

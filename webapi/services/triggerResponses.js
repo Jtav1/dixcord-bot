@@ -677,6 +677,69 @@ export async function createTriggerWithResponses({
 }
 
 /**
+ * Link every trigger string to every response string (cross product), creating/reusing rows on both
+ * sides by string (same dedupe as create()/createTriggerWithResponses()). Existing links are skipped.
+ * @param {{ trigger_strings: string[], response_strings: string[], selection_mode?: string }} params
+ * @returns {Promise<{ triggers: Array<{id:number, trigger_string:string}>, responses: Array<{id:number, response_string:string}>, created: number, skipped: number }>}
+ */
+export async function bulkLinkTriggersAndResponses({
+  trigger_strings,
+  response_strings,
+  selection_mode = "random",
+}) {
+  const mode =
+    selection_mode && VALID_MODES.includes(selection_mode.toLowerCase())
+      ? selection_mode.toLowerCase()
+      : "random";
+
+  const triggerEntries = [];
+  for (const raw of trigger_strings) {
+    const str = typeof raw === "string" ? raw.trim() : "";
+    if (!str) continue;
+    const id = await getOrCreateTriggerId(str, mode);
+    if (id != null) triggerEntries.push({ id, trigger_string: str });
+  }
+
+  const responseEntries = [];
+  for (const raw of response_strings) {
+    const str = typeof raw === "string" ? raw.trim() : "";
+    if (!str) continue;
+    const id = await getOrCreateResponseId(str);
+    if (id != null) responseEntries.push({ id, response_string: str });
+  }
+
+  let created = 0;
+  let skipped = 0;
+  for (const trigger of triggerEntries) {
+    let touched = false;
+    for (const response of responseEntries) {
+      const [existing] = await db.query(
+        "SELECT id FROM trigger_response WHERE trigger_id = ? AND response_id = ? LIMIT 1",
+        [trigger.id, response.id],
+      );
+      if (existing && existing.length > 0) {
+        skipped += 1;
+        continue;
+      }
+      await db.query(
+        "INSERT INTO trigger_response (trigger_id, response_id) VALUES (?, ?)",
+        [trigger.id, response.id],
+      );
+      created += 1;
+      touched = true;
+    }
+    if (touched) {
+      await db.query(
+        "DELETE FROM trigger_response_state WHERE trigger_id = ?",
+        [trigger.id],
+      );
+    }
+  }
+
+  return { triggers: triggerEntries, responses: responseEntries, created, skipped };
+}
+
+/**
  * Update a trigger: selection_mode and/or response list (set order/weight for existing links, add new responses).
  * responses: [ { id: linkId, order?, weight? } ] to set order/weight, or [ { response_string, order?, weight? } ] to add new.
  * @param {number} triggerId

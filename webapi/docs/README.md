@@ -108,6 +108,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/trigger-responses/triggers/responses?trigger=` or `?triggerId=` | ✓ | All responses for a trigger |
 | GET | `/api/trigger-responses/triggers/:id` | ✓ | One trigger with responses |
 | POST | `/api/trigger-responses/triggers` | ✓ | Create trigger + responses |
+| POST | `/api/trigger-responses/bulk` | ✓ | Link every trigger string to every response string (cross product) |
 | PUT | `/api/trigger-responses/triggers/:id` | ✓ | Update trigger / responses |
 | GET | `/api/trigger-responses/random?trigger=&app=&userId=` | ✓ | One response for trigger (mode-aware); app+userId optionally logs trigger_response_user_history |
 | GET | `/api/trigger-responses/functions` | ✓ | Trigger response function catalog |
