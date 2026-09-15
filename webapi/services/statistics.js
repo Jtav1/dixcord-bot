@@ -42,7 +42,7 @@ export async function getDatabaseStatistics() {
       (SELECT COUNT(*) FROM triggers) AS triggers_count,
       (SELECT COUNT(*) FROM responses) AS responses_count,
       (SELECT COALESCE(SUM(frequency), 0) FROM trigger_response) AS trigger_response_frequency_sum,
-      (SELECT COUNT(*) FROM user_repost_tracking) AS repost_tracking_count,
+      (SELECT COUNT(*) FROM member_repost_tracking) AS repost_tracking_count,
       (SELECT COUNT(*) FROM scheduled_messages WHERE status = 'pending') AS scheduled_pending_count,
       (SELECT COUNT(*) FROM scheduled_messages WHERE status = 'sent') AS scheduled_sent_count`,
   );

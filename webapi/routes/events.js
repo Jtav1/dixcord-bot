@@ -206,9 +206,7 @@ router.get("/reposts", authenticate, async (req, res) => {
  *                   items:
  *                     type: object
  *                     properties:
- *                       emoid: { type: string }
- *                       name: { type: string }
- *                       frequency: { type: integer }
+ *                       emoji: { $ref: '#/components/schemas/EmojiFrequency' }
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '403':

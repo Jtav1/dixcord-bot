@@ -1,7 +1,7 @@
 import express from "express";
 import bcrypt from "bcryptjs";
 import db from "../config/db.js";
-import { signToken } from "../middleware/auth.js";
+import { isAllowedAuthenticatedRole, signToken } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -56,7 +56,7 @@ router.post("/register", (req, res) => {
  *               email:
  *                 type: string
  *                 format: email
- *                 description: Must match ADMIN_USERNAME, BOT_USERNAME, or WEBVIEW_USERNAME.
+ *                 description: Must belong to a users row with role admin, bot, or webview.
  *               password:
  *                 type: string
  *                 format: password
@@ -92,7 +92,7 @@ router.post("/register", (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       '503':
- *         description: No service-account usernames configured on the server.
+ *         description: No admin, bot, or webview accounts exist on the server yet.
  *         content:
  *           application/json:
  *             schema:
@@ -107,23 +107,13 @@ router.post("/login", async (req, res) => {
         .json({ ok: false, error: "Email and password are required" });
     }
 
-    const adminUsername = process.env.ADMIN_USERNAME;
-    const botUsername = process.env.BOT_USERNAME;
-    const webviewUsername = process.env.WEBVIEW_USERNAME;
-    const allowedEmails = [adminUsername, botUsername, webviewUsername].filter(
-      Boolean,
+    const [configuredRows] = await db.query(
+      "SELECT COUNT(*) AS c FROM users WHERE role IN ('admin', 'bot', 'webview')",
     );
-
-    if (allowedEmails.length === 0) {
+    if (Number(configuredRows?.[0]?.c ?? 0) === 0) {
       return res
         .status(503)
         .json({ ok: false, error: "Login not configured" });
-    }
-
-    if (!allowedEmails.includes(email)) {
-      return res
-        .status(401)
-        .json({ ok: false, error: "Invalid email or password" });
     }
 
     const [rows] = await db.query(
@@ -136,6 +126,11 @@ router.post("/login", async (req, res) => {
         .json({ ok: false, error: "Invalid email or password" });
     }
     const user = rows[0];
+    if (!isAllowedAuthenticatedRole(user.role)) {
+      return res
+        .status(401)
+        .json({ ok: false, error: "Invalid email or password" });
+    }
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
       return res

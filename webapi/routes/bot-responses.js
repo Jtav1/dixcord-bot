@@ -1,8 +1,17 @@
 import express from "express";
 import { authenticate } from "../middleware/auth.js";
 import { fortuneTeller, twitterFixer } from "../services/botResponses.js";
+import {
+  CHAT_APP_PARAM_ERROR,
+  resolveChatAppFromRequest,
+} from "../utils/chatAppHttp.js";
 
 const router = express.Router();
+
+const GUILD_ID_PARAM_ERROR = {
+  ok: false,
+  error: 'Parameter "guildId" is required',
+};
 
 /**
  * POST /api/bot-responses/fortune
@@ -44,7 +53,7 @@ router.post("/fortune", authenticate, async (req, res) => {
 /**
  * POST /api/bot-responses/link-fixer
  * Returns a fixed embed-friendly link if message contains a social link and trigger.
- * Body: { message: string }
+ * Body: { message: string, app: string, guildId: string }
  * Auth: required.
  * @openapi
  * /api/bot-responses/link-fixer:
@@ -52,15 +61,18 @@ router.post("/fortune", authenticate, async (req, res) => {
  *     operationId: fixBotLink
  *     tags: [Bot Responses]
  *     summary: Rewrite a social link to an embed-friendly host if triggered
- *     description: Returns an empty response string when the message does not contain a supported trigger/link combination.
+ *     description: Returns an empty response string when the message does not contain a supported trigger/link combination, or when twitter_fix_enabled is off for this server.
  *     requestBody:
- *       required: false
+ *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required: [app, guildId]
  *             properties:
  *               message: { type: string }
+ *               app: { type: string, enum: [discord] }
+ *               guildId: { type: string }
  *     responses:
  *       '200':
  *         description: Fixed link response (empty string if no fix applied).
@@ -71,6 +83,8 @@ router.post("/fortune", authenticate, async (req, res) => {
  *               properties:
  *                 ok: { type: boolean, enum: [true] }
  *                 response: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '403':
@@ -80,8 +94,13 @@ router.post("/fortune", authenticate, async (req, res) => {
  */
 router.post("/link-fixer", authenticate, async (req, res) => {
   try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    const guildId = String(req.body?.guildId ?? "").trim();
+    if (!guildId) return res.status(400).json(GUILD_ID_PARAM_ERROR);
+
     const message = req.body?.message ?? "";
-    const { response } = await twitterFixer(message);
+    const { response } = await twitterFixer(message, app, guildId);
     res.json({ ok: true, response });
   } catch (err) {
     console.error(err);

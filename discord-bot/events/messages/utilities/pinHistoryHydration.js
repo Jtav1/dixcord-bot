@@ -1,6 +1,7 @@
 import { ChannelType } from "discord.js";
 import { getPinChannelId, getPinEmoji } from "../../../configStore.js";
 import { guildId } from "../../../configVars.js";
+import { emojisMatch, toEmojiObject } from "../../../utilities/emojiCompare.js";
 import {
   listIncompletePinHistory,
   updatePinHistoryRow,
@@ -197,17 +198,14 @@ export async function findMessageById(
 /**
  * Find the pin emoji reaction on a message (config value from pin_emoji).
  * @param {import("discord.js").Message} message
- * @param {string|null} pinEmoji
+ * @param {{app:string|null,emoid:string|null,emoji:string|null}|null} pinEmoji - resolved emoji object (see configStore.js's getPinEmoji), not a bare string.
  * @returns {import("discord.js").MessageReaction|null}
  */
 export function findPinReaction(message, pinEmoji) {
   if (!pinEmoji) return null;
 
-  const cached = message.reactions.cache.get(pinEmoji);
-  if (cached) return cached;
-
   for (const reaction of message.reactions.cache.values()) {
-    if (reaction.emoji.id === pinEmoji || reaction.emoji.name === pinEmoji) {
+    if (emojisMatch(toEmojiObject(reaction.emoji), pinEmoji)) {
       return reaction;
     }
   }
@@ -218,7 +216,7 @@ export function findPinReaction(message, pinEmoji) {
 /**
  * Collect Discord user ids (non-bot) who reacted with the configured pin emoji.
  * @param {import("discord.js").Message} message
- * @param {string|null} pinEmoji
+ * @param {{app:string|null,emoid:string|null,emoji:string|null}|null} pinEmoji - resolved emoji object (see configStore.js's getPinEmoji), not a bare string.
  * @returns {Promise<string[]>}
  */
 export async function getPinReactionUserIds(message, pinEmoji) {

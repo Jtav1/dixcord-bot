@@ -119,58 +119,25 @@ export async function fetchPlusPlusVoteHistory(
 }
 
 /**
- * Fetch user mappings whose platform user ids appear in `platformUserIds`.
- * Paginates through GET /api/user-mappings until every id is found or the list is exhausted.
- * @param {Array<string|null|undefined>} platformUserIds Discord snowflakes to resolve.
+ * Fetch every member across all guilds for an app, deduped by platformUserId.
+ * Source of truth for platform-id -> name; user-mappings rows lack platformUserId entirely.
  * @param {string} [app="discord"] Chat app id.
- * @returns {Promise<Array<{ name: string, platformUserId: string }>>}
+ * @returns {Promise<Array<{ id: number|null, name: string|null, handle: string|null, platformUserId: string }>>}
  */
-export async function fetchUserMappingsForPlatformIds(
-  platformUserIds,
-  app = "discord",
-) {
-  const needed = new Set(
-    platformUserIds.filter((id) => id != null && id !== "").map(String),
-  );
-  if (needed.size === 0) return [];
+export async function fetchAllGuildMembers(app = "discord") {
+  const params = new URLSearchParams({ app });
+  const res = await fetch(`${API_BASE}/guild-members?${params}`);
 
-  const found = [];
-  let offset = 0;
-  let total = Infinity;
-
-  while (offset < total && needed.size > 0) {
-    const params = new URLSearchParams({
-      app,
-      limit: String(USER_MAPPINGS_PAGE_SIZE),
-      offset: String(offset),
-    });
-    const res = await fetch(`${API_BASE}/user-mappings?${params}`);
-
-    if (!res.ok) {
-      throw new Error(`Failed to load user mappings (${res.status})`);
-    }
-
-    const data = await parseJsonResponse(res, "User mappings");
-    if (!data?.ok) {
-      throw new Error(data?.error || "Failed to load user mappings");
-    }
-
-    const rows = Array.isArray(data.userMappings) ? data.userMappings : [];
-    for (const row of rows) {
-      const id = String(row.platformUserId);
-      if (needed.has(id)) {
-        found.push(row);
-        needed.delete(id);
-      }
-    }
-
-    total = Number(data.total ?? found.length);
-    offset += rows.length;
-
-    if (rows.length === 0) break;
+  if (!res.ok) {
+    throw new Error(`Failed to load guild members (${res.status})`);
   }
 
-  return found;
+  const data = await parseJsonResponse(res, "Guild members");
+  if (!data?.ok) {
+    throw new Error(data?.error || "Failed to load guild members");
+  }
+
+  return Array.isArray(data.members) ? data.members : [];
 }
 
 /**
@@ -213,15 +180,16 @@ export async function fetchAllUserMappings(app = "discord") {
 
 /**
  * Build a lookup map from platform user id to display name.
- * @param {Array<{ name: string, platformUserId: string }>} userMappings
+ * Falls back to the guild handle when a member has no linked mapping name.
+ * @param {Array<{ platformUserId?: string, name?: string|null, handle?: string|null }>} members
  * @returns {Map<string, string>}
  */
-export function buildUserNameMap(userMappings) {
+export function buildUserNameMap(members) {
   const map = new Map();
-  for (const row of userMappings) {
-    if (row?.platformUserId != null && row?.name != null) {
-      map.set(String(row.platformUserId), String(row.name));
-    }
+  for (const row of members) {
+    if (row?.platformUserId == null) continue;
+    const label = row.name ?? row.handle;
+    if (label != null) map.set(String(row.platformUserId), String(label));
   }
   return map;
 }

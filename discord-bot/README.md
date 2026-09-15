@@ -50,6 +50,7 @@ The bot **depends on the web API** for almost all behavior. It loads configurati
 - Polls cache version and refreshes in-memory triggers, link hosts, and config when invalidated.
 - Sends heartbeats to webapi; waits for `/health` before starting in Docker.
 - Pushes a full guild snapshot (metadata, channels, roles) to `POST /api/guild/sync` on startup and every 5 minutes.
+- Pushes the full membership list (nickname, roles held, joined-at) to `POST /api/guild-members/sync` on startup and every 5 minutes; members not yet known to `chat_member_mapping` are synced unlinked rather than skipped.
 - Optionally clears and re-registers guild slash commands on container start.
 
 ### Feature toggles

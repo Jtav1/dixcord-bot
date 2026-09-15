@@ -6,11 +6,12 @@
 
 import db from "../config/db.js";
 import {
-  CHAT_MEMBER_APP_CONFIG,
   isChatMemberAppSupported,
   requireChatMemberMappingId,
   UNKNOWN_CHAT_MEMBER_ERROR,
 } from "./chatMemberMapping.js";
+import { emojisMatch, resolveConfigEmojiValue } from "./emojiFrequency.js";
+import { getGuildConfigValue } from "./guildConfig.js";
 import { normalizePinLogPayload } from "./pinHistory.js";
 
 /**
@@ -33,10 +34,12 @@ function requireChatAppFromPayload(payload) {
 /**
  * Ensure emoji_frequency has a row for this emoji; increment frequency.
  * If no row exists, insert one with frequency 1.
+ * @param {string} app - e.g. "discord"; emoji_frequency.app has no default, so this is required on insert.
  * @param {string} [emojiType] - Type from request (e.g. 'emoji'); if missing, type is stored as null.
  * @private
  */
 async function ensureAndIncrementEmoji(
+  app,
   emojiId,
   emojiName,
   emojiAnimated,
@@ -65,15 +68,15 @@ async function ensureAndIncrementEmoji(
   } else {
     if (emojiId.length > 0 && emojiName.length > 0) {
       await db.query(
-        "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 1, ?, ?)",
-        [id, name, animated, type],
+        "INSERT INTO emoji_frequency (app, emoid, emoji, frequency, animated, type) VALUES (?, ?, ?, 1, ?, ?)",
+        [app, id, name, animated, type],
       );
     }
   }
 }
 
 /**
- * Upsert user_emoji_tracking. DB-agnostic: SELECT then INSERT or UPDATE.
+ * Upsert member_emoji_tracking. DB-agnostic: SELECT then INSERT or UPDATE.
  * @param {number} chatMemberMappingId - chat_member_mapping.id
  * @private
  */
@@ -81,26 +84,41 @@ async function upsertUserEmoji(chatMemberMappingId, emojiId) {
   if (chatMemberMappingId == null || !emojiId) return;
 
   const [rows] = await db.query(
-    "SELECT frequency FROM user_emoji_tracking WHERE userid = ? AND emoid = ?",
+    "SELECT frequency FROM member_emoji_tracking WHERE userid = ? AND emoid = ?",
     [chatMemberMappingId, emojiId],
   );
 
   if (rows && rows.length > 0) {
     await db.query(
-      "UPDATE user_emoji_tracking SET frequency = frequency + 1 WHERE userid = ? AND emoid = ?",
+      "UPDATE member_emoji_tracking SET frequency = frequency + 1 WHERE userid = ? AND emoid = ?",
       [chatMemberMappingId, emojiId],
     );
   } else {
     await db.query(
-      "INSERT INTO user_emoji_tracking (userid, emoid, frequency) VALUES (?, ?, 1)",
+      "INSERT INTO member_emoji_tracking (userid, emoid, frequency) VALUES (?, ?, 1)",
       [chatMemberMappingId, emojiId],
     );
   }
 }
 
 /**
+ * @param {{ id?: unknown, name?: unknown }} e - one entry from a countEmoji payload's `emojis` array
+ * @param {string} app
+ * @returns {{ app: string, emoid: string, emoji: string }}
+ * @private
+ */
+function toEmojiObject(e, app) {
+  const name = String(e?.name ?? "");
+  return {
+    app,
+    emoid: e?.id != null ? String(e.id) : name,
+    emoji: name,
+  };
+}
+
+/**
  * Record emoji usage from a message. Optionally records a +/- vote when replying with one plus/minus emoji.
- * @param {object} payload - { app: string, authorId: string (snowflake), emojis: Array<{ name, id? }>, isReply?, repliedUserId? }
+ * @param {object} payload - { app: string, guildId: string, authorId: string (snowflake), emojis: Array<{ name, id? }>, isReply?, repliedUserId? }
  * @returns {Promise<{ ok: boolean, applied?: string, error?: string }>}
  */
 export async function countEmoji(payload) {
@@ -115,35 +133,24 @@ export async function countEmoji(payload) {
     repliedUserId = null,
   } = payload;
 
-  // Fetch plusplus_emoji and minusminus_emoji config values from the database
-  // Assume db.query returns [rows] as in previous functions
-  const [plusRows] = await db.query(
-    "SELECT value FROM configurations WHERE config = 'plusplus_emoji'",
-  );
+  const guildId = String(payload.guildId ?? "").trim();
+  if (!guildId) return { ok: false, error: "guildId is required" };
 
-  const [minusRows] = await db.query(
-    "SELECT value FROM configurations WHERE config = 'minusminus_emoji'",
-  );
-
-  const plusEmojiId =
-    plusRows && plusRows.length > 0 ? String(plusRows[0].value) : null;
-  const minusEmojiId =
-    minusRows && minusRows.length > 0 ? String(minusRows[0].value) : null;
+  // plusplus_emoji/minusminus_emoji are per-guild (guild_config), resolved into emoji objects
+  // (see resolveConfigEmojiValue) so freeform/never-synced values still compare correctly.
+  const [plusValue, minusValue] = await Promise.all([
+    getGuildConfigValue(chatApp, guildId, "plusplus_emoji"),
+    getGuildConfigValue(chatApp, guildId, "minusminus_emoji"),
+  ]);
+  const plusEmoji = await resolveConfigEmojiValue(chatApp, plusValue);
+  const minusEmoji = await resolveConfigEmojiValue(chatApp, minusValue);
 
   if (!authorId || !Array.isArray(emojis) || emojis.length === 0) {
     return { ok: false };
   }
 
-  const plusCount = emojis.filter(
-    (e) =>
-      (e.id && String(e.id) === plusEmojiId) ||
-      (e.name && e.name === plusEmojiId),
-  ).length;
-  const minusCount = emojis.filter(
-    (e) =>
-      (e.id && String(e.id) === minusEmojiId) ||
-      (e.name && e.name === minusEmojiId),
-  ).length;
+  const plusCount = emojis.filter((e) => emojisMatch(toEmojiObject(e, chatApp), plusEmoji)).length;
+  const minusCount = emojis.filter((e) => emojisMatch(toEmojiObject(e, chatApp), minusEmoji)).length;
 
   const doPlusMinus = isReply && repliedUserId && plusCount + minusCount === 1;
 
@@ -176,7 +183,7 @@ export async function countEmoji(payload) {
   for (const em of emojis) {
     const name = String(em.name ?? "?");
     const id = em.id != null ? String(em.id) : name;
-    await ensureAndIncrementEmoji(id, name, em.animated, em.type);
+    await ensureAndIncrementEmoji(chatApp, id, name, em.animated, em.type);
     if (id && authorId) {
       await upsertUserEmoji(authorMap.id, id);
     }
@@ -207,7 +214,7 @@ export async function countSticker(payload) {
   for (const st of stickers) {
     const name = String(st.name ?? "?");
     const id = st.id != null ? String(st.id) : name;
-    await ensureAndIncrementEmoji(id, name, false, "sticker");
+    await ensureAndIncrementEmoji(chatApp, id, name, false, "sticker");
     if (id && authorId) {
       await upsertUserEmoji(authorMap.id, id);
     }
@@ -247,7 +254,7 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
 
   await db.query(
     "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
-    ["user", targetRes.id, voterRes.id, value],
+    ["user", String(targetRes.id), voterRes.id, value],
   );
   return true;
 }
@@ -386,18 +393,18 @@ export async function countRepost(payload) {
 
   if (repost === 1) {
     const [existing] = await db.query(
-      "SELECT 1 FROM user_repost_tracking WHERE userid = ? AND msgid = ? AND accuser = ?",
+      "SELECT 1 FROM member_repost_tracking WHERE userid = ? AND msgid = ? AND accuser = ?",
       [authorId, msgid, accuserId],
     );
     if (existing && existing.length > 0) {
       const now = new Date().toISOString().slice(0, 19).replace("T", " ");
       await db.query(
-        "UPDATE user_repost_tracking SET msgcontents = ?, timestamp = ? WHERE userid = ? AND msgid = ? AND accuser = ?",
+        "UPDATE member_repost_tracking SET msgcontents = ?, timestamp = ? WHERE userid = ? AND msgid = ? AND accuser = ?",
         [msgcontents || null, now, authorId, msgid, accuserId],
       );
     } else {
       await db.query(
-        "INSERT INTO user_repost_tracking (userid, msgid, accuser, msgcontents) VALUES (?, ?, ?, ?)",
+        "INSERT INTO member_repost_tracking (userid, msgid, accuser, msgcontents) VALUES (?, ?, ?, ?)",
         [authorId, msgid, accuserId, msgcontents || null],
       );
     }
@@ -406,7 +413,7 @@ export async function countRepost(payload) {
 
   if (repost === -1) {
     const [result] = await db.query(
-      "DELETE FROM user_repost_tracking WHERE msgid = ? AND accuser = ?",
+      "DELETE FROM member_repost_tracking WHERE msgid = ? AND accuser = ?",
       [msgid, accuserId],
     );
     const deleted = result?.affectedRows ?? result?.changes ?? 0;
@@ -421,14 +428,16 @@ export async function countRepost(payload) {
 /**
  * Sync guild custom emojis or stickers into `emoji_frequency`.
  * Rows are distinguished by `emoji_frequency.type`: `"emoji"` or `"sticker"` (not Discord API subtype).
- * Deletes only zero-frequency rows of the same asset kind, then inserts missing ids with frequency 0.
+ * Deletes only zero-frequency rows of the same asset kind (and app), then inserts missing ids with frequency 0.
  * @param {Array<{ id: string, name: string, animated?: boolean }>} items - From guild.emojis / guild.stickers
  * @param {"emoji"|"sticker"} assetKind
+ * @param {string} app - e.g. "discord"; emoji_frequency.app has no default, so this is required on insert.
  * @returns {Promise<{ ok: boolean, imported?: number }>} imported = new rows added (existing emoids skipped)
  */
-export async function importGuildAssetFrequencyList(items, assetKind) {
+export async function importGuildAssetFrequencyList(items, assetKind, app) {
   if (!Array.isArray(items)) return { ok: false };
   if (assetKind !== "emoji" && assetKind !== "sticker") return { ok: false };
+  if (!isChatMemberAppSupported(app)) return { ok: false };
 
   const list = items.filter(
     (e) => e != null && (e.id != null || e.name != null),
@@ -436,11 +445,13 @@ export async function importGuildAssetFrequencyList(items, assetKind) {
 
   if (assetKind === "emoji") {
     await db.query(
-      "DELETE FROM emoji_frequency WHERE frequency = 0 AND (type = 'emoji' OR type IS NULL)",
+      "DELETE FROM emoji_frequency WHERE frequency = 0 AND (type = 'emoji' OR type IS NULL) AND app = ?",
+      [app],
     );
   } else {
     await db.query(
-      "DELETE FROM emoji_frequency WHERE frequency = 0 AND type = 'sticker'",
+      "DELETE FROM emoji_frequency WHERE frequency = 0 AND type = 'sticker' AND app = ?",
+      [app],
     );
   }
 
@@ -460,69 +471,13 @@ export async function importGuildAssetFrequencyList(items, assetKind) {
     if (assetKind === "emoji") {
       const animated = e.animated ? 1 : 0;
       await db.query(
-        "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 0, ?, ?)",
-        [emoid, name, animated, "emoji"],
+        "INSERT INTO emoji_frequency (app, emoid, emoji, frequency, animated, type) VALUES (?, ?, ?, 0, ?, ?)",
+        [app, emoid, name, animated, "emoji"],
       );
     } else {
       await db.query(
-        "INSERT INTO emoji_frequency (emoid, emoji, frequency, animated, type) VALUES (?, ?, 0, 0, ?)",
-        [emoid, name, "sticker"],
-      );
-    }
-    imported++;
-  }
-  return { ok: true, imported };
-}
-
-// --- User mapping import (per-app handle/id columns on chat_member_mapping) ---
-
-/** @deprecated Use isChatMemberAppSupported from ./chatMemberMapping.js */
-export const isChatMemberImportAppSupported = isChatMemberAppSupported;
-
-/**
- * Bulk upsert rows into chat_member_mapping. Conflict target is the app’s id column (unique).
- * @param {Array<Record<string, unknown>>} users
- * @param {string} app - e.g. `"discord"` (only supported value today)
- * @returns {Promise<{ ok: boolean, imported?: number, error?: string }>}
- */
-export async function importUserMappingList(users, app) {
-  if (!Array.isArray(users))
-    return { ok: false, error: "users must be an array" };
-  if (!isChatMemberAppSupported(app)) {
-    return {
-      ok: false,
-      error: 'Unsupported app; currently only "discord" is accepted.',
-    };
-  }
-
-  const cfg = CHAT_MEMBER_APP_CONFIG[app];
-  const hc = cfg.handleColumn;
-  const ic = cfg.idColumn;
-  const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
-  let imported = 0;
-
-  for (const u of users) {
-    if (u == null) continue;
-    const platformId = String(cfg.pickId(u) ?? "").trim();
-    const name = String(u.name ?? "").trim();
-    const handle = String(cfg.pickHandle(u) ?? "").trim();
-    if (!platformId || !name || !handle) continue;
-
-    if (isSqlite) {
-      await db.query(
-        `INSERT INTO chat_member_mapping (name, \`${hc}\`, \`${ic}\`) VALUES (?, ?, ?)
-         ON CONFLICT(\`${ic}\`) DO UPDATE SET
-           name = excluded.name,
-           \`${hc}\` = excluded.${hc}`,
-        [name, handle, platformId],
-      );
-    } else {
-      await db.query(
-        `INSERT INTO chat_member_mapping (name, \`${hc}\`, \`${ic}\`) VALUES (?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           name = VALUES(name),
-           \`${hc}\` = VALUES(${hc})`,
-        [name, handle, platformId],
+        "INSERT INTO emoji_frequency (app, emoid, emoji, frequency, animated, type) VALUES (?, ?, ?, 0, 0, ?)",
+        [app, emoid, name, "sticker"],
       );
     }
     imported++;

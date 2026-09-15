@@ -7,15 +7,14 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash VARCHAR(255) NOT NULL,
   name VARCHAR(255),
   role VARCHAR(20) NOT NULL DEFAULT 'admin',
+  guild_id VARCHAR(64) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS chat_member_mapping (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL UNIQUE,
-  discord_handle VARCHAR(255) NOT NULL UNIQUE,
-  discord_id VARCHAR(255) NOT NULL UNIQUE
+  name VARCHAR(255) NOT NULL UNIQUE
 );
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
@@ -43,6 +42,7 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
 );
 
 CREATE TABLE IF NOT EXISTS emoji_frequency (
+  app VARCHAR(20) NOT NULL,
   emoid VARCHAR(255) PRIMARY KEY,
   emoji VARCHAR(255) NOT NULL,
   frequency INT NOT NULL DEFAULT 0,
@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS pin_history (
   CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
 );
 
-CREATE TABLE IF NOT EXISTS user_emoji_tracking (
+CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
   userid INT NOT NULL,
   emoid VARCHAR(255) NOT NULL,
@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS user_emoji_tracking (
   CONSTRAINT fk_user_emoji_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS user_repost_tracking (
+CREATE TABLE IF NOT EXISTS member_repost_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
   userid INT NOT NULL,
   msgid VARCHAR(500) NOT NULL,
@@ -192,14 +192,16 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE TABLE IF NOT EXISTS bot_status (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  guild_id VARCHAR(32) NOT NULL UNIQUE,
+  app VARCHAR(20) NOT NULL,
+  guild_id VARCHAR(32) NOT NULL,
   version VARCHAR(50) NOT NULL,
   last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   ready_at TIMESTAMP NULL,
   member_count INT NULL,
   channel_count INT NULL,
   ws_ping_ms INT NULL,
-  metrics_json TEXT NULL
+  metrics_json TEXT NULL,
+  UNIQUE KEY uniq_bot_status_app_guild (app, guild_id)
 );
 
 CREATE TABLE IF NOT EXISTS system_state (
@@ -250,4 +252,46 @@ CREATE TABLE IF NOT EXISTS guild_roles (
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (app, id),
   KEY idx_guild_roles_guild (app, guild_id)
+);
+
+-- Per-(app, guild_id) configuration/feature-flags; each server gets its own fully
+-- independent set, superseding the single global `configurations` table above.
+CREATE TABLE IF NOT EXISTS guild_config (
+  app VARCHAR(20) NOT NULL,
+  guild_id VARCHAR(64) NOT NULL,
+  config VARCHAR(255) NOT NULL,
+  value VARCHAR(255) NULL,
+  PRIMARY KEY (app, guild_id, config)
+);
+
+-- Per-(app, guild_id, platform_user_id) server membership: Discord handle/nickname/roles/
+-- joined-at held in that server. chat_member_mapping stays the single global cross-server
+-- identity; the link to it lives in member_aliases (one identity, many guild_member aliases),
+-- not here, and is never set by sync — linking is a manual admin action (future work).
+CREATE TABLE IF NOT EXISTS guild_members (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  app VARCHAR(20) NOT NULL,
+  guild_id VARCHAR(64) NOT NULL,
+  platform_user_id VARCHAR(64) NOT NULL,
+  handle VARCHAR(255) NULL,
+  nickname VARCHAR(255) NULL,
+  roles TEXT NULL,
+  joined_at DATETIME NULL,
+  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_guild_members_app_guild_platform (app, guild_id, platform_user_id),
+  KEY idx_guild_members_app_guild (app, guild_id)
+);
+
+-- Links one chat_member_mapping identity to many guild_members rows (one-to-many). A
+-- guild_member row is "unlinked" until an admin creates this row (see GET
+-- /api/guild-members/unlinked) — sync never creates or touches this table.
+CREATE TABLE IF NOT EXISTS member_aliases (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  chat_member_mapping_id INT NOT NULL,
+  guild_member_id INT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_member_aliases_guild_member (guild_member_id),
+  KEY idx_member_aliases_chat_member (chat_member_mapping_id),
+  CONSTRAINT fk_member_aliases_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  CONSTRAINT fk_member_aliases_guild_member FOREIGN KEY (guild_member_id) REFERENCES guild_members(id) ON DELETE CASCADE
 );

@@ -125,6 +125,122 @@
             "type": "string"
           }
         }
+      },
+      "GuildRole": {
+        "type": "object",
+        "description": "A resolved guild_roles row — the shape every webapi response uses for a role, in place of a bare role id. If the id has no matching guild_roles row (deleted or never synced), only id/app are populated and the rest are null.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Discord role snowflake."
+          },
+          "app": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "color": {
+            "type": "string",
+            "nullable": true,
+            "description": "Hex color (e.g. \"#5865f2\"), or null if the role has no color set."
+          },
+          "position": {
+            "type": "integer",
+            "nullable": true
+          },
+          "mentionable": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "hoisted": {
+            "type": "boolean",
+            "nullable": true
+          }
+        }
+      },
+      "EmojiFrequency": {
+        "type": "object",
+        "description": "A resolved emoji_frequency row — the shape every webapi response uses for an emoji or sticker, in place of a bare emoid. If the emoid has no matching emoji_frequency row (deleted), only emoid is populated and the rest are null.",
+        "properties": {
+          "emoid": {
+            "type": "string",
+            "description": "Discord emoji/sticker snowflake, or the literal unicode character for a built-in emoji."
+          },
+          "app": {
+            "type": "string",
+            "nullable": true
+          },
+          "emoji": {
+            "type": "string",
+            "nullable": true,
+            "description": "Display name (custom emoji/sticker) or the unicode character itself."
+          },
+          "frequency": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Global usage count for this emoid."
+          },
+          "animated": {
+            "type": "integer",
+            "nullable": true,
+            "enum": [
+              0,
+              1,
+              null
+            ]
+          },
+          "type": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "emoji",
+              "sticker",
+              null
+            ]
+          }
+        }
+      },
+      "ConfigEmojiValue": {
+        "type": "object",
+        "description": "Resolved value of an \"emoji\"-typed config entry (pin_emoji, plusplus_emoji, minusminus_emoji, repost_emoji). If the stored value matches a synced emoji_frequency row, this is that row (app is the real app name). If it's freeform text an admin typed by hand that was never synced, app/emoid are null and `emoji` holds the raw text — comparisons should fall back to matching that string (see emojisMatch).",
+        "properties": {
+          "emoid": {
+            "type": "string",
+            "nullable": true
+          },
+          "app": {
+            "type": "string",
+            "nullable": true
+          },
+          "emoji": {
+            "type": "string",
+            "nullable": true
+          },
+          "frequency": {
+            "type": "integer",
+            "nullable": true
+          },
+          "animated": {
+            "type": "integer",
+            "nullable": true,
+            "enum": [
+              0,
+              1,
+              null
+            ]
+          },
+          "type": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "emoji",
+              "sticker",
+              null
+            ]
+          }
+        }
       }
     },
     "responses": {
@@ -395,7 +511,7 @@
             "name": "app",
             "in": "query",
             "required": true,
-            "description": "Chat app to scope the mapping to. Currently only \"discord\" is supported.",
+            "description": "Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently only \"discord\" is supported.",
             "schema": {
               "type": "string",
               "enum": [
@@ -427,7 +543,7 @@
             "name": "search",
             "in": "query",
             "required": false,
-            "description": "Case-insensitive substring match against name, handle, or platform user id.",
+            "description": "Case-insensitive substring match against name.",
             "schema": {
               "type": "string"
             }
@@ -458,14 +574,9 @@
                           "name": {
                             "type": "string"
                           },
-                          "handle": {
-                            "type": "string"
-                          },
-                          "platformUserId": {
-                            "type": "string"
-                          },
-                          "app": {
-                            "type": "string"
+                          "discordHandle": {
+                            "type": "string",
+                            "description": "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row."
                           }
                         }
                       }
@@ -501,7 +612,7 @@
           "User Mappings"
         ],
         "summary": "Create a user mapping",
-        "description": "Requires the admin role. `platformUserId` may also be sent as `discord_id` for backward compatibility.",
+        "description": "Requires the admin role. Creates a bare identity (id + name) with no guild_members aliases linked yet — linking is a separate, future admin action.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -510,9 +621,7 @@
                 "type": "object",
                 "required": [
                   "app",
-                  "name",
-                  "handle",
-                  "platformUserId"
+                  "name"
                 ],
                 "properties": {
                   "app": {
@@ -520,15 +629,9 @@
                     "enum": [
                       "discord"
                     ],
-                    "description": "Chat app to scope the mapping to. Currently only \"discord\" is supported."
+                    "description": "Chat app, validated but otherwise unused. Currently only \"discord\" is supported."
                   },
                   "name": {
-                    "type": "string"
-                  },
-                  "handle": {
-                    "type": "string"
-                  },
-                  "platformUserId": {
                     "type": "string"
                   }
                 }
@@ -559,14 +662,9 @@
                         "name": {
                           "type": "string"
                         },
-                        "handle": {
-                          "type": "string"
-                        },
-                        "platformUserId": {
-                          "type": "string"
-                        },
-                        "app": {
-                          "type": "string"
+                        "discordHandle": {
+                          "type": "string",
+                          "description": "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row."
                         }
                       }
                     }
@@ -610,7 +708,7 @@
             "name": "app",
             "in": "query",
             "required": true,
-            "description": "Chat app to scope the mapping to. Currently only \"discord\" is supported.",
+            "description": "Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently only \"discord\" is supported.",
             "schema": {
               "type": "string",
               "enum": [
@@ -642,14 +740,9 @@
                         "name": {
                           "type": "string"
                         },
-                        "handle": {
-                          "type": "string"
-                        },
-                        "platformUserId": {
-                          "type": "string"
-                        },
-                        "app": {
-                          "type": "string"
+                        "discordHandle": {
+                          "type": "string",
+                          "description": "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row."
                         }
                       }
                     }
@@ -678,7 +771,7 @@
           "User Mappings"
         ],
         "summary": "Update a user mapping",
-        "description": "Requires the admin role. Provide at least one of name, handle, or platformUserId. `platformUserId` may also be sent as `discord_id`.",
+        "description": "Requires the admin role.",
         "parameters": [
           {
             "name": "id",
@@ -696,7 +789,8 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "app"
+                  "app",
+                  "name"
                 ],
                 "properties": {
                   "app": {
@@ -704,15 +798,9 @@
                     "enum": [
                       "discord"
                     ],
-                    "description": "Chat app to scope the mapping to. Currently only \"discord\" is supported."
+                    "description": "Chat app, validated but otherwise unused. Currently only \"discord\" is supported."
                   },
                   "name": {
-                    "type": "string"
-                  },
-                  "handle": {
-                    "type": "string"
-                  },
-                  "platformUserId": {
                     "type": "string"
                   }
                 }
@@ -743,14 +831,9 @@
                         "name": {
                           "type": "string"
                         },
-                        "handle": {
-                          "type": "string"
-                        },
-                        "platformUserId": {
-                          "type": "string"
-                        },
-                        "app": {
-                          "type": "string"
+                        "discordHandle": {
+                          "type": "string",
+                          "description": "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row."
                         }
                       }
                     }
@@ -796,7 +879,7 @@
             "name": "app",
             "in": "query",
             "required": true,
-            "description": "Chat app to scope the mapping to. Currently only \"discord\" is supported.",
+            "description": "Chat app, validated but otherwise unused. Currently only \"discord\" is supported.",
             "schema": {
               "type": "string",
               "enum": [
@@ -2725,6 +2808,26 @@
           "System"
         ],
         "summary": "Get system and bot health status",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "discord"
+            },
+            "description": "Together with guildId, scopes `status.bot` to one server. Omit for the most-recently-seen server across all of them."
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "System status.",
@@ -2771,7 +2874,11 @@
                         "bot": {
                           "type": "object",
                           "nullable": true,
+                          "description": "One server's status — see the `app`/`guildId` query params for how it's selected.",
                           "properties": {
+                            "app": {
+                              "type": "string"
+                            },
                             "guildId": {
                               "type": "string"
                             },
@@ -2808,6 +2915,50 @@
                               "type": "integer",
                               "nullable": true,
                               "description": "Discord gateway heartbeat latency in ms as of the last heartbeat."
+                            }
+                          }
+                        },
+                        "bots": {
+                          "type": "array",
+                          "description": "Every known server's status, same shape as `bot`.",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "app": {
+                                "type": "string"
+                              },
+                              "guildId": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "string"
+                              },
+                              "lastSeenAt": {
+                                "type": "string"
+                              },
+                              "online": {
+                                "type": "boolean"
+                              },
+                              "readyAt": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "uptimeSeconds": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "memberCount": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "channelCount": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "wsPingMs": {
+                                "type": "integer",
+                                "nullable": true
+                              }
                             }
                           }
                         }
@@ -2921,10 +3072,17 @@
               "schema": {
                 "type": "object",
                 "required": [
+                  "app",
                   "guildId",
                   "version"
                 ],
                 "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
                   "guildId": {
                     "type": "string"
                   },
@@ -2985,6 +3143,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -3085,6 +3246,264 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/service-accounts": {
+      "get": {
+        "operationId": "listServiceAccounts",
+        "tags": [
+          "Service Accounts"
+        ],
+        "summary": "List service accounts",
+        "description": "Requires the admin role. Admin rows are included for visibility but cannot be created or deleted here.",
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "bot",
+                "webview"
+              ]
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matching service accounts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "accounts": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string"
+                          },
+                          "guildId": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createServiceAccount",
+        "tags": [
+          "Service Accounts"
+        ],
+        "summary": "Create a bot or webview service account",
+        "description": "Requires the admin role. role must be \"bot\" or \"webview\" — admin accounts cannot be created via this route. guildId scopes a bot (or webview) account to one guild for requireOwnGuildOrAdmin-gated routes; omit for an unrestricted account.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password",
+                  "name",
+                  "role"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "Minimum 8 characters."
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "bot",
+                      "webview"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created service account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "account": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "role": {
+                          "type": "string"
+                        },
+                        "guildId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "409": {
+            "description": "Email already in use.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/service-accounts/{id}": {
+      "delete": {
+        "operationId": "deleteServiceAccount",
+        "tags": [
+          "Service Accounts"
+        ],
+        "summary": "Delete a bot or webview service account",
+        "description": "Requires the admin role. Admin accounts cannot be deleted via this route.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -4915,7 +5334,7 @@
           "Message Processing"
         ],
         "summary": "Record emoji usage in a message",
-        "description": "Increments emoji_frequency / user_emoji_tracking for each emoji in the message. If isReply is true and the emojis are exactly one configured plusplus/minusminus emoji, also records a single +/- vote for repliedUserId instead of counting it as emoji usage.\n",
+        "description": "Increments emoji_frequency / member_emoji_tracking for each emoji in the message. If isReply is true and the emojis are exactly one configured plusplus/minusminus emoji (guild_config, resolved via resolveConfigEmojiValue and compared with emojisMatch), also records a single +/- vote for repliedUserId instead of counting it as emoji usage.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -4924,6 +5343,7 @@
                 "type": "object",
                 "required": [
                   "app",
+                  "guildId",
                   "authorId",
                   "emojis"
                 ],
@@ -4933,6 +5353,10 @@
                     "enum": [
                       "discord"
                     ]
+                  },
+                  "guildId": {
+                    "type": "string",
+                    "description": "Needed to resolve this server's plusplus_emoji/minusminus_emoji from guild_config."
                   },
                   "authorId": {
                     "type": "string",
@@ -4993,7 +5417,7 @@
             }
           },
           "400": {
-            "description": "Missing/invalid app parameter, or repliedUserId is not a known chat member.",
+            "description": "Missing/invalid app parameter, missing guildId, or repliedUserId is not a known chat member.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5004,6 +5428,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenBotOrAdmin"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -5018,7 +5445,7 @@
           "Message Processing"
         ],
         "summary": "Record sticker usage in a message",
-        "description": "Increments emoji_frequency (type='sticker') / user_emoji_tracking for each sticker in the message. Unlike emoji-count, there is no plus/minus branch — Discord has no reply-with-sticker vote mechanism.\n",
+        "description": "Increments emoji_frequency (type='sticker') / member_emoji_tracking for each sticker in the message. Unlike emoji-count, there is no plus/minus branch — Discord has no reply-with-sticker vote mechanism.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -5261,7 +5688,7 @@
           "Message Processing"
         ],
         "summary": "Record or withdraw a repost accusation",
-        "description": "repost=1 upserts a row in user_repost_tracking keyed on (userid, msgid, accuser). repost=-1 deletes the row(s) for that (msgid, accuser).\n",
+        "description": "repost=1 upserts a row in member_repost_tracking keyed on (userid, msgid, accuser). repost=-1 deletes the row(s) for that (msgid, accuser).\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -5366,7 +5793,7 @@
           "Message Processing"
         ],
         "summary": "Sync the guild's custom emoji catalog",
-        "description": "Deletes zero-frequency emoji_frequency rows (type 'emoji' or NULL), then inserts any emoji ids not already present with frequency 0.\n",
+        "description": "Deletes zero-frequency emoji_frequency rows (type 'emoji' or NULL) for this app, then inserts any emoji ids not already present with frequency 0.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -5374,9 +5801,16 @@
               "schema": {
                 "type": "object",
                 "required": [
+                  "app",
                   "emojis"
                 ],
                 "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
                   "emojis": {
                     "type": "array",
                     "items": {
@@ -5423,7 +5857,7 @@
             }
           },
           "400": {
-            "description": "emojis is not an array.",
+            "description": "Missing/invalid app, or emojis is not an array.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5448,7 +5882,7 @@
           "Message Processing"
         ],
         "summary": "Sync the guild's sticker catalog",
-        "description": "Deletes zero-frequency emoji_frequency rows of type 'sticker', then inserts any sticker ids not already present with frequency 0.\n",
+        "description": "Deletes zero-frequency emoji_frequency rows of type 'sticker' for this app, then inserts any sticker ids not already present with frequency 0.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -5456,9 +5890,16 @@
               "schema": {
                 "type": "object",
                 "required": [
+                  "app",
                   "stickers"
                 ],
                 "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
                   "stickers": {
                     "type": "array",
                     "items": {
@@ -5502,97 +5943,7 @@
             }
           },
           "400": {
-            "description": "stickers is not an array.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "500": {
-            "$ref": "#/components/responses/ServerError"
-          }
-        }
-      }
-    },
-    "/api/message-processing/user-mapping-import": {
-      "post": {
-        "operationId": "importUserMapping",
-        "tags": [
-          "Message Processing"
-        ],
-        "summary": "Bulk upsert cross-app user identity mappings",
-        "description": "Upserts rows into chat_member_mapping keyed on the app's platform id column (discord_id for app \"discord\"). Rows missing name/handle/id are skipped.\n",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "app",
-                  "users"
-                ],
-                "properties": {
-                  "app": {
-                    "type": "string",
-                    "enum": [
-                      "discord"
-                    ]
-                  },
-                  "users": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string"
-                        },
-                        "discord_handle": {
-                          "type": "string"
-                        },
-                        "discord_id": {
-                          "type": "string",
-                          "description": "Discord snowflake."
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "User mappings synced.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "imported": {
-                      "type": "integer",
-                      "description": "Rows upserted (skipped rows not counted)."
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "users is not an array, or app is unsupported.",
+            "description": "Missing/invalid app, or stickers is not an array.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6687,20 +7038,7 @@
                         "type": "object",
                         "properties": {
                           "emoji": {
-                            "type": "string"
-                          },
-                          "frequency": {
-                            "type": "integer"
-                          },
-                          "emoid": {
-                            "type": "string"
-                          },
-                          "animated": {
-                            "type": "integer",
-                            "enum": [
-                              0,
-                              1
-                            ]
+                            "$ref": "#/components/schemas/EmojiFrequency"
                           }
                         }
                       }
@@ -6726,7 +7064,7 @@
           "Leaderboards"
         ],
         "summary": "Top users by total emoji usage",
-        "description": "Paginated per-user emoji usage totals from user_emoji_tracking (emojis only, excludes stickers).",
+        "description": "Paginated per-user emoji usage totals from member_emoji_tracking (emojis only, excludes stickers).",
         "requestBody": {
           "required": true,
           "content": {
@@ -6882,15 +7220,7 @@
                         "type": "object",
                         "properties": {
                           "emoji": {
-                            "type": "string",
-                            "description": "Sticker name."
-                          },
-                          "frequency": {
-                            "type": "integer"
-                          },
-                          "emoid": {
-                            "type": "string",
-                            "description": "Sticker id."
+                            "$ref": "#/components/schemas/EmojiFrequency"
                           }
                         }
                       }
@@ -6916,7 +7246,7 @@
           "Leaderboards"
         ],
         "summary": "Top users by total sticker usage",
-        "description": "Paginated per-user sticker usage totals from user_emoji_tracking (stickers only).",
+        "description": "Paginated per-user sticker usage totals from member_emoji_tracking (stickers only).",
         "requestBody": {
           "required": true,
           "content": {
@@ -7198,7 +7528,7 @@
           "Leaderboards"
         ],
         "summary": "Per-user emoji usage stats",
-        "description": "Emoji usage breakdown for one user from user_emoji_tracking (emojis only, excludes stickers).",
+        "description": "Emoji usage breakdown for one user from member_emoji_tracking (emojis only, excludes stickers).",
         "parameters": [
           {
             "name": "userId",
@@ -7258,17 +7588,12 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "emoid": {
-                            "type": "string"
+                          "frequency": {
+                            "type": "integer",
+                            "description": "This user's own usage count (member_emoji_tracking); not the emoji's global count."
                           },
                           "emoji": {
-                            "type": "string"
-                          },
-                          "frequency": {
-                            "type": "integer"
-                          },
-                          "animated": {
-                            "type": "boolean"
+                            "$ref": "#/components/schemas/EmojiFrequency"
                           }
                         }
                       }
@@ -7304,7 +7629,7 @@
           "Leaderboards"
         ],
         "summary": "Per-user sticker usage stats",
-        "description": "Sticker usage breakdown for one user from user_emoji_tracking (stickers only).",
+        "description": "Sticker usage breakdown for one user from member_emoji_tracking (stickers only).",
         "parameters": [
           {
             "name": "userId",
@@ -7364,15 +7689,12 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "emoid": {
-                            "type": "string"
+                          "frequency": {
+                            "type": "integer",
+                            "description": "This user's own usage count (member_emoji_tracking); not the sticker's global count."
                           },
                           "emoji": {
-                            "type": "string",
-                            "description": "Sticker name."
-                          },
-                          "frequency": {
-                            "type": "integer"
+                            "$ref": "#/components/schemas/EmojiFrequency"
                           }
                         }
                       }
@@ -7454,7 +7776,7 @@
                     "roles": {
                       "type": "array",
                       "items": {
-                        "type": "object"
+                        "$ref": "#/components/schemas/GuildRole"
                       }
                     },
                     "emojis": {
@@ -7561,6 +7883,755 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members/sync": {
+      "post": {
+        "operationId": "syncGuildMembers",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "Upsert a server's membership list",
+        "description": "Upserts each member keyed on (app, guildId, platformUserId), safe to call with either a full periodic roster push or a single incremental member (e.g. a join event) — never deletes, so a member who has left the guild keeps their row as a historical record. Never creates or links chat_member_mapping/member_aliases rows — identity linking is a separate, manual, future admin action. A guild-scoped bot account (users.guild_id set) may only sync its own guildId; admin and unrestricted (guild_id null) accounts may sync any guildId.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "members"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "discord"
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "members": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "platformUserId"
+                      ],
+                      "properties": {
+                        "platformUserId": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Discord username."
+                        },
+                        "nickname": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "guild_roles.id values held in this server."
+                        },
+                        "joinedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "nullable": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sync result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "imported": {
+                      "type": "integer",
+                      "description": "Every row upserted."
+                    },
+                    "skipped": {
+                      "type": "integer",
+                      "description": "Entries dropped because they had no platformUserId at all (malformed input)."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members/user/{chatMemberMappingId}": {
+      "get": {
+        "operationId": "listServersForUser",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "List every server a given internal user id belongs to",
+        "description": "Reverse lookup for chat_member_mapping.id, joined with guild_info for display name. This is the primitive a cross-server feature (e.g. delivering a reminder to every server a user is in) would use; registered before any bare /{id} route so this literal \"user\" segment isn't shadowed.\n",
+        "parameters": [
+          {
+            "name": "chatMemberMappingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Servers this user belongs to.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "servers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "app": {
+                            "type": "string"
+                          },
+                          "guildId": {
+                            "type": "string"
+                          },
+                          "guildName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "nickname": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/GuildRole"
+                            }
+                          },
+                          "joinedAt": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members/unlinked": {
+      "get": {
+        "operationId": "listUnlinkedGuildMembers",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "List membership rows with no resolved identity link",
+        "description": "Admin manual-link workflow: these rows were synced but have no member_aliases row linking them to a chat_member_mapping identity. Read-only; linking/merging is a future capability.\n",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "discord"
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "description": "Case-insensitive substring match against handle or nickname.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unlinked membership rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "guild_members.id — pass this to POST /api/guild-members/:guildMemberId/link."
+                          },
+                          "app": {
+                            "type": "string"
+                          },
+                          "guildId": {
+                            "type": "string"
+                          },
+                          "platformUserId": {
+                            "type": "string"
+                          },
+                          "handle": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "nickname": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/GuildRole"
+                            }
+                          },
+                          "joinedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "syncedAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members/all": {
+      "get": {
+        "operationId": "listAllGuildMemberRows",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "List every guild_members row, linked or not, for the manual-link picker",
+        "description": "Unlike GET /api/guild-members/unlinked, this includes rows already linked to an identity (with that identity's id/name), so an admin can see and deliberately move one to a different chat_member_mapping — linking again just moves it, since member_aliases.guild_member_id is unique.\n",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "discord"
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "description": "Case-insensitive substring match against handle or nickname.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Every matching guild_members row.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "guild_members.id — pass this to POST /api/guild-members/:guildMemberId/link."
+                          },
+                          "app": {
+                            "type": "string"
+                          },
+                          "guildId": {
+                            "type": "string"
+                          },
+                          "platformUserId": {
+                            "type": "string"
+                          },
+                          "handle": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "nickname": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/GuildRole"
+                            }
+                          },
+                          "joinedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "syncedAt": {
+                            "type": "string"
+                          },
+                          "linkedMappingId": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "chat_member_mapping.id this row is currently linked to",
+                            "or null if unlinked.": null
+                          },
+                          "linkedMappingName": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members/aliases/{chatMemberMappingId}": {
+      "get": {
+        "operationId": "listAliasesForMapping",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "List guild_members aliases linked to a chat_member_mapping identity",
+        "parameters": [
+          {
+            "name": "chatMemberMappingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Linked membership rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "guild_members.id"
+                          },
+                          "app": {
+                            "type": "string"
+                          },
+                          "guildId": {
+                            "type": "string"
+                          },
+                          "guildName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "platformUserId": {
+                            "type": "string"
+                          },
+                          "handle": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "nickname": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/GuildRole"
+                            }
+                          },
+                          "joinedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "syncedAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members/{guildMemberId}/link": {
+      "post": {
+        "operationId": "linkGuildMemberAlias",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "Link a guild_members row to a chat_member_mapping identity",
+        "description": "Creates (or moves, if already linked elsewhere) the member_aliases row for this guild_member — a guild_member can only be an alias of one identity at a time.\n",
+        "parameters": [
+          {
+            "name": "guildMemberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "chatMemberMappingId"
+                ],
+                "properties": {
+                  "chatMemberMappingId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Linked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "unlinkGuildMemberAlias",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "Unlink a guild_members row from its chat_member_mapping identity",
+        "parameters": [
+          {
+            "name": "guildMemberId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unlinked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members": {
+      "get": {
+        "operationId": "listGuildMembers",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "List one server's members, or every server's deduplicated by platformUserId",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "discord"
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": false,
+            "description": "When omitted, returns every member across all guilds for this app, deduplicated by platformUserId (most-recently-synced alias wins).",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Members of this server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "chat_member_mapping.id",
+                            "or null if unlinked": null
+                          },
+                          "name": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "handle": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "platformUserId": {
+                            "type": "string"
+                          },
+                          "nickname": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "roles": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/GuildRole"
+                            }
+                          },
+                          "joinedAt": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "syncedAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -7860,14 +8931,8 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "emoid": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "frequency": {
-                            "type": "integer"
+                          "emoji": {
+                            "$ref": "#/components/schemas/EmojiFrequency"
                           }
                         }
                       }
@@ -8268,10 +9333,31 @@
         "tags": [
           "Config"
         ],
-        "summary": "List all configuration entries",
+        "summary": "List all configuration entries for one server",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "discord"
+              ]
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "All configuration entries, keyed by name and with metadata.",
+            "description": "All configuration entries for this server, keyed by name and with metadata.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8285,9 +9371,19 @@
                     },
                     "config": {
                       "type": "object",
-                      "description": "Map of config name to value.",
+                      "description": "Map of config name to value. \"emoji\"-typed keys (pin_emoji, plusplus_emoji, minusminus_emoji, repost_emoji) resolve to a ConfigEmojiValue object (or null if unset) instead of a plain string.\n",
                       "additionalProperties": {
-                        "type": "string"
+                        "oneOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "$ref": "#/components/schemas/ConfigEmojiValue"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "entries": {
@@ -8299,7 +9395,17 @@
                             "type": "string"
                           },
                           "value": {
-                            "type": "string"
+                            "oneOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "$ref": "#/components/schemas/ConfigEmojiValue"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         }
                       }
@@ -8313,14 +9419,25 @@
                             "type": "string"
                           },
                           "value": {
-                            "type": "string"
+                            "oneOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "$ref": "#/components/schemas/ConfigEmojiValue"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           },
                           "description": {
                             "type": "string",
                             "nullable": true
                           },
                           "type": {
-                            "type": "string"
+                            "type": "string",
+                            "description": "e.g. string, integer, boolean, json, emoji."
                           },
                           "requiresBotRestart": {
                             "type": "boolean"
@@ -8336,8 +9453,14 @@
               }
             }
           },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -8349,7 +9472,7 @@
         "tags": [
           "Config"
         ],
-        "summary": "Create a new configuration key",
+        "summary": "Create a new configuration key for a server",
         "description": "Requires the admin role.",
         "requestBody": {
           "required": true,
@@ -8358,9 +9481,20 @@
               "schema": {
                 "type": "object",
                 "required": [
+                  "app",
+                  "guildId",
                   "config"
                 ],
                 "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
                   "config": {
                     "type": "string",
                     "description": "Configuration key name."
@@ -8408,7 +9542,7 @@
             "$ref": "#/components/responses/ForbiddenRole"
           },
           "409": {
-            "description": "A configuration entry with this key already exists.",
+            "description": "A configuration entry with this key already exists for this server.",
             "content": {
               "application/json": {
                 "schema": {
@@ -8427,8 +9561,8 @@
         "tags": [
           "Config"
         ],
-        "summary": "Update a configuration value by name",
-        "description": "Requires the admin role. Only updates if the config key already exists.",
+        "summary": "Update a configuration value for a server",
+        "description": "Requires the admin role. Only updates if the config key already exists for this server.",
         "requestBody": {
           "required": true,
           "content": {
@@ -8436,9 +9570,20 @@
               "schema": {
                 "type": "object",
                 "required": [
+                  "app",
+                  "guildId",
                   "config"
                 ],
                 "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
                   "config": {
                     "type": "string",
                     "description": "Configuration key name."
@@ -8500,12 +9645,31 @@
         "tags": [
           "Config"
         ],
-        "summary": "Delete a configuration key",
+        "summary": "Delete a configuration key for a server",
         "description": "Requires the admin role.",
         "parameters": [
           {
             "name": "key",
             "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "discord"
+              ]
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
             "required": true,
             "schema": {
               "type": "string"
@@ -8597,15 +9761,28 @@
           "Bot Responses"
         ],
         "summary": "Rewrite a social link to an embed-friendly host if triggered",
-        "description": "Returns an empty response string when the message does not contain a supported trigger/link combination.",
+        "description": "Returns an empty response string when the message does not contain a supported trigger/link combination, or when twitter_fix_enabled is off for this server.",
         "requestBody": {
-          "required": false,
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": [
+                  "app",
+                  "guildId"
+                ],
                 "properties": {
                   "message": {
+                    "type": "string"
+                  },
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
+                  "guildId": {
                     "type": "string"
                   }
                 }
@@ -8634,6 +9811,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -8692,7 +9872,7 @@
                   "email": {
                     "type": "string",
                     "format": "email",
-                    "description": "Must match ADMIN_USERNAME, BOT_USERNAME, or WEBVIEW_USERNAME."
+                    "description": "Must belong to a users row with role admin, bot, or webview."
                   },
                   "password": {
                     "type": "string",
@@ -8774,7 +9954,7 @@
             }
           },
           "503": {
-            "description": "No service-account usernames configured on the server.",
+            "description": "No admin, bot, or webview accounts exist on the server yet.",
             "content": {
               "application/json": {
                 "schema": {

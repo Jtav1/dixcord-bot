@@ -85,7 +85,7 @@ import {
 } from "../lib/stickerLeaderboard.js";
 import {
   buildUserNameMap,
-  fetchAllUserMappings,
+  fetchAllGuildMembers,
 } from "../lib/plusplusRankings.js";
 
 const loading = ref(true);
@@ -179,8 +179,8 @@ function onUserPageChange(nextPage) {
 
 onMounted(async () => {
   try {
-    const userMappings = await fetchAllUserMappings("discord");
-    nameMap.value = buildUserNameMap(userMappings);
+    const members = await fetchAllGuildMembers("discord");
+    nameMap.value = buildUserNameMap(members);
   } catch {
     // Name resolution is best-effort; API rows include names as fallback.
   }

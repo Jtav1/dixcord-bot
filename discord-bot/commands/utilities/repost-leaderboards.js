@@ -2,15 +2,10 @@ import { EmbedBuilder } from "discord.js";
 
 import { SlashCommandBuilder } from "discord.js";
 import { getTopReposters } from "../../api/emojis.js";
-import { getAllConfigurations } from "../../api/configurations.js";
+import { getRepostEmojiId } from "../../configStore.js";
 
 const cmdName = "top-reposters";
 const featureKey = "repost_detection_enabled";
-
-const configs = await getAllConfigurations();
-const repostEmojiId = configs.filter(
-  (config_entry) => config_entry.config === "repost_emoji",
-)[0].value;
 
 const data = new SlashCommandBuilder()
   .setName("top-reposters")
@@ -19,10 +14,16 @@ const data = new SlashCommandBuilder()
 const execute = async (interaction) => {
   let top5 = await getTopReposters(5);
 
+  // emoid only present when matched to a synced emoji_frequency row; else fall back to raw text.
+  const repostEmojiValue = getRepostEmojiId();
+  const repostEmojiDisplay = repostEmojiValue?.emoid
+    ? `<:repost:${repostEmojiValue.emoid}>`
+    : (repostEmojiValue?.emoji ?? "❓");
+
   let replyStr =
-    "Top 5 users with the most <:repost:" +
-    repostEmojiId +
-    "> accusations:\n\n";
+    "Top 5 users with the most " +
+    repostEmojiDisplay +
+    " accusations:\n\n";
   top5.forEach((userRow, idx) => {
     let num = idx + 1;
     //prettier-ignore

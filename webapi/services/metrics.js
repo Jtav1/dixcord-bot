@@ -31,13 +31,14 @@ async function getLatestBotMetrics() {
   return parseBotMetrics(rows?.[0]?.metrics_json);
 }
 
-/** @returns {Promise<Array<{ config: string, enabled: boolean }>>} */
+/** Feature flags are per-guild (guild_config); each guild reports its own gauge series. @returns {Promise<Array<{ config: string, guildId: string, enabled: boolean }>>} */
 async function getFeatureFlagStates() {
-  const [rows] = await db.query("SELECT config, value FROM configurations");
+  const [rows] = await db.query("SELECT guild_id, config, value FROM guild_config");
   return (Array.isArray(rows) ? rows : [])
     .filter((row) => CONFIG_METADATA[row.config]?.type === "boolean")
     .map((row) => ({
       config: row.config,
+      guildId: String(row.guild_id),
       enabled: String(row.value) !== "false",
     }));
 }
@@ -130,7 +131,7 @@ export async function buildMetricsText() {
     "webapi_trigger_response_frequency_total",
     "Sum of trigger_response.frequency across all links.",
   ).set(stats.triggerResponseFrequencySum);
-  gauge("webapi_repost_tracking_total", "Rows in user_repost_tracking.").set(
+  gauge("webapi_repost_tracking_total", "Rows in member_repost_tracking.").set(
     stats.repostTracking,
   );
 
@@ -188,14 +189,17 @@ export async function buildMetricsText() {
     }
   }
 
-  // --- Feature flags ---
+  // --- Feature flags (per guild) ---
   const featureEnabled = gauge(
     "webapi_feature_enabled",
-    "1 if the named feature flag is enabled, else 0.",
-    ["flag"],
+    "1 if the named feature flag is enabled for the guild, else 0.",
+    ["flag", "guild_id"],
   );
   for (const flag of flags) {
-    featureEnabled.set({ flag: flag.config }, flag.enabled ? 1 : 0);
+    featureEnabled.set(
+      { flag: flag.config, guild_id: flag.guildId },
+      flag.enabled ? 1 : 0,
+    );
   }
 
   // --- Audit log activity ---

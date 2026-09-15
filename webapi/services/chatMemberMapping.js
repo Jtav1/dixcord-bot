@@ -1,24 +1,14 @@
 /**
- * Resolve platform user id strings to chat_member_mapping.id for FK writes.
- * SQL uses per-app columns on chat_member_mapping (e.g. discord_id for app "discord").
+ * Resolve platform user id strings to chat_member_mapping.id via guild_members + member_aliases.
  */
 
 import db from "../config/db.js";
 
 /**
- * Per chat app: unique id column on chat_member_mapping, handle column for import, row pickers.
- * Only keys listed here are accepted; expand when adding platforms.
- * Column names are whitelisted for dynamic SQL (never from user input).
+ * Chat apps accepted throughout the codebase. Expand when adding platforms.
  */
 export const CHAT_MEMBER_APP_CONFIG = Object.freeze({
-  discord: {
-    handleColumn: "discord_handle",
-    idColumn: "discord_id",
-    /** @param {Record<string, unknown>} row */
-    pickHandle: (row) => row.discord_handle,
-    /** @param {Record<string, unknown>} row */
-    pickId: (row) => row.discord_id,
-  },
+  discord: {},
 });
 
 /**
@@ -33,16 +23,10 @@ export function isChatMemberAppSupported(app) {
 }
 
 /**
- * @param {string} app
- * @returns {string}
- */
-export function getChatMemberIdColumn(app) {
-  return CHAT_MEMBER_APP_CONFIG[app].idColumn;
-}
-
-/**
+ * Pure existence guard — guild_members/chat_member_mapping columns are fixed and app-agnostic,
+ * so this no longer resolves per-app column names, only whether `app` is a supported value.
  * @param {unknown} app
- * @returns {{ handleColumn: string, idColumn: string, pickHandle: Function, pickId: Function } | null}
+ * @returns {{} | null}
  */
 export function getChatMemberAppConfig(app) {
   if (!isChatMemberAppSupported(app)) return null;
@@ -50,21 +34,27 @@ export function getChatMemberAppConfig(app) {
 }
 
 /**
+ * A real Discord account's platform_user_id is identical across every guild it's in, so this
+ * resolves via any guild_members row for that id that has been manually linked (member_aliases)
+ * — no guildId needed. Returns null if unlinked or unknown; never creates a mapping.
  * @param {unknown} platformUserId - snowflake / platform user id string
  * @param {string} app - e.g. "discord"
- * @returns {Promise<number | null>} chat_member_mapping.id, or null if not found
+ * @returns {Promise<number | null>} chat_member_mapping.id, or null if not found/unlinked
  */
 export async function getChatMemberMappingIdByPlatformUserId(
   platformUserId,
   app,
 ) {
   if (!isChatMemberAppSupported(app)) return null;
-  const idCol = getChatMemberIdColumn(app);
   const id = String(platformUserId ?? "").trim();
   if (!id) return null;
   const [rows] = await db.query(
-    `SELECT id FROM chat_member_mapping WHERE \`${idCol}\` = ?`,
-    [id],
+    `SELECT ma.chat_member_mapping_id AS id
+     FROM guild_members gm
+     JOIN member_aliases ma ON ma.guild_member_id = gm.id
+     WHERE gm.app = ? AND gm.platform_user_id = ?
+     LIMIT 1`,
+    [app, id],
   );
   if (!rows || rows.length === 0) return null;
   const n = Number(rows[0].id);

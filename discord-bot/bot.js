@@ -8,7 +8,6 @@ import { pathToFileURL } from "node:url";
 import { token, guildId, isDev, version, clientId } from "./configVars.js";
 import { importEmojiList } from "./api/emojis.js";
 import { importStickerList } from "./api/stickers.js";
-import { syncUserMappingFromGuild } from "./api/userMapping.js";
 import { hydratePinHistory } from "./events/messages/utilities/pinHistoryHydration.js";
 import {
   getAnnounceChannelId,
@@ -26,6 +25,7 @@ import {
 import { startCacheVersionPoller } from "./api/cacheRefresh.js";
 import { startHeartbeat } from "./api/system.js";
 import { startGuildInfoSync } from "./api/guildInfo.js";
+import { startGuildMembersSync } from "./api/guildMembers.js";
 import { startMessageScheduler } from "./scheduler/messageScheduler.js";
 import {
   handleReactionAdd,
@@ -142,7 +142,6 @@ client.once(Events.ClientReady, async (readyClient) => {
 
   await importEmojiList(emojis);
   await importStickerList(stickers);
-  await syncUserMappingFromGuild(readyClient);
   await hydratePinHistory(readyClient).catch((err) => {
     console.error("pin-history hydration error:", err);
   });
@@ -150,6 +149,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   startCacheVersionPoller();
   startHeartbeat(readyClient, readyClient.readyAt);
   startGuildInfoSync(readyClient);
+  startGuildMembersSync(readyClient);
 
   console.log(
     `bot: Ready! Logged in as ${readyClient.user.tag} at ${new Date().toLocaleString()}`,

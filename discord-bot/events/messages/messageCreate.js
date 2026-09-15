@@ -53,8 +53,8 @@ const execute = async (message) => {
         linkHosts = getCachedLinkHosts() ?? [];
       }
       const twitCheck = message.content.split(" ").filter((word) => {
-        const tmpWord = word.replace(/[<>]/g, "");
-        return linkHosts.some((host) => tmpWord.includes(host));
+        const tmpWord = word.replace(/[<>]/g, "").toLowerCase();
+        return linkHosts.some((host) => tmpWord.includes(host.toLowerCase()));
       });
 
       if (twitCheck.length > 0) {

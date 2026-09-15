@@ -60,14 +60,14 @@ export function getPinThreshold() {
 }
 
 /**
- * @returns {string|null}
+ * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object (see webapi's resolveConfigEmojiValue); null if unset. app: null means freeform text never synced to emoji_frequency — compare with emojisMatch, not by id/name directly.
  */
 export function getPinEmoji() {
   return getConfigValue("pin_emoji");
 }
 
 /**
- * @returns {string|null}
+ * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object; null if unset. See getPinEmoji for shape notes.
  */
 export function getRepostEmojiId() {
   return getConfigValue("repost_emoji");
@@ -81,14 +81,14 @@ export function getAnnounceChannelId() {
 }
 
 /**
- * @returns {string|null}
+ * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object; null if unset. See getPinEmoji for shape notes.
  */
 export function getPlusEmoji() {
   return getConfigValue("plusplus_emoji");
 }
 
 /**
- * @returns {string|null}
+ * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object; null if unset. See getPinEmoji for shape notes.
  */
 export function getMinusEmoji() {
   return getConfigValue("minusminus_emoji");

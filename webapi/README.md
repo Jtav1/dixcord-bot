@@ -110,7 +110,7 @@ All routes except Auth require: `Authorization: Bearer <token>`.
 | Method | Path                            | Description                                      |
 | ------ | ------------------------------- | ------------------------------------------------ |
 | POST   | `/api/bot-responses/fortune`    | Random 8-ball fortune                            |
-| POST   | `/api/bot-responses/link-fixer` | Fix social links in message; body: `{ message }` |
+| POST   | `/api/bot-responses/link-fixer` | Fix social links in message; body: `{ message, app, guildId }` |
 
 ### Message Processing (token required)
 

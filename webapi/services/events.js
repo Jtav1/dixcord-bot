@@ -4,11 +4,11 @@
 
 import db from "../config/db.js";
 import {
-  getChatMemberIdColumn,
   getChatMemberMappingIdByPlatformUserId,
   isChatMemberAppSupported,
 } from "./chatMemberMapping.js";
-import { parseLimit } from "./leaderboards.js";
+import { attachEmojiObjects } from "./emojiFrequency.js";
+import { parseLimit, representativePlatformIdSubquery } from "./leaderboards.js";
 
 /**
  * Parse optional ISO datetime query param to SQL datetime string.
@@ -31,7 +31,6 @@ export async function listPlusplusEvents(opts = {}) {
   const app = opts.app ?? "discord";
   if (!isChatMemberAppSupported(app)) return { events: [], total: 0 };
 
-  const idCol = getChatMemberIdColumn(app);
   const limit = parseLimit(opts.limit, 50, 200);
   const offset = Math.max(0, opts.offset ?? 0);
   const fromSql = parseFromTo(opts.from);
@@ -57,9 +56,8 @@ export async function listPlusplusEvents(opts = {}) {
 
   const [rows] = await db.query(
     `SELECT pt.id, pt.type, pt.string, pt.value, pt.timestamp,
-            cm_v.\`${idCol}\` AS voter_platform_id
+            ${representativePlatformIdSubquery("pt.voter")} AS voter_platform_id
      FROM plusplus_tracking pt
-     LEFT JOIN chat_member_mapping cm_v ON pt.voter = cm_v.id
      ${whereClause}
      ORDER BY pt.timestamp DESC, pt.id DESC
      LIMIT ? OFFSET ?`,
@@ -87,7 +85,6 @@ export async function listRepostEvents(opts = {}) {
   const app = opts.app ?? "discord";
   if (!isChatMemberAppSupported(app)) return { events: [], total: 0 };
 
-  const idCol = getChatMemberIdColumn(app);
   const limit = parseLimit(opts.limit, 50, 200);
   const offset = Math.max(0, opts.offset ?? 0);
   const fromSql = parseFromTo(opts.from);
@@ -114,18 +111,16 @@ export async function listRepostEvents(opts = {}) {
   const whereClause = where.length ? ` WHERE ${where.join(" AND ")}` : "";
 
   const [countRows] = await db.query(
-    `SELECT COUNT(*) AS total FROM user_repost_tracking r${whereClause}`,
+    `SELECT COUNT(*) AS total FROM member_repost_tracking r${whereClause}`,
     params,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
     `SELECT r.id, r.msgid, r.msgcontents, r.timestamp,
-            cm_u.\`${idCol}\` AS userid_platform_id,
-            cm_a.\`${idCol}\` AS accuser_platform_id
-     FROM user_repost_tracking r
-     INNER JOIN chat_member_mapping cm_u ON r.userid = cm_u.id
-     INNER JOIN chat_member_mapping cm_a ON r.accuser = cm_a.id
+            ${representativePlatformIdSubquery("r.userid")} AS userid_platform_id,
+            ${representativePlatformIdSubquery("r.accuser")} AS accuser_platform_id
+     FROM member_repost_tracking r
      ${whereClause}
      ORDER BY r.timestamp DESC, r.id DESC
      LIMIT ? OFFSET ?`,
@@ -136,8 +131,8 @@ export async function listRepostEvents(opts = {}) {
     id: Number(row.id),
     msgid: String(row.msgid),
     msgcontents: row.msgcontents,
-    useridPlatformId: String(row.userid_platform_id),
-    accuserPlatformId: String(row.accuser_platform_id),
+    useridPlatformId: row.userid_platform_id != null ? String(row.userid_platform_id) : null,
+    accuserPlatformId: row.accuser_platform_id != null ? String(row.accuser_platform_id) : null,
     timestamp: row.timestamp,
   }));
 
@@ -151,15 +146,15 @@ const EMOJI_FREQUENCY_WHERE = "ef.type = 'emoji' OR ef.type IS NULL";
  * @param {string} userId - platform user id
  * @param {string} app
  * @param {number} [limit] When omitted, returns all rows.
- * @returns {Promise<Array<{ emoid: string, emoji: string, frequency: number, animated: boolean }>>}
+ * @returns {Promise<Array<{ frequency: number, emoji: object }>>} `frequency` is this user's own usage count (member_emoji_tracking); `emoji` is the full emoji_frequency row (see attachEmojiObjects) — its own `frequency` is the emoji's global count, a different number.
  */
 export async function getEmojiStatsForUser(userId, app, limit) {
   if (!isChatMemberAppSupported(app)) return [];
   const mid = await getChatMemberMappingIdByPlatformUserId(userId, app);
   if (mid == null) return [];
 
-  const sql = `SELECT uet.emoid, ef.emoji, uet.frequency, ef.animated
-     FROM user_emoji_tracking uet
+  const sql = `SELECT uet.emoid, uet.frequency
+     FROM member_emoji_tracking uet
      INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
      WHERE uet.userid = ? AND (${EMOJI_FREQUENCY_WHERE})
      ORDER BY uet.frequency DESC`;
@@ -174,12 +169,11 @@ export async function getEmojiStatsForUser(userId, app, limit) {
     params,
   );
 
-  return (Array.isArray(rows) ? rows : []).map((row) => ({
+  const parsed = (Array.isArray(rows) ? rows : []).map((row) => ({
     emoid: String(row.emoid),
-    emoji: String(row.emoji),
     frequency: Number(row.frequency),
-    animated: Boolean(row.animated),
   }));
+  return attachEmojiObjects(parsed);
 }
 
 const STICKER_FREQUENCY_WHERE = "ef.type = 'sticker'";
@@ -189,15 +183,15 @@ const STICKER_FREQUENCY_WHERE = "ef.type = 'sticker'";
  * @param {string} userId - platform user id
  * @param {string} app
  * @param {number} [limit] When omitted, returns all rows.
- * @returns {Promise<Array<{ emoid: string, emoji: string, frequency: number }>>}
+ * @returns {Promise<Array<{ frequency: number, emoji: object }>>} `frequency` is this user's own usage count (member_emoji_tracking); `emoji` is the full emoji_frequency row (see attachEmojiObjects) — its own `frequency` is the sticker's global count, a different number.
  */
 export async function getStickerStatsForUser(userId, app, limit) {
   if (!isChatMemberAppSupported(app)) return [];
   const mid = await getChatMemberMappingIdByPlatformUserId(userId, app);
   if (mid == null) return [];
 
-  const sql = `SELECT uet.emoid, ef.emoji, uet.frequency
-     FROM user_emoji_tracking uet
+  const sql = `SELECT uet.emoid, uet.frequency
+     FROM member_emoji_tracking uet
      INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
      WHERE uet.userid = ? AND (${STICKER_FREQUENCY_WHERE})
      ORDER BY uet.frequency DESC`;
@@ -212,26 +206,26 @@ export async function getStickerStatsForUser(userId, app, limit) {
     params,
   );
 
-  return (Array.isArray(rows) ? rows : []).map((row) => ({
+  const parsed = (Array.isArray(rows) ? rows : []).map((row) => ({
     emoid: String(row.emoid),
-    emoji: String(row.emoji),
     frequency: Number(row.frequency),
   }));
+  return attachEmojiObjects(parsed);
 }
 
 /**
  * List sticker catalog from emoji_frequency where type = sticker.
  * @param {number} [limit]
- * @returns {Promise<Array<{ emoid: string, name: string, frequency: number }>>}
+ * @returns {Promise<Array<{ emoji: object }>>} `emoji` is the full emoji_frequency row (see attachEmojiObjects).
  */
 export async function listStickerCatalog(limit) {
   const n = parseLimit(limit, 50, 200);
   const [rows] = await db.query(
-    `SELECT emoid, emoji AS name, frequency FROM emoji_frequency
+    `SELECT emoid FROM emoji_frequency
      WHERE type = 'sticker'
      ORDER BY frequency DESC
      LIMIT ?`,
     [n],
   );
-  return Array.isArray(rows) ? rows : [];
+  return attachEmojiObjects(Array.isArray(rows) ? rows : []);
 }

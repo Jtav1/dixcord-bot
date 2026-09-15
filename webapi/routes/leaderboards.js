@@ -403,10 +403,7 @@ router.post("/plusplus/top-voters", authenticate, async (req, res) => {
  *                   items:
  *                     type: object
  *                     properties:
- *                       emoji: { type: string }
- *                       frequency: { type: integer }
- *                       emoid: { type: string }
- *                       animated: { type: integer, enum: [0, 1] }
+ *                       emoji: { $ref: '#/components/schemas/EmojiFrequency' }
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
@@ -436,7 +433,7 @@ router.post("/emoji", authenticate, async (req, res) => {
  *     operationId: getEmojiUserLeaderboard
  *     tags: [Leaderboards]
  *     summary: Top users by total emoji usage
- *     description: Paginated per-user emoji usage totals from user_emoji_tracking (emojis only, excludes stickers).
+ *     description: Paginated per-user emoji usage totals from member_emoji_tracking (emojis only, excludes stickers).
  *     requestBody:
  *       required: true
  *       content:
@@ -533,9 +530,7 @@ router.post("/emoji/users", authenticate, async (req, res) => {
  *                   items:
  *                     type: object
  *                     properties:
- *                       emoji: { type: string, description: "Sticker name." }
- *                       frequency: { type: integer }
- *                       emoid: { type: string, description: "Sticker id." }
+ *                       emoji: { $ref: '#/components/schemas/EmojiFrequency' }
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
@@ -565,7 +560,7 @@ router.post("/sticker", authenticate, async (req, res) => {
  *     operationId: getStickerUserLeaderboard
  *     tags: [Leaderboards]
  *     summary: Top users by total sticker usage
- *     description: Paginated per-user sticker usage totals from user_emoji_tracking (stickers only).
+ *     description: Paginated per-user sticker usage totals from member_emoji_tracking (stickers only).
  *     requestBody:
  *       required: true
  *       content:
@@ -758,7 +753,7 @@ router.get("/repost/user/:userId", authenticate, async (req, res) => {
  *     operationId: getEmojiUserStats
  *     tags: [Leaderboards]
  *     summary: Per-user emoji usage stats
- *     description: Emoji usage breakdown for one user from user_emoji_tracking (emojis only, excludes stickers).
+ *     description: Emoji usage breakdown for one user from member_emoji_tracking (emojis only, excludes stickers).
  *     parameters:
  *       - name: userId
  *         in: path
@@ -790,10 +785,8 @@ router.get("/repost/user/:userId", authenticate, async (req, res) => {
  *                   items:
  *                     type: object
  *                     properties:
- *                       emoid: { type: string }
- *                       emoji: { type: string }
- *                       frequency: { type: integer }
- *                       animated: { type: boolean }
+ *                       frequency: { type: integer, description: "This user's own usage count (member_emoji_tracking); not the emoji's global count." }
+ *                       emoji: { $ref: '#/components/schemas/EmojiFrequency' }
  *       '400':
  *         description: Missing/invalid app parameter.
  *         content:
@@ -832,7 +825,7 @@ router.get("/emoji/user/:userId", authenticate, async (req, res) => {
  *     operationId: getStickerUserStats
  *     tags: [Leaderboards]
  *     summary: Per-user sticker usage stats
- *     description: Sticker usage breakdown for one user from user_emoji_tracking (stickers only).
+ *     description: Sticker usage breakdown for one user from member_emoji_tracking (stickers only).
  *     parameters:
  *       - name: userId
  *         in: path
@@ -864,9 +857,8 @@ router.get("/emoji/user/:userId", authenticate, async (req, res) => {
  *                   items:
  *                     type: object
  *                     properties:
- *                       emoid: { type: string }
- *                       emoji: { type: string, description: "Sticker name." }
- *                       frequency: { type: integer }
+ *                       frequency: { type: integer, description: "This user's own usage count (member_emoji_tracking); not the sticker's global count." }
+ *                       emoji: { $ref: '#/components/schemas/EmojiFrequency' }
  *       '400':
  *         description: Missing/invalid app parameter.
  *         content:

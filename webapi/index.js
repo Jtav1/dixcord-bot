@@ -7,6 +7,8 @@ import bcrypt from "bcryptjs";
 import { apiReference } from "@scalar/express-api-reference";
 import db from "./config/db.js";
 import { ensureSchemaMigrations } from "./scripts/ensureSchema.js";
+import { guildConfigIsEmpty, seedDefaultConfigForGuild } from "./services/guildConfig.js";
+import { CONFIG_METADATA } from "./services/configMetadata.js";
 import { buildOpenApiSpec } from "./lib/openapi.js";
 import { buildMetricsText } from "./services/metrics.js";
 import authRoutes from "./routes/auth.js";
@@ -27,6 +29,8 @@ import eventsRoutes from "./routes/events.js";
 import auditLogRoutes from "./routes/audit-log.js";
 import statisticsRoutes from "./routes/statistics.js";
 import guildRoutes from "./routes/guild.js";
+import guildMembersRoutes from "./routes/guild-members.js";
+import serviceAccountsRoutes from "./routes/service-accounts.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -148,6 +152,25 @@ async function ensureWebViewUser() {
     console.error("Failed to ensure web-view user:", err);
     throw err;
   }
+}
+
+/**
+ * Dev convenience: seed guild_config for DISCORD_GUILD_ID from SEED_CONFIG_* env values.
+ * Skipped in production and whenever guild_config already has any rows (not just first launch).
+ * @returns {Promise<void>}
+ */
+async function seedDevGuildConfig() {
+  if (process.env.NODE_ENV === "production") return;
+  const guildId = process.env.DISCORD_GUILD_ID;
+  if (!guildId) return;
+  if (!(await guildConfigIsEmpty())) return;
+  const overrides = Object.keys(CONFIG_METADATA)
+    .map((config) => ({ config, envValue: process.env[`SEED_CONFIG_${config.toUpperCase()}`] }))
+    .filter(({ envValue }) => envValue !== undefined)
+    .map(({ config, envValue }) => ({ config, value: envValue }));
+  if (overrides.length === 0) return;
+  await seedDefaultConfigForGuild("discord", guildId, overrides);
+  console.log(`webapi: dev-seeded guild_config for discord/${guildId} from SEED_CONFIG_* env vars`);
 }
 
 /**
@@ -287,10 +310,10 @@ app.get("/", publicLimiter, (req, res) => {
       config: {
         authRequired: true,
         adminRoutes: [
-          "GET /api/config (includes entriesWithMeta)",
-          "POST /api/config (body: { config, value })",
-          "PUT /api/config (body: { config, value })",
-          "DELETE /api/config/:key",
+          "GET /api/config?app=&guildId= (includes entriesWithMeta, per-server)",
+          "POST /api/config (body: { app, guildId, config, value })",
+          "PUT /api/config (body: { app, guildId, config, value })",
+          "DELETE /api/config/:key?app=&guildId=",
         ],
       },
       eightBallResponses: {
@@ -329,10 +352,10 @@ app.get("/", publicLimiter, (req, res) => {
       system: {
         authRequired: true,
         routes: [
-          "GET /api/system/status (admin, bot, or webview)",
+          "GET /api/system/status?app=&guildId= (admin, bot, or webview)",
           "GET /api/system/cache-version",
           "POST /api/system/invalidate-cache (admin)",
-          "POST /api/system/heartbeat (body: { guildId, version })",
+          "POST /api/system/heartbeat (body: { app?, guildId, version })",
         ],
       },
       statistics: {
@@ -358,11 +381,28 @@ app.get("/", publicLimiter, (req, res) => {
           "POST /api/guild/sync (body: { app, guildId, guild, channels, roles })",
         ],
       },
+      guildMembers: {
+        authRequired: true,
+        routes: [
+          "GET /api/guild-members?app=&guildId= (guildId optional: omit for all-guilds dedup lookup)",
+          "GET /api/guild-members/user/:chatMemberMappingId",
+          "POST /api/guild-members/sync (body: { app, guildId, members }); upserts, never removes members",
+        ],
+        adminRoutes: ["GET /api/guild-members/unlinked?app=&guildId="],
+      },
+      serviceAccounts: {
+        authRequired: true,
+        adminRoutes: [
+          "GET /api/service-accounts?role=&guildId=",
+          "POST /api/service-accounts (body: { email, password, name, role, guildId? })",
+          "DELETE /api/service-accounts/:id",
+        ],
+      },
       botResponses: {
         authRequired: true,
         routes: [
           "POST /api/bot-responses/fortune",
-          "POST /api/bot-responses/link-fixer (body: { message })",
+          "POST /api/bot-responses/link-fixer (body: { message, app, guildId })",
         ],
       },
       messageProcessing: {
@@ -373,7 +413,6 @@ app.get("/", publicLimiter, (req, res) => {
           "POST /api/message-processing/count-repost",
           "POST /api/message-processing/emoji-import",
           "POST /api/message-processing/sticker-import",
-          "POST /api/message-processing/user-mapping-import",
           "POST /api/message-processing/pin-check",
           "POST /api/message-processing/pin-log",
         ],
@@ -544,6 +583,8 @@ app.use("/api/events", eventsRoutes);
 app.use("/api/audit-log", auditLogRoutes);
 app.use("/api/statistics", statisticsRoutes);
 app.use("/api/guild", guildRoutes);
+app.use("/api/guild-members", guildMembersRoutes);
+app.use("/api/service-accounts", serviceAccountsRoutes);
 
 app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 
@@ -553,6 +594,7 @@ app.use((err, req, res, next) => {
 });
 
 await ensureSchemaMigrations();
+await seedDevGuildConfig();
 await ensureAdminUser();
 await ensureBotUser();
 await ensureWebViewUser();

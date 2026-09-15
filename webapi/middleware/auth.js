@@ -21,6 +21,7 @@ export const WEBVIEW_ALLOWED_ROUTES = [
   { method: "GET", path: "/api/pin-history" },
   { method: "GET", path: "/api/system/status" },
   { method: "GET", path: "/api/statistics" },
+  { method: "GET", path: "/api/guild-members" },
   { method: "GET", path: "/api/user-mappings" },
   { method: "GET", path: "/api/trigger-responses/functions" },
 ];
@@ -116,7 +117,7 @@ export function isWebviewAllowedRoute(method, pathname) {
  */
 async function loadUserWithRole(userId) {
   const [rows] = await db.query(
-    "SELECT id, email, name, created_at, role FROM users WHERE id = ?",
+    "SELECT id, email, name, created_at, role, guild_id FROM users WHERE id = ?",
     [userId],
   );
   if (!rows || rows.length === 0) return null;
@@ -126,6 +127,10 @@ async function loadUserWithRole(userId) {
     role:
       user.role != null && String(user.role).trim() !== ""
         ? String(user.role).trim()
+        : null,
+    guild_id:
+      user.guild_id != null && String(user.guild_id).trim() !== ""
+        ? String(user.guild_id).trim()
         : null,
   };
 }
@@ -197,6 +202,29 @@ export function requireBotOrAdmin(req, res, next) {
     return res
       .status(403)
       .json({ ok: false, error: "Bot or admin access required" });
+  }
+  next();
+}
+
+/**
+ * Require req guildId to match this account's guild_id. Admin and unrestricted (guild_id === null) accounts bypass.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @param {import('express').NextFunction} next
+ */
+export function requireOwnGuildOrAdmin(req, res, next) {
+  if (isAdminRole(req.user?.role)) return next();
+  if (req.user?.guild_id == null) return next();
+  const requestGuildId = String(req.body?.guildId ?? req.query?.guildId ?? "").trim();
+  if (!requestGuildId) {
+    return res
+      .status(400)
+      .json({ ok: false, error: "guildId is required for this scoped service account" });
+  }
+  if (requestGuildId !== req.user.guild_id) {
+    return res
+      .status(403)
+      .json({ ok: false, error: "Forbidden: guildId does not match this service account's guild" });
   }
   next();
 }

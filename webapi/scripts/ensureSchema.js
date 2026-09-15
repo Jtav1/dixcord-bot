@@ -12,6 +12,7 @@ import {
   isSqliteDb,
   tableExists,
 } from "./schemaUtils.js";
+import { guildConfigExistsFor, seedDefaultConfigForGuild } from "../services/guildConfig.js";
 
 const isSqlite = isSqliteDb();
 
@@ -59,6 +60,82 @@ export async function ensureSchemaMigrations() {
     }
   }
 
+  // users.guild_id column: scopes a bot (or webview) service account to one guild; NULL means
+  // unrestricted (preserves existing single-bot deployments after upgrade).
+  if (await tableExists(db, "users", isSqlite)) {
+    if (!(await columnExists(db, "users", "guild_id", isSqlite))) {
+      await db.query(
+        isSqlite
+          ? "ALTER TABLE users ADD COLUMN guild_id TEXT NULL"
+          : "ALTER TABLE users ADD COLUMN guild_id VARCHAR(64) NULL",
+      );
+      applied.push("users.guild_id column");
+      console.log("db: migration applied: added users.guild_id column");
+    } else {
+      console.log("db: schema ok: users.guild_id column already exists");
+    }
+  }
+
+  // member_emoji_tracking table (formerly user_emoji_tracking): rows are keyed on
+  // chat_member_mapping, i.e. a server member, not a webapi user account.
+  if (await tableExists(db, "member_emoji_tracking", isSqlite)) {
+    console.log("db: schema ok: member_emoji_tracking table already exists");
+  } else if (await tableExists(db, "user_emoji_tracking", isSqlite)) {
+    await db.query("ALTER TABLE user_emoji_tracking RENAME TO member_emoji_tracking");
+    applied.push("user_emoji_tracking table renamed to member_emoji_tracking");
+    console.log(
+      "db: migration applied: renamed user_emoji_tracking table to member_emoji_tracking",
+    );
+  }
+
+  // member_repost_tracking table (formerly user_repost_tracking): same rationale as above.
+  if (await tableExists(db, "member_repost_tracking", isSqlite)) {
+    console.log("db: schema ok: member_repost_tracking table already exists");
+  } else if (await tableExists(db, "user_repost_tracking", isSqlite)) {
+    await db.query("ALTER TABLE user_repost_tracking RENAME TO member_repost_tracking");
+    applied.push("user_repost_tracking table renamed to member_repost_tracking");
+    console.log(
+      "db: migration applied: renamed user_repost_tracking table to member_repost_tracking",
+    );
+  }
+
+  // emoji_frequency.app column: mirrors guild_channels/guild_roles' app column, for future
+  // multi-platform support. No DEFAULT — every insert/update must specify it explicitly going
+  // forward (see services/messageProcessing.js). This backfill of 'discord' is a ONE-TIME
+  // migration for rows that existed before this column was added, not a general default — only
+  // "discord" is supported today, so every pre-existing row is safely known to be a discord row.
+  if (
+    (await tableExists(db, "emoji_frequency", isSqlite)) &&
+    !(await columnExists(db, "emoji_frequency", "app", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE emoji_frequency_new (
+          app TEXT NOT NULL,
+          emoid TEXT PRIMARY KEY,
+          emoji TEXT NOT NULL,
+          frequency INTEGER NOT NULL DEFAULT 0,
+          animated INTEGER DEFAULT 0,
+          type TEXT DEFAULT NULL
+        )
+      `);
+      await db.query(`
+        INSERT INTO emoji_frequency_new (app, emoid, emoji, frequency, animated, type)
+        SELECT 'discord', emoid, emoji, frequency, animated, type FROM emoji_frequency
+      `);
+      await db.query("DROP TABLE emoji_frequency");
+      await db.query("ALTER TABLE emoji_frequency_new RENAME TO emoji_frequency");
+    } else {
+      await db.query("ALTER TABLE emoji_frequency ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE emoji_frequency SET app = 'discord' WHERE app IS NULL");
+      await db.query("ALTER TABLE emoji_frequency MODIFY COLUMN app VARCHAR(20) NOT NULL");
+    }
+    applied.push("emoji_frequency.app column (backfilled 'discord' for pre-existing rows)");
+    console.log(
+      "db: migration applied: added emoji_frequency.app column, backfilled 'discord' for pre-existing rows",
+    );
+  }
+
   // audit_log table
   if (!(await tableExists(db, "audit_log", isSqlite))) {
     if (isSqlite) {
@@ -93,24 +170,28 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: audit_log table already exists");
   }
 
-  // bot_status table
+  // bot_status table (app-scoped; existing installs migrated below)
   if (!(await tableExists(db, "bot_status", isSqlite))) {
     if (isSqlite) {
       await db.query(`
         CREATE TABLE bot_status (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          guild_id TEXT NOT NULL UNIQUE,
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
           version TEXT NOT NULL,
-          last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP
+          last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE (app, guild_id)
         )
       `);
     } else {
       await db.query(`
         CREATE TABLE bot_status (
           id INT AUTO_INCREMENT PRIMARY KEY,
-          guild_id VARCHAR(32) NOT NULL UNIQUE,
+          app VARCHAR(20) NOT NULL,
+          guild_id VARCHAR(32) NOT NULL,
           version VARCHAR(50) NOT NULL,
-          last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+          last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uniq_bot_status_app_guild (app, guild_id)
         )
       `);
     }
@@ -120,8 +201,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: bot_status table already exists");
   }
 
-  // bot_status: session/health columns (ready_at, member_count, channel_count, ws_ping_ms,
-  // metrics_json - the bot's cumulative counter snapshot from its most recent heartbeat)
+  // bot_status: session/health columns from the most recent heartbeat
   if (await tableExists(db, "bot_status", isSqlite)) {
     const botStatusColumns = isSqlite
       ? [
@@ -146,6 +226,44 @@ export async function ensureSchemaMigrations() {
         console.log(`db: migration applied: added bot_status.${col.name} column`);
       }
     }
+  }
+
+  // bot_status: add `app` column + composite (app, guild_id) uniqueness; backfill existing rows to 'discord'
+  if ((await tableExists(db, "bot_status", isSqlite)) && !(await columnExists(db, "bot_status", "app", isSqlite))) {
+    if (isSqlite) {
+      // SQLite can't drop/alter a UNIQUE column constraint in place; rebuild the table.
+      await db.query(`
+        CREATE TABLE bot_status_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          version TEXT NOT NULL,
+          last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          ready_at TEXT NULL,
+          member_count INTEGER NULL,
+          channel_count INTEGER NULL,
+          ws_ping_ms INTEGER NULL,
+          metrics_json TEXT NULL,
+          UNIQUE (app, guild_id)
+        )
+      `);
+      await db.query(`
+        INSERT INTO bot_status_new
+          (id, app, guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms, metrics_json)
+        SELECT id, 'discord', guild_id, version, last_seen_at, ready_at, member_count, channel_count, ws_ping_ms, metrics_json
+        FROM bot_status
+      `);
+      await db.query("DROP TABLE bot_status");
+      await db.query("ALTER TABLE bot_status_new RENAME TO bot_status");
+    } else {
+      await db.query("ALTER TABLE bot_status ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE bot_status SET app = 'discord' WHERE app IS NULL");
+      await db.query("ALTER TABLE bot_status MODIFY COLUMN app VARCHAR(20) NOT NULL");
+      await db.query("ALTER TABLE bot_status DROP INDEX guild_id");
+      await db.query("ALTER TABLE bot_status ADD UNIQUE KEY uniq_bot_status_app_guild (app, guild_id)");
+    }
+    applied.push("bot_status.app column + composite unique(app, guild_id)");
+    console.log("db: migration applied: added bot_status.app column and (app, guild_id) uniqueness");
   }
 
   // system_state table
@@ -320,6 +438,407 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: created guild_roles.idx_guild_roles_guild index");
   }
 
+  // guild_config table: per-(app, guild_id) config, superseding the global `configurations` table
+  if (!(await tableExists(db, "guild_config", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_config (
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          config TEXT NOT NULL,
+          value TEXT NULL,
+          PRIMARY KEY (app, guild_id, config)
+        )
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE guild_config (
+          app VARCHAR(20) NOT NULL,
+          guild_id VARCHAR(64) NOT NULL,
+          config VARCHAR(255) NOT NULL,
+          value VARCHAR(255) NULL,
+          PRIMARY KEY (app, guild_id, config)
+        )
+      `);
+    }
+    applied.push("guild_config table");
+    console.log("db: migration applied: created guild_config table");
+  } else {
+    console.log("db: schema ok: guild_config table already exists");
+  }
+
+  // One-time backfill: seed guild_config for every known server from global `configurations`/defaults
+  if (await tableExists(db, "guild_config", isSqlite)) {
+    const [existingGuilds] = await db.query("SELECT app, guild_id FROM guild_info");
+    const [globalConfigRows] = await db.query("SELECT config, value FROM configurations");
+    const globalOverrides = Array.isArray(globalConfigRows) ? globalConfigRows : [];
+    for (const guild of existingGuilds ?? []) {
+      if (await guildConfigExistsFor(guild.app, guild.guild_id)) continue;
+      await seedDefaultConfigForGuild(guild.app, guild.guild_id, globalOverrides);
+      applied.push(`guild_config backfill for ${guild.app}/${guild.guild_id}`);
+      console.log(
+        `db: migration applied: seeded guild_config for ${guild.app}/${guild.guild_id}`,
+      );
+    }
+  }
+
+  // guild_members table: per-server membership (Discord handle/nickname/roles/joined-at) keyed
+  // off platform_user_id. The link to chat_member_mapping lives in member_aliases (see below),
+  // never a column here — sync never creates or touches that link, only a manual admin action does.
+  if (!(await tableExists(db, "guild_members", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_members (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          platform_user_id TEXT NOT NULL,
+          handle TEXT NULL,
+          nickname TEXT NULL,
+          roles TEXT NULL,
+          joined_at TEXT NULL,
+          synced_at TEXT DEFAULT (datetime('now')),
+          UNIQUE (app, guild_id, platform_user_id)
+        )
+      `);
+      await db.query(
+        "CREATE INDEX idx_guild_members_app_guild ON guild_members (app, guild_id)",
+      );
+    } else {
+      await db.query(`
+        CREATE TABLE guild_members (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          app VARCHAR(20) NOT NULL,
+          guild_id VARCHAR(64) NOT NULL,
+          platform_user_id VARCHAR(64) NOT NULL,
+          handle VARCHAR(255) NULL,
+          nickname VARCHAR(255) NULL,
+          roles TEXT NULL,
+          joined_at DATETIME NULL,
+          synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uniq_guild_members_app_guild_platform (app, guild_id, platform_user_id),
+          KEY idx_guild_members_app_guild (app, guild_id)
+        )
+      `);
+    }
+    applied.push("guild_members table");
+    console.log("db: migration applied: created guild_members table");
+  } else {
+    console.log("db: schema ok: guild_members table already exists");
+  }
+
+  // guild_members: platform_user_id + nullable chat_member_mapping_id migration. Old shape had
+  // chat_member_mapping_id NOT NULL as part of the PK; new shape keys on platform_user_id instead
+  // so a member can be recorded before (or without ever) being resolved to an identity. Only
+  // discord/discord_id exists in CHAT_MEMBER_APP_CONFIG today, so hardcoding it for this one-time
+  // backfill is fine — every pre-existing row necessarily has a match since the old column was NOT NULL.
+  if (
+    (await tableExists(db, "guild_members", isSqlite)) &&
+    !(await columnExists(db, "guild_members", "platform_user_id", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_members_new (
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          platform_user_id TEXT NOT NULL,
+          chat_member_mapping_id INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+          nickname TEXT NULL,
+          roles TEXT NULL,
+          joined_at TEXT NULL,
+          synced_at TEXT DEFAULT (datetime('now')),
+          PRIMARY KEY (app, guild_id, platform_user_id)
+        )
+      `);
+      await db.query(`
+        INSERT INTO guild_members_new
+          (app, guild_id, platform_user_id, chat_member_mapping_id, nickname, roles, joined_at, synced_at)
+        SELECT gm.app, gm.guild_id, cmm.discord_id, gm.chat_member_mapping_id,
+               gm.nickname, gm.roles, gm.joined_at, gm.synced_at
+        FROM guild_members gm
+        JOIN chat_member_mapping cmm ON cmm.id = gm.chat_member_mapping_id
+      `);
+      await db.query("DROP TABLE guild_members");
+      await db.query("ALTER TABLE guild_members_new RENAME TO guild_members");
+    } else {
+      await db.query("ALTER TABLE guild_members ADD COLUMN platform_user_id VARCHAR(64) NULL");
+      await db.query(`
+        UPDATE guild_members gm
+        JOIN chat_member_mapping cmm ON cmm.id = gm.chat_member_mapping_id
+        SET gm.platform_user_id = cmm.discord_id
+      `);
+      await db.query(
+        "ALTER TABLE guild_members MODIFY COLUMN platform_user_id VARCHAR(64) NOT NULL",
+      );
+      if (
+        await constraintExists(db, "guild_members", "fk_guild_members_chat_member", isSqlite)
+      ) {
+        await db.query(
+          "ALTER TABLE guild_members DROP FOREIGN KEY fk_guild_members_chat_member",
+        );
+      }
+      await db.query("ALTER TABLE guild_members DROP PRIMARY KEY");
+      await db.query(
+        "ALTER TABLE guild_members ADD PRIMARY KEY (app, guild_id, platform_user_id)",
+      );
+      await db.query(
+        "ALTER TABLE guild_members MODIFY COLUMN chat_member_mapping_id INT NULL",
+      );
+      await db.query(
+        "ALTER TABLE guild_members ADD CONSTRAINT fk_guild_members_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE SET NULL",
+      );
+    }
+    applied.push("guild_members: platform_user_id + nullable chat_member_mapping_id migration");
+    console.log(
+      "db: migration applied: guild_members platform_user_id/nullable-link migration",
+    );
+  }
+
+  // guild_members.id surrogate PK: needed so member_aliases (below) has a stable row to
+  // reference. Without a surrogate id, a full-roster resync (delete+reinsert) would have
+  // regenerated every row's identity and cascade-deleted every alias link on each sync.
+  if (
+    (await tableExists(db, "guild_members", isSqlite)) &&
+    !(await columnExists(db, "guild_members", "id", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_members_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          platform_user_id TEXT NOT NULL,
+          chat_member_mapping_id INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+          nickname TEXT NULL,
+          roles TEXT NULL,
+          joined_at TEXT NULL,
+          synced_at TEXT DEFAULT (datetime('now')),
+          UNIQUE (app, guild_id, platform_user_id)
+        )
+      `);
+      await db.query(`
+        INSERT INTO guild_members_new
+          (app, guild_id, platform_user_id, chat_member_mapping_id, nickname, roles, joined_at, synced_at)
+        SELECT app, guild_id, platform_user_id, chat_member_mapping_id, nickname, roles, joined_at, synced_at
+        FROM guild_members
+      `);
+      await db.query("DROP TABLE guild_members");
+      await db.query("ALTER TABLE guild_members_new RENAME TO guild_members");
+      await db.query(
+        "CREATE INDEX idx_guild_members_app_guild ON guild_members (app, guild_id)",
+      );
+    } else {
+      await db.query("ALTER TABLE guild_members ADD COLUMN id INT NULL");
+      // Backfill sequential ids via a JS loop, not MySQL session variables: `SET @rownum` and
+      // the following UPDATE aren't guaranteed to land on the same pooled connection under
+      // mysql2/promise's pool, which would silently break the increment.
+      const [rowsToNumber] = await db.query(
+        "SELECT app, guild_id, platform_user_id FROM guild_members ORDER BY app, guild_id, platform_user_id",
+      );
+      let nextId = 1;
+      for (const row of rowsToNumber ?? []) {
+        await db.query(
+          "UPDATE guild_members SET id = ? WHERE app = ? AND guild_id = ? AND platform_user_id = ?",
+          [nextId, row.app, row.guild_id, row.platform_user_id],
+        );
+        nextId += 1;
+      }
+      await db.query(
+        "ALTER TABLE guild_members DROP PRIMARY KEY, MODIFY COLUMN id INT NOT NULL AUTO_INCREMENT, ADD PRIMARY KEY (id)",
+      );
+      await db.query(
+        "ALTER TABLE guild_members ADD UNIQUE KEY uniq_guild_members_app_guild_platform (app, guild_id, platform_user_id)",
+      );
+    }
+    applied.push("guild_members.id surrogate PK");
+    console.log("db: migration applied: added guild_members.id surrogate PK");
+  }
+
+  // guild_members.handle column (named discord_handle in a brief earlier iteration of this
+  // migration; rename it in place for any db that already has it, rather than adding a second
+  // column, so a live db that already ran that version doesn't need a fresh backfill).
+  if (
+    (await tableExists(db, "guild_members", isSqlite)) &&
+    !(await columnExists(db, "guild_members", "handle", isSqlite))
+  ) {
+    if (await columnExists(db, "guild_members", "discord_handle", isSqlite)) {
+      await db.query("ALTER TABLE guild_members RENAME COLUMN discord_handle TO handle");
+      applied.push("guild_members.discord_handle renamed to handle");
+      console.log("db: migration applied: renamed guild_members.discord_handle to handle");
+    } else {
+      await db.query(
+        isSqlite
+          ? "ALTER TABLE guild_members ADD COLUMN handle TEXT NULL"
+          : "ALTER TABLE guild_members ADD COLUMN handle VARCHAR(255) NULL",
+      );
+      applied.push("guild_members.handle column");
+      console.log("db: migration applied: added guild_members.handle column");
+    }
+  }
+
+  // Backfill guild_members.handle from chat_member_mapping.discord_handle (the OLD table's own
+  // column name — unrelated to the rename above), matching directly on
+  // chat_member_mapping.discord_id = guild_members.platform_user_id — the authoritative identity
+  // match still available in production at this point — rather than the old
+  // guild_members.chat_member_mapping_id link, which may be unset for rows synced through a path
+  // that never established it. Deliberately re-runs on every boot (WHERE handle IS NULL makes it
+  // cheap once caught up): guild_members may still be empty or partially synced on the very boot
+  // that first creates it (this migration runs before the bot ever gets a chance to sync — see
+  // the member_aliases backfill below for the same reasoning), so this keeps catching newly
+  // synced members for as long as chat_member_mapping.discord_handle/discord_id still exist.
+  // Those columns are intentionally NOT auto-dropped anywhere in this file (see below) — that is
+  // a deliberate separate, manually-triggered step once production data is confirmed backfilled.
+  if (
+    (await tableExists(db, "guild_members", isSqlite)) &&
+    (await columnExists(db, "chat_member_mapping", "discord_handle", isSqlite)) &&
+    (await columnExists(db, "chat_member_mapping", "discord_id", isSqlite))
+  ) {
+    let handleResult;
+    if (isSqlite) {
+      [handleResult] = await db.query(`
+        UPDATE guild_members
+        SET handle = (
+          SELECT cmm.discord_handle FROM chat_member_mapping cmm WHERE cmm.discord_id = guild_members.platform_user_id
+        )
+        WHERE handle IS NULL
+          AND EXISTS (SELECT 1 FROM chat_member_mapping cmm WHERE cmm.discord_id = guild_members.platform_user_id)
+      `);
+    } else {
+      [handleResult] = await db.query(`
+        UPDATE guild_members gm
+        JOIN chat_member_mapping cmm ON cmm.discord_id = gm.platform_user_id
+        SET gm.handle = cmm.discord_handle
+        WHERE gm.handle IS NULL
+      `);
+    }
+    const handleUpdatedCount = handleResult?.affectedRows ?? handleResult?.changes ?? 0;
+    if (handleUpdatedCount > 0) {
+      applied.push(
+        `guild_members.handle backfill via chat_member_mapping.discord_id match (${handleUpdatedCount} row(s))`,
+      );
+      console.log(
+        `db: migration applied: backfilled ${handleUpdatedCount} guild_members.handle row(s) via discord_id match`,
+      );
+    } else {
+      console.log("db: schema ok: guild_members.handle backfill has no new matches to add");
+    }
+  }
+
+  // member_aliases table: links one chat_member_mapping identity to many guild_members rows.
+  // Table creation is one-time; the backfill that populates it is a separate step below that
+  // re-runs on every boot, since guild_members may still be empty (or only partially synced) on
+  // this very boot — this migration runs before the bot ever gets a chance to sync (webapi's
+  // /health, which gates the bot's own container start, isn't reachable until after this whole
+  // function returns). A one-shot backfill tied to table creation would permanently miss anyone
+  // who joins guild_members on a later boot.
+  if (!(await tableExists(db, "member_aliases", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE member_aliases (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          chat_member_mapping_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          guild_member_id INTEGER NOT NULL UNIQUE REFERENCES guild_members(id) ON DELETE CASCADE,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      await db.query(
+        "CREATE INDEX idx_member_aliases_chat_member ON member_aliases (chat_member_mapping_id)",
+      );
+    } else {
+      await db.query(`
+        CREATE TABLE member_aliases (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          chat_member_mapping_id INT NOT NULL,
+          guild_member_id INT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uniq_member_aliases_guild_member (guild_member_id),
+          KEY idx_member_aliases_chat_member (chat_member_mapping_id),
+          CONSTRAINT fk_member_aliases_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          CONSTRAINT fk_member_aliases_guild_member FOREIGN KEY (guild_member_id) REFERENCES guild_members(id) ON DELETE CASCADE
+        )
+      `);
+    }
+    applied.push("member_aliases table");
+    console.log("db: migration applied: created member_aliases table");
+  }
+
+  // member_aliases backfill: matches chat_member_mapping.discord_id directly against
+  // guild_members.platform_user_id — the authoritative identity data production already has —
+  // rather than the old guild_members.chat_member_mapping_id link, which may be unset for rows
+  // synced through a path that never established it (e.g. the current sync code, which never
+  // auto-links at all). A given discord_id is unique on chat_member_mapping, so this matches at
+  // most one identity per guild_members row; one identity can still gain many aliases (one per
+  // guild). Deliberately re-runs on every boot via the NOT EXISTS guard (cheap once caught up),
+  // for as long as chat_member_mapping.discord_id still exists — see the note above on why a
+  // one-shot backfill isn't sufficient. Only logged when it actually inserts something, so a
+  // fully-caught-up boot doesn't spam "migration applied" forever.
+  if (
+    (await tableExists(db, "member_aliases", isSqlite)) &&
+    (await columnExists(db, "chat_member_mapping", "discord_id", isSqlite))
+  ) {
+    const [result] = await db.query(`
+      INSERT INTO member_aliases (chat_member_mapping_id, guild_member_id)
+      SELECT cmm.id, gm.id
+      FROM guild_members gm
+      JOIN chat_member_mapping cmm ON cmm.discord_id = gm.platform_user_id
+      WHERE NOT EXISTS (SELECT 1 FROM member_aliases ma WHERE ma.guild_member_id = gm.id)
+    `);
+    const insertedCount = result?.affectedRows ?? result?.changes ?? 0;
+    if (insertedCount > 0) {
+      applied.push(`member_aliases backfill via chat_member_mapping.discord_id match (${insertedCount} row(s))`);
+      console.log(
+        `db: migration applied: backfilled ${insertedCount} member_aliases row(s) via discord_id match`,
+      );
+    } else {
+      console.log("db: schema ok: member_aliases backfill has no new matches to add");
+    }
+  }
+
+  // Drop guild_members.chat_member_mapping_id: superseded by member_aliases.
+  if (await columnExists(db, "guild_members", "chat_member_mapping_id", isSqlite)) {
+    if (isSqlite) {
+      // idx_guild_members_user (if present, from very old installs) must be dropped before the
+      // column it indexes, same rule as MySQL's index-then-column-drop ordering below.
+      if (await indexExists(db, "guild_members", "idx_guild_members_user", isSqlite)) {
+        await db.query("DROP INDEX idx_guild_members_user");
+      }
+      await db.query("ALTER TABLE guild_members DROP COLUMN chat_member_mapping_id");
+    } else {
+      if (await constraintExists(db, "guild_members", "fk_guild_members_chat_member", isSqlite)) {
+        await db.query("ALTER TABLE guild_members DROP FOREIGN KEY fk_guild_members_chat_member");
+      }
+      if (await indexExists(db, "guild_members", "idx_guild_members_user", isSqlite)) {
+        await db.query("ALTER TABLE guild_members DROP INDEX idx_guild_members_user");
+      }
+      await db.query("ALTER TABLE guild_members DROP COLUMN chat_member_mapping_id");
+    }
+    applied.push("guild_members.chat_member_mapping_id column dropped");
+    console.log("db: migration applied: dropped guild_members.chat_member_mapping_id");
+  }
+
+  // chat_member_mapping.discord_handle/discord_id are DELIBERATELY NOT auto-dropped here.
+  // Production has existing chat_member_mapping rows but guild_members is net new — this
+  // migration always runs before the bot ever gets a chance to sync (see the member_aliases
+  // backfill above), so guild_members may still be empty or only partially populated on the very
+  // boot these columns would otherwise be dropped on. Since they're the only remaining source
+  // for the member_aliases backfill above, dropping them automatically on some unpredictable
+  // boot risks permanently losing the ability to link anyone who hasn't synced into
+  // guild_members yet. Once production is confirmed to have backfilled member_aliases as
+  // expected (e.g. checking its row count against guild_members), drop these columns via a
+  // separate, explicit, manually-triggered migration step — do not re-add this as an automatic
+  // step without re-solving the ordering problem described above.
+  //
+  // That future step, when ready, is exactly what used to run here:
+  //   MySQL:  ALTER TABLE chat_member_mapping DROP COLUMN discord_handle;
+  //           ALTER TABLE chat_member_mapping DROP COLUMN discord_id;
+  //   SQLite: rebuild the table without those columns (both are UNIQUE, so SQLite's
+  //           DROP COLUMN can't remove them directly) — wrap in
+  //           PRAGMA foreign_keys = OFF / ON, since several tables (member_aliases,
+  //           plusplus_tracking, member_emoji_tracking, member_repost_tracking,
+  //           trigger_response_user_history, scheduled_messages, pin_history) FK-reference
+  //           chat_member_mapping(id), some ON DELETE CASCADE, and foreign_keys enforcement
+  //           defaults ON in this SQLite build — see git history for the exact statements.
+
   // pin_history expanded metadata (author, message snapshot, pinners)
   if (await tableExists(db, "pin_history", isSqlite)) {
     const pinHistoryColumns = isSqlite
@@ -458,6 +977,7 @@ export async function ensureSchemaMigrations() {
     "plusplus_enabled",
     "repost_detection_enabled",
     "pin_system_enabled",
+    "twitter_fix_enabled",
   ];
   for (const key of featureToggleKeys) {
     const [rows] = await db.query(

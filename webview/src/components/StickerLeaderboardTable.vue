@@ -28,17 +28,17 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(entry, index) in entries" :key="entry.emoid">
+          <tr v-for="(entry, index) in entries" :key="entry.emoji.emoid">
             <td class="text-body-2 rank-col">
               {{ offset + index + 1 }}
             </td>
             <td class="sample-col">
               <div
                 class="sticker-sample-cell"
-                :title="stickerDisplayName(entry)"
+                :title="stickerDisplayName(entry.emoji)"
               >
                 <v-icon
-                  v-if="isImageMissing(entry)"
+                  v-if="isImageMissing(entry.emoji)"
                   icon="mdi-sticker-emoji"
                   size="32"
                   class="text-medium-emphasis"
@@ -46,18 +46,18 @@
                 />
                 <img
                   v-else
-                  :src="stickerImageUrl(entry)"
-                  :alt="stickerDisplayName(entry)"
+                  :src="stickerImageUrl(entry.emoji)"
+                  :alt="stickerDisplayName(entry.emoji)"
                   class="sticker-sample-image"
                   width="32"
                   height="32"
-                  @error="markImageMissing(entry)"
+                  @error="markImageMissing(entry.emoji)"
                 />
               </div>
             </td>
-            <td class="text-body-2">{{ stickerDisplayName(entry) }}</td>
+            <td class="text-body-2">{{ stickerDisplayName(entry.emoji) }}</td>
             <td class="text-body-2 text-right frequency-col">
-              {{ formatFrequency(entry.frequency) }}
+              {{ formatFrequency(entry.emoji.frequency) }}
             </td>
           </tr>
         </tbody>
@@ -144,12 +144,12 @@ function formatFrequency(value) {
 }
 
 /**
- * Record a failed image load for a sticker row.
- * @param {{ emoid?: string|number }} entry Sticker leaderboard row.
+ * Record a failed image load for a sticker.
+ * @param {{ emoid?: string|number }} emoji Resolved emoji object (emoji_frequency row).
  * @returns {void}
  */
-function markImageMissing(entry) {
-  const id = String(entry.emoid ?? "");
+function markImageMissing(emoji) {
+  const id = String(emoji?.emoid ?? "");
   if (!id) return;
   const next = new Set(missingImageIds.value);
   next.add(id);
@@ -158,11 +158,11 @@ function markImageMissing(entry) {
 
 /**
  * Whether a sticker image failed to load.
- * @param {{ emoid?: string|number }} entry Sticker leaderboard row.
+ * @param {{ emoid?: string|number }} emoji Resolved emoji object (emoji_frequency row).
  * @returns {boolean}
  */
-function isImageMissing(entry) {
-  return missingImageIds.value.has(String(entry.emoid ?? ""));
+function isImageMissing(emoji) {
+  return missingImageIds.value.has(String(emoji?.emoid ?? ""));
 }
 </script>
 
