@@ -5,26 +5,38 @@ import {
 } from "../../../api/plusplus.js";
 import { incrementCounter } from "../../../utilities/metrics.js";
 
-/** Used by reaction handler only (user votes). */
+/**
+ * Used by reaction handler only (user votes).
+ * @returns {Promise<Array>} milestones newly achieved by this vote, if any
+ */
 export const doplus = async (string, typestr, voterid) => {
-  if (typestr !== "user" || string === voterid) return;
-  plusplus(string, typestr, voterid)
-    .then(() => incrementCounter("plusplusVotesTotal"))
-    .catch((err) => {
-      incrementCounter("apiCallErrorsTotal", "plusplus");
-      console.log("bot: plusplus error", err);
-    });
+  if (typestr !== "user" || string === voterid) return [];
+  try {
+    const milestones = await plusplus(string, typestr, voterid);
+    incrementCounter("plusplusVotesTotal");
+    return milestones;
+  } catch (err) {
+    incrementCounter("apiCallErrorsTotal", "plusplus");
+    console.log("bot: plusplus error", err);
+    return [];
+  }
 };
 
-/** Used by reaction handler only (user votes). */
+/**
+ * Used by reaction handler only (user votes).
+ * @returns {Promise<Array>} milestones newly achieved by this vote, if any
+ */
 export const dominus = async (string, typestr, voterid) => {
-  if (typestr !== "user" || string === voterid) return;
-  minusminus(string, typestr, voterid)
-    .then(() => incrementCounter("plusplusVotesTotal"))
-    .catch((err) => {
-      incrementCounter("apiCallErrorsTotal", "plusplus");
-      console.log("bot: minusminus error", err);
-    });
+  if (typestr !== "user" || string === voterid) return [];
+  try {
+    const milestones = await minusminus(string, typestr, voterid);
+    incrementCounter("plusplusVotesTotal");
+    return milestones;
+  } catch (err) {
+    incrementCounter("apiCallErrorsTotal", "plusplus");
+    console.log("bot: minusminus error", err);
+    return [];
+  }
 };
 
 /**
@@ -32,12 +44,13 @@ export const dominus = async (string, typestr, voterid) => {
  * No unnecessary API call for messages lacking any ++/-- pattern; all parsing/decision logic
  * (mentions, word votes, self-vote skip, the bare-"++"/"--" reply case) happens in webapi via
  * recordPlusMinusFromMessage. This just supplies Discord-specific reply context.
+ * @returns {Promise<Array>} milestones newly achieved by this call, if any
  */
 export const plusMinusMsg = async (rawMessage) => {
   const plusMinusRegex = /\+\+|--/;
 
-  if (typeof rawMessage.content !== "string") return;
-  if (!plusMinusRegex.test(rawMessage.content)) return;
+  if (typeof rawMessage.content !== "string") return [];
+  if (!plusMinusRegex.test(rawMessage.content)) return [];
 
   let isReply = false;
   let repliedUserId = null;
@@ -62,7 +75,7 @@ export const plusMinusMsg = async (rawMessage) => {
     }
   }
 
-  await recordPlusMinusFromMessage(rawMessage.content, rawMessage.author?.id, {
+  return recordPlusMinusFromMessage(rawMessage.content, rawMessage.author?.id, {
     isReply,
     repliedUserId,
   });

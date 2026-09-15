@@ -5,6 +5,7 @@
  */
 
 import db from "../config/db.js";
+import { checkAndMarkMilestones } from "./milestones.js";
 import {
   getOrCreateFunctionId,
   incrementFrequencyById as incrementResponseFunctionFrequencyById,
@@ -164,6 +165,7 @@ async function setLastUsedResponseOrder(triggerId, responseOrder) {
  * @param {number} triggerId
  * @param {number} responseId
  * @param {number} triggerResponseId - junction (trigger_response) row id
+ * @returns {Promise<number>} the trigger's new frequency value
  */
 async function incrementSelectionFrequencies(
   triggerId,
@@ -181,6 +183,10 @@ async function incrementSelectionFrequencies(
     "UPDATE trigger_response SET frequency = frequency + 1 WHERE id = ?",
     [triggerResponseId],
   );
+  const [rows] = await db.query("SELECT frequency FROM triggers WHERE id = ?", [
+    triggerId,
+  ]);
+  return Number(rows?.[0]?.frequency ?? 0);
 }
 
 /**
@@ -241,7 +247,7 @@ async function getWeightedResponseForTrigger(triggerId) {
     if (!chosen) chosen = normalized[normalized.length - 1];
   }
   if (!chosen) return null;
-  await incrementSelectionFrequencies(
+  const newTriggerFrequency = await incrementSelectionFrequencies(
     triggerId,
     chosen.id,
     chosen.trigger_response_id,
@@ -253,6 +259,7 @@ async function getWeightedResponseForTrigger(triggerId) {
     response_function_id: chosen.response_function_id,
     response_function_parameters: chosen.response_function_parameters,
     trigger_response_id: chosen.trigger_response_id,
+    newTriggerFrequency,
   };
 }
 
@@ -261,7 +268,7 @@ async function getWeightedResponseForTrigger(triggerId) {
  * chosen response may carry a response_function key regardless of selection_mode; the caller
  * should dispatch to it instead of replying directly when present.
  * @param {string} trigger
- * @returns {Promise<{ id: number, response_string: string, trigger_response_id: number, response_function: string|null }|null>} id is responses.id; trigger_response_id is the junction row id (for history logging)
+ * @returns {Promise<{ id: number, response_string: string, trigger_response_id: number, response_function: string|null, milestones: Array }|null>} id is responses.id; trigger_response_id is the junction row id (for history logging)
  */
 export async function getRandomResponse(trigger) {
   if (!trigger || typeof trigger !== "string" || !trigger.trim()) return null;
@@ -298,55 +305,103 @@ export async function getRandomResponse(trigger) {
       if (nextRow) chosen = nextRow;
     }
     await setLastUsedResponseOrder(triggerId, chosen.response_order);
-    await incrementSelectionFrequencies(
+    const newTriggerFrequency = await incrementSelectionFrequencies(
       triggerId,
       chosen.id,
       chosen.trigger_response_id,
     );
-    if (chosen.response_function_id) {
-      await incrementResponseFunctionFrequencyById(chosen.response_function_id);
-    }
+    const milestones = await checkTriggerMilestones({
+      triggerString: t,
+      newTriggerFrequency,
+      responseFunctionId: chosen.response_function_id,
+      responseFunctionName: chosen.response_function,
+    });
     return {
       id: chosen.id,
       response_string: chosen.response_string,
       trigger_response_id: chosen.trigger_response_id,
       response_function: chosen.response_function ?? null,
       response_function_parameters: chosen.response_function_parameters ?? null,
+      milestones,
     };
   }
 
   if (selection_mode === "weighted") {
     const result = await getWeightedResponseForTrigger(triggerId);
     if (!result) return null;
-    if (result.response_function_id) {
-      await incrementResponseFunctionFrequencyById(result.response_function_id);
-    }
+    const milestones = await checkTriggerMilestones({
+      triggerString: t,
+      newTriggerFrequency: result.newTriggerFrequency,
+      responseFunctionId: result.response_function_id,
+      responseFunctionName: result.response_function,
+    });
     return {
       id: result.id,
       response_string: result.response_string,
       trigger_response_id: result.trigger_response_id,
       response_function: result.response_function ?? null,
       response_function_parameters: result.response_function_parameters ?? null,
+      milestones,
     };
   }
 
   const result = await getRandomResponseByRandomSelection(triggerId);
   if (!result) return null;
-  await incrementSelectionFrequencies(
+  const newTriggerFrequency = await incrementSelectionFrequencies(
     triggerId,
     result.id,
     result.trigger_response_id,
   );
-  if (result.response_function_id) {
-    await incrementResponseFunctionFrequencyById(result.response_function_id);
-  }
+  const milestones = await checkTriggerMilestones({
+    triggerString: t,
+    newTriggerFrequency,
+    responseFunctionId: result.response_function_id,
+    responseFunctionName: result.response_function,
+  });
   return {
     id: result.id,
     response_string: result.response_string,
     trigger_response_id: result.trigger_response_id,
     response_function: result.response_function ?? null,
     response_function_parameters: result.response_function_parameters ?? null,
+    milestones,
   };
+}
+
+/**
+ * Run the trigger_call_count check (always) and trigger_function_call_count check (when a
+ * response function fired), used by all 3 selection-mode branches of getRandomResponse.
+ * @private
+ */
+async function checkTriggerMilestones({
+  triggerString,
+  newTriggerFrequency,
+  responseFunctionId,
+  responseFunctionName,
+}) {
+  const milestones = [];
+  const triggerHit = await checkAndMarkMilestones({
+    type: "trigger_call_count",
+    item: triggerString,
+    value: newTriggerFrequency,
+  });
+  if (triggerHit) milestones.push(triggerHit);
+
+  if (responseFunctionId) {
+    const newFunctionFrequency = await incrementResponseFunctionFrequencyById(
+      responseFunctionId,
+    );
+    if (newFunctionFrequency != null) {
+      const functionHit = await checkAndMarkMilestones({
+        type: "trigger_function_call_count",
+        item: responseFunctionName,
+        value: newFunctionFrequency,
+      });
+      if (functionHit) milestones.push(functionHit);
+    }
+  }
+
+  return milestones;
 }
 
 const VALID_MODES = ["random", "ordered", "weighted"];

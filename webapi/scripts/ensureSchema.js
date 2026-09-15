@@ -1319,6 +1319,54 @@ export async function ensureSchemaMigrations() {
     }
   }
 
+  // milestones table: admin-defined usage-stat thresholds (see services/milestoneTypes.js)
+  if (!(await tableExists(db, "milestones", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE milestones (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          quantity INTEGER NOT NULL,
+          type TEXT NOT NULL,
+          item TEXT NULL,
+          message TEXT NOT NULL,
+          object TEXT NOT NULL,
+          achieved INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      await db.query(
+        "CREATE INDEX idx_milestones_lookup ON milestones(type, item, achieved)",
+      );
+      await db.query(`
+        CREATE TRIGGER milestones_updated_at
+          AFTER UPDATE ON milestones WHEN OLD.updated_at = NEW.updated_at
+          BEGIN
+            UPDATE milestones SET updated_at = datetime('now') WHERE id = NEW.id;
+          END
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE milestones (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          quantity INT NOT NULL,
+          type VARCHAR(50) NOT NULL,
+          item VARCHAR(255) NULL,
+          message VARCHAR(1000) NOT NULL,
+          object VARCHAR(50) NOT NULL,
+          achieved TINYINT(1) NOT NULL DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          KEY idx_milestones_lookup (type, item, achieved)
+        )
+      `);
+    }
+    applied.push("milestones table");
+    console.log("db: migration applied: created milestones table");
+  } else {
+    console.log("db: schema ok: milestones table already exists");
+  }
+
   if (applied.length === 0) {
     console.log("db: schema valid; no migrations applied");
   } else {

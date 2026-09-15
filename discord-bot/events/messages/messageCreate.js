@@ -21,6 +21,7 @@ import {
 import { emojiDetector } from "./utilities/emojiDetector.js";
 import { stickerDetector } from "./utilities/stickerDetector.js";
 import { plusMinusMsg } from "./utilities/plusplus.js";
+import { announceMilestones } from "../../utilities/milestoneNotifier.js";
 import {
   isLinkFixerEnabled,
   isTriggerResponsesEnabled,
@@ -40,7 +41,10 @@ const execute = async (message) => {
     incrementCounter("messagesProcessedTotal");
     await emojiDetector(message);
     if (isStickerTrackingEnabled()) await stickerDetector(message);
-    if (isPlusPlusEnabled()) await plusMinusMsg(message);
+    if (isPlusPlusEnabled()) {
+      const plusMinusMilestones = await plusMinusMsg(message);
+      await announceMilestones(message, plusMinusMilestones);
+    }
 
     const contentStripped = message.content
       .toLowerCase()
@@ -81,6 +85,7 @@ const execute = async (message) => {
           response: triggerResponse,
           response_function,
           response_function_parameters,
+          milestones: triggerMilestones,
         } = await getRandomResponseForTrigger(matchedTrigger, message.author.id);
         if (triggerResponse.length > 0) {
           if (response_function) {
@@ -93,6 +98,7 @@ const execute = async (message) => {
           } else {
             await message.reply(triggerResponse);
           }
+          await announceMilestones(message, triggerMilestones);
           response = "";
         } else {
           response = triggerResponse;

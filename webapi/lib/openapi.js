@@ -62,6 +62,32 @@ const definition = {
           error: { type: "string" },
         },
       },
+      MilestoneHit: {
+        type: "object",
+        description: "One milestone newly marked achieved by the increment this response is for.",
+        properties: {
+          id: { type: "integer" },
+          quantity: { type: "integer" },
+          message: { type: "string" },
+          type: { type: "string" },
+          item: { type: "string", nullable: true },
+        },
+      },
+      Milestone: {
+        type: "object",
+        description: "A milestone definition row (GET/POST/PUT /api/milestones).",
+        properties: {
+          id: { type: "integer" },
+          quantity: { type: "integer" },
+          type: { type: "string" },
+          item: { type: "string", nullable: true },
+          message: { type: "string" },
+          object: { type: "string" },
+          achieved: { type: "boolean" },
+          created_at: { type: "string" },
+          updated_at: { type: "string" },
+        },
+      },
       AuthErrorResponse: {
         type: "object",
         required: ["error"],
