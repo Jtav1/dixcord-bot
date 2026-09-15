@@ -9,6 +9,21 @@ const GUILD_MEMBERS_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 
 /** @type {import("discord.js").Client|null} */
 let syncClient = null;
+let syncInProgress = false;
+
+/**
+ * Duck-types discord.js's GatewayRateLimitError (thrown by guild.members.fetch()
+ * when opcode 8 gets throttled, e.g. right after a shard reconnect).
+ * @param {unknown} err
+ * @returns {err is Error & { data: { retry_after: number } }}
+ */
+function isGatewayRateLimitError(err) {
+  return (
+    err instanceof Error &&
+    err.name === "GatewayRateLimitError" &&
+    typeof (/** @type {any} */ (err).data?.retry_after) === "number"
+  );
+}
 
 /**
  * Build the full membership list from a freshly-fetched member cache. Excludes bots.
@@ -77,10 +92,32 @@ export async function syncSingleGuildMember(member) {
 export function startGuildMembersSync(client) {
   syncClient = client;
   const tick = async () => {
+    if (syncInProgress) {
+      console.log("bot: guild-members sync already in progress; skipping tick");
+      return;
+    }
+    syncInProgress = true;
     try {
       await syncGuildMembers(syncClient);
     } catch (err) {
-      console.error("bot: guild-members sync error:", err);
+      if (isGatewayRateLimitError(err)) {
+        const retryAfterSeconds = err.data.retry_after;
+        console.warn(
+          `bot: guild-members sync rate limited; retrying in ${retryAfterSeconds}s`,
+        );
+        await new Promise((resolve) =>
+          setTimeout(resolve, retryAfterSeconds * 1000),
+        );
+        try {
+          await syncGuildMembers(syncClient);
+        } catch (retryErr) {
+          console.error("bot: guild-members sync retry error:", retryErr);
+        }
+      } else {
+        console.error("bot: guild-members sync error:", err);
+      }
+    } finally {
+      syncInProgress = false;
     }
   };
   tick();
