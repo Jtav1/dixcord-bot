@@ -45,7 +45,8 @@ export async function fortuneTeller() {
 // --- Twitter/social link fixer ---
 
 /**
- * Fix social links in message; returns "fixed link: ..." or empty if not applicable.
+ * Fix social links in message: returns the submitted link with source_host replaced by
+ * target_host (a plain string replace, scheme/path/query untouched), or empty if not applicable.
  * @param {string} messageContents
  * @param {string} app Chat app id (e.g. "discord").
  * @param {string} guildId Guild id owning the twitter_fix_enabled flag.
@@ -74,7 +75,10 @@ export async function twitterFixer(messageContents, app, guildId) {
         for (const scheme of ["https://", "http://"]) {
           const prefix = scheme + source_host;
           if (cleanLower.startsWith(prefix)) {
-            reply = "fixed link: " + target_host + clean.slice(prefix.length);
+            // Slice out the host exactly as it appears in `clean` (case may differ from
+            // source_host) so the plain replace below is guaranteed to find it.
+            const matchedHost = clean.slice(scheme.length, prefix.length);
+            reply = clean.replace(matchedHost, target_host);
             matched = true;
             break;
           }

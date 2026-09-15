@@ -24,14 +24,14 @@
 
 ## POST /api/bot-responses/link-fixer
 
-Body: `{ message, app, guildId }`. `twitter_fix_enabled` is read from that server's `guild_config`.
+Body: `{ message, app, guildId }`. `twitter_fix_enabled` is read from that server's `guild_config`. `response` is the submitted link with `source_host` replaced by `target_host` (scheme/path/query untouched) — not prefixed with any extra text.
 
 **200 OK** (link was fixed)
 
 ```json
 {
   "ok": true,
-  "response": "fixed link: https://vxtwitter.com/user/status/123"
+  "response": "https://fixvx.com/user/status/123"
 }
 ```
 
