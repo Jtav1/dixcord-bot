@@ -3,7 +3,7 @@
  * discord-bot's latest reported counter snapshot (piggybacked on its heartbeat).
  */
 
-import client from "prom-client";
+import client from "@prometheus-io/client";
 import db from "../config/db.js";
 import { getDatabaseStatistics } from "./statistics.js";
 import { getSystemStatus } from "./systemStatus.js";
