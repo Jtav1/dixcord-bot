@@ -254,7 +254,7 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
 
   await db.query(
     "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
-    ["user", targetRes.id, voterRes.id, value],
+    ["user", String(targetRes.id), voterRes.id, value],
   );
   return true;
 }

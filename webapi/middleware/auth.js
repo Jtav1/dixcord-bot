@@ -21,6 +21,7 @@ export const WEBVIEW_ALLOWED_ROUTES = [
   { method: "GET", path: "/api/pin-history" },
   { method: "GET", path: "/api/system/status" },
   { method: "GET", path: "/api/statistics" },
+  { method: "GET", path: "/api/guild-members" },
   { method: "GET", path: "/api/user-mappings" },
   { method: "GET", path: "/api/trigger-responses/functions" },
 ];

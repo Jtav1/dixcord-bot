@@ -141,7 +141,7 @@ export async function getPlusPlusTotalByString(string, type = "word", app) {
     if (mid == null) return { string, type, total: 0 };
 
     const [rows] = await db.query(
-      `SELECT SUM(CAST(value AS INT)) AS total FROM plusplus_tracking WHERE type = 'user' AND string = ?`,
+      `SELECT SUM(CAST(value AS INT)) AS total FROM plusplus_tracking WHERE type = 'user' AND CAST(string AS INTEGER) = ?`,
       [mid],
     );
     const total = rows?.[0]?.total ?? 0;
@@ -167,6 +167,7 @@ export async function getPlusPlusVoteHistoryByRowId(rowId, type = "word", app) {
   if (!isChatMemberAppSupported(app)) return null;
 
   const typestr = type === "user" ? "user" : "word";
+  let stringMatchClause;
   let stringKey;
 
   if (type === "user") {
@@ -174,15 +175,17 @@ export async function getPlusPlusVoteHistoryByRowId(rowId, type = "word", app) {
     if (mid == null) {
       return { string: String(rowId), type, total: 0, votes: [] };
     }
-    stringKey = String(mid);
+    stringMatchClause = "CAST(pt.string AS INTEGER) = ?";
+    stringKey = mid;
   } else {
+    stringMatchClause = "pt.string = ?";
     stringKey = String(rowId);
   }
 
   const [rows] = await db.query(
     `SELECT pt.id, pt.value, pt.timestamp, ${representativePlatformIdSubquery("pt.voter")} AS voter_platform_id
      FROM plusplus_tracking pt
-     WHERE pt.type = ? AND pt.string = ?
+     WHERE pt.type = ? AND ${stringMatchClause}
      ORDER BY pt.timestamp ASC, pt.id ASC`,
     [typestr, stringKey],
   );
