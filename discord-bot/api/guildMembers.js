@@ -11,8 +11,7 @@ const GUILD_MEMBERS_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 let syncClient = null;
 
 /**
- * Build the full membership list from discord.js's member cache (fetched fresh so
- * handle/nickname/roles/joined-at are current). Excludes bot accounts.
+ * Build the full membership list from a freshly-fetched member cache. Excludes bots.
  * @param {import("discord.js").Guild} guild
  * @returns {Promise<Array<{ platformUserId: string, handle: string, nickname: string|null, roles: string[], joinedAt: string|null }>>}
  */
@@ -50,8 +49,7 @@ export async function syncGuildMembers(client) {
 }
 
 /**
- * Push a single member's row without affecting the rest of the guild's roster — sync never
- * deletes, so this is just an upsert of one row via the same endpoint. Used for join events.
+ * Upsert a single member's row without touching the rest of the roster. Used for join events.
  * @param {import("discord.js").GuildMember} member
  * @returns {Promise<void>}
  */

@@ -1,13 +1,11 @@
 /**
- * Emoji object comparison, mirroring webapi's services/emojiFrequency.js. Config getters
- * (getPinEmoji, getPlusEmoji, getMinusEmoji, getRepostEmojiId) return resolved emoji objects
- * ({ app, emoid, emoji }) rather than bare strings — an object with app: null means the admin
- * typed freeform text that was never synced to emoji_frequency.
+ * Emoji object comparison, mirroring webapi's services/emojiFrequency.js.
+ * Config getters return resolved emoji objects ({ app, emoid, emoji }), not bare strings.
  */
 
 /**
- * Build the emoji-object representation of a Discord.js emoji-like value (a MessageReaction's
- * `.emoji`, or discord.js's `parseEmoji()` result) for comparison against a config value.
+ * Convert a Discord.js emoji-like value (MessageReaction's `.emoji`, or `parseEmoji()` result)
+ * into a comparable emoji object.
  * @param {{ id?: string|null, name?: string|null }} discordEmoji
  * @returns {{ app: "discord", emoid: string, emoji: string }}
  */
@@ -21,9 +19,7 @@ export function toEmojiObject(discordEmoji) {
 }
 
 /**
- * Compare two resolved emoji objects for equality. If both come from the same known app,
- * compare by emoid — the stable identity within that app. Otherwise (including when either
- * side is unresolved freeform text, app: null), fall back to comparing the `emoji` string.
+ * Compare two resolved emoji objects for equality. Same app: compare by emoid; else by emoji string.
  * @param {{app:string|null,emoid:string|null,emoji:string|null}|null|undefined} a
  * @param {{app:string|null,emoid:string|null,emoji:string|null}|null|undefined} b
  * @returns {boolean}

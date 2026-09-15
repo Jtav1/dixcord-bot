@@ -80,9 +80,7 @@ const aliasesError = ref("");
 let loadedForId = null;
 
 /**
- * Every guild_members alias for this identity, grouped by app then by guild (each sorted
- * alphabetically) so the popup reads as "app -> its guilds -> that guild's member info"
- * instead of a flat, unordered list.
+ * Every guild_members alias for this identity, grouped by app then guild, each sorted alphabetically.
  * @returns {Array<{ app: string, guilds: Array<{ guildId: string, guildName: string, aliases: Array<object> }> }>}
  */
 const groupedAliases = computed(() => {

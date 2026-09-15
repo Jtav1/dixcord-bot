@@ -206,11 +206,7 @@ export function requireBotOrAdmin(req, res, next) {
 }
 
 /**
- * Require the request's guildId to match this account's own guild_id, unless the account is
- * admin (always bypasses) or unrestricted (guild_id === null, always bypasses). Reads guildId
- * from req.body.guildId, falling back to req.query.guildId (matches the existing app/guildId
- * resolution pattern in routes/config.js). Applies to any non-admin role with a bound guild_id,
- * not just bot, so a webview account could be scoped the same way later for free.
+ * Require req guildId to match this account's guild_id. Admin and unrestricted (guild_id === null) accounts bypass.
  * @param {import('express').Request} req
  * @param {import('express').Response} res
  * @param {import('express').NextFunction} next

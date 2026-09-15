@@ -1,9 +1,7 @@
 import { apiFetch, apiFetchJson } from "./http.js";
 
 /**
- * Fetch every member across all guilds for an app, deduplicated by platformUserId
- * (most-recently-synced alias wins). Backs the cross-guild identity-lookup use case
- * (leaderboard voter chips, etc.) that no longer has a home on /user-mappings.
+ * All members across all guilds for an app, deduplicated by platformUserId (most-recent alias wins).
  * @param {{ app?: string }} [options]
  * @returns {Promise<Array<{id:number|null,name:string|null,handle:string|null,platformUserId:string}>>}
  */
@@ -26,9 +24,7 @@ export async function fetchUnlinkedGuildMembers({ app = "discord", guildId, sear
 }
 
 /**
- * Every guild_members row (every guild, linked or not) — data source for the admin manual-link
- * picker. Unlike fetchUnlinkedGuildMembers, already-linked rows are included (with their
- * current mapping id/name) so an admin can see and deliberately move one elsewhere.
+ * Every guild_members row, including already-linked ones (with their mapping id/name) — for the admin manual-link picker.
  * @param {{ app?: string, guildId?: string, search?: string }} [options]
  * @returns {Promise<Array<{id:number,app:string,guildId:string,platformUserId:string,handle:string|null,nickname:string|null,roles:Array<{id:string,name:string|null}>,joinedAt:string|null,syncedAt:string,linkedMappingId:number|null,linkedMappingName:string|null}>>}
  */

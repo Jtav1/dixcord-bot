@@ -502,10 +502,7 @@ async function onCreateTrigger() {
 }
 
 /**
- * Opens with the response's existing parameters if it has any. Otherwise, pre-fills a blank
- * template shaped for whichever function is currently selected in the Function dropdown (which
- * may be an unsaved change, so this reads the live draft, not the last-saved response) — so an
- * admin who's never touched this dialog can see what keys the function expects.
+ * Pre-fills a blank template from the currently-selected (possibly unsaved) function if no parameters exist yet.
  * @param {{ linkId: number, response_function_parameters: object|null }} response
  * @returns {void}
  */

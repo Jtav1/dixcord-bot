@@ -119,11 +119,8 @@ export async function fetchPlusPlusVoteHistory(
 }
 
 /**
- * Fetch every member across all guilds for an app, deduplicated by platformUserId
- * (most-recently-synced alias wins). This is the source of truth for platform-user-id -> name
- * lookups: GET /api/user-mappings only returns bare chat_member_mapping rows ({id, name}, no
- * platformUserId at all), so it can never resolve a platform id — use fetchAllUserMappings
- * + buildMappingIdNameMap for internal-id lookups instead.
+ * Fetch every member across all guilds for an app, deduped by platformUserId.
+ * Source of truth for platform-id -> name; user-mappings rows lack platformUserId entirely.
  * @param {string} [app="discord"] Chat app id.
  * @returns {Promise<Array<{ id: number|null, name: string|null, handle: string|null, platformUserId: string }>>}
  */
@@ -182,9 +179,8 @@ export async function fetchAllUserMappings(app = "discord") {
 }
 
 /**
- * Build a lookup map from platform user id to display name, from fetchAllGuildMembers rows.
- * Prefers the linked chat_member_mapping name; falls back to the guild handle for members
- * never linked to an identity, so unlinked users still show a real name instead of a raw id.
+ * Build a lookup map from platform user id to display name.
+ * Falls back to the guild handle when a member has no linked mapping name.
  * @param {Array<{ platformUserId?: string, name?: string|null, handle?: string|null }>} members
  * @returns {Map<string, string>}
  */

@@ -193,10 +193,7 @@ const emojiItems = computed(() =>
 );
 
 /**
- * Reconstruct the raw guild_config.value string from a resolved ConfigEmojiValue object (see
- * webapi's resolveConfigEmojiValue): emoid if it matched a synced emoji_frequency row, else the
- * freeform `emoji` text that was typed by hand. Used both to seed the combobox's plain-string
- * v-model and to compare against the saved value for dirty-checking.
+ * Reconstruct the raw guild_config.value string from a resolved ConfigEmojiValue (webapi's resolveConfigEmojiValue).
  * @param {{emoid:string|null,emoji:string|null}|null} value
  * @returns {string}
  */
@@ -206,10 +203,8 @@ function emojiValueToString(value) {
 }
 
 /**
- * VCombobox items are either a matched role object (`return-object="false"` is required for
- * this — without it, Vuetify's own item-matching skips the lookup whenever the model value is a
- * string, so a role never resolves to its item), or (freeSolo, when nothing is synced) a bare
- * string the admin typed directly — handle both.
+ * VCombobox items are either a matched role object or a freeSolo string the admin typed — handle both.
+ * Requires `return-object="false"`, else Vuetify skips item-matching for string model values.
  * @param {object|string} item
  * @returns {string}
  */

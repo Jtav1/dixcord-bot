@@ -12,11 +12,8 @@ import {
 import { resolveConfigEmojiValue } from "./emojiFrequency.js";
 
 /**
- * List all config entries for one server, enriched with type/description/restart metadata, in
- * CONFIG_METADATA's declared display order (not raw DB row order, which has no defined order).
- * "emoji"-typed entries (pin_emoji, plusplus_emoji, minusminus_emoji, repost_emoji) get their
- * raw stored value resolved into an emoji object (see resolveConfigEmojiValue) instead of the
- * bare string — the single point every webapi response returns an emoji through.
+ * List all config entries for one server, enriched with metadata, in CONFIG_METADATA's display order.
+ * "emoji"-typed entries resolve to an emoji object (see resolveConfigEmojiValue) instead of a bare string.
  * @param {string} app
  * @param {string} guildId
  * @returns {Promise<{ config: Record<string, string|object|null>, entries: Array<{config:string,value:string|object|null}>, entriesWithMeta: Array<object> }>}

@@ -14,9 +14,7 @@ const data = new SlashCommandBuilder()
 const execute = async (interaction) => {
   let top5 = await getTopReposters(5);
 
-  // repost_emoji resolves to an emoji object (see webapi's resolveConfigEmojiValue), not a bare
-  // id — emoid is only present when it matched a synced emoji_frequency row (the expected case,
-  // since this is normally a custom server emoji); otherwise fall back to showing its raw text.
+  // emoid only present when matched to a synced emoji_frequency row; else fall back to raw text.
   const repostEmojiValue = getRepostEmojiId();
   const repostEmojiDisplay = repostEmojiValue?.emoid
     ? `<:repost:${repostEmojiValue.emoid}>`
