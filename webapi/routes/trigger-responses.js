@@ -408,6 +408,103 @@ router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
 });
 
 /**
+ * POST /api/trigger-responses/bulk
+ * Link every trigger string to every response string (cross product); creates/reuses both sides by string.
+ * Body: { trigger_strings: string[], response_strings: string[], selection_mode? }
+ * Auth: required.
+ * @openapi
+ * /api/trigger-responses/bulk:
+ *   post:
+ *     operationId: bulkLinkTriggerResponses
+ *     tags: [Trigger Responses]
+ *     summary: Link every trigger to every response (cross product)
+ *     description: >
+ *       Requires the admin role. Each trigger_strings/response_strings entry is deduped/reused by string,
+ *       same as POST /trigger-responses/triggers. Every trigger is linked to every response; pairs that are
+ *       already linked are skipped rather than erroring. selection_mode only applies to newly-created triggers.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [trigger_strings, response_strings]
+ *             properties:
+ *               trigger_strings: { type: array, minItems: 1, items: { type: string } }
+ *               response_strings: { type: array, minItems: 1, items: { type: string } }
+ *               selection_mode:
+ *                 type: string
+ *                 enum: [random, ordered, weighted]
+ *                 default: random
+ *                 description: Falls back to "random" if omitted or not one of the valid values. Only applies to newly-created triggers.
+ *     responses:
+ *       '201':
+ *         description: Summary of the triggers/responses involved and how many links were created vs. already existed.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 triggers:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       trigger_string: { type: string }
+ *                 responses:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       response_string: { type: string }
+ *                 created: { type: integer, description: Number of new trigger_response links created. }
+ *                 skipped: { type: integer, description: Number of trigger/response pairs that were already linked. }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/bulk", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const { trigger_strings, response_strings, selection_mode } = req.body ?? {};
+    if (
+      !Array.isArray(trigger_strings) ||
+      trigger_strings.filter((s) => typeof s === "string" && s.trim()).length === 0
+    ) {
+      return res.status(400).json({
+        ok: false,
+        error: "trigger_strings (non-empty array of non-empty strings) is required",
+      });
+    }
+    if (
+      !Array.isArray(response_strings) ||
+      response_strings.filter((s) => typeof s === "string" && s.trim()).length === 0
+    ) {
+      return res.status(400).json({
+        ok: false,
+        error: "response_strings (non-empty array of non-empty strings) is required",
+      });
+    }
+    const summary = await triggerResponses.bulkLinkTriggersAndResponses({
+      trigger_strings,
+      response_strings,
+      selection_mode,
+    });
+    res.status(201).json({ ok: true, ...summary });
+  } catch (err) {
+    console.error("POST /api/trigger-responses/bulk error:", err);
+    res.status(500).json({ ok: false, error: "Failed to bulk-link triggers and responses" });
+  }
+});
+
+/**
  * PUT /api/trigger-responses/triggers/:id
  * Update trigger: selection_mode and/or responses (set order/weight by link id, or add new response).
  * Body: { selection_mode?, responses?: [ { id: linkId, order?, weight? } | { response_string, order?, weight? } ] }
