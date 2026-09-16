@@ -152,6 +152,37 @@ See also [trigger-responses-examples.md](trigger-responses-examples.md) for samp
 
 ---
 
+## POST /api/trigger-responses/bulk
+
+**201 Created**
+
+```json
+{
+  "ok": true,
+  "triggers": [
+    { "id": 3, "trigger_string": "hello" },
+    { "id": 4, "trigger_string": "hi" }
+  ],
+  "responses": [
+    { "id": 10, "response_string": "Hi there!" },
+    { "id": 11, "response_string": "Hello!" }
+  ],
+  "created": 3,
+  "skipped": 1
+}
+```
+
+**400 Bad Request**
+
+```json
+{
+  "ok": false,
+  "error": "trigger_strings (non-empty array of non-empty strings) is required"
+}
+```
+
+---
+
 ## PUT /api/trigger-responses/triggers/:id
 
 **200 OK** (returns full trigger with updated responses)

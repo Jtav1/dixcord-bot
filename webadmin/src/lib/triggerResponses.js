@@ -28,6 +28,15 @@ export async function createTrigger(payload) {
 }
 
 /**
+ * Link every trigger string to every response string (cross product); dedupes/reuses both sides by text.
+ * @param {{ trigger_strings: string[], response_strings: string[], selection_mode?: string, response_function?: string|null }} payload
+ * @returns {Promise<{ triggers: Array<{id:number, trigger_string:string}>, responses: Array<{id:number, response_string:string}>, created: number, skipped: number }>}
+ */
+export async function bulkCreateTriggerResponses(payload) {
+  return apiFetchJson("POST", "/trigger-responses/bulk", payload, "Bulk-add triggers/responses");
+}
+
+/**
  * Update a trigger's selection_mode.
  * @param {number} id
  * @param {string} selectionMode

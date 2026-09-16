@@ -1854,6 +1854,129 @@
         }
       }
     },
+    "/api/trigger-responses/bulk": {
+      "post": {
+        "operationId": "bulkLinkTriggerResponses",
+        "tags": [
+          "Trigger Responses"
+        ],
+        "summary": "Link every trigger to every response (cross product)",
+        "description": "Requires the admin role. Each trigger_strings/response_strings entry is deduped/reused by string, same as POST /trigger-responses/triggers. Every trigger is linked to every response; pairs that are already linked are skipped rather than erroring. selection_mode only applies to newly-created triggers. response_function is applied to every newly-created link (skipped/already-existing links are left untouched).\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "trigger_strings",
+                  "response_strings"
+                ],
+                "properties": {
+                  "trigger_strings": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "response_strings": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "selection_mode": {
+                    "type": "string",
+                    "enum": [
+                      "random",
+                      "ordered",
+                      "weighted"
+                    ],
+                    "default": "random",
+                    "description": "Falls back to \"random\" if omitted or not one of the valid values. Only applies to newly-created triggers."
+                  },
+                  "response_function": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Optional function key applied to every newly-created trigger-response link."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Summary of the triggers/responses involved and how many links were created vs. already existed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "triggers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "trigger_string": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "responses": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "response_string": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "created": {
+                      "type": "integer",
+                      "description": "Number of new trigger_response links created."
+                    },
+                    "skipped": {
+                      "type": "integer",
+                      "description": "Number of trigger/response pairs that were already linked."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/trigger-responses/random": {
       "get": {
         "operationId": "getRandomResponse",

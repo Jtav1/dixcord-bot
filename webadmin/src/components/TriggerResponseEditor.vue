@@ -14,8 +14,11 @@
             prepend-inner-icon="mdi-magnify"
             class="mb-3"
           />
-          <v-btn block color="primary" variant="tonal" class="mb-3" @click="openCreateDialog">
+          <v-btn block color="primary" variant="tonal" class="mb-2" @click="openCreateDialog">
             New Trigger
+          </v-btn>
+          <v-btn block variant="tonal" class="mb-3" @click="openBulkDialog">
+            Bulk Add
           </v-btn>
           <v-skeleton-loader v-if="listLoading" type="list-item@6" />
           <v-list v-else nav density="comfortable">
@@ -171,6 +174,61 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="bulkDialogOpen" max-width="640">
+      <v-card class="glass-card">
+        <v-card-title class="text-h6">Bulk Add</v-card-title>
+        <v-card-text>
+          <p class="text-medium-emphasis mb-3">
+            Every trigger below will be linked to every response below (one per line). Existing triggers
+            and responses are reused by matching text; existing links are skipped. Function if selected will be
+            associated with each new link. 
+          </p>
+          <v-row>
+            <v-col cols="12" sm="6">
+              <v-textarea
+                v-model="bulkForm.triggersText"
+                label="Triggers (one per line)"
+                rows="8"
+                variant="outlined"
+                hide-details
+              />
+            </v-col>
+            <v-col cols="12" sm="6">
+              <v-textarea
+                v-model="bulkForm.responsesText"
+                label="Responses (one per line)"
+                rows="8"
+                variant="outlined"
+                hide-details
+              />
+            </v-col>
+          </v-row>
+          <v-select
+            v-model="bulkForm.selection_mode"
+            :items="SELECTION_MODES"
+            label="Selection mode (new triggers only)"
+            class="mt-3"
+            hide-details
+          />
+          <v-select
+            v-model="bulkForm.response_function"
+            :items="functionItems"
+            label="Function (applied to all created links)"
+            clearable
+            class="mt-3"
+            hide-details
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="bulkDialogOpen = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="bulkSubmitting" @click="onBulkAdd">
+            Link
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="parametersDialogOpen" max-width="480">
       <v-card class="glass-card">
         <v-card-title class="text-h6">Function Parameters</v-card-title>
@@ -209,6 +267,7 @@ import ConfirmDialog from "./ConfirmDialog.vue";
 import { useSnackbar } from "../composables/useSnackbar.js";
 import {
   addTriggerResponse,
+  bulkCreateTriggerResponses,
   createTrigger,
   deleteResponse as deleteResponseApi,
   deleteTrigger as deleteTriggerApi,
@@ -253,6 +312,15 @@ const functionItems = computed(() =>
 const createDialogOpen = ref(false);
 const creating = ref(false);
 const createForm = reactive({ trigger_string: "", selection_mode: "random", response_string: "" });
+
+const bulkDialogOpen = ref(false);
+const bulkSubmitting = ref(false);
+const bulkForm = reactive({
+  triggersText: "",
+  responsesText: "",
+  selection_mode: "random",
+  response_function: null,
+});
 
 const parametersDialogOpen = ref(false);
 const parametersTargetLinkId = ref(null);
@@ -498,6 +566,62 @@ async function onCreateTrigger() {
     notify(err instanceof Error ? err.message : "Failed to create trigger", { color: "error" });
   } finally {
     creating.value = false;
+  }
+}
+
+/**
+ * @returns {void}
+ */
+function openBulkDialog() {
+  bulkForm.triggersText = "";
+  bulkForm.responsesText = "";
+  bulkForm.selection_mode = "random";
+  bulkForm.response_function = null;
+  bulkDialogOpen.value = true;
+}
+
+/**
+ * @param {string} text
+ * @returns {string[]}
+ */
+function linesToUniqueStrings(text) {
+  const seen = new Set();
+  for (const raw of text.split("\n")) {
+    const trimmed = raw.trim();
+    if (trimmed) seen.add(trimmed);
+  }
+  return [...seen];
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function onBulkAdd() {
+  const trigger_strings = linesToUniqueStrings(bulkForm.triggersText);
+  const response_strings = linesToUniqueStrings(bulkForm.responsesText);
+  if (!trigger_strings.length || !response_strings.length) {
+    notify("At least one trigger and one response are required", { color: "error" });
+    return;
+  }
+  bulkSubmitting.value = true;
+  try {
+    const result = await bulkCreateTriggerResponses({
+      trigger_strings,
+      response_strings,
+      selection_mode: bulkForm.selection_mode,
+      response_function: bulkForm.response_function || null,
+    });
+    notify(
+      `Linked ${result.created} response${result.created === 1 ? "" : "s"}` +
+        (result.skipped ? `, ${result.skipped} already existed` : ""),
+    );
+    bulkDialogOpen.value = false;
+    await loadTriggers();
+    await reloadDetail();
+  } catch (err) {
+    notify(err instanceof Error ? err.message : "Failed to bulk-add", { color: "error" });
+  } finally {
+    bulkSubmitting.value = false;
   }
 }
 
