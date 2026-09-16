@@ -10,6 +10,7 @@ import LinkReplacementsView from "../views/LinkReplacementsView.vue";
 import UserMappingsView from "../views/UserMappingsView.vue";
 import RemindersView from "../views/RemindersView.vue";
 import ActivityView from "../views/ActivityView.vue";
+import MilestonesView from "../views/MilestonesView.vue";
 import PinArchiveAdminView from "../views/PinArchiveAdminView.vue";
 import AuditLogView from "../views/AuditLogView.vue";
 
@@ -24,6 +25,7 @@ const FEATURE_COMPONENTS = {
   "user-mappings": UserMappingsView,
   reminders: RemindersView,
   activity: ActivityView,
+  milestones: MilestonesView,
   "pin-archive": PinArchiveAdminView,
   "audit-log": AuditLogView,
 };
