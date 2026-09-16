@@ -679,18 +679,20 @@ export async function createTriggerWithResponses({
 /**
  * Link every trigger string to every response string (cross product), creating/reusing rows on both
  * sides by string (same dedupe as create()/createTriggerWithResponses()). Existing links are skipped.
- * @param {{ trigger_strings: string[], response_strings: string[], selection_mode?: string }} params
+ * @param {{ trigger_strings: string[], response_strings: string[], selection_mode?: string, response_function?: string|null }} params
  * @returns {Promise<{ triggers: Array<{id:number, trigger_string:string}>, responses: Array<{id:number, response_string:string}>, created: number, skipped: number }>}
  */
 export async function bulkLinkTriggersAndResponses({
   trigger_strings,
   response_strings,
   selection_mode = "random",
+  response_function,
 }) {
   const mode =
     selection_mode && VALID_MODES.includes(selection_mode.toLowerCase())
       ? selection_mode.toLowerCase()
       : "random";
+  const responseFunctionId = await getOrCreateFunctionId(response_function);
 
   const triggerEntries = [];
   for (const raw of trigger_strings) {
@@ -722,8 +724,8 @@ export async function bulkLinkTriggersAndResponses({
         continue;
       }
       await db.query(
-        "INSERT INTO trigger_response (trigger_id, response_id) VALUES (?, ?)",
-        [trigger.id, response.id],
+        "INSERT INTO trigger_response (trigger_id, response_id, response_function) VALUES (?, ?, ?)",
+        [trigger.id, response.id, responseFunctionId],
       );
       created += 1;
       touched = true;

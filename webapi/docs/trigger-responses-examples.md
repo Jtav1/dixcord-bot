@@ -105,7 +105,8 @@ curl -s -X POST "${BASE_URL}/api/trigger-responses/bulk" \
   -d '{
     "trigger_strings": ["hello", "hi", "hey"],
     "response_strings": ["Hi there!", "Hello!"],
-    "selection_mode": "random"
+    "selection_mode": "random",
+    "response_function": null
   }'
 ```
 

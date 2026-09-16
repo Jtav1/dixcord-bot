@@ -410,7 +410,7 @@ router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
 /**
  * POST /api/trigger-responses/bulk
  * Link every trigger string to every response string (cross product); creates/reuses both sides by string.
- * Body: { trigger_strings: string[], response_strings: string[], selection_mode? }
+ * Body: { trigger_strings: string[], response_strings: string[], selection_mode?, response_function? }
  * Auth: required.
  * @openapi
  * /api/trigger-responses/bulk:
@@ -422,6 +422,8 @@ router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
  *       Requires the admin role. Each trigger_strings/response_strings entry is deduped/reused by string,
  *       same as POST /trigger-responses/triggers. Every trigger is linked to every response; pairs that are
  *       already linked are skipped rather than erroring. selection_mode only applies to newly-created triggers.
+ *       response_function is applied to every newly-created link (skipped/already-existing links are left
+ *       untouched).
  *     requestBody:
  *       required: true
  *       content:
@@ -437,6 +439,7 @@ router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
  *                 enum: [random, ordered, weighted]
  *                 default: random
  *                 description: Falls back to "random" if omitted or not one of the valid values. Only applies to newly-created triggers.
+ *               response_function: { type: string, nullable: true, description: Optional function key applied to every newly-created trigger-response link. }
  *     responses:
  *       '201':
  *         description: Summary of the triggers/responses involved and how many links were created vs. already existed.
@@ -473,7 +476,7 @@ router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
  */
 router.post("/bulk", authenticate, requireAdmin, async (req, res) => {
   try {
-    const { trigger_strings, response_strings, selection_mode } = req.body ?? {};
+    const { trigger_strings, response_strings, selection_mode, response_function } = req.body ?? {};
     if (
       !Array.isArray(trigger_strings) ||
       trigger_strings.filter((s) => typeof s === "string" && s.trim()).length === 0
@@ -496,6 +499,7 @@ router.post("/bulk", authenticate, requireAdmin, async (req, res) => {
       trigger_strings,
       response_strings,
       selection_mode,
+      response_function,
     });
     res.status(201).json({ ok: true, ...summary });
   } catch (err) {

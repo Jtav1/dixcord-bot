@@ -180,7 +180,8 @@
         <v-card-text>
           <p class="text-medium-emphasis mb-3">
             Every trigger below will be linked to every response below (one per line). Existing triggers
-            and responses are reused by matching text; existing links are skipped.
+            and responses are reused by matching text; existing links are skipped. Function if selected will be
+            associated with each new link. 
           </p>
           <v-row>
             <v-col cols="12" sm="6">
@@ -206,6 +207,14 @@
             v-model="bulkForm.selection_mode"
             :items="SELECTION_MODES"
             label="Selection mode (new triggers only)"
+            class="mt-3"
+            hide-details
+          />
+          <v-select
+            v-model="bulkForm.response_function"
+            :items="functionItems"
+            label="Function (applied to all created links)"
+            clearable
             class="mt-3"
             hide-details
           />
@@ -306,7 +315,12 @@ const createForm = reactive({ trigger_string: "", selection_mode: "random", resp
 
 const bulkDialogOpen = ref(false);
 const bulkSubmitting = ref(false);
-const bulkForm = reactive({ triggersText: "", responsesText: "", selection_mode: "random" });
+const bulkForm = reactive({
+  triggersText: "",
+  responsesText: "",
+  selection_mode: "random",
+  response_function: null,
+});
 
 const parametersDialogOpen = ref(false);
 const parametersTargetLinkId = ref(null);
@@ -562,6 +576,7 @@ function openBulkDialog() {
   bulkForm.triggersText = "";
   bulkForm.responsesText = "";
   bulkForm.selection_mode = "random";
+  bulkForm.response_function = null;
   bulkDialogOpen.value = true;
 }
 
@@ -594,6 +609,7 @@ async function onBulkAdd() {
       trigger_strings,
       response_strings,
       selection_mode: bulkForm.selection_mode,
+      response_function: bulkForm.response_function || null,
     });
     notify(
       `Linked ${result.created} response${result.created === 1 ? "" : "s"}` +

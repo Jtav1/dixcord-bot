@@ -1861,7 +1861,7 @@
           "Trigger Responses"
         ],
         "summary": "Link every trigger to every response (cross product)",
-        "description": "Requires the admin role. Each trigger_strings/response_strings entry is deduped/reused by string, same as POST /trigger-responses/triggers. Every trigger is linked to every response; pairs that are already linked are skipped rather than erroring. selection_mode only applies to newly-created triggers.\n",
+        "description": "Requires the admin role. Each trigger_strings/response_strings entry is deduped/reused by string, same as POST /trigger-responses/triggers. Every trigger is linked to every response; pairs that are already linked are skipped rather than erroring. selection_mode only applies to newly-created triggers. response_function is applied to every newly-created link (skipped/already-existing links are left untouched).\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -1896,6 +1896,11 @@
                     ],
                     "default": "random",
                     "description": "Falls back to \"random\" if omitted or not one of the valid values. Only applies to newly-created triggers."
+                  },
+                  "response_function": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Optional function key applied to every newly-created trigger-response link."
                   }
                 }
               }
