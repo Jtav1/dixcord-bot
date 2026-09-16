@@ -13,6 +13,22 @@ import {
 import { emojisMatch, resolveConfigEmojiValue } from "./emojiFrequency.js";
 import { getGuildConfigValue } from "./guildConfig.js";
 import { normalizePinLogPayload } from "./pinHistory.js";
+import {
+  checkAndMarkMilestones,
+  computeEmojiFrequencyPerApp,
+  computeEmojiTrackedGlobal,
+  computeEmojiUsedGlobal,
+  computePinTotal,
+  computePlusPlusItemNegative,
+  computePlusPlusItemPositive,
+  computePlusPlusItemTotal,
+  computePlusPlusVotesGlobal,
+  computePlusPlusVotesPerApp,
+  computeRepostGlobalTotal,
+  computeRepostUserTotal,
+  computeStickerTrackedGlobal,
+  computeStickerUsedGlobal,
+} from "./milestones.js";
 
 /**
  * @param {Record<string, unknown> | null | undefined} payload
@@ -36,6 +52,7 @@ function requireChatAppFromPayload(payload) {
  * If no row exists, insert one with frequency 1.
  * @param {string} app - e.g. "discord"; emoji_frequency.app has no default, so this is required on insert.
  * @param {string} [emojiType] - Type from request (e.g. 'emoji'); if missing, type is stored as null.
+ * @returns {Promise<{ frequency: number|null, inserted: boolean }>} frequency is null if neither branch wrote a row (missing id/name)
  * @private
  */
 async function ensureAndIncrementEmoji(
@@ -54,7 +71,7 @@ async function ensureAndIncrementEmoji(
       : null;
 
   const [existing] = await db.query(
-    "SELECT 1 FROM emoji_frequency WHERE emoid = ?",
+    "SELECT frequency FROM emoji_frequency WHERE emoid = ?",
     [id],
   );
 
@@ -64,15 +81,19 @@ async function ensureAndIncrementEmoji(
         "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoid = ?",
         [id],
       );
+      return { frequency: Number(existing[0].frequency) + 1, inserted: false };
     }
-  } else {
-    if (emojiId.length > 0 && emojiName.length > 0) {
-      await db.query(
-        "INSERT INTO emoji_frequency (app, emoid, emoji, frequency, animated, type) VALUES (?, ?, ?, 1, ?, ?)",
-        [app, id, name, animated, type],
-      );
-    }
+    return { frequency: null, inserted: false };
   }
+
+  if (emojiId.length > 0 && emojiName.length > 0) {
+    await db.query(
+      "INSERT INTO emoji_frequency (app, emoid, emoji, frequency, animated, type) VALUES (?, ?, ?, 1, ?, ?)",
+      [app, id, name, animated, type],
+    );
+    return { frequency: 1, inserted: true };
+  }
+  return { frequency: null, inserted: false };
 }
 
 /**
@@ -119,7 +140,7 @@ function toEmojiObject(e, app) {
 /**
  * Record emoji usage from a message. Optionally records a +/- vote when replying with one plus/minus emoji.
  * @param {object} payload - { app: string, guildId: string, authorId: string (snowflake), emojis: Array<{ name, id? }>, isReply?, repliedUserId? }
- * @returns {Promise<{ ok: boolean, applied?: string, error?: string }>}
+ * @returns {Promise<{ ok: boolean, applied?: string, error?: string, milestones?: Array }>}
  */
 export async function countEmoji(payload) {
   const appCheck = requireChatAppFromPayload(payload);
@@ -155,47 +176,107 @@ export async function countEmoji(payload) {
   const doPlusMinus = isReply && repliedUserId && plusCount + minusCount === 1;
 
   if (doPlusMinus && plusCount === 1) {
-    const ok = await recordPlusPlus(
+    const result = await recordPlusPlus(
       repliedUserId,
       "user",
       authorId,
       1,
       chatApp,
     );
-    if (!ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
-    return { ok: true, applied: "plus" };
+    if (!result.ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
+    return { ok: true, applied: "plus", milestones: result.milestones };
   }
   if (doPlusMinus && minusCount === 1) {
-    const ok = await recordPlusPlus(
+    const result = await recordPlusPlus(
       repliedUserId,
       "user",
       authorId,
       -1,
       chatApp,
     );
-    if (!ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
-    return { ok: true, applied: "minus" };
+    if (!result.ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
+    return { ok: true, applied: "minus", milestones: result.milestones };
   }
 
   const authorMap = await requireChatMemberMappingId(authorId, chatApp);
   if (!authorMap.ok) return { ok: false, error: authorMap.error };
 
+  const milestones = [];
   for (const em of emojis) {
     const name = String(em.name ?? "?");
     const id = em.id != null ? String(em.id) : name;
-    await ensureAndIncrementEmoji(chatApp, id, name, em.animated, em.type);
+    const isSticker = String(em.type ?? "").trim() === "sticker";
+    const { frequency, inserted } = await ensureAndIncrementEmoji(
+      chatApp,
+      id,
+      name,
+      em.animated,
+      em.type,
+    );
     if (id && authorId) {
       await upsertUserEmoji(authorMap.id, id);
     }
+    if (frequency != null) {
+      milestones.push(
+        ...(await checkAllEmojiMilestones({ chatApp, id, frequency, inserted, isSticker })),
+      );
+    }
   }
-  return { ok: true };
+  return { ok: true, milestones };
+}
+
+/**
+ * Run every milestone check relevant to one counted emoji/sticker occurrence.
+ * @private
+ */
+async function checkAllEmojiMilestones({ chatApp, id, frequency, inserted, isSticker }) {
+  const hits = [];
+
+  const itemHit = await checkAndMarkMilestones({
+    type: "emoji_frequency_item",
+    item: id,
+    value: frequency,
+  });
+  if (itemHit) hits.push(itemHit);
+
+  const perAppTotal = await computeEmojiFrequencyPerApp(chatApp);
+  const perAppHit = await checkAndMarkMilestones({
+    type: "emoji_frequency_per_app",
+    item: chatApp,
+    value: perAppTotal,
+  });
+  if (perAppHit) hits.push(perAppHit);
+
+  const usedValue = isSticker
+    ? await computeStickerUsedGlobal()
+    : await computeEmojiUsedGlobal();
+  const usedHit = await checkAndMarkMilestones({
+    type: isSticker ? "sticker_used_global" : "emoji_used_global",
+    item: null,
+    value: usedValue,
+  });
+  if (usedHit) hits.push(usedHit);
+
+  if (inserted) {
+    const trackedValue = isSticker
+      ? await computeStickerTrackedGlobal()
+      : await computeEmojiTrackedGlobal();
+    const trackedHit = await checkAndMarkMilestones({
+      type: isSticker ? "sticker_tracked_global" : "emoji_tracked_global",
+      item: null,
+      value: trackedValue,
+    });
+    if (trackedHit) hits.push(trackedHit);
+  }
+
+  return hits;
 }
 
 /**
  * Record sticker usage from a message. No plus/minus concept for stickers (Discord has no
  * reply-with-sticker vote mechanism), so this is simpler than countEmoji.
  * @param {object} payload - { app: string, authorId: string (snowflake), stickers: Array<{ name, id? }> }
- * @returns {Promise<{ ok: boolean, error?: string }>}
+ * @returns {Promise<{ ok: boolean, error?: string, milestones?: Array }>}
  */
 export async function countSticker(payload) {
   const appCheck = requireChatAppFromPayload(payload);
@@ -211,18 +292,84 @@ export async function countSticker(payload) {
   const authorMap = await requireChatMemberMappingId(authorId, chatApp);
   if (!authorMap.ok) return { ok: false, error: authorMap.error };
 
+  const milestones = [];
   for (const st of stickers) {
     const name = String(st.name ?? "?");
     const id = st.id != null ? String(st.id) : name;
-    await ensureAndIncrementEmoji(chatApp, id, name, false, "sticker");
+    const { frequency, inserted } = await ensureAndIncrementEmoji(
+      chatApp,
+      id,
+      name,
+      false,
+      "sticker",
+    );
     if (id && authorId) {
       await upsertUserEmoji(authorMap.id, id);
     }
+    if (frequency != null) {
+      milestones.push(
+        ...(await checkAllEmojiMilestones({
+          chatApp,
+          id,
+          frequency,
+          inserted,
+          isSticker: true,
+        })),
+      );
+    }
   }
-  return { ok: true };
+  return { ok: true, milestones };
 }
 
 // --- Plus/minus in messages ---
+
+/**
+ * Run every milestone check relevant to one recorded plusplus vote. `target` must be the
+ * pre-resolution value (word text or the target's own platform snowflake), not an internal
+ * chat_member_mapping id, since that's what milestone `item` values are defined against.
+ * @private
+ */
+async function checkAllPlusPlusMilestones({ typestr, target, value, chatApp }) {
+  const hits = [];
+
+  const globalTotal = await computePlusPlusVotesGlobal();
+  const globalHit = await checkAndMarkMilestones({
+    type: "plusplus_votes_global",
+    item: null,
+    value: globalTotal,
+  });
+  if (globalHit) hits.push(globalHit);
+
+  const perAppTotal = await computePlusPlusVotesPerApp(chatApp);
+  const perAppHit = await checkAndMarkMilestones({
+    type: "plusplus_votes_per_app",
+    item: chatApp,
+    value: perAppTotal,
+  });
+  if (perAppHit) hits.push(perAppHit);
+
+  const itemTotal = await computePlusPlusItemTotal(target, typestr, chatApp);
+  const itemHit = await checkAndMarkMilestones({
+    type: "plusplus_item_total",
+    item: String(target),
+    value: itemTotal,
+  });
+  if (itemHit) hits.push(itemHit);
+
+  const signedType = value === 1 ? "plusplus_item_positive" : "plusplus_item_negative";
+  const signedValue =
+    value === 1
+      ? await computePlusPlusItemPositive(target, typestr, chatApp)
+      : await computePlusPlusItemNegative(target, typestr, chatApp);
+  const signedHit = await checkAndMarkMilestones({
+    type: signedType,
+    item: String(target),
+    value: signedValue,
+  });
+  if (signedHit) hits.push(signedHit);
+
+  return hits;
+}
 
 /**
  * @param {string} target - word text, or target user snowflake when typestr is 'user'
@@ -230,33 +377,35 @@ export async function countSticker(payload) {
  * @param {string} voterDiscordId - voter snowflake
  * @param {number} value - 1 or -1
  * @param {string} chatApp - e.g. "discord"
- * @returns {Promise<boolean>} false if mapping missing or invalid
+ * @returns {Promise<{ ok: boolean, milestones: Array }>} ok:false if mapping missing or invalid
  */
 async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
-  if (!typestr || !voterDiscordId) return false;
+  if (!typestr || !voterDiscordId) return { ok: false, milestones: [] };
   if (typestr === "user" && String(target) === String(voterDiscordId))
-    return false;
+    return { ok: false, milestones: [] };
 
   const voterRes = await requireChatMemberMappingId(voterDiscordId, chatApp);
-  if (!voterRes.ok) return false;
+  if (!voterRes.ok) return { ok: false, milestones: [] };
 
   if (typestr === "word") {
-    if (!target || String(target).trim() === "") return false;
+    if (!target || String(target).trim() === "") return { ok: false, milestones: [] };
     await db.query(
       "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
       ["word", String(target), voterRes.id, value],
     );
-    return true;
+    const milestones = await checkAllPlusPlusMilestones({ typestr, target, value, chatApp });
+    return { ok: true, milestones };
   }
 
   const targetRes = await requireChatMemberMappingId(target, chatApp);
-  if (!targetRes.ok) return false;
+  if (!targetRes.ok) return { ok: false, milestones: [] };
 
   await db.query(
     "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
     ["user", String(targetRes.id), voterRes.id, value],
   );
-  return true;
+  const milestones = await checkAllPlusPlusMilestones({ typestr, target, value, chatApp });
+  return { ok: true, milestones };
 }
 
 /**
@@ -264,7 +413,7 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
  * has no preceding word/mention for the regex below to match, so that case is treated as a
  * single vote on the replied-to user instead.
  * @param {object} payload - { app: string, message: { content, author: { id } }, voterId: string (snowflake), isReply?: boolean, repliedUserId?: string }
- * @returns {Promise<{ ok: boolean, recorded?: number, error?: string }>}
+ * @returns {Promise<{ ok: boolean, recorded?: number, error?: string, milestones?: Array }>}
  */
 export async function recordPlusMinusMessage(payload) {
   const appCheck = requireChatAppFromPayload(payload);
@@ -280,21 +429,21 @@ export async function recordPlusMinusMessage(payload) {
 
   const trimmed = content.trim();
   if (isReply && repliedUserId && (trimmed === "++" || trimmed === "--")) {
-    const ok = await recordPlusPlus(
+    const result = await recordPlusPlus(
       repliedUserId,
       "user",
       voterId,
       trimmed === "++" ? 1 : -1,
       chatApp,
     );
-    if (!ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
-    return { ok: true, recorded: 1 };
+    if (!result.ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
+    return { ok: true, recorded: 1, milestones: result.milestones };
   }
 
   // Cap total +/- characters so one message can't cast a pile of votes at once.
   const plusMinusCharCount = (content.match(/[+-]/g) ?? []).length;
   if (plusMinusCharCount > 2) {
-    return { ok: true, recorded: 0 };
+    return { ok: true, recorded: 0, milestones: [] };
   }
 
   const regex = /(\S+)\s*(\+\+|\-\-)/g;
@@ -307,6 +456,7 @@ export async function recordPlusMinusMessage(payload) {
 
   const mentionRegex = /^<@!?(\d+)>$/;
   let recorded = 0;
+  const milestones = [];
 
   for (const m of matches) {
     let target = m.target;
@@ -324,20 +474,26 @@ export async function recordPlusMinusMessage(payload) {
     if (!matchtype) continue;
 
     if (m.type === "++" && matchtype) {
-      const ok = await recordPlusPlus(target, matchtype, voterId, 1, chatApp);
-      if (ok) recorded++;
+      const result = await recordPlusPlus(target, matchtype, voterId, 1, chatApp);
+      if (result.ok) {
+        recorded++;
+        milestones.push(...result.milestones);
+      }
     } else if (m.type === "--" && matchtype) {
-      const ok = await recordPlusPlus(target, matchtype, voterId, -1, chatApp);
-      if (ok) recorded++;
+      const result = await recordPlusPlus(target, matchtype, voterId, -1, chatApp);
+      if (result.ok) {
+        recorded++;
+        milestones.push(...result.milestones);
+      }
     }
   }
-  return { ok: true, recorded };
+  return { ok: true, recorded, milestones };
 }
 
 /**
  * Record a single plus or minus from a reaction. Writes to plusplus_tracking (type='user'). Self-votes are rejected.
  * @param {object} payload - { app: string, targetUserId: string, reactorId: string, value: 1 | -1 } (snowflakes)
- * @returns {Promise<{ ok: boolean, recorded?: number, value?: number, error?: string }>}
+ * @returns {Promise<{ ok: boolean, recorded?: number, value?: number, error?: string, milestones?: Array }>}
  */
 export async function recordPlusMinusReaction(payload) {
   const appCheck = requireChatAppFromPayload(payload);
@@ -354,15 +510,15 @@ export async function recordPlusMinusReaction(payload) {
   if (String(targetUserId) === String(reactorId)) {
     return { ok: false, error: "Cannot vote for yourself" };
   }
-  const ok = await recordPlusPlus(
+  const result = await recordPlusPlus(
     String(targetUserId),
     "user",
     String(reactorId),
     value,
     chatApp,
   );
-  if (!ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
-  return { ok: true, recorded: 1, value };
+  if (!result.ok) return { ok: false, error: UNKNOWN_CHAT_MEMBER_ERROR };
+  return { ok: true, recorded: 1, value, milestones: result.milestones };
 }
 
 // --- Repost tracking ---
@@ -370,7 +526,7 @@ export async function recordPlusMinusReaction(payload) {
 /**
  * Record or withdraw a repost accusation.
  * @param {object} payload - { app: string, userid, msgid, accuser (snowflakes), msgcontents?, repost: 1 | -1 }
- * @returns {Promise<{ ok: boolean, action?: string, deleted?: number, error?: string }>}
+ * @returns {Promise<{ ok: boolean, action?: string, deleted?: number, error?: string, milestones?: Array }>}
  */
 export async function countRepost(payload) {
   const appCheck = requireChatAppFromPayload(payload);
@@ -408,7 +564,25 @@ export async function countRepost(payload) {
         [authorId, msgid, accuserId, msgcontents || null],
       );
     }
-    return { ok: true, action: "created" };
+
+    const milestones = [];
+    const userTotal = await computeRepostUserTotal(userid, chatApp);
+    const userHit = await checkAndMarkMilestones({
+      type: "repost_user_total",
+      item: String(userid),
+      value: userTotal,
+    });
+    if (userHit) milestones.push(userHit);
+
+    const globalTotal = await computeRepostGlobalTotal();
+    const globalHit = await checkAndMarkMilestones({
+      type: "repost_global_total",
+      item: null,
+      value: globalTotal,
+    });
+    if (globalHit) milestones.push(globalHit);
+
+    return { ok: true, action: "created", milestones };
   }
 
   if (repost === -1) {
@@ -417,7 +591,7 @@ export async function countRepost(payload) {
       [msgid, accuserId],
     );
     const deleted = result?.affectedRows ?? result?.changes ?? 0;
-    return { ok: true, action: "withdrawn", deleted };
+    return { ok: true, action: "withdrawn", deleted, milestones: [] };
   }
 
   return { ok: false };
@@ -504,7 +678,7 @@ export async function isMessageAlreadyPinned(messageId) {
 /**
  * Log a message as pinned (idempotent: no-op if already logged).
  * @param {{ messageId?: string, app?: string, authorId?: string, contents?: string, attachments?: unknown, channelId?: string, channelName?: string, pinnerIds?: string[] }} payload
- * @returns {Promise<{ ok: boolean, error?: string }>}
+ * @returns {Promise<{ ok: boolean, error?: string, milestones?: Array }>}
  */
 export async function logPinnedMessage(payload) {
   const messageId =
@@ -514,7 +688,7 @@ export async function logPinnedMessage(payload) {
   }
   const id = String(messageId).trim();
   const already = await isMessageAlreadyPinned(id);
-  if (already) return { ok: true };
+  if (already) return { ok: true, milestones: [] };
 
   const appCheck = requireChatAppFromPayload(
     typeof payload === "object" && payload != null ? payload : {},
@@ -533,5 +707,11 @@ export async function logPinnedMessage(payload) {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [id, author, contents, attachments, channelId, channelName, pinners, 1],
   );
-  return { ok: true };
+
+  const milestones = [];
+  const total = await computePinTotal();
+  const hit = await checkAndMarkMilestones({ type: "pin_total", item: null, value: total });
+  if (hit) milestones.push(hit);
+
+  return { ok: true, milestones };
 }

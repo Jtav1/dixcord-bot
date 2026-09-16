@@ -295,3 +295,19 @@ CREATE TABLE IF NOT EXISTS member_aliases (
   CONSTRAINT fk_member_aliases_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   CONSTRAINT fk_member_aliases_guild_member FOREIGN KEY (guild_member_id) REFERENCES guild_members(id) ON DELETE CASCADE
 );
+
+-- Admin-defined usage-stat thresholds. `type` is the fine-grained metric key (see
+-- webapi/services/milestoneTypes.js), `item` scopes it to one entity (null = global), `object`
+-- is a free-form display category, not used for matching.
+CREATE TABLE IF NOT EXISTS milestones (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  quantity INT NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  item VARCHAR(255) NULL,
+  message VARCHAR(1000) NOT NULL,
+  object VARCHAR(50) NOT NULL,
+  achieved TINYINT(1) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY idx_milestones_lookup (type, item, achieved)
+);

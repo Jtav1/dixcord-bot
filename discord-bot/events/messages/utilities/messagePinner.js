@@ -73,11 +73,12 @@ function buildPinLogPayload(message, attachmentPaths, pinnerUserIds, channelName
  * Log a message as pinned (idempotent; API no-op if already logged).
  * POST /api/message-processing/pin-log
  * @param {object} payload - Pin log fields (messageId required)
- * @returns {Promise<void>}
+ * @returns {Promise<Array>} milestones newly achieved by this log, if any
  */
 export const logPinnedMessage = async (payload) => {
-  if (!payload?.messageId) return;
-  await api.post("/api/message-processing/pin-log", payload);
+  if (!payload?.messageId) return [];
+  const { data } = await api.post("/api/message-processing/pin-log", payload);
+  return Array.isArray(data?.milestones) ? data.milestones : [];
 };
 
 /**
@@ -85,7 +86,7 @@ export const logPinnedMessage = async (payload) => {
  * @param {import("discord.js").Message} message
  * @param {import("discord.js").Client} client
  * @param {string[]} pinnerUserIds - Discord user snowflakes who pinned the message
- * @returns {Promise<true>}
+ * @returns {Promise<{ sent: true, milestones: Array }>}
  */
 async function logAndSendPinEmbed(message, client, pinnerUserIds) {
   const attachmentPaths = await savePinAttachments(
@@ -93,7 +94,7 @@ async function logAndSendPinEmbed(message, client, pinnerUserIds) {
     message.id,
   );
   const channelName = await getChannelNameForPin(message.channel);
-  await logPinnedMessage(
+  const milestones = await logPinnedMessage(
     buildPinLogPayload(message, attachmentPaths, pinnerUserIds, channelName),
   );
 
@@ -131,7 +132,7 @@ async function logAndSendPinEmbed(message, client, pinnerUserIds) {
   const channel = await client.channels.fetch(getPinChannelId());
   await channel.send({ embeds: [pinEmbed] });
 
-  return true;
+  return { sent: true, milestones };
 }
 
 /**
@@ -139,10 +140,10 @@ async function logAndSendPinEmbed(message, client, pinnerUserIds) {
  * @param {import("discord.js").Message} message
  * @param {import("discord.js").Client} client
  * @param {string[]} pinnerUserIds - Discord user snowflakes who pinned the message
- * @returns {Promise<boolean>} true if alert was sent
+ * @returns {Promise<{ sent: boolean, milestones: Array }>}
  */
 export async function sendPinAlert(message, client, pinnerUserIds) {
-  if (await isMessageAlreadyPinned(message.id)) return false;
+  if (await isMessageAlreadyPinned(message.id)) return { sent: false, milestones: [] };
   return logAndSendPinEmbed(message, client, pinnerUserIds);
 }
 
@@ -153,10 +154,10 @@ export async function sendPinAlert(message, client, pinnerUserIds) {
  * @param {object} pinReaction
  * @param {object} user
  * @param {object} client
- * @returns {boolean} false (can ignore)
+ * @returns {Promise<{ sent: boolean, milestones: Array }>}
  */
 export const messagePinner = async (message, pinReaction, user, client) => {
-  if (await isMessageAlreadyPinned(message.id)) return false;
+  if (await isMessageAlreadyPinned(message.id)) return { sent: false, milestones: [] };
 
   const users = await pinReaction.users.fetch();
   const pinnerUserIds = [];

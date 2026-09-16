@@ -27,19 +27,21 @@ export const importEmojiList = async (emojiObjectList) => {
  * @param {string} emojiName - Emoji name
  * @param {string} [emojiId] - Emoji ID (optional for unicode)
  * @param {string|null} [userid] - User who used the emoji (author/reactor)
+ * @returns {Promise<Array>} milestones newly achieved by this count, if any
  */
 export const countEmoji = async (emojiName, emojiId, userid = null) => {
   const authorId = userid || undefined;
   const emojis = [{ name: emojiName, id: emojiId ?? undefined }].filter(
     (e) => e.name != null && e.name !== "",
   );
-  if (emojis.length === 0) return;
-  await api.post("/api/message-processing/emoji-count", {
+  if (emojis.length === 0) return [];
+  const { data } = await api.post("/api/message-processing/emoji-count", {
     app: "discord",
     guildId,
     authorId,
     emojis,
   });
+  return Array.isArray(data?.milestones) ? data.milestones : [];
 };
 
 /**
@@ -60,16 +62,18 @@ export const getTopEmoji = async (number = 5) => {
  * @param {string} userid - Message author (accused)
  * @param {string} msgid - Message ID
  * @param {string} accuserid - User who added repost reaction
+ * @returns {Promise<Array>} milestones newly achieved by this count, if any
  */
 export const countRepost = async (userid, msgid, accuserid) => {
-  if (!msgid || !userid || !accuserid) return;
-  await api.post("/api/message-processing/count-repost", {
+  if (!msgid || !userid || !accuserid) return [];
+  const { data } = await api.post("/api/message-processing/count-repost", {
     app: "discord",
     userid,
     msgid,
     accuser: accuserid,
     repost: 1,
   });
+  return Array.isArray(data?.milestones) ? data.milestones : [];
 };
 
 /**

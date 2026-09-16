@@ -14,6 +14,7 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 - **Config** – Per-`(app, guildId)` key/value bot settings (pin threshold, emoji IDs, channels, feature on/off toggles, etc.); each server a community operates gets its own fully independent set, auto-seeded with defaults when first registered via guild sync.
 - **Link replacements** – CRUD for source_host → target_host rewrite rules.
 - **Pin quips** – CRUD + random quip for pin reactions.
+- **Milestones** – Admin-defined usage-stat thresholds (pins, emoji/sticker usage, plusplus votes, repost accusations, trigger calls); checked internally on every relevant increment and surfaced via a `milestones` array on the increment response.
 - **Trigger–responses** – Triggers with selection modes (`random`, `ordered` round-robin, `weighted`), responses, junction links, trigger response function catalog, frequency tracking, per-user usage history. See [trigger-responses-examples.md](trigger-responses-examples.md).
 - **Leaderboards** – Plusplus, emoji, and repost rankings and per-user totals.
 - **Eight-ball responses** – Fortune string catalog (admin writes).
@@ -102,6 +103,12 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/pin-quips` | ✓ | Create (body: `{ quip }`) |
 | PUT | `/api/pin-quips/:id` | ✓ | Update (body: `{ quip }`) |
 | DELETE | `/api/pin-quips/:id` | ✓ | Delete |
+| GET | `/api/milestones?type=&item=&object=&achieved=` | ✓ | List milestones |
+| GET | `/api/milestones/types` | ✓ | Dictionary of valid milestone `type` values |
+| GET | `/api/milestones/:id` | ✓ | Get one milestone |
+| POST | `/api/milestones` | admin | Create (body: `{ quantity, type, item?, message, object }`) |
+| PUT | `/api/milestones/:id` | admin | Update (partial; can toggle `achieved`) |
+| DELETE | `/api/milestones/:id` | admin | Delete |
 | GET | `/api/trigger-responses` | ✓ | List all trigger-response pairs (flat) |
 | GET | `/api/trigger-responses/triggers` | ✓ | List unique trigger strings |
 | GET | `/api/trigger-responses/triggers/list` | ✓ | List triggers with id, selection_mode |
@@ -186,6 +193,7 @@ Example JSON responses for each API route category:
 | **Config** | [config-response-examples.md](config-response-examples.md) | Get/put configuration |
 | **Link Replacements** | [link-replacements-response-examples.md](link-replacements-response-examples.md) | CRUD for source_host → target_host |
 | **Pin Quips** | [pin-quips-response-examples.md](pin-quips-response-examples.md) | List, random, CRUD |
+| **Milestones** | [milestones-response-examples.md](milestones-response-examples.md) | CRUD, types dictionary, `milestones` field on increment routes |
 | **Trigger-Responses** | [trigger-responses-response-examples.md](trigger-responses-response-examples.md) | Triggers, responses, links, random |
 | **Leaderboards** | [leaderboards-response-examples.md](leaderboards-response-examples.md) | Plusplus, emoji, repost |
 | **Admin backend** | [admin-backend-api.md](admin-backend-api.md) | New admin-panel backend routes |

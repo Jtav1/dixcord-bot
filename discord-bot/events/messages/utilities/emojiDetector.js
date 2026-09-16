@@ -11,6 +11,7 @@ import {
 import { doplus, dominus } from "./plusplus.js";
 import { incrementCounter } from "../../../utilities/metrics.js";
 import { emojisMatch, toEmojiObject } from "../../../utilities/emojiCompare.js";
+import { announceMilestones } from "../../../utilities/milestoneNotifier.js";
 
 /**
  * Detect and record emoji usage in a message's text content. Also applies a single +/- vote
@@ -51,13 +52,16 @@ export const emojiDetector = async (rawMessage) => {
   for (const emo of mapEmoAry) {
     const emoObj = toEmojiObject(emo);
     if (plusMinusEnabled && emojisMatch(emoObj, plusEmoji) && doPlusMinus && messageType === "reply" && repliedUser) {
-      await doplus(repliedUser.id, "user", rawMessage.author.id);
+      const milestones = await doplus(repliedUser.id, "user", rawMessage.author.id);
+      await announceMilestones(rawMessage, milestones);
     } else if (plusMinusEnabled && emojisMatch(emoObj, minusEmoji) && doPlusMinus && messageType === "reply" && repliedUser) {
-      await dominus(repliedUser.id, "user", rawMessage.author.id);
+      const milestones = await dominus(repliedUser.id, "user", rawMessage.author.id);
+      await announceMilestones(rawMessage, milestones);
     } else if (emojiTrackingEnabled) {
       try {
-        await countEmoji(emo.name, emo.id, rawMessage.author.id);
+        const milestones = await countEmoji(emo.name, emo.id, rawMessage.author.id);
         incrementCounter("emojiCountedTotal");
+        await announceMilestones(rawMessage, milestones);
       } catch (err) {
         incrementCounter("apiCallErrorsTotal", "emojis");
         console.error(

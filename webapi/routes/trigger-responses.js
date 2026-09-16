@@ -723,6 +723,9 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
  *                   description: >
  *                     Present only when the selected link has a non-null response_function_parameters
  *                     payload. Passed to the dispatched function as its execution config.
+ *                 milestones:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/MilestoneHit' }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -775,6 +778,7 @@ router.get("/random", authenticate, async (req, res) => {
       ...(row.response_function_parameters
         ? { response_function_parameters: row.response_function_parameters }
         : {}),
+      milestones: row.milestones ?? [],
     });
   } catch (err) {
     console.error("GET /api/trigger-responses/random error:", err);

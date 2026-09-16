@@ -25,16 +25,21 @@ export async function getAll() {
 /**
  * Increment frequency for a catalog function when it is invoked.
  * @param {number} id - trigger_response_functions.id (trigger_response.response_function FK value)
- * @returns {Promise<boolean>} true if a row was updated
+ * @returns {Promise<number|null>} the new frequency value, or null if no row was updated
  */
 export async function incrementFrequencyById(id) {
   const n = Number(id);
-  if (!Number.isFinite(n) || n <= 0) return false;
+  if (!Number.isFinite(n) || n <= 0) return null;
   const [result] = await db.query(
     "UPDATE trigger_response_functions SET frequency = frequency + 1 WHERE id = ?",
     [n],
   );
-  return (result?.affectedRows ?? result?.changes ?? 0) > 0;
+  if ((result?.affectedRows ?? result?.changes ?? 0) <= 0) return null;
+  const [rows] = await db.query(
+    "SELECT frequency FROM trigger_response_functions WHERE id = ?",
+    [n],
+  );
+  return rows?.[0]?.frequency == null ? null : Number(rows[0].frequency);
 }
 
 /**

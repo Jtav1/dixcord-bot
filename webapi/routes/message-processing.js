@@ -76,6 +76,9 @@ const router = express.Router();
  *                   type: string
  *                   enum: [plus, minus]
  *                   description: Present only when isReply triggered a single +/- vote instead of emoji counting.
+ *                 milestones:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/MilestoneHit' }
  *       '400':
  *         description: Missing/invalid app parameter, missing guildId, or repliedUserId is not a known chat member.
  *         content:
@@ -98,7 +101,7 @@ router.post("/emoji-count", authenticate, requireOwnGuildOrAdmin, async (req, re
     if (result.ok === false && result.error) {
       return res.status(400).json({ ...result, ok: false });
     }
-    res.json({ ...result, ok: result.ok !== false });
+    res.json({ ...result, ok: result.ok !== false, milestones: result.milestones ?? [] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to record emoji count" });
@@ -148,6 +151,9 @@ router.post("/emoji-count", authenticate, requireOwnGuildOrAdmin, async (req, re
  *               type: object
  *               properties:
  *                 ok: { type: boolean }
+ *                 milestones:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/MilestoneHit' }
  *       '400':
  *         description: Missing/invalid app parameter, or authorId is not a known chat member.
  *         content:
@@ -168,7 +174,7 @@ router.post("/sticker-count", authenticate, async (req, res) => {
     if (result.ok === false && result.error) {
       return res.status(400).json({ ...result, ok: false });
     }
-    res.json({ ...result, ok: result.ok !== false });
+    res.json({ ...result, ok: result.ok !== false, milestones: result.milestones ?? [] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to record sticker count" });
@@ -238,6 +244,9 @@ router.post("/sticker-count", authenticate, async (req, res) => {
  *                 ok: { type: boolean, enum: [true] }
  *                 recorded: { type: integer, description: "Number of votes recorded (0 or 1 for reaction mode)." }
  *                 value: { type: integer, enum: [1, -1], description: "Reaction mode only." }
+ *                 milestones:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/MilestoneHit' }
  *       '400':
  *         description: Missing/invalid app, missing voterId/targetUserId/reactorId, invalid value, or self-vote attempted.
  *         content:
@@ -265,7 +274,7 @@ router.post("/plusminus", authenticate, async (req, res) => {
     if (!result.ok) {
       return res.status(400).json({ ...result, ok: false });
     }
-    res.json({ ...result, ok: true });
+    res.json({ ...result, ok: true, milestones: result.milestones ?? [] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to record plus/minus" });
@@ -318,6 +327,9 @@ router.post("/plusminus", authenticate, async (req, res) => {
  *                 ok: { type: boolean, enum: [true] }
  *                 action: { type: string, enum: [created, withdrawn] }
  *                 deleted: { type: integer, description: "Rows deleted; only present when action is withdrawn." }
+ *                 milestones:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/MilestoneHit' }
  *       '400':
  *         description: Missing/invalid app, userid/msgid/accuser missing, repost not 1 or -1, or unknown chat member.
  *         content:
@@ -338,7 +350,7 @@ router.post("/count-repost", authenticate, async (req, res) => {
     if (!result.ok) {
       return res.status(400).json({ ...result, ok: false });
     }
-    res.json({ ...result, ok: true });
+    res.json({ ...result, ok: true, milestones: result.milestones ?? [] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to record repost" });
@@ -596,6 +608,9 @@ router.post("/pin-check", authenticate, async (req, res) => {
  *               type: object
  *               properties:
  *                 ok: { type: boolean, enum: [true] }
+ *                 milestones:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/MilestoneHit' }
  *       '400':
  *         description: messageId missing, app missing/unsupported, or attachments payload invalid.
  *         content:
@@ -616,7 +631,7 @@ router.post("/pin-log", authenticate, async (req, res) => {
         error: result.error ?? "messageId is required",
       });
     }
-    res.json({ ok: true });
+    res.json({ ok: true, milestones: result.milestones ?? [] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to log pinned message" });

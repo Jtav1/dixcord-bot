@@ -114,6 +114,62 @@
           }
         }
       },
+      "MilestoneHit": {
+        "type": "object",
+        "description": "One milestone newly marked achieved by the increment this response is for.",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "item": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Milestone": {
+        "type": "object",
+        "description": "A milestone definition row (GET/POST/PUT /api/milestones).",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "quantity": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          },
+          "item": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string"
+          },
+          "object": {
+            "type": "string"
+          },
+          "achieved": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        }
+      },
       "AuthErrorResponse": {
         "type": "object",
         "required": [
@@ -2047,6 +2103,12 @@
                       "type": "object",
                       "nullable": true,
                       "description": "Present only when the selected link has a non-null response_function_parameters payload. Passed to the dispatched function as its execution config.\n"
+                    },
+                    "milestones": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MilestoneHit"
+                      }
                     }
                   }
                 }
@@ -5450,6 +5512,411 @@
         }
       }
     },
+    "/api/milestones": {
+      "get": {
+        "operationId": "listMilestones",
+        "tags": [
+          "Milestones"
+        ],
+        "summary": "List milestones",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "item",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "object",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "achieved",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All matching milestones.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "milestones": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Milestone"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createMilestone",
+        "tags": [
+          "Milestones"
+        ],
+        "summary": "Create a milestone",
+        "description": "Requires the admin role. `achieved` always starts false.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "quantity",
+                  "type",
+                  "message",
+                  "object"
+                ],
+                "properties": {
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Must be one of the keys from GET /api/milestones/types."
+                  },
+                  "item": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Required or forbidden depending on the type; see GET /api/milestones/types."
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "object": {
+                    "type": "string",
+                    "description": "Free-form display category, not used for matching."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created milestone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Milestone"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/milestones/types": {
+      "get": {
+        "operationId": "listMilestoneTypes",
+        "tags": [
+          "Milestones"
+        ],
+        "summary": "List valid milestone type values",
+        "responses": {
+          "200": {
+            "description": "The milestone type dictionary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "types": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "itemRequired": {
+                            "type": "boolean"
+                          },
+                          "description": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/milestones/{id}": {
+      "get": {
+        "operationId": "getMilestone",
+        "tags": [
+          "Milestones"
+        ],
+        "summary": "Get one milestone by id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The milestone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Milestone"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateMilestone",
+        "tags": [
+          "Milestones"
+        ],
+        "summary": "Update a milestone",
+        "description": "Requires the admin role. Partial update; only provided fields change.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "item": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "object": {
+                    "type": "string"
+                  },
+                  "achieved": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated milestone.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "ok": {
+                          "type": "boolean",
+                          "enum": [
+                            true
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "$ref": "#/components/schemas/Milestone"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteMilestone",
+        "tags": [
+          "Milestones"
+        ],
+        "summary": "Delete a milestone",
+        "description": "Requires the admin role.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/message-processing/emoji-count": {
       "post": {
         "operationId": "recordEmojiCount",
@@ -5533,6 +6000,12 @@
                         "minus"
                       ],
                       "description": "Present only when isReply triggered a single +/- vote instead of emoji counting."
+                    },
+                    "milestones": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MilestoneHit"
+                      }
                     }
                   }
                 }
@@ -5620,6 +6093,12 @@
                   "properties": {
                     "ok": {
                       "type": "boolean"
+                    },
+                    "milestones": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MilestoneHit"
+                      }
                     }
                   }
                 }
@@ -5779,6 +6258,12 @@
                         -1
                       ],
                       "description": "Reaction mode only."
+                    },
+                    "milestones": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MilestoneHit"
+                      }
                     }
                   }
                 }
@@ -5884,6 +6369,12 @@
                     "deleted": {
                       "type": "integer",
                       "description": "Rows deleted; only present when action is withdrawn."
+                    },
+                    "milestones": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MilestoneHit"
+                      }
                     }
                   }
                 }
@@ -6219,6 +6710,12 @@
                       "enum": [
                         true
                       ]
+                    },
+                    "milestones": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MilestoneHit"
+                      }
                     }
                   }
                 }

@@ -19,6 +19,7 @@ import configRoutes from "./routes/config.js";
 import linkReplacementsRoutes from "./routes/link-replacements.js";
 import leaderboardsRoutes from "./routes/leaderboards.js";
 import pinQuipsRoutes from "./routes/pin-quips.js";
+import milestonesRoutes from "./routes/milestones.js";
 import triggerResponsesRoutes from "./routes/trigger-responses.js";
 import scheduledMessagesRoutes from "./routes/scheduled-messages.js";
 import eightBallResponsesRoutes from "./routes/eight-ball-responses.js";
@@ -428,6 +429,19 @@ app.get("/", publicLimiter, (req, res) => {
           "GET /api/pin-quips/random",
         ],
       },
+      milestones: {
+        authRequired: true,
+        routes: [
+          "GET /api/milestones?type=&item=&object=&achieved=",
+          "GET /api/milestones/types",
+          "GET /api/milestones/:id",
+        ],
+        adminRoutes: [
+          "POST /api/milestones",
+          "PUT /api/milestones/:id",
+          "DELETE /api/milestones/:id",
+        ],
+      },
       triggerResponses: {
         authRequired: true,
         routes: ["Full CRUD under /api/trigger-responses/*"],
@@ -572,6 +586,7 @@ app.use("/api/message-processing", messageProcessingRoutes);
 app.use("/api/config", configRoutes);
 app.use("/api/link-replacements", linkReplacementsRoutes);
 app.use("/api/pin-quips", pinQuipsRoutes);
+app.use("/api/milestones", milestonesRoutes);
 app.use("/api/trigger-responses", triggerResponsesRoutes);
 app.use("/api/scheduled-messages", scheduledMessagesRoutes);
 app.use("/api/leaderboards", leaderboardsRoutes);
