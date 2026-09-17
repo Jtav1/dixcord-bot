@@ -3,7 +3,7 @@
     <header class="view-header mb-6">
       <h1 class="text-h4 font-weight-bold mb-2">Pin Archive</h1>
       <p class="text-body-1 text-medium-emphasis">
-        Archived pinned messages, with metadata correction
+        Archived pinned messages
       </p>
     </header>
 
@@ -22,7 +22,7 @@
             <v-chip size="small" :color="entry.hydrated ? 'success' : 'warning'" variant="tonal">
               {{ entry.hydrated ? "hydrated" : "pending" }}
             </v-chip>
-            <v-btn icon="mdi-pencil" size="small" variant="text" @click="openEdit(entry)" />
+            <v-btn icon="mdi-delete" size="small" variant="text" color="error" @click="confirmDelete(entry)" />
           </div>
         </div>
 
@@ -50,30 +50,32 @@
       </div>
     </template>
 
-    <v-dialog v-model="dialogOpen" max-width="520">
-      <v-card class="glass-card">
-        <v-card-title class="text-h6">Edit Pin</v-card-title>
-        <v-card-text>
-          <v-textarea v-model="form.contents" label="Contents" rows="3" auto-grow class="mb-3" />
-          <v-text-field v-model="form.channelName" label="Channel name" class="mb-3" />
-          <v-text-field v-model="form.channelId" label="Channel ID" class="mb-3" />
-          <v-switch v-model="form.hydrated" label="Hydrated" color="primary" />
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="dialogOpen = false">Cancel</v-btn>
-          <v-btn color="primary" variant="flat" :loading="saving" @click="onSave">Save</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <ConfirmDialog
+      v-model="confirmOpen"
+      title="Delete Pin"
+      message="Delete this pin from history? This cannot be undone."
+      @confirm="onFirstConfirm"
+      @cancel="confirmOpen = false"
+    />
+
+    <ConfirmDialog
+      v-model="confirmOpen2"
+      title="Are you sure?"
+      message="This will permanently remove the pin and its metadata. Confirm deletion."
+      confirm-label="Delete permanently"
+      :loading="deleting"
+      @confirm="onDelete"
+      @cancel="confirmOpen2 = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, ref } from "vue";
+import ConfirmDialog from "../components/ConfirmDialog.vue";
 import { usePaginatedResource } from "../composables/usePaginatedResource.js";
 import { useSnackbar } from "../composables/useSnackbar.js";
-import { fetchPinHistory, updatePinHistoryEntry } from "../lib/pinHistory.js";
+import { deletePinHistoryEntry, fetchPinHistory } from "../lib/pinHistory.js";
 import { fetchUserMappings } from "../lib/userMappings.js";
 
 const { notify } = useSnackbar();
@@ -101,43 +103,42 @@ function formatTimestamp(iso) {
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleString();
 }
 
-const dialogOpen = ref(false);
-const saving = ref(false);
-const editing = ref(null);
-const form = reactive({ contents: "", channelName: "", channelId: "", hydrated: false });
+const confirmOpen = ref(false);
+const confirmOpen2 = ref(false);
+const deleting = ref(false);
+const pendingDelete = ref(null);
 
 /**
  * @param {object} entry
  * @returns {void}
  */
-function openEdit(entry) {
-  editing.value = entry;
-  form.contents = entry.contents || "";
-  form.channelName = entry.channelName || "";
-  form.channelId = entry.channelId || "";
-  form.hydrated = Boolean(entry.hydrated);
-  dialogOpen.value = true;
+function confirmDelete(entry) {
+  pendingDelete.value = entry;
+  confirmOpen.value = true;
+}
+
+/**
+ * @returns {void}
+ */
+function onFirstConfirm() {
+  confirmOpen.value = false;
+  confirmOpen2.value = true;
 }
 
 /**
  * @returns {Promise<void>}
  */
-async function onSave() {
-  saving.value = true;
+async function onDelete() {
+  deleting.value = true;
   try {
-    await updatePinHistoryEntry(editing.value.id, {
-      contents: form.contents,
-      channelName: form.channelName,
-      channelId: form.channelId,
-      hydrated: form.hydrated,
-    });
-    notify("Pin updated");
-    dialogOpen.value = false;
+    await deletePinHistoryEntry(pendingDelete.value.id);
+    notify("Pin deleted");
+    confirmOpen2.value = false;
     await load(page.value);
   } catch (err) {
-    notify(err instanceof Error ? err.message : "Failed to update pin", { color: "error" });
+    notify(err instanceof Error ? err.message : "Failed to delete pin", { color: "error" });
   } finally {
-    saving.value = false;
+    deleting.value = false;
   }
 }
 

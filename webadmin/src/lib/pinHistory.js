@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchJson } from "./http.js";
+import { apiFetch } from "./http.js";
 
 /**
  * Paginated pin history.
@@ -11,12 +11,10 @@ export async function fetchPinHistory({ limit = 25, offset = 0 } = {}) {
 }
 
 /**
- * Correct a pin history entry's metadata.
+ * Delete a pin history entry.
  * @param {number} id
- * @param {{ contents?: string, channelId?: string, channelName?: string, hydrated?: boolean }} fields
- * @returns {Promise<object>}
+ * @returns {Promise<void>}
  */
-export async function updatePinHistoryEntry(id, fields) {
-  const data = await apiFetchJson("PUT", `/pin-history/${id}`, fields, "Update pin");
-  return data.pin;
+export async function deletePinHistoryEntry(id) {
+  await apiFetch(`/pin-history/${id}`, { method: "DELETE" }, "Delete pin");
 }

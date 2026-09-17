@@ -348,3 +348,14 @@ export async function updatePinHistory(id, updates) {
   const pin = await getPinHistoryById(id);
   return { ok: true, pin };
 }
+
+/**
+ * Delete one pin_history row.
+ * @param {number} id - pin_history.id
+ * @returns {Promise<boolean>} true if a row was deleted.
+ */
+export async function deletePinHistory(id) {
+  if (!Number.isFinite(id) || id <= 0) return false;
+  const [result] = await db.query("DELETE FROM pin_history WHERE id = ?", [id]);
+  return (result?.affectedRows ?? result?.changes ?? 0) > 0;
+}

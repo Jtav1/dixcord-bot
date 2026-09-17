@@ -1,6 +1,6 @@
 import express from "express";
-import { authenticate, requireOwnGuildOrAdmin } from "../middleware/auth.js";
-import { getGuildSnapshot, upsertGuildSnapshot } from "../services/guildInfo.js";
+import { authenticate, requireAdmin, requireOwnGuildOrAdmin } from "../middleware/auth.js";
+import { getGuildSnapshot, listSyncedGuilds, upsertGuildSnapshot } from "../services/guildInfo.js";
 
 const router = express.Router();
 
@@ -62,6 +62,53 @@ router.get("/", authenticate, async (req, res) => {
   } catch (err) {
     console.error("GET /api/guild error:", err);
     res.status(500).json({ ok: false, error: "Failed to get guild info" });
+  }
+});
+
+/**
+ * GET /api/guild/all
+ * List every guild that has ever synced (for a guild-picker UI).
+ * Auth: admin required.
+ * @openapi
+ * /api/guild/all:
+ *   get:
+ *     operationId: listGuilds
+ *     tags: [Guild]
+ *     summary: List every synced guild
+ *     description: Requires the admin role.
+ *     responses:
+ *       '200':
+ *         description: Every guild that has ever synced.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 guilds:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       app: { type: string }
+ *                       guildId: { type: string }
+ *                       name: { type: string }
+ *                       iconUrl: { type: string, nullable: true }
+ *                       syncedAt: { type: string }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/all", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const guilds = await listSyncedGuilds();
+    res.json({ ok: true, guilds });
+  } catch (err) {
+    console.error("GET /api/guild/all error:", err);
+    res.status(500).json({ ok: false, error: "Failed to list guilds" });
   }
 });
 

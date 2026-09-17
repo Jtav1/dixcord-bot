@@ -348,6 +348,7 @@ app.get("/", publicLimiter, (req, res) => {
           "GET /api/pin-history/incomplete?limit=&offset=",
           "GET /api/pin-history/:id",
           "PUT /api/pin-history/:id",
+          "DELETE /api/pin-history/:id",
         ],
       },
       system: {
@@ -381,6 +382,7 @@ app.get("/", publicLimiter, (req, res) => {
           "GET /api/guild?app=&guildId=",
           "POST /api/guild/sync (body: { app, guildId, guild, channels, roles })",
         ],
+        adminRoutes: ["GET /api/guild/all"],
       },
       guildMembers: {
         authRequired: true,

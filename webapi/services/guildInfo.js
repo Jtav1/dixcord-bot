@@ -295,3 +295,20 @@ export async function getGuildSnapshot({ app, guildId } = {}) {
     syncedAt: info.synced_at,
   };
 }
+
+/**
+ * List every guild that has ever synced, for a guild-picker UI (e.g. webadmin's tab switcher).
+ * @returns {Promise<Array<{ app: string, guildId: string, name: string, iconUrl: string|null, syncedAt: string }>>}
+ */
+export async function listSyncedGuilds() {
+  const [rows] = await db.query(
+    "SELECT app, guild_id, name, icon_url, synced_at FROM guild_info ORDER BY name",
+  );
+  return (rows ?? []).map((r) => ({
+    app: r.app,
+    guildId: r.guild_id,
+    name: r.name,
+    iconUrl: r.icon_url,
+    syncedAt: r.synced_at,
+  }));
+}
