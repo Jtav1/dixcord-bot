@@ -107,13 +107,16 @@ export async function deleteGuildConfigKey(app, guildId, config) {
 
 /**
  * Seed every known config key's default value for a server, skipping keys already present.
+ * Safe to call repeatedly for an already-configured guild — e.g. to backfill keys added to
+ * CONFIG_METADATA after the guild was first registered (see ensureSchema.js's per-boot backfill).
  * @param {string} app
  * @param {string} guildId
  * @param {Array<{config:string,value:string}>} [overrides] Values to use instead of the default
- * @returns {Promise<void>}
+ * @returns {Promise<number>} number of keys actually inserted (0 if the guild already had everything)
  */
 export async function seedDefaultConfigForGuild(app, guildId, overrides = []) {
   const overrideMap = new Map(overrides.map((row) => [row.config, row.value]));
+  let insertedCount = 0;
   for (const entry of getDefaultConfigEntries()) {
     const existing = await getGuildConfigValue(app, guildId, entry.config);
     if (existing != null) continue;
@@ -122,7 +125,9 @@ export async function seedDefaultConfigForGuild(app, guildId, overrides = []) {
       "INSERT INTO guild_config (app, guild_id, config, value) VALUES (?, ?, ?, ?)",
       [app, guildId, entry.config, value],
     );
+    insertedCount += 1;
   }
+  return insertedCount;
 }
 
 /**

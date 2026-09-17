@@ -419,6 +419,8 @@ app.get("/", publicLimiter, (req, res) => {
           "POST /api/message-processing/sticker-import",
           "POST /api/message-processing/pin-check",
           "POST /api/message-processing/pin-log",
+          "POST /api/message-processing/timeout-vote",
+          "POST /api/message-processing/timeout-vote/remove",
         ],
       },
       linkReplacements: {
@@ -463,6 +465,8 @@ app.get("/", publicLimiter, (req, res) => {
           "POST /api/leaderboards/plusplus (optional from/to)",
           "POST /api/leaderboards/repost (optional from/to)",
           "GET /api/leaderboards/emoji/user/:userId?app=discord",
+          "GET /api/leaderboards/timeout?app=discord",
+          "GET /api/leaderboards/timeout/history/:historyId",
           "Other plusplus/emoji/repost routes",
         ],
       },

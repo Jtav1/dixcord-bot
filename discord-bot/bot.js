@@ -16,11 +16,15 @@ import {
   getPinThreshold,
   getPlusEmoji,
   getRepostEmojiId,
+  getTimeoutVoteDoubleRoleId,
+  getTimeoutVoteEmoji,
+  getTimeoutVoteTripleRoleId,
   isFeatureEnabled,
   isPinSystemEnabled,
   isPlusPlusEnabled,
   isEmojiTrackingEnabled,
   isRepostDetectionEnabled,
+  isTimeoutVoteEnabled,
 } from "./configStore.js";
 import { startCacheVersionPoller } from "./api/cacheRefresh.js";
 import { startHeartbeat } from "./api/system.js";
@@ -167,10 +171,14 @@ client.on(
         plusEmoji: getPlusEmoji(),
         minusEmoji: getMinusEmoji(),
         repostEmojiId: getRepostEmojiId(),
+        timeoutVoteEmoji: getTimeoutVoteEmoji(),
+        timeoutVoteDoubleRoleId: getTimeoutVoteDoubleRoleId(),
+        timeoutVoteTripleRoleId: getTimeoutVoteTripleRoleId(),
         pinSystemEnabled: isPinSystemEnabled(),
         plusPlusEnabled: isPlusPlusEnabled(),
         emojiTrackingEnabled: isEmojiTrackingEnabled(),
         repostDetectionEnabled: isRepostDetectionEnabled(),
+        timeoutVoteEnabled: isTimeoutVoteEnabled(),
       });
     }
   }),
@@ -183,8 +191,10 @@ client.on(
       plusEmoji: getPlusEmoji(),
       minusEmoji: getMinusEmoji(),
       repostEmojiId: getRepostEmojiId(),
+      timeoutVoteEmoji: getTimeoutVoteEmoji(),
       plusPlusEnabled: isPlusPlusEnabled(),
       repostDetectionEnabled: isRepostDetectionEnabled(),
+      timeoutVoteEnabled: isTimeoutVoteEnabled(),
     });
   }),
 );

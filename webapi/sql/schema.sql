@@ -311,3 +311,32 @@ CREATE TABLE IF NOT EXISTS milestones (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_milestones_lookup (type, item, achieved)
 );
+
+-- Vote-to-timeout: mutable ledger, one row per active vote (deleted on reaction-remove).
+CREATE TABLE IF NOT EXISTS timeout_vote_tracking (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  app VARCHAR(20) NOT NULL,
+  guild_id VARCHAR(64) NOT NULL,
+  message_id VARCHAR(255) NOT NULL,
+  target INT NULL,
+  voter INT NULL,
+  weight INT NOT NULL DEFAULT 1,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_timeout_vote (message_id, voter),
+  CONSTRAINT fk_timeout_vote_target FOREIGN KEY (target) REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+  CONSTRAINT fk_timeout_vote_voter FOREIGN KEY (voter) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
+);
+
+-- Vote-to-timeout: immutable record of fired timeouts. UNIQUE(message_id) is the idempotency
+-- guard — once a row exists here, further votes on that message never re-trigger.
+CREATE TABLE IF NOT EXISTS timeout_history (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  app VARCHAR(20) NOT NULL,
+  guild_id VARCHAR(64) NOT NULL,
+  message_id VARCHAR(255) NOT NULL UNIQUE,
+  target INT NULL,
+  vote_weight_total INT NOT NULL,
+  duration_seconds INT NOT NULL,
+  timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_timeout_history_target FOREIGN KEY (target) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
+);

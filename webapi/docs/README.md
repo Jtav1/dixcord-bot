@@ -88,6 +88,8 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/message-processing/sticker-import` | ✓ | Sync server sticker list (body: `{ app, stickers }`) |
 | POST | `/api/message-processing/pin-check` | ✓ | Check if message already pinned (body: `{ messageId }`) |
 | POST | `/api/message-processing/pin-log` | ✓ | Log message as pinned (body: `{ messageId }`) |
+| POST | `/api/message-processing/timeout-vote` | ✓ | Record a vote-to-timeout reaction (body: `{ app, guildId, messageId, targetPlatformId, voterPlatformId, weight? }`); returns `triggered:true` + duration/response message once threshold is reached |
+| POST | `/api/message-processing/timeout-vote/remove` | ✓ | Un-count a vote-to-timeout reaction removal (body: `{ app, messageId, voterPlatformId }`) |
 | GET | `/api/config?app=&guildId=` | ✓ | All configuration entries for one server (includes `entriesWithMeta`) |
 | POST | `/api/config` | admin | Create config key for a server (body: `{ app, guildId, config, value }`) |
 | PUT | `/api/config` | admin | Update one config for a server (body: `{ app, guildId, config, value }`) |
@@ -137,6 +139,8 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/leaderboards/repost` | ✓ | Top reposters (body: `{ limit? }`) |
 | GET | `/api/leaderboards/repost/user/:userId` | ✓ | Repost count for user |
 | GET | `/api/leaderboards/emoji/user/:userId?app=discord` | ✓ | Per-user emoji stats |
+| GET | `/api/leaderboards/timeout?app=discord` | ✓ | Paginated list of fired vote-to-timeout events, newest first |
+| GET | `/api/leaderboards/timeout/history/:historyId` | ✓ | Voters for one fired vote-to-timeout event |
 | GET | `/api/eight-ball-responses` | ✓ | List eight-ball responses |
 | POST | `/api/eight-ball-responses` | admin | Create eight-ball response |
 | GET | `/api/user-mappings?app=discord` | ✓ | List user mappings (id, name, and discordHandle if that legacy column exists and is non-null) |

@@ -24,6 +24,7 @@ export const WEBVIEW_ALLOWED_ROUTES = [
   { method: "GET", path: "/api/guild-members" },
   { method: "GET", path: "/api/user-mappings" },
   { method: "GET", path: "/api/trigger-responses/functions" },
+  { method: "GET", path: "/api/leaderboards/timeout" },
 ];
 
 /** GET path prefixes the webview service account may access. */
@@ -33,6 +34,7 @@ export const WEBVIEW_ALLOWED_ROUTE_PREFIXES = [
   "/api/leaderboards/sticker/user/",
   "/api/trigger-responses/history/",
   "/api/guild-members/public-aliases/",
+  "/api/leaderboards/timeout/history/",
 ];
 
 /**

@@ -480,6 +480,22 @@ export async function ensureSchemaMigrations() {
         `db: migration applied: seeded guild_config for ${guild.app}/${guild.guild_id}`,
       );
     }
+
+    // Ongoing backfill (every boot, cheap once caught up): a guild already having SOME
+    // guild_config rows doesn't mean it has ALL of them — new CONFIG_METADATA keys added after a
+    // guild's first registration (e.g. the vote-to-timeout feature's keys) are otherwise never
+    // seeded for pre-existing guilds, since seedDefaultConfigForGuild is normally only called for
+    // brand-new servers (guildInfo.js's upsertGuildSnapshot). Only logged when something is
+    // actually missing, so a fully-caught-up boot doesn't spam this every time.
+    for (const guild of existingGuilds ?? []) {
+      const insertedCount = await seedDefaultConfigForGuild(guild.app, guild.guild_id);
+      if (insertedCount > 0) {
+        applied.push(`guild_config key backfill for ${guild.app}/${guild.guild_id} (${insertedCount} key(s))`);
+        console.log(
+          `db: migration applied: backfilled ${insertedCount} missing guild_config key(s) for ${guild.app}/${guild.guild_id}`,
+        );
+      }
+    }
   }
 
   // guild_members table: per-server membership (Discord handle/nickname/roles/joined-at) keyed
@@ -1365,6 +1381,81 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: created milestones table");
   } else {
     console.log("db: schema ok: milestones table already exists");
+  }
+
+  // Vote-to-timeout: mutable vote ledger (deleted on reaction-remove) + immutable fired-timeout
+  // history (UNIQUE message_id is the idempotency guard against re-triggering).
+  if (!(await tableExists(db, "timeout_vote_tracking", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE timeout_vote_tracking (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          message_id TEXT NOT NULL,
+          target INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+          voter INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+          weight INTEGER NOT NULL DEFAULT 1,
+          timestamp TEXT DEFAULT (datetime('now')),
+          UNIQUE (message_id, voter)
+        )
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE timeout_vote_tracking (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          app VARCHAR(20) NOT NULL,
+          guild_id VARCHAR(64) NOT NULL,
+          message_id VARCHAR(255) NOT NULL,
+          target INT NULL,
+          voter INT NULL,
+          weight INT NOT NULL DEFAULT 1,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uniq_timeout_vote (message_id, voter),
+          CONSTRAINT fk_timeout_vote_target FOREIGN KEY (target) REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+          CONSTRAINT fk_timeout_vote_voter FOREIGN KEY (voter) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
+        )
+      `);
+    }
+    applied.push("timeout_vote_tracking table");
+    console.log("db: migration applied: created timeout_vote_tracking table");
+  } else {
+    console.log("db: schema ok: timeout_vote_tracking table already exists");
+  }
+
+  if (!(await tableExists(db, "timeout_history", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE timeout_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          message_id TEXT NOT NULL UNIQUE,
+          target INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+          vote_weight_total INTEGER NOT NULL,
+          duration_seconds INTEGER NOT NULL,
+          timestamp TEXT DEFAULT (datetime('now'))
+        )
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE timeout_history (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          app VARCHAR(20) NOT NULL,
+          guild_id VARCHAR(64) NOT NULL,
+          message_id VARCHAR(255) NOT NULL UNIQUE,
+          target INT NULL,
+          vote_weight_total INT NOT NULL,
+          duration_seconds INT NOT NULL,
+          timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT fk_timeout_history_target FOREIGN KEY (target) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
+        )
+      `);
+    }
+    applied.push("timeout_history table");
+    console.log("db: migration applied: created timeout_history table");
+  } else {
+    console.log("db: schema ok: timeout_history table already exists");
   }
 
   if (applied.length === 0) {

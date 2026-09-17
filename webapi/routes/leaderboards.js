@@ -2,6 +2,7 @@ import express from "express";
 import { authenticate } from "../middleware/auth.js";
 import * as leaderboards from "../services/leaderboards.js";
 import { getEmojiStatsForUser, getStickerStatsForUser } from "../services/events.js";
+import { listTimeoutHistory, listTimeoutVotersForHistory } from "../services/timeoutVotes.js";
 import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
@@ -883,6 +884,137 @@ router.get("/sticker/user/:userId", authenticate, async (req, res) => {
   } catch (err) {
     console.error("GET /api/leaderboards/sticker/user/:userId error:", err);
     res.status(500).json({ ok: false, error: "Failed to get user sticker stats" });
+  }
+});
+
+/**
+ * GET /api/leaderboards/timeout
+ * Paginated list of fired vote-to-timeout events, newest first.
+ * Query: app=discord required, limit?, offset?
+ * Auth: required.
+ * @openapi
+ * /api/leaderboards/timeout:
+ *   get:
+ *     operationId: getTimeoutHistory
+ *     tags: [Leaderboards]
+ *     summary: List fired vote-to-timeout events
+ *     parameters:
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         schema: { type: string, enum: [discord] }
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 20 }
+ *       - name: offset
+ *         in: query
+ *         required: false
+ *         schema: { type: integer, default: 0 }
+ *     responses:
+ *       '200':
+ *         description: Timeout history entries.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 entries:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer, description: "timeout_history.id — pass to GET /api/leaderboards/timeout/history/{id}." }
+ *                       messageId: { type: string }
+ *                       guildId: { type: string }
+ *                       target: { type: integer, nullable: true, description: "chat_member_mapping id." }
+ *                       voteWeightTotal: { type: integer }
+ *                       durationSeconds: { type: integer }
+ *                       timestamp: { type: string, format: date-time }
+ *                 total: { type: integer }
+ *       '400':
+ *         description: Missing/invalid app parameter.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/timeout", authenticate, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    const { entries, total } = await listTimeoutHistory({
+      app,
+      limit: req.query.limit,
+      offset: req.query.offset,
+    });
+    res.json({ ok: true, entries, total });
+  } catch (err) {
+    console.error("GET /api/leaderboards/timeout error:", err);
+    res.status(500).json({ ok: false, error: "Failed to list timeout history" });
+  }
+});
+
+/**
+ * GET /api/leaderboards/timeout/history/:historyId
+ * Voters for one fired vote-to-timeout event.
+ * Auth: required.
+ * @openapi
+ * /api/leaderboards/timeout/history/{historyId}:
+ *   get:
+ *     operationId: getTimeoutVoters
+ *     tags: [Leaderboards]
+ *     summary: List voters for one fired vote-to-timeout event
+ *     parameters:
+ *       - name: historyId
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *         description: timeout_history.id, as returned by GET /api/leaderboards/timeout.
+ *     responses:
+ *       '200':
+ *         description: Voters for this timeout event.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 voters:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       voter: { type: integer, nullable: true, description: "chat_member_mapping id." }
+ *                       weight: { type: integer }
+ *                       timestamp: { type: string, format: date-time }
+ *       '400':
+ *         description: Missing/invalid historyId.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/timeout/history/:historyId", authenticate, async (req, res) => {
+  try {
+    const historyId = parseInt(req.params.historyId, 10);
+    if (Number.isNaN(historyId)) {
+      return res.status(400).json({ ok: false, error: "Invalid historyId" });
+    }
+    const voters = await listTimeoutVotersForHistory(historyId);
+    res.json({ ok: true, voters });
+  } catch (err) {
+    console.error("GET /api/leaderboards/timeout/history/:historyId error:", err);
+    res.status(500).json({ ok: false, error: "Failed to list timeout voters" });
   }
 });
 

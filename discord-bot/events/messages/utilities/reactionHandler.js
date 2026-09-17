@@ -2,9 +2,32 @@ import * as api from "../../../api/client.js";
 import { messagePinner } from "./messagePinner.js";
 import { doplus, dominus } from "./plusplus.js";
 import { countEmoji, countRepost, uncountRepost } from "../../../api/emojis.js";
+import {
+  recordTimeoutVote,
+  removeTimeoutVote,
+} from "../../../api/timeoutVotes.js";
 import { incrementCounter } from "../../../utilities/metrics.js";
 import { emojisMatch, toEmojiObject } from "../../../utilities/emojiCompare.js";
 import { announceMilestones } from "../../../utilities/milestoneNotifier.js";
+import { timeoutMember } from "../../../utilities/timeoutMember.js";
+
+/**
+ * Weight of one user's timeout vote based on their roles: 3x if they hold the triple-vote role,
+ * 2x if they hold the double-vote role (checked in that order so triple wins if a user has both),
+ * 1x otherwise.
+ * @param {import('discord.js').GuildMember|null} member
+ * @param {string} doubleRoleId
+ * @param {string} tripleRoleId
+ * @returns {number}
+ */
+function resolveTimeoutVoteWeight(member, doubleRoleId, tripleRoleId) {
+  let voteQty = 1;
+  if (!member) voteQty = 0;
+  if (tripleRoleId && member.roles.cache.has(tripleRoleId)) voteQty = 3;
+  if (doubleRoleId && member.roles.cache.has(doubleRoleId)) voteQty = 2;
+  console.log("Recording timeout votes: " + voteQty);
+  return voteQty;
+}
 
 /** Fetch a random pin quip from the API; returns fallback if unavailable. */
 async function getRandomPinQuip() {
@@ -47,10 +70,14 @@ export async function handleReactionAdd(reaction, user, options) {
     plusEmoji,
     minusEmoji,
     repostEmojiId,
+    timeoutVoteEmoji,
+    timeoutVoteDoubleRoleId,
+    timeoutVoteTripleRoleId,
     pinSystemEnabled,
     plusPlusEnabled,
     emojiTrackingEnabled,
     repostDetectionEnabled,
+    timeoutVoteEnabled,
   } = options;
 
   const message = await resolveMessage(reaction);
@@ -68,7 +95,9 @@ export async function handleReactionAdd(reaction, user, options) {
 
   const allReactions = message.reactions.valueOf();
   const pinReact = pinEmoji
-    ? [...allReactions.values()].find((r) => emojisMatch(toEmojiObject(r.emoji), pinEmoji))
+    ? [...allReactions.values()].find((r) =>
+        emojisMatch(toEmojiObject(r.emoji), pinEmoji),
+      )
     : null;
 
   if (pinSystemEnabled && pinReact && pinReact.count === pinThreshold) {
@@ -100,10 +129,69 @@ export async function handleReactionAdd(reaction, user, options) {
   }
 
   if (
+    timeoutVoteEnabled &&
+    emojisMatch(emojiObj, timeoutVoteEmoji) &&
+    user.id !== message.author.id
+  ) {
+    console.log("timeout vote detected");
+    console.log(timeoutVoteEnabled);
+    console.log(emojiObj);
+    console.log(timeoutVoteEmoji);
+    const voterMember = await message.guild.members
+      .fetch(user.id)
+      .catch(() => null);
+    const weight = resolveTimeoutVoteWeight(
+      voterMember,
+      timeoutVoteDoubleRoleId,
+      timeoutVoteTripleRoleId,
+    );
+    try {
+      const result = await recordTimeoutVote(
+        message.id,
+        message.author.id,
+        user.id,
+        weight,
+      );
+      if (result.triggered) {
+        const targetMember =
+          message.member ??
+          (await message.guild.members
+            .fetch(message.author.id)
+            .catch(() => null));
+        if (targetMember) {
+          try {
+            await timeoutMember(
+              targetMember,
+              result.durationSeconds,
+              "Timed out by community vote",
+            );
+            await message.channel.send(
+              String(result.responseMessage).replace(
+                "{user}",
+                `<@${message.author.id}>`,
+              ),
+            );
+          } catch (err) {
+            console.error(
+              `bot: failed to apply vote-timeout on message ${message.id} (target ${message.author.id}): ${err.message}`,
+            );
+          }
+        }
+      }
+    } catch (err) {
+      incrementCounter("apiCallErrorsTotal", "timeoutVotes");
+      console.error(
+        `bot: recordTimeoutVote failed for message ${message.id} (target ${message.author.id}, voter ${user.id}): ${api.describeApiError(err)}`,
+      );
+    }
+  }
+
+  if (
     emojiTrackingEnabled &&
     !emojisMatch(emojiObj, pinEmoji) &&
     !emojisMatch(emojiObj, plusEmoji) &&
-    !emojisMatch(emojiObj, minusEmoji)
+    !emojisMatch(emojiObj, minusEmoji) &&
+    !emojisMatch(emojiObj, timeoutVoteEmoji)
   ) {
     if (reaction.partial) {
       // A partial reaction's emoji data isn't fully cached - typically a custom emoji from a
@@ -142,14 +230,21 @@ export async function handleReactionAdd(reaction, user, options) {
 }
 
 /**
- * Handle messageReactionRemove: uncount repost, reverse plus/minus votes.
+ * Handle messageReactionRemove: uncount repost, reverse plus/minus votes, un-count timeout votes.
  * @param {MessageReaction} reaction
  * @param {User} user
- * @param {{ plusEmoji: object|null, minusEmoji: object|null, repostEmojiId: object|null, plusPlusEnabled: boolean, repostDetectionEnabled: boolean }} options - the *Emoji options are resolved emoji objects (see configStore.js), not bare strings.
+ * @param {{ plusEmoji: object|null, minusEmoji: object|null, repostEmojiId: object|null, timeoutVoteEmoji: object|null, plusPlusEnabled: boolean, repostDetectionEnabled: boolean, timeoutVoteEnabled: boolean }} options - the *Emoji options are resolved emoji objects (see configStore.js), not bare strings.
  */
 export async function handleReactionRemove(reaction, user, options) {
-  const { plusEmoji, minusEmoji, repostEmojiId, plusPlusEnabled, repostDetectionEnabled } =
-    options;
+  const {
+    plusEmoji,
+    minusEmoji,
+    repostEmojiId,
+    timeoutVoteEmoji,
+    plusPlusEnabled,
+    repostDetectionEnabled,
+    timeoutVoteEnabled,
+  } = options;
 
   const message = await resolveMessage(reaction);
   if (!message) return;
@@ -188,5 +283,14 @@ export async function handleReactionRemove(reaction, user, options) {
   ) {
     const milestones = await doplus(message.author.id, "user", user.id);
     await announceMilestones(message, milestones);
+  }
+
+  if (timeoutVoteEnabled && emojisMatch(emojiObj, timeoutVoteEmoji)) {
+    removeTimeoutVote(message.id, user.id).catch((err) => {
+      incrementCounter("apiCallErrorsTotal", "timeoutVotes");
+      console.error(
+        `bot: removeTimeoutVote failed for message ${message.id} (voter ${user.id}): ${api.describeApiError(err)}`,
+      );
+    });
   }
 }

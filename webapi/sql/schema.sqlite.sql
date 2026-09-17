@@ -313,3 +313,29 @@ CREATE TRIGGER IF NOT EXISTS milestones_updated_at
   BEGIN
     UPDATE milestones SET updated_at = datetime('now') WHERE id = NEW.id;
   END;
+
+-- Vote-to-timeout: mutable ledger, one row per active vote (deleted on reaction-remove).
+CREATE TABLE IF NOT EXISTS timeout_vote_tracking (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  target INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+  voter INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+  weight INTEGER NOT NULL DEFAULT 1,
+  timestamp TEXT DEFAULT (datetime('now')),
+  UNIQUE (message_id, voter)
+);
+
+-- Vote-to-timeout: immutable record of fired timeouts. UNIQUE(message_id) is the idempotency
+-- guard — once a row exists here, further votes on that message never re-trigger.
+CREATE TABLE IF NOT EXISTS timeout_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
+  message_id TEXT NOT NULL UNIQUE,
+  target INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+  vote_weight_total INTEGER NOT NULL,
+  duration_seconds INTEGER NOT NULL,
+  timestamp TEXT DEFAULT (datetime('now'))
+);

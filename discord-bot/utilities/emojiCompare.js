@@ -25,6 +25,9 @@ export function toEmojiObject(discordEmoji) {
  * @returns {boolean}
  */
 export function emojisMatch(a, b) {
+  console.log("in emoji match with");
+  console.log(a);
+  console.log(b);
   if (!a || !b) return false;
   if (a.app != null && a.app === b.app) return a.emoid === b.emoid;
   return a.emoji != null && a.emoji === b.emoji;

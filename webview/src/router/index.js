@@ -7,6 +7,7 @@ import StatisticsView from "../views/StatisticsView.vue";
 import SystemStatusView from "../views/SystemStatusView.vue";
 import TriggerHistoryUsersView from "../views/TriggerHistoryUsersView.vue";
 import TriggerHistoryUserView from "../views/TriggerHistoryUserView.vue";
+import TimeoutVotesView from "../views/TimeoutVotesView.vue";
 
 /**
  * Application route table.
@@ -64,6 +65,12 @@ const routes = [
     name: "system-status",
     component: SystemStatusView,
     meta: { title: "System Status" },
+  },
+  {
+    path: "/timeout-votes",
+    name: "timeout-votes",
+    component: TimeoutVotesView,
+    meta: { title: "Timeout Votes" },
   },
 ];
 

@@ -51,6 +51,7 @@ const tabs = [
   { label: "Emoji Count", route: "/emoji-count" },
   { label: "Sticker Count", route: "/sticker-count" },
   { label: "PlusPlus Rankings", route: "/plusplus-rankings" },
+  { label: "Timeout Votes", route: "/timeout-votes" },
   { label: "Statistics", route: "/statistics" },
   { label: "Trigger History", route: "/trigger-history" },
 ];

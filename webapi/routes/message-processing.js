@@ -10,6 +10,7 @@ import {
   isMessageAlreadyPinned,
   logPinnedMessage,
 } from "../services/messageProcessing.js";
+import { recordTimeoutVote, removeTimeoutVote } from "../services/timeoutVotes.js";
 import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
@@ -635,6 +636,153 @@ router.post("/pin-log", authenticate, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to log pinned message" });
+  }
+});
+
+/**
+ * POST /api/message-processing/timeout-vote
+ * Record one reaction-add vote toward timing out a message's author. Idempotent once the
+ * message has already fired a timeout (see timeout_history).
+ * Body: { app: "discord", guildId: string, messageId: string, targetPlatformId: string, voterPlatformId: string, weight?: number }
+ * Auth: required. A guild-scoped bot account may only post for its own guildId.
+ * @openapi
+ * /api/message-processing/timeout-vote:
+ *   post:
+ *     operationId: recordTimeoutVote
+ *     tags: [Message Processing]
+ *     summary: Record a vote-to-timeout reaction
+ *     description: >
+ *       Inserts into timeout_vote_tracking (unique per message+voter) and checks the running
+ *       weighted total against guild_config's timeout_vote_threshold. Once the threshold is
+ *       reached, inserts a timeout_history row (unique per message — the idempotency guard) and
+ *       returns triggered:true with the duration/response message to apply; further votes on an
+ *       already-triggered message return alreadyActioned:true instead of re-triggering.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, guildId, messageId, targetPlatformId, voterPlatformId]
+ *             properties:
+ *               app: { type: string, enum: [discord] }
+ *               guildId: { type: string }
+ *               messageId: { type: string, description: "Discord message snowflake." }
+ *               targetPlatformId: { type: string, description: "Discord snowflake of the message author." }
+ *               voterPlatformId: { type: string, description: "Discord snowflake of the user who reacted." }
+ *               weight: { type: integer, description: "Vote weight based on the voter's roles (1/2/3). Defaults to 1.", default: 1 }
+ *     responses:
+ *       '200':
+ *         description: Vote recorded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 triggered: { type: boolean }
+ *                 alreadyActioned: { type: boolean }
+ *                 currentWeight: { type: integer }
+ *                 threshold: { type: integer }
+ *                 targetPlatformId: { type: string }
+ *                 durationSeconds: { type: integer }
+ *                 responseMessage: { type: string }
+ *                 voteWeightTotal: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/timeout-vote", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+
+    const { guildId, messageId, targetPlatformId, voterPlatformId, weight } = req.body ?? {};
+    if (!guildId || !messageId || !targetPlatformId || !voterPlatformId) {
+      return res.status(400).json({
+        ok: false,
+        error: "guildId, messageId, targetPlatformId, and voterPlatformId are required",
+      });
+    }
+
+    const result = await recordTimeoutVote({
+      app,
+      guildId: String(guildId),
+      messageId: String(messageId),
+      targetPlatformId: String(targetPlatformId),
+      voterPlatformId: String(voterPlatformId),
+      weight,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error("POST /api/message-processing/timeout-vote error:", err);
+    res.status(500).json({ ok: false, error: "Failed to record timeout vote" });
+  }
+});
+
+/**
+ * POST /api/message-processing/timeout-vote/remove
+ * Un-count a reaction-remove vote. No-op once the message has already fired a timeout.
+ * Body: { app: "discord", messageId: string, voterPlatformId: string }
+ * Auth: required.
+ * @openapi
+ * /api/message-processing/timeout-vote/remove:
+ *   post:
+ *     operationId: removeTimeoutVote
+ *     tags: [Message Processing]
+ *     summary: Un-count a vote-to-timeout reaction removal
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, messageId, voterPlatformId]
+ *             properties:
+ *               app: { type: string, enum: [discord] }
+ *               messageId: { type: string, description: "Discord message snowflake." }
+ *               voterPlatformId: { type: string, description: "Discord snowflake of the user who un-reacted." }
+ *     responses:
+ *       '200':
+ *         description: Vote removed (or there was nothing to remove).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 removed: { type: boolean }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/timeout-vote/remove", authenticate, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+
+    const { messageId, voterPlatformId } = req.body ?? {};
+    if (!messageId || !voterPlatformId) {
+      return res.status(400).json({ ok: false, error: "messageId and voterPlatformId are required" });
+    }
+
+    const result = await removeTimeoutVote({
+      app,
+      messageId: String(messageId),
+      voterPlatformId: String(voterPlatformId),
+    });
+    res.json(result);
+  } catch (err) {
+    console.error("POST /api/message-processing/timeout-vote/remove error:", err);
+    res.status(500).json({ ok: false, error: "Failed to remove timeout vote" });
   }
 });
 

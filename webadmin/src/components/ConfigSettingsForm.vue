@@ -64,6 +64,26 @@
             </template>
           </v-combobox>
           <v-combobox
+            v-else-if="isRoleSinglePicker(entry.config)"
+            v-model="draft[entry.config]"
+            :items="roleItems"
+            item-title="name"
+            item-value="id"
+            :return-object="false"
+            density="comfortable"
+            variant="outlined"
+            hide-details
+            :placeholder="roleItems.length ? undefined : 'No synced roles — enter a role ID'"
+          >
+            <template #item="{ item, props: itemProps }">
+              <v-list-item v-bind="itemProps">
+                <template #title>
+                  <span :style="roleChipStyle(item)">{{ roleLabel(item) }}</span>
+                </template>
+              </v-list-item>
+            </template>
+          </v-combobox>
+          <v-combobox
             v-else-if="isChannelPicker(entry.config)"
             v-model="draft[entry.config]"
             :items="channelItems"
@@ -143,6 +163,10 @@ const props = defineProps({
 const { notify } = useSnackbar();
 
 const ROLE_LIST_KEYS = new Set(["pin_message_role_ids"]);
+const ROLE_SINGLE_KEYS = new Set([
+  "timeout_vote_double_role_id",
+  "timeout_vote_triple_role_id",
+]);
 const CHANNEL_KEYS = new Set([
   "pin_channel_id",
   "announce_channel_id",
@@ -153,6 +177,7 @@ const EMOJI_KEYS = new Set([
   "plusplus_emoji",
   "minusminus_emoji",
   "repost_emoji",
+  "timeout_vote_emoji",
 ]);
 
 /** @type {Record<string, string|string[]>} Editable form state, keyed by config name. */
@@ -271,6 +296,14 @@ function safeParseIdArray(value) {
  */
 function isRolePicker(config) {
   return ROLE_LIST_KEYS.has(config);
+}
+
+/**
+ * @param {string} config
+ * @returns {boolean}
+ */
+function isRoleSinglePicker(config) {
+  return ROLE_SINGLE_KEYS.has(config);
 }
 
 /**
