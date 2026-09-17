@@ -1,6 +1,8 @@
 /**
- * Client/feature navigation tree: top tabs per client, left nav per feature.
- * @type {{ key: string, label: string, features: { key: string, label: string, icon: string }[] }[]}
+ * Client/feature navigation tree: left nav per feature, scoped under the active guild tab
+ * (AppShell.vue). `guildScoped: true` marks a feature as backed by per-guild data (guild_config,
+ * etc.) — hidden from the nav while the "Global" tab is active.
+ * @type {{ key: string, label: string, features: { key: string, label: string, icon: string, guildScoped?: boolean }[] }[]}
  */
 export const CLIENTS = [
   {
@@ -8,7 +10,7 @@ export const CLIENTS = [
     label: "Discord Bot",
     features: [
       { key: "dashboard", label: "Dashboard", icon: "mdi-view-dashboard-outline" },
-      { key: "config", label: "Config & Feature Flags", icon: "mdi-tune" },
+      { key: "config", label: "Config & Feature Flags", icon: "mdi-tune", guildScoped: true },
       { key: "triggers", label: "Trigger Responses", icon: "mdi-message-reply-text-outline" },
       { key: "pin-quips", label: "Pin Quips", icon: "mdi-comment-quote-outline" },
       { key: "eight-ball", label: "8-Ball Responses", icon: "mdi-billiards" },

@@ -86,7 +86,18 @@
             variant="outlined"
             hide-details
             :placeholder="emojiItems.length ? undefined : 'No synced emojis — type an emoji, or paste a custom emoji ID'"
-          />
+          >
+            <template #item="{ item, props: itemProps }">
+              <v-list-item v-bind="itemProps" :title="undefined">
+                <template #title>
+                  <span>{{ emojiLabel(item) }}</span>
+                  <span v-if="emojiDescription(item)" class="text-caption text-medium-emphasis ml-2">
+                    {{ emojiDescription(item) }}
+                  </span>
+                </template>
+              </v-list-item>
+            </template>
+          </v-combobox>
           <v-text-field
             v-else
             v-model="draft[entry.config]"
@@ -118,6 +129,7 @@
 import { computed, reactive, ref, watch } from "vue";
 import { updateConfigValue } from "../lib/config.js";
 import { useSnackbar } from "../composables/useSnackbar.js";
+import standardEmojiNames from "unicode-emoji-json/data-by-emoji.json";
 
 const props = defineProps({
   app: { type: String, required: true },
@@ -200,6 +212,25 @@ const emojiItems = computed(() =>
 function emojiValueToString(value) {
   if (value == null) return "";
   return String(value.emoid ?? value.emoji ?? "");
+}
+
+/**
+ * @param {object|string} item
+ * @returns {string}
+ */
+function emojiLabel(item) {
+  return typeof item === "string" ? item : (item?.emoji ?? "");
+}
+
+/**
+ * Standard (unicode) emojis have no display name of their own — pin_emoji's `emoji` field is just
+ * the raw character — so look up its description in unicode-emoji-json. Custom Discord emojis
+ * (item.emoji is already their name) won't match and render without a description.
+ * @param {object|string} item
+ * @returns {string|undefined}
+ */
+function emojiDescription(item) {
+  return standardEmojiNames[emojiLabel(item)]?.name;
 }
 
 /**
