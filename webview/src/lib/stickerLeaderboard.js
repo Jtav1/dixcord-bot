@@ -1,13 +1,10 @@
 import { API_BASE } from "./api.js";
-import { resolveUserLabel } from "./emojiLeaderboard.js";
 
 /** Sticker leaderboard rows shown per page. */
 export const STICKER_PAGE_SIZE = 50;
 
 /** Per-user sticker leaderboard rows shown per page. */
 export const STICKER_USER_PAGE_SIZE = STICKER_PAGE_SIZE;
-
-export { resolveUserLabel };
 
 /**
  * Parse a fetch Response as JSON, with a clear error when the body is not JSON.

@@ -204,27 +204,11 @@ export function leaderboardEntryKey(entry) {
 }
 
 /**
- * Resolve the display label for a voter platform user id.
- * @param {string|null|undefined} voterPlatformId Discord snowflake.
- * @param {Map<string, string>} nameMap platformUserId → display name.
- * @returns {string}
- */
-export function resolveVoterLabel(voterPlatformId, nameMap) {
-  if (voterPlatformId == null || voterPlatformId === "") return "Unknown";
-  return nameMap.get(String(voterPlatformId)) ?? String(voterPlatformId);
-}
-
-/**
- * Resolve the display label for a plusplus leaderboard entry.
- * User entries use mapped name when available, prefixed with `@`; word entries use the raw string.
+ * Resolve the display label for a word-typed plusplus leaderboard entry. User-typed entries
+ * render a UserIdentityChip instead (see PlusPlusLeaderboardPanels.vue) and don't call this.
  * @param {{ string: string, typestr: string }} entry Leaderboard row.
- * @param {Map<string, string>} nameMap platformUserId → display name.
  * @returns {string}
  */
-export function resolveEntryLabel(entry, nameMap) {
-  if (entry?.typestr === "user") {
-    const name = nameMap.get(String(entry.string)) ?? String(entry.string);
-    return "@" + " " + name;
-  }
+export function resolveEntryLabel(entry) {
   return String(entry?.string ?? "");
 }

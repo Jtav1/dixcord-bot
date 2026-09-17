@@ -120,22 +120,6 @@ export async function fetchUserEmojiStats(userId, app = "discord") {
 }
 
 /**
- * Resolve display label for a user leaderboard row.
- * @param {{ userid?: string, name?: string }} entry User leaderboard row.
- * @param {Map<string, string>} nameMap platformUserId → display name.
- * @returns {string}
- */
-export function resolveUserLabel(entry, nameMap) {
-  const id = String(entry?.userid ?? "");
-  if (!id) return "Unknown";
-  const mapped = nameMap.get(id);
-  if (mapped) return mapped;
-  const apiName = String(entry?.name ?? "").trim();
-  if (apiName) return apiName;
-  return id;
-}
-
-/**
  * Whether a resolved emoji is a custom Discord emoji (numeric emoid), as opposed to unicode.
  * @param {{ emoid?: string|number|null }|null|undefined} emoji Resolved emoji object (emoji_frequency row).
  * @returns {boolean}

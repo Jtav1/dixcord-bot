@@ -374,6 +374,79 @@ router.get("/aliases/:chatMemberMappingId", authenticate, requireAdmin, async (r
 });
 
 /**
+ * GET /api/guild-members/public-aliases/:chatMemberMappingId
+ * Public-safe version of GET /api/guild-members/aliases/:chatMemberMappingId — no ids, no
+ * platform snowflakes, just per-guild handle/nickname. Backs webview's public identity chip.
+ * Auth: required (webview-allowed).
+ * @openapi
+ * /api/guild-members/public-aliases/{chatMemberMappingId}:
+ *   get:
+ *     operationId: listPublicAliasesForMapping
+ *     tags: [Guild Members]
+ *     summary: List one identity's per-guild handle/nickname (public-safe)
+ *     description: >
+ *       Same underlying data as GET /api/guild-members/aliases/{chatMemberMappingId}, trimmed to
+ *       fields safe to show on the public webview site — no internal ids, no platform user id.
+ *     parameters:
+ *       - name: chatMemberMappingId
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: Linked membership rows, public-safe fields only.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 members:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       app: { type: string }
+ *                       guildId: { type: string }
+ *                       guildName: { type: string, nullable: true }
+ *                       handle: { type: string, nullable: true }
+ *                       nickname: { type: string, nullable: true }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/public-aliases/:chatMemberMappingId", authenticate, async (req, res) => {
+  try {
+    const id = parseInt(req.params.chatMemberMappingId, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ ok: false, error: "Invalid chatMemberMappingId" });
+    }
+    const mapping = await getUserMappingById(id);
+    if (!mapping) {
+      return res.status(404).json({ ok: false, error: "User mapping not found" });
+    }
+    const members = (await listAliasesForMapping(id)).map((m) => ({
+      app: m.app,
+      guildId: m.guildId,
+      guildName: m.guildName,
+      handle: m.handle,
+      nickname: m.nickname,
+    }));
+    res.json({ ok: true, members });
+  } catch (err) {
+    console.error("GET /api/guild-members/public-aliases/:chatMemberMappingId error:", err);
+    res.status(500).json({ ok: false, error: "Failed to list aliases" });
+  }
+});
+
+/**
  * POST /api/guild-members/:guildMemberId/link
  * Link a guild_members row to a chat_member_mapping identity as one of its aliases
  * (re-linking moves it, since a guild_member can only alias one identity at a time).

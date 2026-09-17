@@ -155,6 +155,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/guild-members/unlinked?app=&guildId=&search=` | admin | Membership rows with no member_aliases link yet |
 | GET | `/api/guild-members/all?app=&guildId=&search=` | admin | Every membership row, linked or not, for the manual-link picker (includes linkedMappingId/Name) |
 | GET | `/api/guild-members/aliases/:chatMemberMappingId` | admin | Membership rows currently linked (member_aliases) to this identity |
+| GET | `/api/guild-members/public-aliases/:chatMemberMappingId` | ✓ | Public-safe version of the above: just `{app,guildId,guildName,handle,nickname}` per guild, no ids or platform user id |
 | POST | `/api/guild-members/:guildMemberId/link` | admin | Link (or move) a guild_member to a chat_member_mapping identity (body: `{ chatMemberMappingId }`) |
 | DELETE | `/api/guild-members/:guildMemberId/link` | admin | Unlink a guild_member from its identity |
 | POST | `/api/guild-members/sync` | ✓ | Upsert a server's membership list (body: `{ app, guildId, members }`); never removes members, safe for a full roster or a single incremental push |

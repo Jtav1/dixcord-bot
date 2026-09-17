@@ -141,32 +141,6 @@ export function buildMappingIdNameMap(userMappings) {
 }
 
 /**
- * Resolve the display label for a chat_member_mapping internal id.
- * @param {number|null|undefined} mappingId chat_member_mapping.id.
- * @param {Map<number, string>} nameMap mapping id → display name.
- * @returns {string}
- */
-export function resolveMappingLabel(mappingId, nameMap) {
-  if (mappingId == null) return "Unknown";
-  const id = Number(mappingId);
-  if (!Number.isFinite(id)) return "Unknown";
-  return nameMap.get(id) ?? `User #${id}`;
-}
-
-/**
- * Resolve pinner mapping ids to a comma-separated display string.
- * @param {number[]} pinnerIds chat_member_mapping ids.
- * @param {Map<number, string>} nameMap mapping id → display name.
- * @returns {string}
- */
-export function resolvePinnerLabels(pinnerIds, nameMap) {
-  if (!Array.isArray(pinnerIds) || pinnerIds.length === 0) return "Unknown";
-  return pinnerIds
-    .map((id) => resolveMappingLabel(id, nameMap))
-    .join(", ");
-}
-
-/**
  * Resolve channel label from a pin history row.
  * @param {{ channelName?: string|null, channelId?: string|null }} entry Pin row.
  * @returns {string}
