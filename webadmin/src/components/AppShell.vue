@@ -10,19 +10,19 @@
       </v-app-bar-title>
 
       <v-tabs
-        :model-value="activeClientKey"
+        :model-value="activeGuildScope"
         class="app-tabs"
         color="primary"
         show-arrows
       >
         <v-tab
-          v-for="client in CLIENTS"
-          :key="client.key"
-          :value="client.key"
-          :to="clientHomePath(client)"
+          v-for="tab in guildTabs"
+          :key="tab.key"
+          :value="tab.key"
+          :to="guildTabPath(tab.key)"
           class="text-none"
         >
-          {{ client.label }}
+          {{ tab.label }}
         </v-tab>
       </v-tabs>
 
@@ -36,7 +36,7 @@
         <v-list-item
           v-for="feature in activeFeatures"
           :key="feature.key"
-          :to="`/${activeClientKey}/${feature.key}`"
+          :to="`/${activeClientKey}/${activeGuildScope}/${feature.key}`"
           :prepend-icon="feature.icon"
           :title="feature.label"
         />
@@ -54,28 +54,66 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import ThemeToggle from "./ThemeToggle.vue";
 import GlobalSnackbar from "./GlobalSnackbar.vue";
 import { CLIENTS } from "../nav/clients.js";
+import { fetchAllGuilds } from "../lib/guild.js";
 
 const route = useRoute();
 
+/** @type {import("vue").Ref<Array<{app:string,guildId:string,name:string}>>} */
+const guilds = ref([]);
+
+onMounted(async () => {
+  try {
+    guilds.value = await fetchAllGuilds();
+  } catch {
+    guilds.value = [];
+  }
+});
+
 const activeClientKey = computed(
-  () => CLIENTS.find((client) => route.path.startsWith(`/${client.key}`))?.key,
+  () =>
+    CLIENTS.find((client) => route.path.startsWith(`/${client.key}`))?.key ?? CLIENTS[0].key,
 );
 
-const activeFeatures = computed(
+const activeGuildScope = computed(() => route.params.guildScope ?? "global");
+
+/** Current feature key, read from the URL's last path segment. */
+const activeFeatureKey = computed(() => route.path.split("/").filter(Boolean).pop());
+
+const allFeatures = computed(
   () => CLIENTS.find((client) => client.key === activeClientKey.value)?.features ?? [],
 );
 
+/** Left-nav features, dropping guild-scoped ones (e.g. Config) while "Global" is active. */
+const activeFeatures = computed(() =>
+  activeGuildScope.value === "global"
+    ? allFeatures.value.filter((feature) => !feature.guildScoped)
+    : allFeatures.value,
+);
+
+/** Guild-tab list: a hardcoded "Global" entry first, then one tab per synced guild. */
+const guildTabs = computed(() => [
+  { key: "global", label: "Global" },
+  ...guilds.value.map((guild) => ({ key: guild.guildId, label: guild.name })),
+]);
+
 /**
- * @param {{ key: string, features: { key: string }[] }} client
+ * Target path for a guild tab: stay on the current feature, unless it's guild-scoped and the
+ * target is "Global" (that feature is hidden there), in which case fall back to dashboard.
+ * @param {string} guildScope
  * @returns {string}
  */
-function clientHomePath(client) {
-  return `/${client.key}/${client.features[0]?.key ?? ""}`;
+function guildTabPath(guildScope) {
+  const currentFeature = allFeatures.value.find((f) => f.key === activeFeatureKey.value);
+  const feature =
+    guildScope === "global" && currentFeature?.guildScoped
+      ? "dashboard"
+      : (activeFeatureKey.value ?? "dashboard");
+  return `/${activeClientKey.value}/${guildScope}/${feature}`;
 }
 </script>
 

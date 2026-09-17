@@ -66,6 +66,7 @@
 
 <script setup>
 import { onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import ConfigSettingsForm from "../components/ConfigSettingsForm.vue";
 import { fetchConfigEntries } from "../lib/config.js";
 import { fetchGuildSnapshot } from "../lib/guild.js";
@@ -73,6 +74,8 @@ import { invalidateConfigCache } from "../lib/systemStatus.js";
 import { testFortune, testLinkFixer } from "../lib/botResponses.js";
 import { useSnackbar } from "../composables/useSnackbar.js";
 
+const route = useRoute();
+const router = useRouter();
 const { notify } = useSnackbar();
 
 const loading = ref(true);
@@ -100,14 +103,25 @@ const linkFixerChecked = ref(false);
 const linkFixerResult = ref("");
 
 /**
- * Config is per-(app, guildId), so resolve the synced guild first, then load its config.
+ * Config is per-(app, guildId) — the guildId comes from the active guild tab (route param), never
+ * guessed, since guessing ("most recently synced guild") silently shows the wrong server's config
+ * as soon as more than one guild has ever synced.
  * @returns {Promise<void>}
  */
 async function loadConfig() {
+  const guildScope = route.params.guildScope;
+  if (guildScope === "global") {
+    // Config has no cross-guild concept today; this route shouldn't be reachable via nav, but
+    // guard direct URL entry by bouncing to a feature "Global" actually supports.
+    const [, clientKey] = route.path.split("/");
+    router.replace(`/${clientKey}/global/dashboard`);
+    return;
+  }
+
   loading.value = true;
   error.value = "";
   try {
-    const snapshot = await fetchGuildSnapshot();
+    const snapshot = await fetchGuildSnapshot("discord", guildScope);
     currentApp.value = snapshot.guild.app;
     currentGuildId.value = snapshot.guild.guildId;
     channels.value = snapshot.channels;

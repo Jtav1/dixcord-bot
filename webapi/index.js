@@ -382,6 +382,7 @@ app.get("/", publicLimiter, (req, res) => {
           "GET /api/guild?app=&guildId=",
           "POST /api/guild/sync (body: { app, guildId, guild, channels, roles })",
         ],
+        adminRoutes: ["GET /api/guild/all"],
       },
       guildMembers: {
         authRequired: true,

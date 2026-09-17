@@ -33,18 +33,19 @@ const FEATURE_COMPONENTS = {
 const firstClient = CLIENTS[0];
 
 /**
- * Application route table, generated from CLIENTS so a feature only needs
- * an entry in nav/clients.js (+ optionally FEATURE_COMPONENTS) to appear.
+ * Application route table, generated from CLIENTS so a feature only needs an entry in
+ * nav/clients.js (+ optionally FEATURE_COMPONENTS) to appear. Every route carries a `guildScope`
+ * param ("global" or a guild_id) set by AppShell.vue's tab switcher.
  * @type {import("vue-router").RouteRecordRaw[]}
  */
 const routes = [
   {
     path: "/",
-    redirect: `/${firstClient.key}/${firstClient.features[0].key}`,
+    redirect: `/${firstClient.key}/global/${firstClient.features[0].key}`,
   },
   ...CLIENTS.flatMap((client) =>
     client.features.map((feature) => ({
-      path: `/${client.key}/${feature.key}`,
+      path: `/${client.key}/:guildScope/${feature.key}`,
       name: `${client.key}/${feature.key}`,
       component: FEATURE_COMPONENTS[feature.key] ?? ComingSoonView,
       props: FEATURE_COMPONENTS[feature.key] ? false : { title: feature.label },

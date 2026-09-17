@@ -148,6 +148,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/system/invalidate-cache` | admin | Bump cache version |
 | POST | `/api/system/heartbeat` | ✓ | Bot heartbeat (body: `{ app, guildId, version }`) |
 | GET | `/api/guild?app=&guildId=` | ✓ | Synced guild metadata, channels, roles, emoji/sticker catalog |
+| GET | `/api/guild/all` | admin | Every guild that has ever synced, for a guild-picker UI |
 | POST | `/api/guild/sync` | ✓ | Push a full guild snapshot (body: `{ app, guildId, guild, channels, roles }`); auto-seeds default config for brand-new servers |
 | GET | `/api/guild-members?app=&guildId=` | ✓ | List one server's members (guildId optional: omit for all-guilds dedup lookup); unlinked members have null id/name |
 | GET | `/api/guild-members/user/:chatMemberMappingId` | ✓ | Every server a given internal user id belongs to |
