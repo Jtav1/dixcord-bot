@@ -141,6 +141,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/eight-ball-responses` | admin | Create eight-ball response |
 | GET | `/api/user-mappings?app=discord` | ✓ | List user mappings (id, name, and discordHandle if that legacy column exists and is non-null) |
 | GET | `/api/pin-history` | ✓ | Pin history log |
+| DELETE | `/api/pin-history/:id` | admin | Delete a pin history entry |
 | GET | `/api/statistics` | ✓ | Aggregate usage statistics |
 | GET | `/api/system/status?app=&guildId=` | ✓ | System and bot status; `status.bot` scoped to one server when both params given, else most-recently-seen; `status.bots` always lists every known server |
 | GET | `/api/system/cache-version` | ✓ | Cache version for bot polling |

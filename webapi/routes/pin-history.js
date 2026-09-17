@@ -1,6 +1,12 @@
 import express from "express";
-import { authenticate } from "../middleware/auth.js";
-import { getPinHistoryById, listIncompletePinHistory, listPinHistory, updatePinHistory } from "../services/pinHistory.js";
+import { authenticate, requireAdmin } from "../middleware/auth.js";
+import {
+  deletePinHistory,
+  getPinHistoryById,
+  listIncompletePinHistory,
+  listPinHistory,
+  updatePinHistory,
+} from "../services/pinHistory.js";
 
 const router = express.Router();
 
@@ -304,6 +310,59 @@ router.put("/:id", authenticate, async (req, res) => {
   } catch (err) {
     console.error("PUT /api/pin-history/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to update pin history entry" });
+  }
+});
+
+/**
+ * DELETE /api/pin-history/:id
+ * Delete one pin history entry.
+ * Auth: required, admin role.
+ * @openapi
+ * /api/pin-history/{id}:
+ *   delete:
+ *     operationId: deletePinHistoryEntry
+ *     tags: [Pin History]
+ *     summary: Delete one pin history entry
+ *     description: Requires the admin role.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: Deleted.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id) || id <= 0) {
+      return res.status(400).json({ ok: false, error: "Invalid id" });
+    }
+    const deleted = await deletePinHistory(id);
+    if (!deleted) {
+      return res.status(404).json({ ok: false, error: "Pin not found" });
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /api/pin-history/:id error:", err);
+    res.status(500).json({ ok: false, error: "Failed to delete pin history entry" });
   }
 });
 
