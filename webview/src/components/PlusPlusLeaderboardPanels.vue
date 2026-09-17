@@ -33,7 +33,8 @@
           {{ index + 1 }}
         </span>
         <span class="text-body-1 flex-grow-1">
-          {{ resolveEntryLabel(entry, nameMap) }}
+          <UserIdentityChip v-if="entry.typestr === 'user'" v-bind="identityFor(entry.string)" />
+          <template v-else>{{ resolveEntryLabel(entry) }}</template>
         </span>
         <span class="font-weight-bold ml-3">{{ entry.total }}</span>
       </v-expansion-panel-title>
@@ -76,7 +77,7 @@
                 >
                   <td class="text-body-2">{{ formatTimestamp(vote.timestamp) }}</td>
                   <td class="text-body-2">
-                    {{ resolveVoterLabel(vote.voterPlatformId, nameMap) }}
+                    <UserIdentityChip v-bind="identityFor(vote.voterPlatformId)" />
                   </td>
                   <td
                     class="text-body-2 text-right font-weight-bold"
@@ -122,8 +123,8 @@ import {
   fetchPlusPlusVoteHistory,
   leaderboardEntryKey,
   resolveEntryLabel,
-  resolveVoterLabel,
 } from "../lib/plusplusRankings.js";
+import UserIdentityChip from "./UserIdentityChip.vue";
 
 const props = defineProps({
   /** Leaderboard rows to render. */
@@ -131,8 +132,8 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  /** Platform user id → display name (entry labels). */
-  nameMap: {
+  /** Platform user id -> { mappingId, nickname, handle } (see lib/userIdentity.js). */
+  identityMap: {
     type: Map,
     required: true,
   },
@@ -241,6 +242,23 @@ function paginatedVotes(entry) {
   const page = historyPageFor(entry);
   const start = (page - 1) * VOTE_HISTORY_PAGE_SIZE;
   return history.votes.slice(start, start + VOTE_HISTORY_PAGE_SIZE);
+}
+
+/**
+ * Resolve UserIdentityChip props for a platform user id.
+ * @param {string|null|undefined} platformUserId Discord snowflake.
+ * @returns {{ mappingId: number|null, name: string|null, nickname: string|null, handle: string|null, platformUserId: string|null }}
+ */
+function identityFor(platformUserId) {
+  const id = platformUserId != null ? String(platformUserId) : null;
+  const identity = id != null ? props.identityMap.get(id) : null;
+  return {
+    mappingId: identity?.mappingId ?? null,
+    name: identity?.name ?? null,
+    nickname: identity?.nickname ?? null,
+    handle: identity?.handle ?? null,
+    platformUserId: id,
+  };
 }
 
 /**

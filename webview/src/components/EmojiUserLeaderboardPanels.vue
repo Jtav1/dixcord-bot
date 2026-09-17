@@ -33,7 +33,7 @@
               {{ offset + index + 1 }}
             </span>
             <span class="text-body-1 flex-grow-1">
-              {{ resolveUserLabel(entry, nameMap) }}
+              <UserIdentityChip v-bind="identityFor(entry.userid)" />
             </span>
             <span class="font-weight-bold ml-3">
               {{ formatFrequency(entry.total) }}
@@ -153,8 +153,8 @@ import {
   emojiImageUrl,
   fetchUserEmojiStats,
   isCustomDiscordEmoji,
-  resolveUserLabel,
 } from "../lib/emojiLeaderboard.js";
+import UserIdentityChip from "./UserIdentityChip.vue";
 
 const props = defineProps({
   /** User leaderboard rows to render. */
@@ -162,8 +162,8 @@ const props = defineProps({
     type: Array,
     default: () => [],
   },
-  /** Platform user id → display name. */
-  nameMap: {
+  /** Platform user id -> { mappingId, nickname, handle } (see lib/userIdentity.js). */
+  identityMap: {
     type: Map,
     required: true,
   },
@@ -258,6 +258,23 @@ function statsErrorFor(entry) {
  */
 function statsFor(entry) {
   return statsCache.value.get(entryKey(entry));
+}
+
+/**
+ * Resolve UserIdentityChip props for a platform user id.
+ * @param {string|null|undefined} platformUserId Discord snowflake.
+ * @returns {{ mappingId: number|null, name: string|null, nickname: string|null, handle: string|null, platformUserId: string|null }}
+ */
+function identityFor(platformUserId) {
+  const id = platformUserId != null ? String(platformUserId) : null;
+  const identity = id != null ? props.identityMap.get(id) : null;
+  return {
+    mappingId: identity?.mappingId ?? null,
+    name: identity?.name ?? null,
+    nickname: identity?.nickname ?? null,
+    handle: identity?.handle ?? null,
+    platformUserId: id,
+  };
 }
 
 /**

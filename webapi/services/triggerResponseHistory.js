@@ -8,7 +8,6 @@ import {
   getChatMemberMappingIdByPlatformUserId,
   isChatMemberAppSupported,
 } from "./chatMemberMapping.js";
-import { serializeUserMappingRow } from "./userMappings.js";
 
 /**
  * Record that a user received a given trigger_response selection.
@@ -86,21 +85,34 @@ export async function listTriggerResponseHistoryForUser(userId, opts = {}) {
 }
 
 /**
- * List chat_member_mapping rows for `app` that have at least one trigger-response history entry.
+ * List chat_member_mapping rows for `app` that have at least one trigger-response history entry,
+ * each enriched with its most-recently-synced guild_members alias (handle/nickname/platformUserId)
+ * for that app, mirroring the "most-recent wins" convention in guildMembers.js's listAllGuildMembers.
  * @param {string} app - chat app key, e.g. "discord"
- * @returns {Promise<Array<ReturnType<typeof serializeUserMappingRow>>>}
+ * @returns {Promise<Array<{ id: number, name: string, handle: string|null, nickname: string|null, platformUserId: string|null }>>}
  */
 export async function listUsersWithTriggerResponseHistory(app) {
   if (!isChatMemberAppSupported(app)) return [];
 
   const [rows] = await db.query(
-    `SELECT DISTINCT m.*
+    `SELECT m.id, m.name,
+       (SELECT gm.handle FROM guild_members gm INNER JOIN member_aliases ma ON ma.guild_member_id = gm.id
+        WHERE ma.chat_member_mapping_id = m.id AND gm.app = ? ORDER BY gm.synced_at DESC LIMIT 1) AS handle,
+       (SELECT gm.nickname FROM guild_members gm INNER JOIN member_aliases ma ON ma.guild_member_id = gm.id
+        WHERE ma.chat_member_mapping_id = m.id AND gm.app = ? ORDER BY gm.synced_at DESC LIMIT 1) AS nickname,
+       (SELECT gm.platform_user_id FROM guild_members gm INNER JOIN member_aliases ma ON ma.guild_member_id = gm.id
+        WHERE ma.chat_member_mapping_id = m.id AND gm.app = ? ORDER BY gm.synced_at DESC LIMIT 1) AS platformUserId
      FROM chat_member_mapping m
-     INNER JOIN trigger_response_user_history h ON h.user_id = m.id
+     WHERE EXISTS (SELECT 1 FROM trigger_response_user_history h WHERE h.user_id = m.id)
      ORDER BY m.name ASC`,
+    [app, app, app],
   );
 
-  return (Array.isArray(rows) ? rows : []).map((row) =>
-    serializeUserMappingRow(row, app),
-  );
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    id: Number(row.id),
+    name: String(row.name),
+    handle: row.handle ?? null,
+    nickname: row.nickname ?? null,
+    platformUserId: row.platformUserId ?? null,
+  }));
 }

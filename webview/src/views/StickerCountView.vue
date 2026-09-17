@@ -52,7 +52,7 @@
           <v-card-text class="pa-0">
             <StickerUserLeaderboardPanels
               :entries="userEntries"
-              :name-map="nameMap"
+              :identity-map="identityMap"
               :total="userTotal"
               :offset="userOffset"
               :page="userPage"
@@ -83,10 +83,8 @@ import {
   fetchStickerLeaderboardPage,
   fetchStickerUserLeaderboardPage,
 } from "../lib/stickerLeaderboard.js";
-import {
-  buildUserNameMap,
-  fetchAllGuildMembers,
-} from "../lib/plusplusRankings.js";
+import { fetchAllGuildMembers } from "../lib/plusplusRankings.js";
+import { buildIdentityMapByPlatformId } from "../lib/userIdentity.js";
 
 const loading = ref(true);
 const error = ref("");
@@ -101,7 +99,7 @@ const userEntries = ref([]);
 const userTotal = ref(0);
 const userOffset = ref(0);
 const userPage = ref(1);
-const nameMap = ref(new Map());
+const identityMap = ref(new Map());
 
 const updatedAt = ref("");
 
@@ -180,7 +178,7 @@ function onUserPageChange(nextPage) {
 onMounted(async () => {
   try {
     const members = await fetchAllGuildMembers("discord");
-    nameMap.value = buildUserNameMap(members);
+    identityMap.value = buildIdentityMapByPlatformId(members);
   } catch {
     // Name resolution is best-effort; API rows include names as fallback.
   }

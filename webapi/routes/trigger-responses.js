@@ -1053,9 +1053,9 @@ router.get("/functions", authenticate, async (req, res) => {
  *                     properties:
  *                       id: { type: integer }
  *                       name: { type: string }
- *                       handle: { type: string }
- *                       platformUserId: { type: string }
- *                       app: { type: string }
+ *                       handle: { type: string, nullable: true }
+ *                       nickname: { type: string, nullable: true }
+ *                       platformUserId: { type: string, nullable: true }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':

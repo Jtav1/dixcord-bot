@@ -36,8 +36,7 @@
     >
       <thead>
         <tr>
-          <th class="text-left">Name</th>
-          <th class="text-left">Handle</th>
+          <th class="text-left">User</th>
         </tr>
       </thead>
       <tbody>
@@ -50,8 +49,14 @@
           @click="$emit('select-user', user.id)"
           @keydown.enter="$emit('select-user', user.id)"
         >
-          <td class="text-body-2">{{ user.name }}</td>
-          <td class="text-body-2 text-medium-emphasis">{{ user.handle }}</td>
+          <td class="text-body-2">
+            <UserIdentityChip
+              :mapping-id="user.id"
+              :name="user.name"
+              :nickname="user.nickname"
+              :handle="user.handle"
+            />
+          </td>
         </tr>
       </tbody>
     </v-table>
@@ -60,6 +65,7 @@
 
 <script setup>
 import { computed, ref } from "vue";
+import UserIdentityChip from "./UserIdentityChip.vue";
 
 const props = defineProps({
   users: {
@@ -81,16 +87,17 @@ defineEmits(["select-user"]);
 const search = ref("");
 
 /**
- * Users filtered by the search box, matching name or handle case-insensitively.
- * @returns {Array<{ id: number, name: string, handle: string }>}
+ * Users filtered by the search box, matching name, nickname, or handle case-insensitively.
+ * @returns {Array<{ id: number, name: string, handle: string|null, nickname: string|null }>}
  */
 const filteredUsers = computed(() => {
   const term = search.value?.trim().toLowerCase();
   if (!term) return props.users;
   return props.users.filter((user) => {
     const name = String(user.name ?? "").toLowerCase();
+    const nickname = String(user.nickname ?? "").toLowerCase();
     const handle = String(user.handle ?? "").toLowerCase();
-    return name.includes(term) || handle.includes(term);
+    return name.includes(term) || nickname.includes(term) || handle.includes(term);
   });
 });
 </script>

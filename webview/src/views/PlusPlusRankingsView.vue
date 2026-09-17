@@ -26,7 +26,7 @@
             <PlusPlusLeaderboardPanels
               list-key="top"
               :entries="top"
-              :name-map="nameMap"
+              :identity-map="identityMap"
               :loading="loading"
               :skeleton-count="LEADERBOARD_LIMIT"
             />
@@ -44,7 +44,7 @@
             <PlusPlusLeaderboardPanels
               list-key="bottom"
               :entries="bottom"
-              :name-map="nameMap"
+              :identity-map="identityMap"
               :loading="loading"
               :skeleton-count="LEADERBOARD_LIMIT"
             />
@@ -67,16 +67,16 @@ import { onMounted, ref } from "vue";
 import PlusPlusLeaderboardPanels from "../components/PlusPlusLeaderboardPanels.vue";
 import {
   LEADERBOARD_LIMIT,
-  buildUserNameMap,
   fetchAllGuildMembers,
   fetchPlusPlusLeaderboard,
 } from "../lib/plusplusRankings.js";
+import { buildIdentityMapByPlatformId } from "../lib/userIdentity.js";
 
 const loading = ref(true);
 const error = ref("");
 const top = ref([]);
 const bottom = ref([]);
-const nameMap = ref(new Map());
+const identityMap = ref(new Map());
 const updatedAt = ref("");
 
 /**
@@ -95,7 +95,7 @@ async function loadRankings() {
 
     top.value = leaderboard.top;
     bottom.value = leaderboard.bottom;
-    nameMap.value = buildUserNameMap(members);
+    identityMap.value = buildIdentityMapByPlatformId(members);
     updatedAt.value = new Date().toLocaleString();
   } catch (err) {
     error.value =

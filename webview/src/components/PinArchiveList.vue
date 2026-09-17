@@ -25,11 +25,9 @@
         <v-divider v-if="index > 0" class="my-4" />
 
         <header class="d-flex flex-wrap align-center justify-space-between ga-2 mb-2">
-          <span class="text-body-1">
-            <span class="font-weight-bold">
-              {{ resolveMappingLabel(entry.author, nameMap) }}
-            </span>
-            <span class="text-medium-emphasis ml-2">
+          <span class="d-flex align-center ga-2">
+            <UserIdentityChip v-bind="identityFor(entry.author)" />
+            <span class="text-medium-emphasis">
               {{ resolveChannelLabel(entry) }}
             </span>
           </span>
@@ -88,9 +86,15 @@
           </div>
         </div>
 
-        <p class="text-body-2 text-medium-emphasis mb-0">
+        <p class="text-body-2 text-medium-emphasis mb-0 d-flex align-center flex-wrap ga-1">
           <v-icon size="14" class="mr-1" aria-hidden="true">mdi-pin-outline</v-icon>
-          Pinned by: {{ resolvePinnerLabels(entry.pinners, nameMap) }}
+          Pinned by:
+          <UserIdentityChip
+            v-for="pinnerId in entry.pinners"
+            :key="`${entry.id}-pinner-${pinnerId}`"
+            v-bind="identityFor(pinnerId)"
+          />
+          <span v-if="!entry.pinners?.length">Unknown</span>
         </p>
       </article>
 
@@ -120,10 +124,9 @@ import {
   isValidAttachmentPath,
   pinAttachmentUrl,
   resolveChannelLabel,
-  resolveMappingLabel,
   resolvePinContents,
-  resolvePinnerLabels,
 } from "../lib/pinArchive.js";
+import UserIdentityChip from "./UserIdentityChip.vue";
 
 const props = defineProps({
   entries: {
@@ -146,7 +149,8 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
-  nameMap: {
+  /** chat_member_mapping id -> { nickname, handle } (see lib/userIdentity.js). */
+  identityMap: {
     type: Map,
     default: () => new Map(),
   },
@@ -159,6 +163,22 @@ const props = defineProps({
     default: PIN_PAGE_SIZE,
   },
 });
+
+/**
+ * Resolve UserIdentityChip props for a chat_member_mapping id.
+ * @param {number|null|undefined} mappingId pin_history.author or one of pin_history.pinners.
+ * @returns {{ mappingId: number|null, name: string|null, nickname: string|null, handle: string|null }}
+ */
+function identityFor(mappingId) {
+  const id = mappingId != null ? Number(mappingId) : null;
+  const identity = id != null ? props.identityMap.get(id) : null;
+  return {
+    mappingId: id,
+    name: identity?.name ?? null,
+    nickname: identity?.nickname ?? null,
+    handle: identity?.handle ?? null,
+  };
+}
 
 defineEmits(["update:page"]);
 

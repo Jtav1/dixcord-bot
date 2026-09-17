@@ -29,7 +29,7 @@ async function parseJsonResponse(res, context) {
 /**
  * Fetch users who have at least one trigger-response history entry.
  * @param {string} [app="discord"] Chat app id.
- * @returns {Promise<Array<{ id: number, name: string, handle: string, platformUserId: string }>>}
+ * @returns {Promise<Array<{ id: number, name: string, handle: string|null, nickname: string|null, platformUserId: string|null }>>}
  */
 export async function fetchUsersWithTriggerHistory(app = "discord") {
   const params = new URLSearchParams({ app });

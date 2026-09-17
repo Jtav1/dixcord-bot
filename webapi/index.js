@@ -389,6 +389,7 @@ app.get("/", publicLimiter, (req, res) => {
         routes: [
           "GET /api/guild-members?app=&guildId= (guildId optional: omit for all-guilds dedup lookup)",
           "GET /api/guild-members/user/:chatMemberMappingId",
+          "GET /api/guild-members/public-aliases/:chatMemberMappingId (handle/nickname per guild, public-safe)",
           "POST /api/guild-members/sync (body: { app, guildId, members }); upserts, never removes members",
         ],
         adminRoutes: ["GET /api/guild-members/unlinked?app=&guildId="],

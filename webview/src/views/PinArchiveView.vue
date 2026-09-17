@@ -23,7 +23,7 @@
           :offset="offset"
           :page="page"
           :loading="loading"
-          :name-map="nameMap"
+          :identity-map="identityMap"
           :platform-name-map="platformNameMap"
           @update:page="onPageChange"
         />
@@ -47,14 +47,10 @@ import { onMounted, ref } from "vue";
 import PinArchiveList from "../components/PinArchiveList.vue";
 import {
   PIN_PAGE_SIZE,
-  buildMappingIdNameMap,
   fetchPinHistoryPage,
 } from "../lib/pinArchive.js";
-import {
-  buildUserNameMap,
-  fetchAllGuildMembers,
-  fetchAllUserMappings,
-} from "../lib/plusplusRankings.js";
+import { buildUserNameMap, fetchAllGuildMembers } from "../lib/plusplusRankings.js";
+import { buildIdentityMapByMappingId } from "../lib/userIdentity.js";
 
 const loading = ref(true);
 const error = ref("");
@@ -62,7 +58,7 @@ const entries = ref([]);
 const total = ref(0);
 const offset = ref(0);
 const page = ref(1);
-const nameMap = ref(new Map());
+const identityMap = ref(new Map());
 const platformNameMap = ref(new Map());
 const updatedAt = ref("");
 
@@ -104,11 +100,8 @@ function onPageChange(nextPage) {
 
 onMounted(async () => {
   try {
-    const [userMappings, members] = await Promise.all([
-      fetchAllUserMappings("discord"),
-      fetchAllGuildMembers("discord"),
-    ]);
-    nameMap.value = buildMappingIdNameMap(userMappings);
+    const members = await fetchAllGuildMembers("discord");
+    identityMap.value = buildIdentityMapByMappingId(members);
     platformNameMap.value = buildUserNameMap(members);
   } catch {
     // Name resolution is best-effort.
