@@ -725,13 +725,17 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
  * legacy rows that never got backfilled) so the script can detect and fix a wrong/missing type,
  * not just emoji rows. `sourceFrequency` is the emoji_frequency total that
  * migrateEmojiCatalogFrequency would write into `frequency` (only meaningful for emoji rows).
+ * `hasFrequencyHistory` flags any emoji_frequency row for this emoid (even a zero-frequency one) —
+ * a fallback "this was a real emoji" signal for ids no longer live on Discord (deleted since),
+ * since sticker usage is tracked in the separate sticker_frequency table and never appears here.
  * @param {string} app
- * @returns {Promise<Array<{id: string, guildId: string, name: string, type: string|null, animated: boolean, frequency: number, sourceFrequency: number}>>}
+ * @returns {Promise<Array<{id: string, guildId: string, name: string, type: string|null, animated: boolean, frequency: number, sourceFrequency: number, hasFrequencyHistory: boolean}>>}
  */
 export async function listEmojiCatalogWithGuild(app) {
   const [rows] = await db.query(
     `SELECT ge.id, ge.guild_id, ge.name, ge.type, ge.animated, ge.frequency,
-            (SELECT COALESCE(SUM(ef.frequency), 0) FROM emoji_frequency ef WHERE ef.emoid = ge.id AND ef.app = ge.app) AS source_frequency
+            (SELECT COALESCE(SUM(ef.frequency), 0) FROM emoji_frequency ef WHERE ef.emoid = ge.id AND ef.app = ge.app) AS source_frequency,
+            (SELECT COUNT(*) FROM emoji_frequency ef WHERE ef.emoid = ge.id AND ef.app = ge.app) AS frequency_row_count
      FROM guild_emojis ge
      WHERE ge.app = ? AND ge.guild_id IS NOT NULL
      ORDER BY ge.guild_id, ge.name`,
@@ -745,6 +749,7 @@ export async function listEmojiCatalogWithGuild(app) {
     animated: Boolean(r.animated),
     frequency: Number(r.frequency) || 0,
     sourceFrequency: Number(r.source_frequency) || 0,
+    hasFrequencyHistory: (Number(r.frequency_row_count) || 0) > 0,
   }));
 }
 

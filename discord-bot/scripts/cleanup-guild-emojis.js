@@ -12,15 +12,18 @@ import {
 /**
  * Admin maintenance script, three phases, in order:
  *
- * 1. Delete guild_emojis rows that don't actually belong to this guild (e.g. legacy backfilled
- *    rows from before the (app, guild_id) split). Every row is checked against this bot's own
- *    guild's live Discord emoji AND sticker lists — the only guild this deployment can verify —
- *    so a row is kept only when its guild_id matches DISCORD_GUILD_ID *and* its id is still one
- *    of that guild's current emojis or stickers.
- * 2. For every row still in guild_emojis after step 1, correct its `type` ("emoji" or "sticker")
- *    based on which live Discord list actually contains its id, fixing rows that were never
- *    backfilled (NULL) or were tagged wrong.
- * 3. For every row of type "emoji" still in guild_emojis after step 2, migrate its usage total
+ * 1. Delete guild_emojis rows whose guild_id doesn't match this bot's own guild (e.g. legacy
+ *    backfilled rows from before the (app, guild_id) split, or reactions to another guild's
+ *    emoji misattributed here). This is the only deletion criterion — a row is NOT deleted just
+ *    because its emoji/sticker was since removed from Discord; that's normal churn, not foreign
+ *    data, and its guild_id is still correct.
+ * 2. For every row kept after step 1, determine its real kind and correct `type` if wrong/NULL:
+ *    live on Discord as an emoji or sticker settles it outright; for an id no longer live,
+ *    fall back to `hasFrequencyHistory` (any emoji_frequency row for that emoid) as evidence it
+ *    was an emoji — sticker usage is tracked in the separate sticker_frequency table, so it never
+ *    produces an emoji_frequency row. A row we can't determine a kind for either way is left
+ *    untouched (never guessed at).
+ * 3. For every row of kind "emoji" still in guild_emojis after step 2, migrate its usage total
  *    from emoji_frequency into guild_emojis.frequency (matched by emoid).
  *
  * Run manually: `node scripts/cleanup-guild-emojis.js [--dry-run]`
@@ -55,17 +58,29 @@ async function main() {
   const rows = await listEmojiCatalog();
   console.log(`emoji-cleanup: guild_emojis has ${rows.length} custom row(s) to check.`);
 
+  // actualKind: 'emoji' | 'sticker' when we can determine it (live on Discord, or — for a no
+  // longer live id — evidenced by emoji_frequency history); null when genuinely unknown.
   const withKind = rows.map((row) => ({
     ...row,
     actualKind: actualEmojiIds.has(String(row.id))
       ? "emoji"
       : actualStickerIds.has(String(row.id))
         ? "sticker"
-        : null,
+        : row.hasFrequencyHistory
+          ? "emoji"
+          : null,
   }));
 
-  const stale = withKind.filter((row) => row.guildId !== guildId || row.actualKind === null);
+  const stale = withKind.filter((row) => row.guildId !== guildId);
   const kept = withKind.filter((row) => !stale.includes(row));
+
+  const unverifiable = kept.filter((row) => row.actualKind === null);
+  if (unverifiable.length > 0) {
+    console.log(
+      `emoji-cleanup: ${unverifiable.length} kept row(s) have no determinable kind (not currently ` +
+        `live on Discord, no emoji_frequency history) — left untouched, neither deleted nor migrated.`,
+    );
+  }
 
   // --- Step 1: delete rows that don't belong to this guild ---
   if (stale.length === 0) {
@@ -92,8 +107,10 @@ async function main() {
     }
   }
 
-  // --- Step 2: fix the type field on kept rows ---
-  const typeMismatches = kept.filter((row) => row.type !== row.actualKind);
+  // --- Step 2: fix the type field on kept rows (skip rows with no determinable kind) ---
+  const typeMismatches = kept.filter(
+    (row) => row.actualKind !== null && row.type !== row.actualKind,
+  );
   if (typeMismatches.length === 0) {
     console.log("emoji-cleanup: no type mismatches to fix.");
   } else {

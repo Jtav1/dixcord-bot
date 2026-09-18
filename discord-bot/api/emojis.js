@@ -27,7 +27,7 @@ export const importEmojiList = async (emojiObjectList) => {
 /**
  * List custom emoji/sticker catalog rows that carry a guild_id, any type (including NULL).
  * GET /api/message-processing/emoji-catalog
- * @returns {Promise<Array<{ id: string, guildId: string, name: string, type: string|null, animated: boolean, frequency: number, sourceFrequency: number }>>}
+ * @returns {Promise<Array<{ id: string, guildId: string, name: string, type: string|null, animated: boolean, frequency: number, sourceFrequency: number, hasFrequencyHistory: boolean }>>}
  */
 export const listEmojiCatalog = async () => {
   const { data } = await api.get("/api/message-processing/emoji-catalog", {

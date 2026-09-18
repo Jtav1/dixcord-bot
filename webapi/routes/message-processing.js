@@ -488,6 +488,7 @@ router.post("/emoji-import", authenticate, async (req, res) => {
  *                       animated: { type: boolean }
  *                       frequency: { type: integer, description: "Current guild_emojis.frequency value." }
  *                       sourceFrequency: { type: integer, description: "emoji_frequency total; what migrate-frequency would write. Only meaningful for type=emoji." }
+ *                       hasFrequencyHistory: { type: boolean, description: "True if any emoji_frequency row exists for this emoid — a fallback 'this is an emoji' signal when the id is no longer live on Discord." }
  *       '400':
  *         description: Missing/invalid app parameter.
  *         content:

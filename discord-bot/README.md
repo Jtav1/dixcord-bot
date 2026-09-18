@@ -154,12 +154,15 @@ Run from the `discord-bot` directory after installing dependencies.
 three steps, in order, checking every custom row against this bot's own guild's live Discord emoji
 and sticker lists — the only guild this deployment can verify:
 
-1. Removes `guild_emojis` rows that don't actually belong to the guild_id they're stored under (e.g.
-   legacy rows from before catalog identity was split per-guild): deletes any row whose guild_id
-   isn't `DISCORD_GUILD_ID`, or whose id is no longer one of that guild's current emojis or stickers.
-2. For every row still in `guild_emojis` after step 1, corrects its `type` ("emoji" or "sticker")
-   based on which live Discord list actually contains its id — fixing rows that were never
-   backfilled (NULL) or were tagged wrong.
+1. Removes `guild_emojis` rows whose guild_id doesn't match `DISCORD_GUILD_ID` (e.g. legacy rows
+   from before catalog identity was split per-guild, or reactions to another guild's emoji
+   misattributed here). A row is **not** deleted just because its emoji/sticker was since removed
+   from Discord — that's normal churn, not foreign data, and its guild_id is still correct.
+2. For every row kept after step 1, corrects its `type` ("emoji" or "sticker") if wrong or NULL.
+   Live on Discord settles it outright; for an id no longer live, falls back to whether it has any
+   `emoji_frequency` history as evidence it was an emoji (stickers are tracked in the separate
+   `sticker_frequency` table, so they never produce an `emoji_frequency` row). A row with no
+   determinable kind either way is left untouched.
 3. For every row of type "emoji" still in `guild_emojis` after step 2, migrates its usage total
    from `emoji_frequency` into the `guild_emojis.frequency` column, matched by emoid. Rows deleted
    in step 1 are never touched by steps 2 or 3.

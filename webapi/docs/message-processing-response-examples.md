@@ -175,7 +175,8 @@ or
       "type": "emoji",
       "animated": false,
       "frequency": 0,
-      "sourceFrequency": 42
+      "sourceFrequency": 42,
+      "hasFrequencyHistory": true
     }
   ]
 }

@@ -6639,6 +6639,10 @@
                           "sourceFrequency": {
                             "type": "integer",
                             "description": "emoji_frequency total; what migrate-frequency would write. Only meaningful for type=emoji."
+                          },
+                          "hasFrequencyHistory": {
+                            "type": "boolean",
+                            "description": "True if any emoji_frequency row exists for this emoid — a fallback 'this is an emoji' signal when the id is no longer live on Discord."
                           }
                         }
                       }
