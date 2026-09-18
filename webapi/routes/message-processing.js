@@ -10,6 +10,7 @@ import {
   isMessageAlreadyPinned,
   logPinnedMessage,
 } from "../services/messageProcessing.js";
+import { recordTimeoutVote, removeTimeoutVote } from "../services/timeoutVotes.js";
 import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
@@ -111,7 +112,7 @@ router.post("/emoji-count", authenticate, requireOwnGuildOrAdmin, async (req, re
 /**
  * POST /api/message-processing/sticker-count
  * Record sticker usage in a message.
- * Body: { app: "discord", authorId: string, stickers: Array<{ name: string, id?: string }> }
+ * Body: { app: "discord", guildId: string, authorId: string, stickers: Array<{ name: string, id?: string }> }
  * Auth: required.
  * @openapi
  * /api/message-processing/sticker-count:
@@ -120,18 +121,19 @@ router.post("/emoji-count", authenticate, requireOwnGuildOrAdmin, async (req, re
  *     tags: [Message Processing]
  *     summary: Record sticker usage in a message
  *     description: >
- *       Increments emoji_frequency (type='sticker') / member_emoji_tracking for each sticker in the
- *       message. Unlike emoji-count, there is no plus/minus branch — Discord has no reply-with-sticker
- *       vote mechanism.
+ *       Increments emoji_frequency (type='sticker', now per-guild) / member_emoji_tracking for each
+ *       sticker in the message. Unlike emoji-count, there is no plus/minus branch — Discord has no
+ *       reply-with-sticker vote mechanism.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [app, authorId, stickers]
+ *             required: [app, guildId, authorId, stickers]
  *             properties:
  *               app: { type: string, enum: [discord] }
+ *               guildId: { type: string }
  *               authorId: { type: string, description: "Discord snowflake of the message author." }
  *               stickers:
  *                 type: array
@@ -360,8 +362,9 @@ router.post("/count-repost", authenticate, async (req, res) => {
 /**
  * POST /api/message-processing/emoji-import
  * Sync server emoji list (mirrors bot api/emojis.js POST to this route).
- * Deletes zero-frequency emoji rows (type 'emoji' or NULL) for this app, then inserts any missing ids into emoji_frequency with type 'emoji'.
- * Body: { app: "discord", emojis: Array<{ id: string, name: string, animated?: boolean }> }
+ * Fully replaces this guild's guild_emojis catalog rows (type='emoji'); emoji_frequency usage
+ * counts are untouched. Gracefully no-ops (imported:0) if guildId isn't a known guild.
+ * Body: { app: "discord", guildId: string, emojis: Array<{ id: string, name: string, animated?: boolean, available?: boolean, managed?: boolean, requiresColons?: boolean, roles?: string[] }> }
  * Response: { ok: true, imported: number }
  * Auth: required.
  * @openapi
@@ -371,17 +374,19 @@ router.post("/count-repost", authenticate, async (req, res) => {
  *     tags: [Message Processing]
  *     summary: Sync the guild's custom emoji catalog
  *     description: >
- *       Deletes zero-frequency emoji_frequency rows (type 'emoji' or NULL) for this app, then
- *       inserts any emoji ids not already present with frequency 0.
+ *       Fully replaces this guild's guild_emojis rows of type 'emoji' (mirrors guild_channels/
+ *       guild_roles sync). emoji_frequency usage counts are untouched. Gracefully discards the
+ *       whole sync (imported:0, no error) if guildId isn't a known guild (guild_info).
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [app, emojis]
+ *             required: [app, guildId, emojis]
  *             properties:
  *               app: { type: string, enum: [discord] }
+ *               guildId: { type: string }
  *               emojis:
  *                 type: array
  *                 items:
@@ -390,6 +395,10 @@ router.post("/count-repost", authenticate, async (req, res) => {
  *                     id: { type: string }
  *                     name: { type: string }
  *                     animated: { type: boolean }
+ *                     available: { type: boolean, nullable: true }
+ *                     managed: { type: boolean, nullable: true }
+ *                     requiresColons: { type: boolean, nullable: true }
+ *                     roles: { type: array, items: { type: string } }
  *     responses:
  *       '200':
  *         description: Emoji catalog synced.
@@ -416,12 +425,12 @@ router.post("/emoji-import", authenticate, async (req, res) => {
     if (!resolveChatAppFromRequest(req)) {
       return res.status(400).json(CHAT_APP_PARAM_ERROR);
     }
-    const { app, emojis } = req.body ?? {};
-    const result = await importGuildAssetFrequencyList(emojis, "emoji", app);
+    const { app, guildId, emojis } = req.body ?? {};
+    const result = await importGuildAssetFrequencyList(emojis, "emoji", app, guildId);
     if (!result.ok) {
       return res
         .status(400)
-        .json({ ok: false, error: "emojis array is required" });
+        .json({ ok: false, error: "guildId and emojis array are required" });
     }
     res.json({ ok: true, imported: result.imported ?? 0 });
   } catch (err) {
@@ -433,8 +442,9 @@ router.post("/emoji-import", authenticate, async (req, res) => {
 /**
  * POST /api/message-processing/sticker-import
  * Sync server sticker list (like emoji-import; no animated field).
- * Deletes zero-frequency sticker rows in emoji_frequency (type 'sticker') for this app, then inserts any missing ids with type 'sticker'.
- * Body: { app: "discord", stickers: Array<{ id: string, name: string }> }
+ * Fully replaces this guild's guild_emojis catalog rows (type='sticker'); emoji_frequency usage
+ * counts are untouched. Gracefully no-ops (imported:0) if guildId isn't a known guild.
+ * Body: { app: "discord", guildId: string, stickers: Array<{ id: string, name: string }> }
  * Response: { ok: true, imported: number }
  * Auth: required.
  * @openapi
@@ -444,17 +454,19 @@ router.post("/emoji-import", authenticate, async (req, res) => {
  *     tags: [Message Processing]
  *     summary: Sync the guild's sticker catalog
  *     description: >
- *       Deletes zero-frequency emoji_frequency rows of type 'sticker' for this app, then inserts
- *       any sticker ids not already present with frequency 0.
+ *       Fully replaces this guild's guild_emojis rows of type 'sticker' (mirrors emoji-import).
+ *       emoji_frequency usage counts are untouched. Gracefully discards the whole sync
+ *       (imported:0, no error) if guildId isn't a known guild (guild_info).
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [app, stickers]
+ *             required: [app, guildId, stickers]
  *             properties:
  *               app: { type: string, enum: [discord] }
+ *               guildId: { type: string }
  *               stickers:
  *                 type: array
  *                 items:
@@ -488,12 +500,12 @@ router.post("/sticker-import", authenticate, async (req, res) => {
     if (!resolveChatAppFromRequest(req)) {
       return res.status(400).json(CHAT_APP_PARAM_ERROR);
     }
-    const { app, stickers } = req.body ?? {};
-    const result = await importGuildAssetFrequencyList(stickers, "sticker", app);
+    const { app, guildId, stickers } = req.body ?? {};
+    const result = await importGuildAssetFrequencyList(stickers, "sticker", app, guildId);
     if (!result.ok) {
       return res
         .status(400)
-        .json({ ok: false, error: "stickers array is required" });
+        .json({ ok: false, error: "guildId and stickers array are required" });
     }
     res.json({ ok: true, imported: result.imported ?? 0 });
   } catch (err) {
@@ -635,6 +647,153 @@ router.post("/pin-log", authenticate, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ ok: false, error: "Failed to log pinned message" });
+  }
+});
+
+/**
+ * POST /api/message-processing/timeout-vote
+ * Record one reaction-add vote toward timing out a message's author. Idempotent once the
+ * message has already fired a timeout (see timeout_history).
+ * Body: { app: "discord", guildId: string, messageId: string, targetPlatformId: string, voterPlatformId: string, weight?: number }
+ * Auth: required. A guild-scoped bot account may only post for its own guildId.
+ * @openapi
+ * /api/message-processing/timeout-vote:
+ *   post:
+ *     operationId: recordTimeoutVote
+ *     tags: [Message Processing]
+ *     summary: Record a vote-to-timeout reaction
+ *     description: >
+ *       Inserts into timeout_vote_tracking (unique per message+voter) and checks the running
+ *       weighted total against guild_config's timeout_vote_threshold. Once the threshold is
+ *       reached, inserts a timeout_history row (unique per message — the idempotency guard) and
+ *       returns triggered:true with the duration/response message to apply; further votes on an
+ *       already-triggered message return alreadyActioned:true instead of re-triggering.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, guildId, messageId, targetPlatformId, voterPlatformId]
+ *             properties:
+ *               app: { type: string, enum: [discord] }
+ *               guildId: { type: string }
+ *               messageId: { type: string, description: "Discord message snowflake." }
+ *               targetPlatformId: { type: string, description: "Discord snowflake of the message author." }
+ *               voterPlatformId: { type: string, description: "Discord snowflake of the user who reacted." }
+ *               weight: { type: integer, description: "Vote weight based on the voter's roles (1/2/3). Defaults to 1.", default: 1 }
+ *     responses:
+ *       '200':
+ *         description: Vote recorded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 triggered: { type: boolean }
+ *                 alreadyActioned: { type: boolean }
+ *                 currentWeight: { type: integer }
+ *                 threshold: { type: integer }
+ *                 targetPlatformId: { type: string }
+ *                 durationSeconds: { type: integer }
+ *                 responseMessage: { type: string }
+ *                 voteWeightTotal: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/timeout-vote", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+
+    const { guildId, messageId, targetPlatformId, voterPlatformId, weight } = req.body ?? {};
+    if (!guildId || !messageId || !targetPlatformId || !voterPlatformId) {
+      return res.status(400).json({
+        ok: false,
+        error: "guildId, messageId, targetPlatformId, and voterPlatformId are required",
+      });
+    }
+
+    const result = await recordTimeoutVote({
+      app,
+      guildId: String(guildId),
+      messageId: String(messageId),
+      targetPlatformId: String(targetPlatformId),
+      voterPlatformId: String(voterPlatformId),
+      weight,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error("POST /api/message-processing/timeout-vote error:", err);
+    res.status(500).json({ ok: false, error: "Failed to record timeout vote" });
+  }
+});
+
+/**
+ * POST /api/message-processing/timeout-vote/remove
+ * Un-count a reaction-remove vote. No-op once the message has already fired a timeout.
+ * Body: { app: "discord", messageId: string, voterPlatformId: string }
+ * Auth: required.
+ * @openapi
+ * /api/message-processing/timeout-vote/remove:
+ *   post:
+ *     operationId: removeTimeoutVote
+ *     tags: [Message Processing]
+ *     summary: Un-count a vote-to-timeout reaction removal
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, messageId, voterPlatformId]
+ *             properties:
+ *               app: { type: string, enum: [discord] }
+ *               messageId: { type: string, description: "Discord message snowflake." }
+ *               voterPlatformId: { type: string, description: "Discord snowflake of the user who un-reacted." }
+ *     responses:
+ *       '200':
+ *         description: Vote removed (or there was nothing to remove).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 removed: { type: boolean }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/timeout-vote/remove", authenticate, async (req, res) => {
+  try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+
+    const { messageId, voterPlatformId } = req.body ?? {};
+    if (!messageId || !voterPlatformId) {
+      return res.status(400).json({ ok: false, error: "messageId and voterPlatformId are required" });
+    }
+
+    const result = await removeTimeoutVote({
+      app,
+      messageId: String(messageId),
+      voterPlatformId: String(voterPlatformId),
+    });
+    res.json(result);
+  } catch (err) {
+    console.error("POST /api/message-processing/timeout-vote/remove error:", err);
+    res.status(500).json({ ok: false, error: "Failed to remove timeout vote" });
   }
 });
 

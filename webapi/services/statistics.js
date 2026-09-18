@@ -33,8 +33,8 @@ export async function getDatabaseStatistics() {
   const [rows] = await db.query(
     `SELECT
       (SELECT COUNT(*) FROM chat_member_mapping) AS chat_member_mappings,
-      (SELECT COUNT(*) FROM emoji_frequency WHERE type = 'emoji' OR type IS NULL) AS emoji_catalog_count,
-      (SELECT COUNT(*) FROM emoji_frequency WHERE type = 'sticker') AS sticker_catalog_count,
+      (SELECT COUNT(*) FROM guild_emojis WHERE type = 'emoji' OR type IS NULL) AS emoji_catalog_count,
+      (SELECT COUNT(*) FROM guild_emojis WHERE type = 'sticker') AS sticker_catalog_count,
       (SELECT COALESCE(SUM(frequency), 0) FROM emoji_frequency WHERE type = 'emoji' OR type IS NULL) AS emoji_usage_total,
       (SELECT COALESCE(SUM(frequency), 0) FROM emoji_frequency WHERE type = 'sticker') AS sticker_usage_total,
       (SELECT COUNT(*) FROM pin_history) AS pin_history_count,

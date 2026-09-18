@@ -139,7 +139,8 @@ export async function listRepostEvents(opts = {}) {
   return { events, total };
 }
 
-const EMOJI_FREQUENCY_WHERE = "ef.type = 'emoji' OR ef.type IS NULL";
+// Joins guild_emojis (one row per emoid) for type, not emoji_frequency (per-guild, would fan out rows).
+const EMOJI_FREQUENCY_WHERE = "ge.type = 'emoji' OR ge.type IS NULL";
 
 /**
  * Per-user emoji usage stats (emojis only, excludes stickers).
@@ -155,7 +156,7 @@ export async function getEmojiStatsForUser(userId, app, limit) {
 
   const sql = `SELECT uet.emoid, uet.frequency
      FROM member_emoji_tracking uet
-     INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
+     INNER JOIN guild_emojis ge ON uet.emoid = ge.id
      WHERE uet.userid = ? AND (${EMOJI_FREQUENCY_WHERE})
      ORDER BY uet.frequency DESC`;
 
@@ -176,7 +177,7 @@ export async function getEmojiStatsForUser(userId, app, limit) {
   return attachEmojiObjects(parsed);
 }
 
-const STICKER_FREQUENCY_WHERE = "ef.type = 'sticker'";
+const STICKER_FREQUENCY_WHERE = "ge.type = 'sticker'";
 
 /**
  * Per-user sticker usage stats.
@@ -192,7 +193,7 @@ export async function getStickerStatsForUser(userId, app, limit) {
 
   const sql = `SELECT uet.emoid, uet.frequency
      FROM member_emoji_tracking uet
-     INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
+     INNER JOIN guild_emojis ge ON uet.emoid = ge.id
      WHERE uet.userid = ? AND (${STICKER_FREQUENCY_WHERE})
      ORDER BY uet.frequency DESC`;
 
@@ -220,10 +221,13 @@ export async function getStickerStatsForUser(userId, app, limit) {
  */
 export async function listStickerCatalog(limit) {
   const n = parseLimit(limit, 50, 200);
+  // emoji_frequency is per-guild now — GROUP BY/SUM so the same sticker used in multiple guilds
+  // appears once, ranked by its total usage across all of them.
   const [rows] = await db.query(
-    `SELECT emoid FROM emoji_frequency
+    `SELECT emoid, SUM(frequency) AS total_frequency FROM emoji_frequency
      WHERE type = 'sticker'
-     ORDER BY frequency DESC
+     GROUP BY emoid
+     ORDER BY total_frequency DESC
      LIMIT ?`,
     [n],
   );

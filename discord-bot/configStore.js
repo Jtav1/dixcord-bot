@@ -69,7 +69,7 @@ export function getPinEmoji() {
 /**
  * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object; null if unset. See getPinEmoji for shape notes.
  */
-export function getRepostEmojiId() {
+export function getRepostEmoji() {
   return getConfigValue("repost_emoji");
 }
 
@@ -182,6 +182,33 @@ export function isRepostDetectionEnabled() {
 /** @returns {boolean} */
 export function isPinSystemEnabled() {
   return isFeatureEnabled("pin_system_enabled");
+}
+
+/** @returns {boolean} New moderation feature; defaults to disabled (unlike isFeatureEnabled's default-on convention) when unseeded. */
+export function isTimeoutVoteEnabled() {
+  return getConfigValue("timeout_vote_enabled", "false") === "true";
+}
+
+/**
+ * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object; null if unset. See getPinEmoji for shape notes.
+ */
+export function getTimeoutVoteEmoji() {
+  return getConfigValue("timeout_vote_emoji");
+}
+
+/** @returns {number} */
+export function getTimeoutVoteThreshold() {
+  return parseInt(getConfigValue("timeout_vote_threshold", "0"), 10) || 0;
+}
+
+/** @returns {string} */
+export function getTimeoutVoteDoubleRoleId() {
+  return getConfigValue("timeout_vote_double_role_id", "");
+}
+
+/** @returns {string} */
+export function getTimeoutVoteTripleRoleId() {
+  return getConfigValue("timeout_vote_triple_role_id", "");
 }
 
 await loadConfig();

@@ -58,6 +58,13 @@ export const emojiDetector = async (rawMessage) => {
       const milestones = await dominus(repliedUser.id, "user", rawMessage.author.id);
       await announceMilestones(rawMessage, milestones);
     } else if (emojiTrackingEnabled) {
+      // parseEmoji() doesn't resolve ownership; an id missing from the client's emoji cache belongs to an unknown guild.
+      if (emo.id != null && !rawMessage.client.emojis.cache.has(emo.id)) {
+        console.log(
+          `bot: skipping emoji count for external/unknown-guild custom emoji ${emo.id} in message ${rawMessage.id} from user ${rawMessage.author.id}`,
+        );
+        continue;
+      }
       try {
         const milestones = await countEmoji(emo.name, emo.id, rawMessage.author.id);
         incrementCounter("emojiCountedTotal");

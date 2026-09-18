@@ -259,15 +259,17 @@ export async function listEmojiFrequency(limit, offset = 0) {
   const n = parseLimit(limit, 5, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
+  // GROUP BY/SUM: emoji_frequency is per-guild, so sum usage across guilds into one ranked total.
   const [countRows] = await db.query(
-    `SELECT COUNT(*) AS total FROM emoji_frequency WHERE ${EMOJI_FREQUENCY_WHERE}`,
+    `SELECT COUNT(DISTINCT emoid) AS total FROM emoji_frequency WHERE ${EMOJI_FREQUENCY_WHERE}`,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT emoid FROM emoji_frequency
+    `SELECT emoid, SUM(frequency) AS total_frequency FROM emoji_frequency
      WHERE ${EMOJI_FREQUENCY_WHERE}
-     ORDER BY frequency DESC LIMIT ? OFFSET ?`,
+     GROUP BY emoid
+     ORDER BY total_frequency DESC LIMIT ? OFFSET ?`,
     [n, off],
   );
 
@@ -300,11 +302,13 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
   const n = parseLimit(limit, 50, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
+  // Joins guild_emojis (one row per emoid) for type, not emoji_frequency (per-guild, would inflate totals).
+  const isEmojiType = "ge.type = 'emoji' OR ge.type IS NULL";
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT uet.userid) AS total
      FROM member_emoji_tracking uet
-     INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
-     WHERE ${EMOJI_FREQUENCY_WHERE}`,
+     INNER JOIN guild_emojis ge ON uet.emoid = ge.id
+     WHERE ${isEmojiType}`,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
 
@@ -312,8 +316,8 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
     `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid, cm.name, SUM(uet.frequency) AS total
      FROM member_emoji_tracking uet
      INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
-     INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
-     WHERE ${EMOJI_FREQUENCY_WHERE}
+     INNER JOIN guild_emojis ge ON uet.emoid = ge.id
+     WHERE ${isEmojiType}
      GROUP BY cm.id, cm.name
      ORDER BY total DESC
      LIMIT ? OFFSET ?`,
@@ -344,15 +348,17 @@ export async function listStickerFrequency(limit, offset = 0) {
   const n = parseLimit(limit, 5, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
+  // GROUP BY/SUM: emoji_frequency is per-guild, so sum usage across guilds into one ranked total.
   const [countRows] = await db.query(
-    `SELECT COUNT(*) AS total FROM emoji_frequency WHERE ${STICKER_FREQUENCY_WHERE}`,
+    `SELECT COUNT(DISTINCT emoid) AS total FROM emoji_frequency WHERE ${STICKER_FREQUENCY_WHERE}`,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT emoid FROM emoji_frequency
+    `SELECT emoid, SUM(frequency) AS total_frequency FROM emoji_frequency
      WHERE ${STICKER_FREQUENCY_WHERE}
-     ORDER BY frequency DESC LIMIT ? OFFSET ?`,
+     GROUP BY emoid
+     ORDER BY total_frequency DESC LIMIT ? OFFSET ?`,
     [n, off],
   );
 
@@ -375,11 +381,13 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
   const n = parseLimit(limit, 50, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
+  // Joins guild_emojis for type, not emoji_frequency — see listEmojiUsersByTotalUsage's comment.
+  const isStickerType = "ge.type = 'sticker'";
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT uet.userid) AS total
      FROM member_emoji_tracking uet
-     INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
-     WHERE ${STICKER_FREQUENCY_WHERE}`,
+     INNER JOIN guild_emojis ge ON uet.emoid = ge.id
+     WHERE ${isStickerType}`,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
 
@@ -387,8 +395,8 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
     `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid, cm.name, SUM(uet.frequency) AS total
      FROM member_emoji_tracking uet
      INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
-     INNER JOIN emoji_frequency ef ON uet.emoid = ef.emoid
-     WHERE ${STICKER_FREQUENCY_WHERE}
+     INNER JOIN guild_emojis ge ON uet.emoid = ge.id
+     WHERE ${isStickerType}
      GROUP BY cm.id, cm.name
      ORDER BY total DESC
      LIMIT ? OFFSET ?`,

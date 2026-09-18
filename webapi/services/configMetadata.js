@@ -117,6 +117,48 @@ export const CONFIG_METADATA = Object.freeze({
     requiresBotRestart: true,
     defaultValue: "",
   },
+  timeout_vote_enabled: {
+    description: "Enable vote-to-timeout via reaction threshold",
+    type: "boolean",
+    requiresBotRestart: false,
+    defaultValue: "false",
+  },
+  timeout_vote_emoji: {
+    description: "Emoji used for timeout votes",
+    type: "emoji",
+    requiresBotRestart: false,
+    defaultValue: "",
+  },
+  timeout_vote_threshold: {
+    description: "Weighted vote total required to time out a message's author",
+    type: "integer",
+    requiresBotRestart: false,
+    defaultValue: "5",
+  },
+  timeout_vote_duration_seconds: {
+    description: "Timeout duration in seconds once the vote threshold is reached (capped at 86400, Discord's 24h max)",
+    type: "integer",
+    requiresBotRestart: false,
+    defaultValue: "300",
+  },
+  timeout_vote_response_message: {
+    description: "Message the bot sends when a timeout vote succeeds; {user} is replaced with a mention",
+    type: "string",
+    requiresBotRestart: false,
+    defaultValue: "{user} has been timed out by community vote.",
+  },
+  timeout_vote_double_role_id: {
+    description: "Discord role whose timeout votes count double",
+    type: "string",
+    requiresBotRestart: false,
+    defaultValue: "",
+  },
+  timeout_vote_triple_role_id: {
+    description: "Discord role whose timeout votes count triple",
+    type: "string",
+    requiresBotRestart: false,
+    defaultValue: "",
+  },
 });
 
 const CONFIG_KEY_ORDER = Object.keys(CONFIG_METADATA);

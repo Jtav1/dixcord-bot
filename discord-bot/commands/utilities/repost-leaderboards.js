@@ -2,7 +2,7 @@ import { EmbedBuilder } from "discord.js";
 
 import { SlashCommandBuilder } from "discord.js";
 import { getTopReposters } from "../../api/emojis.js";
-import { getRepostEmojiId } from "../../configStore.js";
+import { getRepostEmoji } from "../../configStore.js";
 
 const cmdName = "top-reposters";
 const featureKey = "repost_detection_enabled";
@@ -15,7 +15,7 @@ const execute = async (interaction) => {
   let top5 = await getTopReposters(5);
 
   // emoid only present when matched to a synced emoji_frequency row; else fall back to raw text.
-  const repostEmojiValue = getRepostEmojiId();
+  const repostEmojiValue = getRepostEmoji();
   const repostEmojiDisplay = repostEmojiValue?.emoid
     ? `<:repost:${repostEmojiValue.emoid}>`
     : (repostEmojiValue?.emoji ?? "❓");

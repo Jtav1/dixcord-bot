@@ -46,13 +46,42 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
   value TEXT
 );
 
+-- Emoji/sticker catalog identity: one row per known emoji, custom or unicode. Custom Discord
+-- emoji: app="discord" + a real guild_id (owning guild). Unicode emoji: app/guild_id both NULL
+-- (cross-platform, no owner). Fully replaced per-guild on each emoji-import sync (mirrors
+-- guild_channels/guild_roles); unicode rows are added lazily on first use, never synced from Discord
+-- (no such API exists — see discord-bot/api/emojis.js).
+CREATE TABLE IF NOT EXISTS guild_emojis (
+  id TEXT PRIMARY KEY,
+  app TEXT NULL,
+  guild_id TEXT NULL,
+  type TEXT NULL,                     -- "emoji" | "sticker" | NULL (unicode); scopes the per-kind full-replace sync
+  name TEXT NOT NULL,
+  animated INTEGER DEFAULT 0,
+  available INTEGER NULL,
+  managed INTEGER NULL,
+  requires_colons INTEGER NULL,
+  roles TEXT NULL,
+  synced_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_guild_emojis_guild ON guild_emojis (app, guild_id);
+
+-- Per-guild usage counter for any emoji/sticker seen in a message/reaction. `type` classifies the
+-- row (emoji/sticker/unicode) for leaderboard filtering; display identity (name, animated) lives
+-- in guild_emojis, joined via emoid.
+-- emoid is a soft reference to guild_emojis.id, deliberately NOT a real FK: guild_emojis is fully
+-- replaced (delete+insert) on every catalog sync, and emoid is part of this table's PRIMARY KEY
+-- (so it can't be nulled out) — a real FK with ON DELETE CASCADE would silently destroy usage
+-- history the moment an emoji/sticker is removed from Discord. Missing catalog rows resolve to a
+-- placeholder object at read time (see attachEmojiObjects), matching guild_channels/guild_roles.
 CREATE TABLE IF NOT EXISTS emoji_frequency (
   app TEXT NOT NULL,
-  emoid TEXT PRIMARY KEY,
-  emoji TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
+  emoid TEXT NOT NULL,
   frequency INTEGER NOT NULL DEFAULT 0,
-  animated INTEGER DEFAULT 0,
-  type TEXT DEFAULT NULL
+  type TEXT DEFAULT NULL,
+  PRIMARY KEY (app, guild_id, emoid)
 );
 
 CREATE TABLE IF NOT EXISTS sticker_frequency (
@@ -313,3 +342,29 @@ CREATE TRIGGER IF NOT EXISTS milestones_updated_at
   BEGIN
     UPDATE milestones SET updated_at = datetime('now') WHERE id = NEW.id;
   END;
+
+-- Vote-to-timeout: mutable ledger, one row per active vote (deleted on reaction-remove).
+CREATE TABLE IF NOT EXISTS timeout_vote_tracking (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
+  message_id TEXT NOT NULL,
+  target INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+  voter INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+  weight INTEGER NOT NULL DEFAULT 1,
+  timestamp TEXT DEFAULT (datetime('now')),
+  UNIQUE (message_id, voter)
+);
+
+-- Vote-to-timeout: immutable record of fired timeouts. UNIQUE(message_id) is the idempotency
+-- guard — once a row exists here, further votes on that message never re-trigger.
+CREATE TABLE IF NOT EXISTS timeout_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
+  message_id TEXT NOT NULL UNIQUE,
+  target INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+  vote_weight_total INTEGER NOT NULL,
+  duration_seconds INTEGER NOT NULL,
+  timestamp TEXT DEFAULT (datetime('now'))
+);

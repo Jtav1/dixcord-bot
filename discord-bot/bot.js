@@ -15,12 +15,16 @@ import {
   getPinEmoji,
   getPinThreshold,
   getPlusEmoji,
-  getRepostEmojiId,
+  getRepostEmoji,
+  getTimeoutVoteDoubleRoleId,
+  getTimeoutVoteEmoji,
+  getTimeoutVoteTripleRoleId,
   isFeatureEnabled,
   isPinSystemEnabled,
   isPlusPlusEnabled,
   isEmojiTrackingEnabled,
   isRepostDetectionEnabled,
+  isTimeoutVoteEnabled,
 } from "./configStore.js";
 import { startCacheVersionPoller } from "./api/cacheRefresh.js";
 import { startHeartbeat } from "./api/system.js";
@@ -166,11 +170,15 @@ client.on(
         pinThreshold: getPinThreshold(),
         plusEmoji: getPlusEmoji(),
         minusEmoji: getMinusEmoji(),
-        repostEmojiId: getRepostEmojiId(),
+        repostEmoji: getRepostEmoji(),
+        timeoutVoteEmoji: getTimeoutVoteEmoji(),
+        timeoutVoteDoubleRoleId: getTimeoutVoteDoubleRoleId(),
+        timeoutVoteTripleRoleId: getTimeoutVoteTripleRoleId(),
         pinSystemEnabled: isPinSystemEnabled(),
         plusPlusEnabled: isPlusPlusEnabled(),
         emojiTrackingEnabled: isEmojiTrackingEnabled(),
         repostDetectionEnabled: isRepostDetectionEnabled(),
+        timeoutVoteEnabled: isTimeoutVoteEnabled(),
       });
     }
   }),
@@ -182,9 +190,11 @@ client.on(
     await handleReactionRemove(reaction, user, {
       plusEmoji: getPlusEmoji(),
       minusEmoji: getMinusEmoji(),
-      repostEmojiId: getRepostEmojiId(),
+      repostEmoji: getRepostEmoji(),
+      timeoutVoteEmoji: getTimeoutVoteEmoji(),
       plusPlusEnabled: isPlusPlusEnabled(),
       repostDetectionEnabled: isRepostDetectionEnabled(),
+      timeoutVoteEnabled: isTimeoutVoteEnabled(),
     });
   }),
 );
