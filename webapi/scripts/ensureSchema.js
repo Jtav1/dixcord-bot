@@ -481,12 +481,7 @@ export async function ensureSchemaMigrations() {
       );
     }
 
-    // Ongoing backfill (every boot, cheap once caught up): a guild already having SOME
-    // guild_config rows doesn't mean it has ALL of them — new CONFIG_METADATA keys added after a
-    // guild's first registration (e.g. the vote-to-timeout feature's keys) are otherwise never
-    // seeded for pre-existing guilds, since seedDefaultConfigForGuild is normally only called for
-    // brand-new servers (guildInfo.js's upsertGuildSnapshot). Only logged when something is
-    // actually missing, so a fully-caught-up boot doesn't spam this every time.
+    // Every boot: backfill any CONFIG_METADATA keys added after a guild's initial seeding.
     for (const guild of existingGuilds ?? []) {
       const insertedCount = await seedDefaultConfigForGuild(guild.app, guild.guild_id);
       if (insertedCount > 0) {
@@ -1458,9 +1453,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: timeout_history table already exists");
   }
 
-  // guild_emojis: splits emoji/sticker catalog identity (name, animated) out of emoji_frequency
-  // into its own guild-scoped table, mirroring guild_channels/guild_roles. emoji_frequency then
-  // narrows to pure per-guild usage counting (app, guild_id, emoid).
+  // guild_emojis: catalog identity split out of emoji_frequency, which narrows to per-guild usage counts.
   if (!(await tableExists(db, "guild_emojis", isSqlite))) {
     if (isSqlite) {
       await db.query(`
@@ -1503,10 +1496,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: guild_emojis table already exists");
   }
 
-  // guild_emojis.type column: distinguishes emoji vs sticker catalog rows so each kind's
-  // full-replace sync (importGuildAssetFrequencyList) only deletes its own rows, not the other
-  // kind's. Added after the initial guild_emojis rollout — backfill from the matching
-  // emoji_frequency row's `type` for anything created before this column existed.
+  // guild_emojis.type: distinguishes emoji/sticker rows for per-kind full-replace sync; backfilled from emoji_frequency.
   if (
     (await tableExists(db, "guild_emojis", isSqlite)) &&
     !(await columnExists(db, "guild_emojis", "type", isSqlite))
@@ -1529,15 +1519,8 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: guild_emojis.type column already exists");
   }
 
-  // Backfill guild_emojis from legacy emoji_frequency rows (which still have `emoji`/`animated`
-  // columns pre-narrowing), then narrow emoji_frequency to (app, guild_id, emoid) once every row
-  // is accounted for. Legacy rows have no guild_id at all, so a custom-emoji row can only be
-  // safely attributed to a guild when exactly one guild is known (this bot's typical single-guild
-  // deployment — same assumption the historical app='discord' backfill already made). If more
-  // than one guild is registered, legacy rows are left unmigrated (old columns kept) rather than
-  // guessing which guild owns them — narrowing retries on a later boot, same "don't drop data you
-  // can't verify" caution as the deferred chat_member_mapping column narrowing elsewhere in this
-  // file.
+  // Backfill guild_emojis from legacy emoji_frequency rows, then narrow emoji_frequency once every row
+  // is accounted for. Legacy rows lack guild_id, so they're only attributable when exactly one guild is known.
   if (
     (await tableExists(db, "guild_emojis", isSqlite)) &&
     (await tableExists(db, "emoji_frequency", isSqlite)) &&
@@ -1602,9 +1585,7 @@ export async function ensureSchemaMigrations() {
       );
     } else {
       if (isSqlite) {
-        // emoid is deliberately NOT a real FK to guild_emojis — see schema.sqlite.sql's comment;
-        // a real FK (emoid is part of this PK, can't be nulled) would cascade-delete usage
-        // history the moment guild_emojis is fully replaced on the next catalog sync.
+        // emoid deliberately isn't a real FK to guild_emojis — it'd cascade-delete usage history on catalog sync.
         await db.query(`
           CREATE TABLE emoji_frequency_new (
             app TEXT NOT NULL,
@@ -1640,13 +1621,8 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: emoji_frequency already narrowed (no emoji/animated columns)");
   }
 
-  // Repair step: an earlier version of the narrowing migration above (SQLite only) mistakenly
-  // added a real FK (emoid -> guild_emojis.id, ON DELETE CASCADE). Since emoid is part of this
-  // table's PRIMARY KEY it can't be nulled, so that FK would silently cascade-delete usage history
-  // the moment a guild_emojis row is replaced by the next catalog sync — strip it if present.
-  // PRAGMA foreign_key_list doesn't round-trip through db.js's query wrapper correctly (it isn't
-  // a SELECT), so detect via the table's stored CREATE TABLE text instead (same technique as
-  // getColumnDeclaredType above).
+  // Repair: strip a mistakenly-added emoid FK (SQLite only) that would cascade-delete usage history.
+  // Detected via stored CREATE TABLE text, since PRAGMA foreign_key_list doesn't round-trip through db.js.
   const emojiFrequencyDdl = isSqlite
     ? (
         await db.query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'emoji_frequency'")

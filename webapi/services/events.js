@@ -139,10 +139,7 @@ export async function listRepostEvents(opts = {}) {
   return { events, total };
 }
 
-// Joins guild_emojis (not emoji_frequency) purely for the type classification: emoji_frequency is
-// per-guild now, so joining it here (with no guild_id in the join condition) would fan out one
-// member_emoji_tracking row into several duplicate results. guild_emojis has exactly one row per
-// emoid, so this join can't fan out.
+// Joins guild_emojis (one row per emoid) for type, not emoji_frequency (per-guild, would fan out rows).
 const EMOJI_FREQUENCY_WHERE = "ge.type = 'emoji' OR ge.type IS NULL";
 
 /**

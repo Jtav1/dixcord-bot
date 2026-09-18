@@ -112,9 +112,7 @@ export async function handleReactionAdd(reaction, user, options) {
   const emojiObj = toEmojiObject(emoji);
   const isSelfReaction = user.id === message.author.id;
 
-  // Pin threshold: independent of which specific reaction triggered this event — re-scans every
-  // reaction on the message for whichever one matches pinEmoji, since the count can cross the
-  // threshold no matter which of that emoji's reactions was the most recent add.
+  // Re-scans all reactions for pinEmoji, since threshold can be crossed regardless of which reaction fired.
   if (pinSystemEnabled && pinEmoji) {
     const allReactions = message.reactions.valueOf();
     const pinReact = [...allReactions.values()].find((r) =>
@@ -217,9 +215,7 @@ export async function handleReactionAdd(reaction, user, options) {
   } else if (kind === "generic") {
     if (emojiTrackingEnabled) {
       if (reaction.partial) {
-        // A partial reaction's emoji data isn't fully cached - typically a custom emoji from a
-        // server this bot isn't in. Rather than spend a Discord API call resolving it, just skip
-        // counting it.
+        // Partial reaction data is uncached (likely an unknown-guild custom emoji); skip rather than resolve via API.
         console.log(
           `bot: skipping emoji count for a partial reaction (likely a custom emoji from another server) on message ${message.id} from user ${user.id}`,
         );

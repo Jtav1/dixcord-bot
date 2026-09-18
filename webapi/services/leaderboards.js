@@ -259,9 +259,7 @@ export async function listEmojiFrequency(limit, offset = 0) {
   const n = parseLimit(limit, 5, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
-  // emoji_frequency is per-guild now — GROUP BY/SUM so the same emoji used in multiple guilds
-  // appears once, ranked by its total usage across all of them (matches attachEmojiObjects'
-  // global-sum convention).
+  // GROUP BY/SUM: emoji_frequency is per-guild, so sum usage across guilds into one ranked total.
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT emoid) AS total FROM emoji_frequency WHERE ${EMOJI_FREQUENCY_WHERE}`,
   );
@@ -304,10 +302,7 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
   const n = parseLimit(limit, 50, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
-  // Joins guild_emojis (not emoji_frequency) purely for the type classification: emoji_frequency
-  // is per-guild now, so joining it here (with no guild_id in the join condition) would fan out
-  // one member_emoji_tracking row into several, inflating totals. guild_emojis has exactly one
-  // row per emoid, so this join can't fan out.
+  // Joins guild_emojis (one row per emoid) for type, not emoji_frequency (per-guild, would inflate totals).
   const isEmojiType = "ge.type = 'emoji' OR ge.type IS NULL";
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT uet.userid) AS total
@@ -353,8 +348,7 @@ export async function listStickerFrequency(limit, offset = 0) {
   const n = parseLimit(limit, 5, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
-  // emoji_frequency is per-guild now — GROUP BY/SUM so the same sticker used in multiple guilds
-  // appears once, ranked by its total usage across all of them.
+  // GROUP BY/SUM: emoji_frequency is per-guild, so sum usage across guilds into one ranked total.
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT emoid) AS total FROM emoji_frequency WHERE ${STICKER_FREQUENCY_WHERE}`,
   );
@@ -387,8 +381,7 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
   const n = parseLimit(limit, 50, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
-  // Joins guild_emojis (not emoji_frequency) purely for the type classification — see
-  // listEmojiUsersByTotalUsage's comment for why (emoji_frequency is per-guild now, would fan out).
+  // Joins guild_emojis for type, not emoji_frequency — see listEmojiUsersByTotalUsage's comment.
   const isStickerType = "ge.type = 'sticker'";
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT uet.userid) AS total

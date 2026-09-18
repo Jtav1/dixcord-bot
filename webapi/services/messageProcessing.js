@@ -107,10 +107,7 @@ async function ensureAndIncrementEmoji(
     return { frequency: Number(existing[0].frequency) + 1, inserted: false };
   }
 
-  // Unicode emoji have no sync path (no such Discord API — see discord-bot/api/emojis.js), so
-  // their guild_emojis catalog row is created lazily here, on first use. Custom (numeric) emoji
-  // are never created here — their catalog row only ever comes from the sync path; a first-seen
-  // custom emoji with no catalog row yet just resolves to a placeholder until the next sync.
+  // Unicode emoji have no sync path, so their catalog row is created lazily here; custom (numeric) ones never are.
   if (!isNumericEmoid(id)) {
     const [catalogRow] = await db.query("SELECT id FROM guild_emojis WHERE id = ?", [id]);
     if (!catalogRow || catalogRow.length === 0) {
