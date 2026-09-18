@@ -11,6 +11,7 @@ import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
 } from "../utils/chatAppHttp.js";
+import { bumpCacheVersion } from "../utils/bumpCacheVersion.js";
 
 const router = express.Router();
 
@@ -400,6 +401,7 @@ router.post("/triggers", authenticate, requireAdmin, async (req, res) => {
     if (!trigger) {
       return res.status(500).json({ ok: false, error: "Failed to create trigger with responses" });
     }
+    await bumpCacheVersion();
     res.status(201).json({ ok: true, ...trigger });
   } catch (err) {
     console.error("POST /api/trigger-responses/triggers error:", err);
@@ -501,6 +503,7 @@ router.post("/bulk", authenticate, requireAdmin, async (req, res) => {
       selection_mode,
       response_function,
     });
+    await bumpCacheVersion();
     res.status(201).json({ ok: true, ...summary });
   } catch (err) {
     console.error("POST /api/trigger-responses/bulk error:", err);
@@ -598,6 +601,7 @@ router.put("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
       return res.status(404).json({ ok: false, error: "Trigger not found" });
     }
     const trigger = await triggerResponses.getTriggerById(id);
+    await bumpCacheVersion();
     res.json({ ok: true, ...trigger });
   } catch (err) {
     console.error("PUT /api/trigger-responses/triggers/:id error:", err);
@@ -653,6 +657,7 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ ok: false, error: "Trigger not found" });
     }
+    await bumpCacheVersion();
     res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/trigger-responses/triggers/:id error:", err);
@@ -905,6 +910,7 @@ router.put("/responses/:id", authenticate, requireAdmin, async (req, res) => {
       return res.status(404).json({ ok: false, error: "Response not found" });
     }
     const response = await triggerResponses.getResponseById(id);
+    await bumpCacheVersion();
     res.json({ ok: true, ...response });
   } catch (err) {
     console.error("PUT /api/trigger-responses/responses/:id error:", err);
@@ -960,6 +966,7 @@ router.delete("/responses/:id", authenticate, requireAdmin, async (req, res) => 
     if (!deleted) {
       return res.status(404).json({ ok: false, error: "Response not found" });
     }
+    await bumpCacheVersion();
     res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/trigger-responses/responses/:id error:", err);
@@ -1325,6 +1332,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
         .json({ ok: false, error: "Failed to create trigger-response" });
     }
     const row = await triggerResponses.getById(id);
+    await bumpCacheVersion();
     res.status(201).json({ ok: true, ...row });
   } catch (err) {
     console.error("POST /api/trigger-responses error:", err);
@@ -1443,6 +1451,7 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
         .json({ ok: false, error: "Trigger-response not found" });
     }
     const row = await triggerResponses.getById(id);
+    await bumpCacheVersion();
     res.json({ ok: true, ...row });
   } catch (err) {
     console.error("PUT /api/trigger-responses/:id error:", err);
@@ -1536,6 +1545,7 @@ router.patch("/:id/parameters", authenticate, requireAdmin, async (req, res) => 
         .status(404)
         .json({ ok: false, error: "Trigger-response not found" });
     }
+    await bumpCacheVersion();
     res.json({ ok: true, ...row });
   } catch (err) {
     console.error("PATCH /api/trigger-responses/:id/parameters error:", err);
@@ -1597,6 +1607,7 @@ router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
         .status(404)
         .json({ ok: false, error: "Trigger-response not found" });
     }
+    await bumpCacheVersion();
     res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/trigger-responses/:id error:", err);

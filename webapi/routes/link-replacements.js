@@ -1,6 +1,7 @@
 import express from "express";
 import { authenticate, requireAdmin } from "../middleware/auth.js";
 import * as linkReplacements from "../services/linkReplacements.js";
+import { bumpCacheVersion } from "../utils/bumpCacheVersion.js";
 
 const router = express.Router();
 
@@ -195,6 +196,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
       return res.status(500).json({ ok: false, error: "Failed to create link replacement" });
     }
     const row = await linkReplacements.getById(id);
+    await bumpCacheVersion();
     res.status(201).json({ ok: true, ...row });
   } catch (err) {
     console.error("POST /api/link-replacements error:", err);
@@ -282,6 +284,7 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
       return res.status(404).json({ ok: false, error: "Link replacement not found" });
     }
     const row = await linkReplacements.getById(id);
+    await bumpCacheVersion();
     res.json({ ok: true, ...row });
   } catch (err) {
     console.error("PUT /api/link-replacements/:id error:", err);
@@ -338,6 +341,7 @@ router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ ok: false, error: "Link replacement not found" });
     }
+    await bumpCacheVersion();
     res.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/link-replacements/:id error:", err);
