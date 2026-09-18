@@ -214,26 +214,36 @@ export async function handleReactionAdd(reaction, user, options) {
     }
   } else if (kind === "generic") {
     if (emojiTrackingEnabled) {
+      let resolvedReaction = reaction;
       if (reaction.partial) {
-        // Partial reaction data is uncached (likely an unknown-guild custom emoji); skip rather than resolve via API.
-        console.log(
-          `bot: skipping emoji count for a partial reaction (likely a custom emoji from another server) on message ${message.id} from user ${user.id}`,
-        );
-      } else if (emoji.id != null && !emoji.guild) {
+        try {
+          resolvedReaction = await reaction.fetch();
+        } catch (err) {
+          console.error(
+            `bot: reactionHandler could not fetch a partial reaction (likely deleted before fetch completed) on message ${message.id} from user ${user.id}: ${api.describeApiError(err)}`,
+          );
+          resolvedReaction = null;
+        }
+      }
+      const resolvedEmoji = resolvedReaction?.emoji ?? null;
+
+      if (!resolvedEmoji) {
+        // Fetch failed above; already logged.
+      } else if (resolvedEmoji.id != null && !resolvedEmoji.guild) {
         // Custom emoji whose owning guild isn't one this bot is in (e.g. used via Nitro from
         // another server) — gracefully discard, don't track usage for an unknown guild's emoji.
         console.log(
-          `bot: skipping emoji count for external/unknown-guild custom emoji ${emoji.id} on message ${message.id} from user ${user.id}`,
+          `bot: skipping emoji count for external/unknown-guild custom emoji ${resolvedEmoji.id} on message ${message.id} from user ${user.id}`,
         );
       } else {
         try {
-          const milestones = await countEmoji(emoji.name, emoji.id, user.id);
+          const milestones = await countEmoji(resolvedEmoji.name, resolvedEmoji.id, user.id);
           incrementCounter("emojiCountedTotal");
           await announceMilestones(message, milestones);
         } catch (err) {
           incrementCounter("apiCallErrorsTotal", "emojis");
           console.error(
-            `bot: countEmoji failed for reaction emoji "${emoji.id ?? emoji.name}" on message ${message.id} from user ${user.id}: ${api.describeApiError(err)}`,
+            `bot: countEmoji failed for reaction emoji "${resolvedEmoji.id ?? resolvedEmoji.name}" on message ${message.id} from user ${user.id}: ${api.describeApiError(err)}`,
           );
         }
       }
