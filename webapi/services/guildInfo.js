@@ -265,9 +265,18 @@ export async function getGuildSnapshot({ app, guildId } = {}) {
     "SELECT app, id, name, color, position, mentionable, hoisted FROM guild_roles WHERE app = ? AND guild_id = ? ORDER BY position DESC",
     [resolvedApp, resolvedGuildId],
   );
+  // guild_emojis scoped to this guild's own custom emoji, plus every unicode entry (guild_id IS
+  // NULL — no owning guild, shared across every admin panel). frequency is this guild's own usage
+  // count (LEFT JOIN so a never-yet-used catalog entry still shows up, at 0).
   const [emojiRows] = await db.query(
-    "SELECT app, emoid, emoji, frequency, animated, type FROM emoji_frequency WHERE app = ? AND (type = 'emoji' OR type IS NULL)",
-    [resolvedApp],
+    `SELECT ge.app AS app, ge.id AS emoid, ge.name AS emoji, ge.animated AS animated,
+            COALESCE(ef.type, ge.type) AS type, COALESCE(ef.frequency, 0) AS frequency
+     FROM guild_emojis ge
+     LEFT JOIN emoji_frequency ef ON ef.emoid = ge.id AND ef.app = ? AND ef.guild_id = ?
+     WHERE (ge.guild_id = ? OR ge.guild_id IS NULL)
+       AND (ge.type = 'emoji' OR ge.type IS NULL)
+     ORDER BY ge.name`,
+    [resolvedApp, resolvedGuildId, resolvedGuildId],
   );
   const [stickerRows] = await db.query(
     "SELECT stickerid, name, frequency FROM sticker_frequency",

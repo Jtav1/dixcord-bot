@@ -69,7 +69,7 @@ export function getPinEmoji() {
 /**
  * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object; null if unset. See getPinEmoji for shape notes.
  */
-export function getRepostEmojiId() {
+export function getRepostEmoji() {
   return getConfigValue("repost_emoji");
 }
 

@@ -71,15 +71,17 @@ export async function computeEmojiFrequencyPerApp(app) {
 }
 
 export async function computeEmojiTrackedGlobal() {
+  // DISTINCT emoid: emoji_frequency is now per-guild, so the same emoji tracked in two guilds
+  // has two rows — this counts distinct emoji ever tracked, not usage-rows.
   const [rows] = await db.query(
-    "SELECT COUNT(*) AS total FROM emoji_frequency WHERE type = 'emoji' OR type IS NULL",
+    "SELECT COUNT(DISTINCT emoid) AS total FROM emoji_frequency WHERE type = 'emoji' OR type IS NULL",
   );
   return Number(rows?.[0]?.total ?? 0);
 }
 
 export async function computeStickerTrackedGlobal() {
   const [rows] = await db.query(
-    "SELECT COUNT(*) AS total FROM emoji_frequency WHERE type = 'sticker'",
+    "SELECT COUNT(DISTINCT emoid) AS total FROM emoji_frequency WHERE type = 'sticker'",
   );
   return Number(rows?.[0]?.total ?? 0);
 }
