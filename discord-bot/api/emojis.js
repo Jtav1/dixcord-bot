@@ -25,6 +25,36 @@ export const importEmojiList = async (emojiObjectList) => {
 };
 
 /**
+ * List custom emoji catalog rows that carry a guild_id. GET /api/message-processing/emoji-catalog
+ * @returns {Promise<Array<{ id: string, guildId: string, name: string, animated: boolean, frequency: number, sourceFrequency: number }>>}
+ */
+export const listEmojiCatalog = async () => {
+  const { data } = await api.get("/api/message-processing/emoji-catalog", {
+    params: { app: "discord" },
+  });
+  return Array.isArray(data?.emojis) ? data.emojis : [];
+};
+
+/**
+ * Delete one custom emoji catalog row by id. DELETE /api/message-processing/emoji-catalog/:id
+ * @param {string} id
+ */
+export const deleteEmojiCatalogRow = async (id) => {
+  await api.del(`/api/message-processing/emoji-catalog/${id}`);
+};
+
+/**
+ * Migrate one emoji's usage total from emoji_frequency into guild_emojis.frequency.
+ * POST /api/message-processing/emoji-catalog/:id/migrate-frequency
+ * @param {string} id
+ * @returns {Promise<number>} the frequency written
+ */
+export const migrateEmojiCatalogFrequency = async (id) => {
+  const { data } = await api.post(`/api/message-processing/emoji-catalog/${id}/migrate-frequency`);
+  return Number(data?.frequency) || 0;
+};
+
+/**
  * Record emoji usage. POST /api/message-processing/emoji-count
  * guildId (this bot's own, from configVars) is required so webapi can resolve this server's
  * plusplus_emoji/minusminus_emoji from guild_config for the reply-vote comparison.

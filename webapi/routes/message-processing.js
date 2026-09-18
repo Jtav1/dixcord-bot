@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate, requireOwnGuildOrAdmin } from "../middleware/auth.js";
+import { authenticate, requireBotOrAdmin, requireOwnGuildOrAdmin } from "../middleware/auth.js";
 import {
   countEmoji,
   countSticker,
@@ -7,6 +7,9 @@ import {
   recordPlusMinusReaction,
   countRepost,
   importGuildAssetFrequencyList,
+  listEmojiCatalogWithGuild,
+  deleteEmojiCatalogRow,
+  migrateEmojiCatalogFrequency,
   isMessageAlreadyPinned,
   logPinnedMessage,
 } from "../services/messageProcessing.js";
@@ -438,6 +441,176 @@ router.post("/emoji-import", authenticate, async (req, res) => {
     res.status(500).json({ ok: false, error: "Failed to import emoji list" });
   }
 });
+
+/**
+ * GET /api/message-processing/emoji-catalog
+ * List guild_emojis catalog rows that carry a guild_id (custom emoji only, not unicode).
+ * Used by discord-bot/scripts/cleanup-guild-emojis.js to find rows misattributed to the
+ * wrong guild by checking each id against that guild's live Discord emoji list.
+ * Query: { app: "discord" }
+ * Auth: bot or admin.
+ * @openapi
+ * /api/message-processing/emoji-catalog:
+ *   get:
+ *     operationId: listEmojiCatalog
+ *     tags: [Message Processing]
+ *     summary: List custom emoji catalog rows (with guild_id)
+ *     description: >
+ *       Returns every guild_emojis row of type 'emoji' that has a guild_id (i.e. custom, not
+ *       unicode). Intended for the emoji-cleanup admin script, not general browsing.
+ *     parameters:
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         schema: { type: string, enum: [discord] }
+ *     responses:
+ *       '200':
+ *         description: Catalog rows.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 emojis:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: string }
+ *                       guildId: { type: string }
+ *                       name: { type: string }
+ *                       animated: { type: boolean }
+ *                       frequency: { type: integer, description: "Current guild_emojis.frequency value." }
+ *                       sourceFrequency: { type: integer, description: "emoji_frequency total; what migrate-frequency would write." }
+ *       '400':
+ *         description: Missing/invalid app parameter.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/emoji-catalog", authenticate, requireBotOrAdmin, async (req, res) => {
+  try {
+    if (!resolveChatAppFromRequest(req)) {
+      return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    }
+    const emojis = await listEmojiCatalogWithGuild(req.query.app);
+    res.json({ ok: true, emojis });
+  } catch (err) {
+    console.error("GET /api/message-processing/emoji-catalog error:", err);
+    res.status(500).json({ ok: false, error: "Failed to list emoji catalog" });
+  }
+});
+
+/**
+ * DELETE /api/message-processing/emoji-catalog/:id
+ * Delete one guild_emojis emoji row by id. Used by the emoji-cleanup admin script to remove
+ * rows that don't actually belong to the guild_id they're stored under.
+ * Auth: bot or admin.
+ * @openapi
+ * /api/message-processing/emoji-catalog/{id}:
+ *   delete:
+ *     operationId: deleteEmojiCatalogRow
+ *     tags: [Message Processing]
+ *     summary: Delete one custom emoji catalog row
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Row deleted (or already absent).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.delete("/emoji-catalog/:id", authenticate, requireBotOrAdmin, async (req, res) => {
+  try {
+    await deleteEmojiCatalogRow(req.params.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /api/message-processing/emoji-catalog/:id error:", err);
+    res.status(500).json({ ok: false, error: "Failed to delete emoji catalog row" });
+  }
+});
+
+/**
+ * POST /api/message-processing/emoji-catalog/:id/migrate-frequency
+ * Sum emoji_frequency rows for this emoid and write the total into guild_emojis.frequency.
+ * No-ops with a 404-shaped error if the id isn't in guild_emojis (e.g. already deleted by the
+ * emoji-cleanup script's stale-row pass, which must run before this).
+ * Auth: bot or admin.
+ * @openapi
+ * /api/message-processing/emoji-catalog/{id}/migrate-frequency:
+ *   post:
+ *     operationId: migrateEmojiCatalogFrequency
+ *     tags: [Message Processing]
+ *     summary: Migrate one emoji's usage total from emoji_frequency into guild_emojis.frequency
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Frequency migrated.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 frequency: { type: integer }
+ *       '404':
+ *         description: id not found in guild_emojis.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post(
+  "/emoji-catalog/:id/migrate-frequency",
+  authenticate,
+  requireBotOrAdmin,
+  async (req, res) => {
+    try {
+      const result = await migrateEmojiCatalogFrequency(req.params.id);
+      if (!result.ok) {
+        return res.status(404).json({ ok: false, error: result.error });
+      }
+      res.json({ ok: true, frequency: result.frequency });
+    } catch (err) {
+      console.error(
+        "POST /api/message-processing/emoji-catalog/:id/migrate-frequency error:",
+        err,
+      );
+      res.status(500).json({ ok: false, error: "Failed to migrate emoji frequency" });
+    }
+  },
+);
 
 /**
  * POST /api/message-processing/sticker-import

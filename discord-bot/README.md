@@ -145,3 +145,22 @@ Registered for the guild in `DISCORD_GUILD_ID`:
 - **Remove all guild commands:** `node delete-all-commands.js`
 
 Run from the `discord-bot` directory after installing dependencies.
+
+---
+
+## Emoji catalog cleanup
+
+`node scripts/cleanup-guild-emojis.js [--dry-run]` (or `npm run cleanup-emojis -- --dry-run`) runs two
+steps, in order:
+
+1. Removes `guild_emojis` rows that don't actually belong to the guild_id they're stored under (e.g.
+   legacy rows from before catalog identity was split per-guild). It checks every custom emoji row
+   against this bot's own guild's live Discord emoji list — the only guild it can verify — and
+   deletes any row whose guild_id isn't `DISCORD_GUILD_ID` or whose id is no longer one of that
+   guild's current emojis.
+2. For every row still in `guild_emojis` after step 1, migrates its usage total from
+   `emoji_frequency` into the `guild_emojis.frequency` column, matched by emoid. Rows deleted in
+   step 1 are never migrated.
+
+`--dry-run` previews both steps (what would be deleted, what frequency would move) without deleting
+or migrating anything. Run manually from the bot container terminal.

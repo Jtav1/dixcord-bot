@@ -673,6 +673,15 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
     (e) => e != null && (e.id != null || e.name != null),
   );
 
+  // Carry frequency forward across the delete+insert replace below, or every restart would reset it to 0.
+  const [existingRows] = await db.query(
+    "SELECT id, frequency FROM guild_emojis WHERE app = ? AND guild_id = ? AND type = ?",
+    [app, gid, assetKind],
+  );
+  const frequencyById = new Map(
+    (existingRows ?? []).map((r) => [r.id, Number(r.frequency) || 0]),
+  );
+
   // Scoped by (app, guild_id, type) so replacing one kind's catalog never touches the other's.
   await db.query("DELETE FROM guild_emojis WHERE app = ? AND guild_id = ? AND type = ?", [
     app,
@@ -688,8 +697,8 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
     const emoid = id || name;
 
     await db.query(
-      `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles, frequency)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         emoid,
         app,
@@ -701,11 +710,88 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
         e.managed == null ? null : e.managed ? 1 : 0,
         e.requiresColons == null ? null : e.requiresColons ? 1 : 0,
         Array.isArray(e.roles) && e.roles.length > 0 ? JSON.stringify(e.roles) : null,
+        frequencyById.get(emoid) ?? 0,
       ],
     );
     imported++;
   }
   return { ok: true, imported };
+}
+
+/**
+ * List guild_emojis emoji rows that carry a guild_id (custom emoji, not unicode), for the
+ * emoji-cleanup admin script (discord-bot/scripts/cleanup-guild-emojis.js) to verify against
+ * each guild's live Discord emoji list. `sourceFrequency` is the emoji_frequency total that
+ * migrateEmojiCatalogFrequency would write into `frequency`, for the script's dry-run preview.
+ * @param {string} app
+ * @returns {Promise<Array<{id: string, guildId: string, name: string, animated: boolean, frequency: number, sourceFrequency: number}>>}
+ */
+export async function listEmojiCatalogWithGuild(app) {
+  const [rows] = await db.query(
+    `SELECT ge.id, ge.guild_id, ge.name, ge.animated, ge.frequency,
+            (SELECT COALESCE(SUM(ef.frequency), 0) FROM emoji_frequency ef WHERE ef.emoid = ge.id AND ef.app = ge.app) AS source_frequency
+     FROM guild_emojis ge
+     WHERE ge.app = ? AND ge.guild_id IS NOT NULL AND ge.type = 'emoji'
+     ORDER BY ge.guild_id, ge.name`,
+    [app],
+  );
+  return (rows ?? []).map((r) => ({
+    id: r.id,
+    guildId: r.guild_id,
+    name: r.name,
+    animated: Boolean(r.animated),
+    frequency: Number(r.frequency) || 0,
+    sourceFrequency: Number(r.source_frequency) || 0,
+  }));
+}
+
+/**
+ * Delete one guild_emojis emoji row by id (used by the emoji-cleanup admin script to remove
+ * rows misattributed to a guild they don't actually belong to).
+ * @param {string} id
+ * @returns {Promise<boolean>} true if a row was deleted
+ */
+export async function deleteEmojiCatalogRow(id) {
+  if (!id || String(id).trim() === "") return false;
+  const [result] = await db.query(
+    "DELETE FROM guild_emojis WHERE id = ? AND type = 'emoji'",
+    [String(id).trim()],
+  );
+  return (result?.affectedRows ?? 0) > 0;
+}
+
+/**
+ * Migrate one emoji's usage total from emoji_frequency into guild_emojis.frequency, keyed by
+ * emoid. Only writes when the row is still present in guild_emojis (i.e. the emoji-cleanup
+ * script's stale-row deletion has already run) — recomputes the sum server-side rather than
+ * trusting a client-supplied total.
+ * @param {string} id
+ * @returns {Promise<{ok: boolean, frequency?: number, error?: string}>}
+ */
+export async function migrateEmojiCatalogFrequency(id) {
+  if (!id || String(id).trim() === "") return { ok: false, error: "id is required" };
+  const trimmedId = String(id).trim();
+
+  const [catalogRows] = await db.query(
+    "SELECT app FROM guild_emojis WHERE id = ? AND type = 'emoji'",
+    [trimmedId],
+  );
+  if (!catalogRows || catalogRows.length === 0) {
+    return { ok: false, error: "Emoji not found in guild_emojis" };
+  }
+  const app = catalogRows[0].app;
+
+  const [sumRows] = await db.query(
+    "SELECT COALESCE(SUM(frequency), 0) AS total FROM emoji_frequency WHERE emoid = ? AND app = ?",
+    [trimmedId, app],
+  );
+  const total = Number(sumRows?.[0]?.total ?? 0);
+
+  await db.query(
+    "UPDATE guild_emojis SET frequency = ? WHERE id = ? AND type = 'emoji'",
+    [total, trimmedId],
+  );
+  return { ok: true, frequency: total };
 }
 
 // --- Pin history (for pin decision + log) ---

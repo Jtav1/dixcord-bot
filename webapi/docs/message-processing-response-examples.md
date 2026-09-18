@@ -160,6 +160,62 @@ or
 
 ---
 
+## GET /api/message-processing/emoji-catalog
+
+**200 OK**
+
+```json
+{
+  "ok": true,
+  "emojis": [
+    {
+      "id": "123456789012345678",
+      "guildId": "999888777666555444",
+      "name": "pepehands",
+      "animated": false,
+      "frequency": 0,
+      "sourceFrequency": 42
+    }
+  ]
+}
+```
+
+---
+
+## DELETE /api/message-processing/emoji-catalog/:id
+
+**200 OK**
+
+```json
+{
+  "ok": true
+}
+```
+
+---
+
+## POST /api/message-processing/emoji-catalog/:id/migrate-frequency
+
+**200 OK**
+
+```json
+{
+  "ok": true,
+  "frequency": 42
+}
+```
+
+**404 Not Found**
+
+```json
+{
+  "ok": false,
+  "error": "Emoji not found in guild_emojis"
+}
+```
+
+---
+
 ## POST /api/message-processing/sticker-import
 
 **200 OK**

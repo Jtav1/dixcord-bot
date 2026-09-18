@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   managed TINYINT(1) NULL,
   requires_colons TINYINT(1) NULL,
   roles TEXT NULL,
+  frequency INT NOT NULL DEFAULT 0,   -- migrated from emoji_frequency by discord-bot/scripts/cleanup-guild-emojis.js
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_guild_emojis_guild (app, guild_id)
 );

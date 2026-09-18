@@ -1468,6 +1468,7 @@ export async function ensureSchemaMigrations() {
           managed INTEGER NULL,
           requires_colons INTEGER NULL,
           roles TEXT NULL,
+          frequency INTEGER NOT NULL DEFAULT 0,
           synced_at TEXT DEFAULT (datetime('now'))
         )
       `);
@@ -1485,6 +1486,7 @@ export async function ensureSchemaMigrations() {
           managed TINYINT(1) NULL,
           requires_colons TINYINT(1) NULL,
           roles TEXT NULL,
+          frequency INT NOT NULL DEFAULT 0,
           synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           KEY idx_guild_emojis_guild (app, guild_id)
         )
@@ -1517,6 +1519,24 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: added guild_emojis.type column, backfilled from emoji_frequency");
   } else {
     console.log("db: schema ok: guild_emojis.type column already exists");
+  }
+
+  // guild_emojis.frequency: usage count migrated from emoji_frequency (by emoid) via
+  // discord-bot/scripts/cleanup-guild-emojis.js. Starts at 0; not auto-backfilled here — the
+  // migration deliberately only runs after that script's stale-row cleanup.
+  if (
+    (await tableExists(db, "guild_emojis", isSqlite)) &&
+    !(await columnExists(db, "guild_emojis", "frequency", isSqlite))
+  ) {
+    await db.query(
+      isSqlite
+        ? "ALTER TABLE guild_emojis ADD COLUMN frequency INTEGER NOT NULL DEFAULT 0"
+        : "ALTER TABLE guild_emojis ADD COLUMN frequency INT NOT NULL DEFAULT 0",
+    );
+    applied.push("guild_emojis.frequency column");
+    console.log("db: migration applied: added guild_emojis.frequency column");
+  } else {
+    console.log("db: schema ok: guild_emojis.frequency column already exists");
   }
 
   // Backfill guild_emojis from legacy emoji_frequency rows, then narrow emoji_frequency once every row

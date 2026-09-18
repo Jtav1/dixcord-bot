@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "dixcord-bot webapi",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "description": "Internal REST API backing the dixcord-bot Discord bot, webview, and webadmin services. Every route requires a service-account JWT (admin, bot, or webview) except login and health."
   },
   "servers": [
@@ -2438,13 +2438,16 @@
                             "type": "string"
                           },
                           "handle": {
-                            "type": "string"
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "nickname": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "platformUserId": {
-                            "type": "string"
-                          },
-                          "app": {
-                            "type": "string"
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -6094,7 +6097,7 @@
           "Message Processing"
         ],
         "summary": "Record sticker usage in a message",
-        "description": "Increments emoji_frequency (type='sticker') / member_emoji_tracking for each sticker in the message. Unlike emoji-count, there is no plus/minus branch — Discord has no reply-with-sticker vote mechanism.\n",
+        "description": "Increments emoji_frequency (type='sticker', now per-guild) / member_emoji_tracking for each sticker in the message. Unlike emoji-count, there is no plus/minus branch — Discord has no reply-with-sticker vote mechanism.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -6103,6 +6106,7 @@
                 "type": "object",
                 "required": [
                   "app",
+                  "guildId",
                   "authorId",
                   "stickers"
                 ],
@@ -6112,6 +6116,9 @@
                     "enum": [
                       "discord"
                     ]
+                  },
+                  "guildId": {
+                    "type": "string"
                   },
                   "authorId": {
                     "type": "string",
@@ -6460,7 +6467,7 @@
           "Message Processing"
         ],
         "summary": "Sync the guild's custom emoji catalog",
-        "description": "Deletes zero-frequency emoji_frequency rows (type 'emoji' or NULL) for this app, then inserts any emoji ids not already present with frequency 0.\n",
+        "description": "Fully replaces this guild's guild_emojis rows of type 'emoji' (mirrors guild_channels/ guild_roles sync). emoji_frequency usage counts are untouched. Gracefully discards the whole sync (imported:0, no error) if guildId isn't a known guild (guild_info).\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -6469,6 +6476,7 @@
                 "type": "object",
                 "required": [
                   "app",
+                  "guildId",
                   "emojis"
                 ],
                 "properties": {
@@ -6477,6 +6485,9 @@
                     "enum": [
                       "discord"
                     ]
+                  },
+                  "guildId": {
+                    "type": "string"
                   },
                   "emojis": {
                     "type": "array",
@@ -6491,6 +6502,24 @@
                         },
                         "animated": {
                           "type": "boolean"
+                        },
+                        "available": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "managed": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "requiresColons": {
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "roles": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
                         }
                       }
                     }
@@ -6542,6 +6571,205 @@
         }
       }
     },
+    "/api/message-processing/emoji-catalog": {
+      "get": {
+        "operationId": "listEmojiCatalog",
+        "tags": [
+          "Message Processing"
+        ],
+        "summary": "List custom emoji catalog rows (with guild_id)",
+        "description": "Returns every guild_emojis row of type 'emoji' that has a guild_id (i.e. custom, not unicode). Intended for the emoji-cleanup admin script, not general browsing.\n",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "discord"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalog rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "emojis": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "guildId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "animated": {
+                            "type": "boolean"
+                          },
+                          "frequency": {
+                            "type": "integer",
+                            "description": "Current guild_emojis.frequency value."
+                          },
+                          "sourceFrequency": {
+                            "type": "integer",
+                            "description": "emoji_frequency total; what migrate-frequency would write."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/invalid app parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenBotOrAdmin"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/message-processing/emoji-catalog/{id}": {
+      "delete": {
+        "operationId": "deleteEmojiCatalogRow",
+        "tags": [
+          "Message Processing"
+        ],
+        "summary": "Delete one custom emoji catalog row",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Row deleted (or already absent).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenBotOrAdmin"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/message-processing/emoji-catalog/{id}/migrate-frequency": {
+      "post": {
+        "operationId": "migrateEmojiCatalogFrequency",
+        "tags": [
+          "Message Processing"
+        ],
+        "summary": "Migrate one emoji's usage total from emoji_frequency into guild_emojis.frequency",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Frequency migrated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "frequency": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenBotOrAdmin"
+          },
+          "404": {
+            "description": "id not found in guild_emojis.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/message-processing/sticker-import": {
       "post": {
         "operationId": "importStickers",
@@ -6549,7 +6777,7 @@
           "Message Processing"
         ],
         "summary": "Sync the guild's sticker catalog",
-        "description": "Deletes zero-frequency emoji_frequency rows of type 'sticker' for this app, then inserts any sticker ids not already present with frequency 0.\n",
+        "description": "Fully replaces this guild's guild_emojis rows of type 'sticker' (mirrors emoji-import). emoji_frequency usage counts are untouched. Gracefully discards the whole sync (imported:0, no error) if guildId isn't a known guild (guild_info).\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -6558,6 +6786,7 @@
                 "type": "object",
                 "required": [
                   "app",
+                  "guildId",
                   "stickers"
                 ],
                 "properties": {
@@ -6566,6 +6795,9 @@
                     "enum": [
                       "discord"
                     ]
+                  },
+                  "guildId": {
+                    "type": "string"
                   },
                   "stickers": {
                     "type": "array",
@@ -6784,6 +7016,189 @@
                 }
               }
             }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/message-processing/timeout-vote": {
+      "post": {
+        "operationId": "recordTimeoutVote",
+        "tags": [
+          "Message Processing"
+        ],
+        "summary": "Record a vote-to-timeout reaction",
+        "description": "Inserts into timeout_vote_tracking (unique per message+voter) and checks the running weighted total against guild_config's timeout_vote_threshold. Once the threshold is reached, inserts a timeout_history row (unique per message — the idempotency guard) and returns triggered:true with the duration/response message to apply; further votes on an already-triggered message return alreadyActioned:true instead of re-triggering.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "messageId",
+                  "targetPlatformId",
+                  "voterPlatformId"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "messageId": {
+                    "type": "string",
+                    "description": "Discord message snowflake."
+                  },
+                  "targetPlatformId": {
+                    "type": "string",
+                    "description": "Discord snowflake of the message author."
+                  },
+                  "voterPlatformId": {
+                    "type": "string",
+                    "description": "Discord snowflake of the user who reacted."
+                  },
+                  "weight": {
+                    "type": "integer",
+                    "description": "Vote weight based on the voter's roles (1/2/3). Defaults to 1.",
+                    "default": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Vote recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "triggered": {
+                      "type": "boolean"
+                    },
+                    "alreadyActioned": {
+                      "type": "boolean"
+                    },
+                    "currentWeight": {
+                      "type": "integer"
+                    },
+                    "threshold": {
+                      "type": "integer"
+                    },
+                    "targetPlatformId": {
+                      "type": "string"
+                    },
+                    "durationSeconds": {
+                      "type": "integer"
+                    },
+                    "responseMessage": {
+                      "type": "string"
+                    },
+                    "voteWeightTotal": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/message-processing/timeout-vote/remove": {
+      "post": {
+        "operationId": "removeTimeoutVote",
+        "tags": [
+          "Message Processing"
+        ],
+        "summary": "Un-count a vote-to-timeout reaction removal",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "messageId",
+                  "voterPlatformId"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord"
+                    ]
+                  },
+                  "messageId": {
+                    "type": "string",
+                    "description": "Discord message snowflake."
+                  },
+                  "voterPlatformId": {
+                    "type": "string",
+                    "description": "Discord snowflake of the user who un-reacted."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Vote removed (or there was nothing to remove).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -8396,6 +8811,194 @@
         }
       }
     },
+    "/api/leaderboards/timeout": {
+      "get": {
+        "operationId": "getTimeoutHistory",
+        "tags": [
+          "Leaderboards"
+        ],
+        "summary": "List fired vote-to-timeout events",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "discord"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Timeout history entries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "description": "timeout_history.id — pass to GET /api/leaderboards/timeout/history/{id}."
+                          },
+                          "messageId": {
+                            "type": "string"
+                          },
+                          "guildId": {
+                            "type": "string"
+                          },
+                          "target": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "chat_member_mapping id."
+                          },
+                          "voteWeightTotal": {
+                            "type": "integer"
+                          },
+                          "durationSeconds": {
+                            "type": "integer"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/invalid app parameter.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/leaderboards/timeout/history/{historyId}": {
+      "get": {
+        "operationId": "getTimeoutVoters",
+        "tags": [
+          "Leaderboards"
+        ],
+        "summary": "List voters for one fired vote-to-timeout event",
+        "parameters": [
+          {
+            "name": "historyId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "timeout_history.id, as returned by GET /api/leaderboards/timeout."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Voters for this timeout event.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "voters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "voter": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "chat_member_mapping id."
+                          },
+                          "weight": {
+                            "type": "integer"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/invalid historyId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/guild": {
       "get": {
         "operationId": "getGuild",
@@ -8477,6 +9080,69 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild/all": {
+      "get": {
+        "operationId": "listGuilds",
+        "tags": [
+          "Guild"
+        ],
+        "summary": "List every synced guild",
+        "description": "Requires the admin role.",
+        "responses": {
+          "200": {
+            "description": "Every guild that has ever synced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "guilds": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "app": {
+                            "type": "string"
+                          },
+                          "guildId": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "iconUrl": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "syncedAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -9057,6 +9723,87 @@
                           },
                           "syncedAt": {
                             "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members/public-aliases/{chatMemberMappingId}": {
+      "get": {
+        "operationId": "listPublicAliasesForMapping",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "List one identity's per-guild handle/nickname (public-safe)",
+        "description": "Same underlying data as GET /api/guild-members/aliases/{chatMemberMappingId}, trimmed to fields safe to show on the public webview site — no internal ids, no platform user id.\n",
+        "parameters": [
+          {
+            "name": "chatMemberMappingId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Linked membership rows, public-safe fields only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "members": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "app": {
+                            "type": "string"
+                          },
+                          "guildId": {
+                            "type": "string"
+                          },
+                          "guildName": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "handle": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "nickname": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
