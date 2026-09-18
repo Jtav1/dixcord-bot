@@ -6577,8 +6577,8 @@
         "tags": [
           "Message Processing"
         ],
-        "summary": "List custom emoji catalog rows (with guild_id)",
-        "description": "Returns every guild_emojis row of type 'emoji' that has a guild_id (i.e. custom, not unicode). Intended for the emoji-cleanup admin script, not general browsing.\n",
+        "summary": "List custom emoji/sticker catalog rows (with guild_id)",
+        "description": "Returns every guild_emojis row that has a guild_id (i.e. custom, not unicode), of any type (including NULL — legacy rows that were never backfilled). Intended for the emoji-cleanup admin script, not general browsing.\n",
         "parameters": [
           {
             "name": "app",
@@ -6620,6 +6620,15 @@
                           "name": {
                             "type": "string"
                           },
+                          "type": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "emoji",
+                              "sticker",
+                              null
+                            ]
+                          },
                           "animated": {
                             "type": "boolean"
                           },
@@ -6629,7 +6638,7 @@
                           },
                           "sourceFrequency": {
                             "type": "integer",
-                            "description": "emoji_frequency total; what migrate-frequency would write."
+                            "description": "emoji_frequency total; what migrate-frequency would write. Only meaningful for type=emoji."
                           }
                         }
                       }
@@ -6667,7 +6676,7 @@
         "tags": [
           "Message Processing"
         ],
-        "summary": "Delete one custom emoji catalog row",
+        "summary": "Delete one custom emoji/sticker catalog row",
         "parameters": [
           {
             "name": "id",
@@ -6693,6 +6702,86 @@
                       ]
                     }
                   }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenBotOrAdmin"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/message-processing/emoji-catalog/{id}/type": {
+      "patch": {
+        "operationId": "setEmojiCatalogRowType",
+        "tags": [
+          "Message Processing"
+        ],
+        "summary": "Correct one custom emoji/sticker catalog row's type",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "emoji",
+                      "sticker"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Type updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/invalid type.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

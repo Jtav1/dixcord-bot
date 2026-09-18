@@ -150,17 +150,20 @@ Run from the `discord-bot` directory after installing dependencies.
 
 ## Emoji catalog cleanup
 
-`node scripts/cleanup-guild-emojis.js [--dry-run]` (or `npm run cleanup-emojis -- --dry-run`) runs two
-steps, in order:
+`node scripts/cleanup-guild-emojis.js [--dry-run]` (or `npm run cleanup-emojis -- --dry-run`) runs
+three steps, in order, checking every custom row against this bot's own guild's live Discord emoji
+and sticker lists — the only guild this deployment can verify:
 
 1. Removes `guild_emojis` rows that don't actually belong to the guild_id they're stored under (e.g.
-   legacy rows from before catalog identity was split per-guild). It checks every custom emoji row
-   against this bot's own guild's live Discord emoji list — the only guild it can verify — and
-   deletes any row whose guild_id isn't `DISCORD_GUILD_ID` or whose id is no longer one of that
-   guild's current emojis.
-2. For every row still in `guild_emojis` after step 1, migrates its usage total from
-   `emoji_frequency` into the `guild_emojis.frequency` column, matched by emoid. Rows deleted in
-   step 1 are never migrated.
+   legacy rows from before catalog identity was split per-guild): deletes any row whose guild_id
+   isn't `DISCORD_GUILD_ID`, or whose id is no longer one of that guild's current emojis or stickers.
+2. For every row still in `guild_emojis` after step 1, corrects its `type` ("emoji" or "sticker")
+   based on which live Discord list actually contains its id — fixing rows that were never
+   backfilled (NULL) or were tagged wrong.
+3. For every row of type "emoji" still in `guild_emojis` after step 2, migrates its usage total
+   from `emoji_frequency` into the `guild_emojis.frequency` column, matched by emoid. Rows deleted
+   in step 1 are never touched by steps 2 or 3.
 
-`--dry-run` previews both steps (what would be deleted, what frequency would move) without deleting
-or migrating anything. Run manually from the bot container terminal.
+`--dry-run` previews all three steps (what would be deleted, what type would change, what frequency
+would move) without deleting, retyping, or migrating anything. Run manually from the bot container
+terminal.

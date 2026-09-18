@@ -9,6 +9,7 @@ import {
   importGuildAssetFrequencyList,
   listEmojiCatalogWithGuild,
   deleteEmojiCatalogRow,
+  setEmojiCatalogRowType,
   migrateEmojiCatalogFrequency,
   isMessageAlreadyPinned,
   logPinnedMessage,
@@ -444,9 +445,11 @@ router.post("/emoji-import", authenticate, async (req, res) => {
 
 /**
  * GET /api/message-processing/emoji-catalog
- * List guild_emojis catalog rows that carry a guild_id (custom emoji only, not unicode).
- * Used by discord-bot/scripts/cleanup-guild-emojis.js to find rows misattributed to the
- * wrong guild by checking each id against that guild's live Discord emoji list.
+ * List guild_emojis catalog rows that carry a guild_id (custom emoji/sticker, not unicode).
+ * Includes rows of any `type`, including NULL (never backfilled). Used by
+ * discord-bot/scripts/cleanup-guild-emojis.js to find rows misattributed to the wrong guild,
+ * and to fix a wrong/missing `type`, by checking each id against that guild's live Discord
+ * emoji and sticker lists.
  * Query: { app: "discord" }
  * Auth: bot or admin.
  * @openapi
@@ -454,10 +457,11 @@ router.post("/emoji-import", authenticate, async (req, res) => {
  *   get:
  *     operationId: listEmojiCatalog
  *     tags: [Message Processing]
- *     summary: List custom emoji catalog rows (with guild_id)
+ *     summary: List custom emoji/sticker catalog rows (with guild_id)
  *     description: >
- *       Returns every guild_emojis row of type 'emoji' that has a guild_id (i.e. custom, not
- *       unicode). Intended for the emoji-cleanup admin script, not general browsing.
+ *       Returns every guild_emojis row that has a guild_id (i.e. custom, not unicode), of any
+ *       type (including NULL — legacy rows that were never backfilled). Intended for the
+ *       emoji-cleanup admin script, not general browsing.
  *     parameters:
  *       - name: app
  *         in: query
@@ -480,9 +484,10 @@ router.post("/emoji-import", authenticate, async (req, res) => {
  *                       id: { type: string }
  *                       guildId: { type: string }
  *                       name: { type: string }
+ *                       type: { type: string, nullable: true, enum: [emoji, sticker, null] }
  *                       animated: { type: boolean }
  *                       frequency: { type: integer, description: "Current guild_emojis.frequency value." }
- *                       sourceFrequency: { type: integer, description: "emoji_frequency total; what migrate-frequency would write." }
+ *                       sourceFrequency: { type: integer, description: "emoji_frequency total; what migrate-frequency would write. Only meaningful for type=emoji." }
  *       '400':
  *         description: Missing/invalid app parameter.
  *         content:
@@ -511,15 +516,15 @@ router.get("/emoji-catalog", authenticate, requireBotOrAdmin, async (req, res) =
 
 /**
  * DELETE /api/message-processing/emoji-catalog/:id
- * Delete one guild_emojis emoji row by id. Used by the emoji-cleanup admin script to remove
- * rows that don't actually belong to the guild_id they're stored under.
+ * Delete one guild_emojis row by id, regardless of type. Used by the emoji-cleanup admin script
+ * to remove rows that don't actually belong to the guild_id they're stored under.
  * Auth: bot or admin.
  * @openapi
  * /api/message-processing/emoji-catalog/{id}:
  *   delete:
  *     operationId: deleteEmojiCatalogRow
  *     tags: [Message Processing]
- *     summary: Delete one custom emoji catalog row
+ *     summary: Delete one custom emoji/sticker catalog row
  *     parameters:
  *       - name: id
  *         in: path
@@ -548,6 +553,69 @@ router.delete("/emoji-catalog/:id", authenticate, requireBotOrAdmin, async (req,
   } catch (err) {
     console.error("DELETE /api/message-processing/emoji-catalog/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to delete emoji catalog row" });
+  }
+});
+
+/**
+ * PATCH /api/message-processing/emoji-catalog/:id/type
+ * Set a guild_emojis row's type ("emoji" or "sticker"). Used by the emoji-cleanup admin script
+ * to correct rows whose type is wrong or was never backfilled, after checking Discord for what
+ * the id actually is.
+ * Body: { type: "emoji" | "sticker" }
+ * Auth: bot or admin.
+ * @openapi
+ * /api/message-processing/emoji-catalog/{id}/type:
+ *   patch:
+ *     operationId: setEmojiCatalogRowType
+ *     tags: [Message Processing]
+ *     summary: Correct one custom emoji/sticker catalog row's type
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [type]
+ *             properties:
+ *               type: { type: string, enum: [emoji, sticker] }
+ *     responses:
+ *       '200':
+ *         description: Type updated.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         description: Missing/invalid type.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.patch("/emoji-catalog/:id/type", authenticate, requireBotOrAdmin, async (req, res) => {
+  try {
+    const { type } = req.body ?? {};
+    if (type !== "emoji" && type !== "sticker") {
+      return res.status(400).json({ ok: false, error: "type must be 'emoji' or 'sticker'" });
+    }
+    await setEmojiCatalogRowType(req.params.id, type);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("PATCH /api/message-processing/emoji-catalog/:id/type error:", err);
+    res.status(500).json({ ok: false, error: "Failed to update emoji catalog row type" });
   }
 });
 

@@ -172,6 +172,7 @@ or
       "id": "123456789012345678",
       "guildId": "999888777666555444",
       "name": "pepehands",
+      "type": "emoji",
       "animated": false,
       "frequency": 0,
       "sourceFrequency": 42
@@ -189,6 +190,27 @@ or
 ```json
 {
   "ok": true
+}
+```
+
+---
+
+## PATCH /api/message-processing/emoji-catalog/:id/type
+
+**200 OK**
+
+```json
+{
+  "ok": true
+}
+```
+
+**400 Bad Request**
+
+```json
+{
+  "ok": false,
+  "error": "type must be 'emoji' or 'sticker'"
 }
 ```
 

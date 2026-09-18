@@ -25,8 +25,9 @@ export const importEmojiList = async (emojiObjectList) => {
 };
 
 /**
- * List custom emoji catalog rows that carry a guild_id. GET /api/message-processing/emoji-catalog
- * @returns {Promise<Array<{ id: string, guildId: string, name: string, animated: boolean, frequency: number, sourceFrequency: number }>>}
+ * List custom emoji/sticker catalog rows that carry a guild_id, any type (including NULL).
+ * GET /api/message-processing/emoji-catalog
+ * @returns {Promise<Array<{ id: string, guildId: string, name: string, type: string|null, animated: boolean, frequency: number, sourceFrequency: number }>>}
  */
 export const listEmojiCatalog = async () => {
   const { data } = await api.get("/api/message-processing/emoji-catalog", {
@@ -36,11 +37,20 @@ export const listEmojiCatalog = async () => {
 };
 
 /**
- * Delete one custom emoji catalog row by id. DELETE /api/message-processing/emoji-catalog/:id
+ * Delete one custom emoji/sticker catalog row by id. DELETE /api/message-processing/emoji-catalog/:id
  * @param {string} id
  */
 export const deleteEmojiCatalogRow = async (id) => {
   await api.del(`/api/message-processing/emoji-catalog/${id}`);
+};
+
+/**
+ * Correct one catalog row's type. PATCH /api/message-processing/emoji-catalog/:id/type
+ * @param {string} id
+ * @param {"emoji"|"sticker"} type
+ */
+export const setEmojiCatalogRowType = async (id, type) => {
+  await api.patch(`/api/message-processing/emoji-catalog/${id}/type`, { type });
 };
 
 /**

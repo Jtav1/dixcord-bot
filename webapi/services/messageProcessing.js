@@ -719,19 +719,21 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
 }
 
 /**
- * List guild_emojis emoji rows that carry a guild_id (custom emoji, not unicode), for the
+ * List guild_emojis rows that carry a guild_id (custom emoji/sticker, not unicode), for the
  * emoji-cleanup admin script (discord-bot/scripts/cleanup-guild-emojis.js) to verify against
- * each guild's live Discord emoji list. `sourceFrequency` is the emoji_frequency total that
- * migrateEmojiCatalogFrequency would write into `frequency`, for the script's dry-run preview.
+ * each guild's live Discord emoji/sticker lists. Includes rows of any `type` (including NULL —
+ * legacy rows that never got backfilled) so the script can detect and fix a wrong/missing type,
+ * not just emoji rows. `sourceFrequency` is the emoji_frequency total that
+ * migrateEmojiCatalogFrequency would write into `frequency` (only meaningful for emoji rows).
  * @param {string} app
- * @returns {Promise<Array<{id: string, guildId: string, name: string, animated: boolean, frequency: number, sourceFrequency: number}>>}
+ * @returns {Promise<Array<{id: string, guildId: string, name: string, type: string|null, animated: boolean, frequency: number, sourceFrequency: number}>>}
  */
 export async function listEmojiCatalogWithGuild(app) {
   const [rows] = await db.query(
-    `SELECT ge.id, ge.guild_id, ge.name, ge.animated, ge.frequency,
+    `SELECT ge.id, ge.guild_id, ge.name, ge.type, ge.animated, ge.frequency,
             (SELECT COALESCE(SUM(ef.frequency), 0) FROM emoji_frequency ef WHERE ef.emoid = ge.id AND ef.app = ge.app) AS source_frequency
      FROM guild_emojis ge
-     WHERE ge.app = ? AND ge.guild_id IS NOT NULL AND ge.type = 'emoji'
+     WHERE ge.app = ? AND ge.guild_id IS NOT NULL
      ORDER BY ge.guild_id, ge.name`,
     [app],
   );
@@ -739,6 +741,7 @@ export async function listEmojiCatalogWithGuild(app) {
     id: r.id,
     guildId: r.guild_id,
     name: r.name,
+    type: r.type,
     animated: Boolean(r.animated),
     frequency: Number(r.frequency) || 0,
     sourceFrequency: Number(r.source_frequency) || 0,
@@ -746,17 +749,33 @@ export async function listEmojiCatalogWithGuild(app) {
 }
 
 /**
- * Delete one guild_emojis emoji row by id (used by the emoji-cleanup admin script to remove
- * rows misattributed to a guild they don't actually belong to).
+ * Delete one guild_emojis row by id, regardless of type (used by the emoji-cleanup admin script
+ * to remove rows misattributed to a guild they don't actually belong to).
  * @param {string} id
  * @returns {Promise<boolean>} true if a row was deleted
  */
 export async function deleteEmojiCatalogRow(id) {
   if (!id || String(id).trim() === "") return false;
-  const [result] = await db.query(
-    "DELETE FROM guild_emojis WHERE id = ? AND type = 'emoji'",
-    [String(id).trim()],
-  );
+  const [result] = await db.query("DELETE FROM guild_emojis WHERE id = ?", [
+    String(id).trim(),
+  ]);
+  return (result?.affectedRows ?? 0) > 0;
+}
+
+/**
+ * Set a guild_emojis row's `type`, used by the emoji-cleanup admin script to correct rows whose
+ * type is wrong or was never backfilled (NULL), after checking Discord for what the id actually is.
+ * @param {string} id
+ * @param {"emoji"|"sticker"} type
+ * @returns {Promise<boolean>} true if a row was updated
+ */
+export async function setEmojiCatalogRowType(id, type) {
+  if (!id || String(id).trim() === "") return false;
+  if (type !== "emoji" && type !== "sticker") return false;
+  const [result] = await db.query("UPDATE guild_emojis SET type = ? WHERE id = ?", [
+    type,
+    String(id).trim(),
+  ]);
   return (result?.affectedRows ?? 0) > 0;
 }
 

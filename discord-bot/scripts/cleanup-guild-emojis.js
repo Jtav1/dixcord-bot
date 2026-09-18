@@ -5,24 +5,27 @@ import { token, guildId } from "../configVars.js";
 import {
   listEmojiCatalog,
   deleteEmojiCatalogRow,
+  setEmojiCatalogRowType,
   migrateEmojiCatalogFrequency,
 } from "../api/emojis.js";
 
 /**
- * Admin maintenance script, two phases, in order:
+ * Admin maintenance script, three phases, in order:
  *
- * 1. Delete guild_emojis rows that don't actually belong to the guild_id they're stored under
- *    (e.g. legacy backfilled rows from before the (app, guild_id) split). Every custom emoji row
- *    is checked against this bot's own guild's live Discord emoji list — the only guild this
- *    deployment can verify — so a row is kept only when its guild_id matches DISCORD_GUILD_ID
- *    *and* its id is still one of that guild's current emojis.
- * 2. For every row still in guild_emojis after step 1, migrate its usage total from
- *    emoji_frequency into guild_emojis.frequency (matched by emoid). Rows deleted in step 1 are
- *    never migrated.
+ * 1. Delete guild_emojis rows that don't actually belong to this guild (e.g. legacy backfilled
+ *    rows from before the (app, guild_id) split). Every row is checked against this bot's own
+ *    guild's live Discord emoji AND sticker lists — the only guild this deployment can verify —
+ *    so a row is kept only when its guild_id matches DISCORD_GUILD_ID *and* its id is still one
+ *    of that guild's current emojis or stickers.
+ * 2. For every row still in guild_emojis after step 1, correct its `type` ("emoji" or "sticker")
+ *    based on which live Discord list actually contains its id, fixing rows that were never
+ *    backfilled (NULL) or were tagged wrong.
+ * 3. For every row of type "emoji" still in guild_emojis after step 2, migrate its usage total
+ *    from emoji_frequency into guild_emojis.frequency (matched by emoid).
  *
  * Run manually: `node scripts/cleanup-guild-emojis.js [--dry-run]`
- * --dry-run previews both steps (what would be deleted, what frequency would move) without
- * deleting or migrating anything.
+ * --dry-run previews all three steps without deleting, retyping, or migrating anything — type
+ * and frequency previews are computed against Discord's actual data, not the stale DB value.
  */
 
 const dryRun = process.argv.includes("--dry-run");
@@ -34,24 +37,35 @@ async function main() {
   await client.login(token);
   await new Promise((resolve) => client.once("ready", resolve));
 
-  let actualEmojiIds;
+  let actualEmojiIds, actualStickerIds;
   try {
     const oauthGuild = await client.guilds.fetch(guildId);
     const guild = await oauthGuild.fetch();
     const emojis = await guild.emojis.fetch();
+    const stickers = await guild.stickers.fetch();
     actualEmojiIds = new Set(emojis.map((e) => String(e.id)));
+    actualStickerIds = new Set(stickers.map((s) => String(s.id)));
   } finally {
     await client.destroy();
   }
-  console.log(`emoji-cleanup: guild ${guildId} has ${actualEmojiIds.size} real emoji(s).`);
+  console.log(
+    `emoji-cleanup: guild ${guildId} has ${actualEmojiIds.size} real emoji(s) and ${actualStickerIds.size} real sticker(s).`,
+  );
 
   const rows = await listEmojiCatalog();
-  console.log(`emoji-cleanup: guild_emojis has ${rows.length} custom emoji row(s) to check.`);
+  console.log(`emoji-cleanup: guild_emojis has ${rows.length} custom row(s) to check.`);
 
-  const stale = rows.filter(
-    (row) => row.guildId !== guildId || !actualEmojiIds.has(String(row.id)),
-  );
-  const kept = rows.filter((row) => !stale.includes(row));
+  const withKind = rows.map((row) => ({
+    ...row,
+    actualKind: actualEmojiIds.has(String(row.id))
+      ? "emoji"
+      : actualStickerIds.has(String(row.id))
+        ? "sticker"
+        : null,
+  }));
+
+  const stale = withKind.filter((row) => row.guildId !== guildId || row.actualKind === null);
+  const kept = withKind.filter((row) => !stale.includes(row));
 
   // --- Step 1: delete rows that don't belong to this guild ---
   if (stale.length === 0) {
@@ -78,8 +92,36 @@ async function main() {
     }
   }
 
-  // --- Step 2: migrate emoji_frequency totals into guild_emojis.frequency, kept rows only ---
-  const pendingMigration = kept.filter((row) => row.sourceFrequency !== row.frequency);
+  // --- Step 2: fix the type field on kept rows ---
+  const typeMismatches = kept.filter((row) => row.type !== row.actualKind);
+  if (typeMismatches.length === 0) {
+    console.log("emoji-cleanup: no type mismatches to fix.");
+  } else {
+    console.log(`emoji-cleanup: ${typeMismatches.length} row(s) have the wrong type recorded:`);
+    for (const row of typeMismatches) {
+      console.log(`  - ${row.id} "${row.name}": ${row.type ?? "NULL"} -> ${row.actualKind}`);
+    }
+
+    if (dryRun) {
+      console.log("emoji-cleanup: dry run, no types updated.");
+    } else {
+      let fixed = 0;
+      for (const row of typeMismatches) {
+        try {
+          await setEmojiCatalogRowType(row.id, row.actualKind);
+          fixed++;
+        } catch (err) {
+          console.error(`emoji-cleanup: failed to fix type for ${row.id}:`, err?.message ?? err);
+        }
+      }
+      console.log(`emoji-cleanup: fixed type for ${fixed}/${typeMismatches.length} row(s).`);
+    }
+  }
+
+  // --- Step 3: migrate emoji_frequency totals into guild_emojis.frequency, kept emoji rows only ---
+  const pendingMigration = kept.filter(
+    (row) => row.actualKind === "emoji" && row.sourceFrequency !== row.frequency,
+  );
 
   if (pendingMigration.length === 0) {
     console.log("emoji-cleanup: no frequency to migrate.");

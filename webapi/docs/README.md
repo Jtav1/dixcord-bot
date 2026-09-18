@@ -85,8 +85,9 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/message-processing/plusminus` | ✓ | Record plus/minus (message or reaction) |
 | POST | `/api/message-processing/count-repost` | ✓ | Record or withdraw repost accusation |
 | POST | `/api/message-processing/emoji-import` | ✓ | Sync server emoji list (body: `{ app, emojis }`) |
-| GET | `/api/message-processing/emoji-catalog?app=` | bot/admin | List custom emoji catalog rows with a guild_id (for the emoji-cleanup script) |
-| DELETE | `/api/message-processing/emoji-catalog/:id` | bot/admin | Delete one custom emoji catalog row |
+| GET | `/api/message-processing/emoji-catalog?app=` | bot/admin | List custom emoji/sticker catalog rows with a guild_id, any type (for the emoji-cleanup script) |
+| DELETE | `/api/message-processing/emoji-catalog/:id` | bot/admin | Delete one custom emoji/sticker catalog row |
+| PATCH | `/api/message-processing/emoji-catalog/:id/type` | bot/admin | Correct one catalog row's type (body: `{ type: "emoji" \| "sticker" }`) |
 | POST | `/api/message-processing/emoji-catalog/:id/migrate-frequency` | bot/admin | Sum emoji_frequency for this emoid into guild_emojis.frequency |
 | POST | `/api/message-processing/sticker-import` | ✓ | Sync server sticker list (body: `{ app, stickers }`) |
 | POST | `/api/message-processing/pin-check` | ✓ | Check if message already pinned (body: `{ messageId }`) |
