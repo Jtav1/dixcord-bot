@@ -47,16 +47,25 @@ function requireChatAppFromPayload(payload) {
 
 // --- Emoji detector (count emoji usage) ---
 
+/** @param {string} emoid @returns {boolean} true if this looks like a real Discord snowflake (custom emoji/sticker), not a unicode character. */
+function isNumericEmoid(emoid) {
+  return /^\d+$/.test(String(emoid));
+}
+
 /**
- * Ensure emoji_frequency has a row for this emoji; increment frequency.
- * If no row exists, insert one with frequency 1.
+ * Ensure emoji_frequency has a per-guild row for this emoji/sticker; increment frequency.
+ * If no row exists, insert one with frequency 1. Numeric (custom) ids are gracefully discarded
+ * (no row written) unless guildId is a known guild (guild_info) — see reactionHandler.js's
+ * mirror-image guard on the bot side for external/unknown-guild emoji.
  * @param {string} app - e.g. "discord"; emoji_frequency.app has no default, so this is required on insert.
+ * @param {string} guildId
  * @param {string} [emojiType] - Type from request (e.g. 'emoji'); if missing, type is stored as null.
- * @returns {Promise<{ frequency: number|null, inserted: boolean }>} frequency is null if neither branch wrote a row (missing id/name)
+ * @returns {Promise<{ frequency: number|null, inserted: boolean }>} frequency is null if the row was discarded/not written (missing id/name, or unknown guild)
  * @private
  */
 async function ensureAndIncrementEmoji(
   app,
+  guildId,
   emojiId,
   emojiName,
   emojiAnimated,
@@ -64,36 +73,59 @@ async function ensureAndIncrementEmoji(
 ) {
   const id = String(emojiId ?? "");
   const name = String((emojiName ?? id) || "?");
-  const animated = emojiAnimated ? 1 : 0;
+  const gid = String(guildId ?? "").trim();
   const type =
     emojiType != null && String(emojiType).trim() !== ""
       ? String(emojiType).trim()
       : null;
 
-  const [existing] = await db.query(
-    "SELECT frequency FROM emoji_frequency WHERE emoid = ?",
-    [id],
-  );
-
-  if (existing && existing.length > 0) {
-    if (emojiId.length > 0 && emojiName.length > 0) {
-      await db.query(
-        "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE emoid = ?",
-        [id],
-      );
-      return { frequency: Number(existing[0].frequency) + 1, inserted: false };
-    }
+  if (id.length === 0 || name.length === 0 || !gid) {
     return { frequency: null, inserted: false };
   }
 
-  if (emojiId.length > 0 && emojiName.length > 0) {
-    await db.query(
-      "INSERT INTO emoji_frequency (app, emoid, emoji, frequency, animated, type) VALUES (?, ?, ?, 1, ?, ?)",
-      [app, id, name, animated, type],
+  if (isNumericEmoid(id)) {
+    const [knownGuild] = await db.query(
+      "SELECT 1 FROM guild_info WHERE app = ? AND guild_id = ?",
+      [app, gid],
     );
-    return { frequency: 1, inserted: true };
+    if (!knownGuild || knownGuild.length === 0) {
+      // Gracefully discard: custom emoji/sticker from a guild we don't know about.
+      return { frequency: null, inserted: false };
+    }
   }
-  return { frequency: null, inserted: false };
+
+  const [existing] = await db.query(
+    "SELECT frequency FROM emoji_frequency WHERE app = ? AND guild_id = ? AND emoid = ?",
+    [app, gid, id],
+  );
+
+  if (existing && existing.length > 0) {
+    await db.query(
+      "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE app = ? AND guild_id = ? AND emoid = ?",
+      [app, gid, id],
+    );
+    return { frequency: Number(existing[0].frequency) + 1, inserted: false };
+  }
+
+  // Unicode emoji have no sync path (no such Discord API — see discord-bot/api/emojis.js), so
+  // their guild_emojis catalog row is created lazily here, on first use. Custom (numeric) emoji
+  // are never created here — their catalog row only ever comes from the sync path; a first-seen
+  // custom emoji with no catalog row yet just resolves to a placeholder until the next sync.
+  if (!isNumericEmoid(id)) {
+    const [catalogRow] = await db.query("SELECT id FROM guild_emojis WHERE id = ?", [id]);
+    if (!catalogRow || catalogRow.length === 0) {
+      await db.query(
+        "INSERT INTO guild_emojis (id, app, guild_id, type, name, animated) VALUES (?, NULL, NULL, ?, ?, ?)",
+        [id, type, name, emojiAnimated ? 1 : 0],
+      );
+    }
+  }
+
+  await db.query(
+    "INSERT INTO emoji_frequency (app, guild_id, emoid, frequency, type) VALUES (?, ?, ?, 1, ?)",
+    [app, gid, id, type],
+  );
+  return { frequency: 1, inserted: true };
 }
 
 /**
@@ -163,8 +195,8 @@ export async function countEmoji(payload) {
     getGuildConfigValue(chatApp, guildId, "plusplus_emoji"),
     getGuildConfigValue(chatApp, guildId, "minusminus_emoji"),
   ]);
-  const plusEmoji = await resolveConfigEmojiValue(chatApp, plusValue);
-  const minusEmoji = await resolveConfigEmojiValue(chatApp, minusValue);
+  const plusEmoji = await resolveConfigEmojiValue(chatApp, guildId, plusValue);
+  const minusEmoji = await resolveConfigEmojiValue(chatApp, guildId, minusValue);
 
   if (!authorId || !Array.isArray(emojis) || emojis.length === 0) {
     return { ok: false };
@@ -208,6 +240,7 @@ export async function countEmoji(payload) {
     const isSticker = String(em.type ?? "").trim() === "sticker";
     const { frequency, inserted } = await ensureAndIncrementEmoji(
       chatApp,
+      guildId,
       id,
       name,
       em.animated,
@@ -284,6 +317,8 @@ export async function countSticker(payload) {
   const chatApp = appCheck.app;
 
   const { authorId, stickers = [] } = payload;
+  const guildId = String(payload.guildId ?? "").trim();
+  if (!guildId) return { ok: false, error: "guildId is required" };
 
   if (!authorId || !Array.isArray(stickers) || stickers.length === 0) {
     return { ok: false };
@@ -298,6 +333,7 @@ export async function countSticker(payload) {
     const id = st.id != null ? String(st.id) : name;
     const { frequency, inserted } = await ensureAndIncrementEmoji(
       chatApp,
+      guildId,
       id,
       name,
       false,
@@ -608,26 +644,44 @@ export async function countRepost(payload) {
  * @param {string} app - e.g. "discord"; emoji_frequency.app has no default, so this is required on insert.
  * @returns {Promise<{ ok: boolean, imported?: number }>} imported = new rows added (existing emoids skipped)
  */
-export async function importGuildAssetFrequencyList(items, assetKind, app) {
+/**
+ * Fully replace this guild's custom emoji/sticker catalog in guild_emojis (mirrors
+ * guildInfo.js's upsertGuildSnapshot delete+insert for channels/roles). Gracefully discards the
+ * whole sync if guildId isn't a known guild (guild_info) — see reactionHandler.js's mirror-image
+ * guard on the bot side. Usage counts in emoji_frequency are untouched; they're created lazily by
+ * ensureAndIncrementEmoji on first actual use, and survive a catalog entry disappearing here.
+ * @param {Array<{id?: string, name?: string, animated?: boolean, available?: boolean|null, managed?: boolean|null, requiresColons?: boolean|null, roles?: string[]}>} items
+ * @param {"emoji"|"sticker"} assetKind
+ * @param {string} app
+ * @param {string} guildId
+ * @returns {Promise<{ ok: boolean, imported?: number }>} imported = catalog rows written this sync
+ */
+export async function importGuildAssetFrequencyList(items, assetKind, app, guildId) {
   if (!Array.isArray(items)) return { ok: false };
   if (assetKind !== "emoji" && assetKind !== "sticker") return { ok: false };
   if (!isChatMemberAppSupported(app)) return { ok: false };
+  const gid = String(guildId ?? "").trim();
+  if (!gid) return { ok: false };
+
+  const [knownGuild] = await db.query(
+    "SELECT 1 FROM guild_info WHERE app = ? AND guild_id = ?",
+    [app, gid],
+  );
+  if (!knownGuild || knownGuild.length === 0) {
+    // Gracefully discard: don't create catalog entries for a guild we don't know about.
+    return { ok: true, imported: 0 };
+  }
 
   const list = items.filter(
     (e) => e != null && (e.id != null || e.name != null),
   );
 
-  if (assetKind === "emoji") {
-    await db.query(
-      "DELETE FROM emoji_frequency WHERE frequency = 0 AND (type = 'emoji' OR type IS NULL) AND app = ?",
-      [app],
-    );
-  } else {
-    await db.query(
-      "DELETE FROM emoji_frequency WHERE frequency = 0 AND type = 'sticker' AND app = ?",
-      [app],
-    );
-  }
+  // Scoped by (app, guild_id, type) so replacing one kind's catalog never touches the other's.
+  await db.query("DELETE FROM guild_emojis WHERE app = ? AND guild_id = ? AND type = ?", [
+    app,
+    gid,
+    assetKind,
+  ]);
 
   let imported = 0;
   for (const e of list) {
@@ -636,24 +690,22 @@ export async function importGuildAssetFrequencyList(items, assetKind, app) {
     if (id.length === 0 && name === "?") continue;
     const emoid = id || name;
 
-    const [existing] = await db.query(
-      "SELECT 1 FROM emoji_frequency WHERE emoid = ?",
-      [emoid],
+    await db.query(
+      `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        emoid,
+        app,
+        gid,
+        assetKind,
+        name,
+        e.animated ? 1 : 0,
+        e.available == null ? null : e.available ? 1 : 0,
+        e.managed == null ? null : e.managed ? 1 : 0,
+        e.requiresColons == null ? null : e.requiresColons ? 1 : 0,
+        Array.isArray(e.roles) && e.roles.length > 0 ? JSON.stringify(e.roles) : null,
+      ],
     );
-    if (existing && existing.length > 0) continue;
-
-    if (assetKind === "emoji") {
-      const animated = e.animated ? 1 : 0;
-      await db.query(
-        "INSERT INTO emoji_frequency (app, emoid, emoji, frequency, animated, type) VALUES (?, ?, ?, 0, ?, ?)",
-        [app, emoid, name, animated, "emoji"],
-      );
-    } else {
-      await db.query(
-        "INSERT INTO emoji_frequency (app, emoid, emoji, frequency, animated, type) VALUES (?, ?, ?, 0, 0, ?)",
-        [app, emoid, name, "sticker"],
-      );
-    }
     imported++;
   }
   return { ok: true, imported };

@@ -2,9 +2,9 @@ import * as api from "./client.js";
 import { guildId } from "../configVars.js";
 
 /**
- * Sync server emoji list with the web API.
+ * Sync server emoji list with the web API. Fully replaces this guild's guild_emojis catalog.
  * POST /api/message-processing/emoji-import
- * @param {Iterable<{ id: string, name: string, animated?: boolean, type?: string }>} emojiObjectList - e.g. guild.emojis (Collection)
+ * @param {Iterable<import('discord.js').GuildEmoji>} emojiObjectList - e.g. guild.emojis (Collection)
  */
 export const importEmojiList = async (emojiObjectList) => {
   const list = Array.isArray(emojiObjectList)
@@ -14,9 +14,13 @@ export const importEmojiList = async (emojiObjectList) => {
     id: String(e.id),
     name: String(e.name),
     animated: Boolean(e.animated),
+    available: e.available ?? null,
+    managed: e.managed ?? null,
+    requiresColons: e.requiresColons ?? null,
+    roles: e.roles?.cache ? [...e.roles.cache.keys()] : [],
     type: "emoji",
   }));
-  await api.post("/api/message-processing/emoji-import", { app: "discord", emojis });
+  await api.post("/api/message-processing/emoji-import", { app: "discord", guildId, emojis });
   console.log("bot: emoji import via webapi complete");
 };
 

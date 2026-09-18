@@ -1,7 +1,8 @@
 import * as api from "./client.js";
+import { guildId } from "../configVars.js";
 
 /**
- * Sync server sticker list with the web API.
+ * Sync server sticker list with the web API. Fully replaces this guild's sticker catalog.
  * POST /api/message-processing/sticker-import
  * @param {Iterable<{ id: string, name: string }>} stickerObjectList - e.g. guild.stickers (Collection)
  */
@@ -13,7 +14,7 @@ export const importStickerList = async (stickerObjectList) => {
     id: String(s.id),
     name: String(s.name),
   }));
-  await api.post("/api/message-processing/sticker-import", { app: "discord", stickers });
+  await api.post("/api/message-processing/sticker-import", { app: "discord", guildId, stickers });
   console.log("bot: sticker import via webapi complete");
 };
 
@@ -29,6 +30,7 @@ export const countSticker = async (stickerName, stickerId, userid = null) => {
   if (!stickerName) return [];
   const { data } = await api.post("/api/message-processing/sticker-count", {
     app: "discord",
+    guildId,
     authorId,
     stickers: [{ name: stickerName, id: stickerId }],
   });

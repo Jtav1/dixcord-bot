@@ -1458,6 +1458,223 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: timeout_history table already exists");
   }
 
+  // guild_emojis: splits emoji/sticker catalog identity (name, animated) out of emoji_frequency
+  // into its own guild-scoped table, mirroring guild_channels/guild_roles. emoji_frequency then
+  // narrows to pure per-guild usage counting (app, guild_id, emoid).
+  if (!(await tableExists(db, "guild_emojis", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_emojis (
+          id TEXT PRIMARY KEY,
+          app TEXT NULL,
+          guild_id TEXT NULL,
+          type TEXT NULL,
+          name TEXT NOT NULL,
+          animated INTEGER DEFAULT 0,
+          available INTEGER NULL,
+          managed INTEGER NULL,
+          requires_colons INTEGER NULL,
+          roles TEXT NULL,
+          synced_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      await db.query("CREATE INDEX idx_guild_emojis_guild ON guild_emojis (app, guild_id)");
+    } else {
+      await db.query(`
+        CREATE TABLE guild_emojis (
+          id VARCHAR(255) PRIMARY KEY,
+          app VARCHAR(20) NULL,
+          guild_id VARCHAR(64) NULL,
+          type VARCHAR(50) NULL,
+          name VARCHAR(255) NOT NULL,
+          animated TINYINT(1) DEFAULT 0,
+          available TINYINT(1) NULL,
+          managed TINYINT(1) NULL,
+          requires_colons TINYINT(1) NULL,
+          roles TEXT NULL,
+          synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          KEY idx_guild_emojis_guild (app, guild_id)
+        )
+      `);
+    }
+    applied.push("guild_emojis table");
+    console.log("db: migration applied: created guild_emojis table");
+  } else {
+    console.log("db: schema ok: guild_emojis table already exists");
+  }
+
+  // guild_emojis.type column: distinguishes emoji vs sticker catalog rows so each kind's
+  // full-replace sync (importGuildAssetFrequencyList) only deletes its own rows, not the other
+  // kind's. Added after the initial guild_emojis rollout — backfill from the matching
+  // emoji_frequency row's `type` for anything created before this column existed.
+  if (
+    (await tableExists(db, "guild_emojis", isSqlite)) &&
+    !(await columnExists(db, "guild_emojis", "type", isSqlite))
+  ) {
+    await db.query(
+      isSqlite
+        ? "ALTER TABLE guild_emojis ADD COLUMN type TEXT NULL"
+        : "ALTER TABLE guild_emojis ADD COLUMN type VARCHAR(50) NULL",
+    );
+    if (await tableExists(db, "emoji_frequency", isSqlite)) {
+      await db.query(`
+        UPDATE guild_emojis
+        SET type = (SELECT ef.type FROM emoji_frequency ef WHERE ef.emoid = guild_emojis.id LIMIT 1)
+        WHERE type IS NULL AND EXISTS (SELECT 1 FROM emoji_frequency ef WHERE ef.emoid = guild_emojis.id)
+      `);
+    }
+    applied.push("guild_emojis.type column (backfilled from emoji_frequency)");
+    console.log("db: migration applied: added guild_emojis.type column, backfilled from emoji_frequency");
+  } else {
+    console.log("db: schema ok: guild_emojis.type column already exists");
+  }
+
+  // Backfill guild_emojis from legacy emoji_frequency rows (which still have `emoji`/`animated`
+  // columns pre-narrowing), then narrow emoji_frequency to (app, guild_id, emoid) once every row
+  // is accounted for. Legacy rows have no guild_id at all, so a custom-emoji row can only be
+  // safely attributed to a guild when exactly one guild is known (this bot's typical single-guild
+  // deployment — same assumption the historical app='discord' backfill already made). If more
+  // than one guild is registered, legacy rows are left unmigrated (old columns kept) rather than
+  // guessing which guild owns them — narrowing retries on a later boot, same "don't drop data you
+  // can't verify" caution as the deferred chat_member_mapping column narrowing elsewhere in this
+  // file.
+  if (
+    (await tableExists(db, "guild_emojis", isSqlite)) &&
+    (await tableExists(db, "emoji_frequency", isSqlite)) &&
+    (await columnExists(db, "emoji_frequency", "emoji", isSqlite))
+  ) {
+    const [guildRows] = await db.query("SELECT app, guild_id FROM guild_info");
+    const knownGuilds = Array.isArray(guildRows) ? guildRows : [];
+
+    const [legacyRows] = await db.query(
+      "SELECT app, emoid, emoji, animated, type FROM emoji_frequency",
+    );
+    const isNumericEmoid = (emoid) => /^\d+$/.test(String(emoid));
+
+    let insertedCount = 0;
+    let ambiguousCount = 0;
+    for (const row of legacyRows ?? []) {
+      const [existing] = await db.query("SELECT id FROM guild_emojis WHERE id = ?", [row.emoid]);
+      if (existing && existing.length > 0) continue;
+
+      if (isNumericEmoid(row.emoid)) {
+        if (knownGuilds.length !== 1) {
+          ambiguousCount += 1;
+          continue;
+        }
+        await db.query(
+          "INSERT INTO guild_emojis (id, app, guild_id, type, name, animated) VALUES (?, ?, ?, ?, ?, ?)",
+          [row.emoid, knownGuilds[0].app, knownGuilds[0].guild_id, row.type, row.emoji, row.animated ? 1 : 0],
+        );
+      } else {
+        await db.query(
+          "INSERT INTO guild_emojis (id, app, guild_id, type, name, animated) VALUES (?, NULL, NULL, ?, ?, ?)",
+          [row.emoid, row.type, row.emoji, row.animated ? 1 : 0],
+        );
+      }
+      insertedCount += 1;
+    }
+
+    if (insertedCount > 0) {
+      applied.push(`guild_emojis backfill (${insertedCount} row(s))`);
+      console.log(
+        `db: migration applied: backfilled ${insertedCount} guild_emojis row(s) from emoji_frequency`,
+      );
+    }
+    if (ambiguousCount > 0) {
+      console.log(
+        `db: schema warning: ${ambiguousCount} legacy custom-emoji emoji_frequency row(s) could not be attributed to a single known guild (guild_info has ${knownGuilds.length} guild(s)); left unmigrated`,
+      );
+    }
+
+    const [remainingRows] = await db.query(
+      "SELECT COUNT(*) AS total FROM emoji_frequency ef WHERE NOT EXISTS (SELECT 1 FROM guild_emojis ge WHERE ge.id = ef.emoid)",
+    );
+    const remaining = Number(remainingRows?.[0]?.total ?? 0);
+
+    if (remaining > 0) {
+      console.log(
+        `db: schema ok: emoji_frequency narrowing deferred — ${remaining} row(s) not yet represented in guild_emojis`,
+      );
+    } else if (knownGuilds.length !== 1) {
+      console.log(
+        `db: schema warning: emoji_frequency narrowing skipped — guild_info has ${knownGuilds.length} guild(s), can't safely assign legacy rows a guild_id`,
+      );
+    } else {
+      if (isSqlite) {
+        // emoid is deliberately NOT a real FK to guild_emojis — see schema.sqlite.sql's comment;
+        // a real FK (emoid is part of this PK, can't be nulled) would cascade-delete usage
+        // history the moment guild_emojis is fully replaced on the next catalog sync.
+        await db.query(`
+          CREATE TABLE emoji_frequency_new (
+            app TEXT NOT NULL,
+            guild_id TEXT NOT NULL,
+            emoid TEXT NOT NULL,
+            frequency INTEGER NOT NULL DEFAULT 0,
+            type TEXT DEFAULT NULL,
+            PRIMARY KEY (app, guild_id, emoid)
+          )
+        `);
+        await db.query(
+          `INSERT INTO emoji_frequency_new (app, guild_id, emoid, frequency, type)
+           SELECT app, ?, emoid, frequency, type FROM emoji_frequency`,
+          [knownGuilds[0].guild_id],
+        );
+        await db.query("DROP TABLE emoji_frequency");
+        await db.query("ALTER TABLE emoji_frequency_new RENAME TO emoji_frequency");
+      } else {
+        await db.query("ALTER TABLE emoji_frequency ADD COLUMN guild_id VARCHAR(64) NULL");
+        await db.query("UPDATE emoji_frequency SET guild_id = ? WHERE guild_id IS NULL", [
+          knownGuilds[0].guild_id,
+        ]);
+        await db.query(
+          "ALTER TABLE emoji_frequency DROP PRIMARY KEY, MODIFY COLUMN guild_id VARCHAR(64) NOT NULL, ADD PRIMARY KEY (app, guild_id, emoid), DROP COLUMN emoji, DROP COLUMN animated",
+        );
+      }
+      applied.push("emoji_frequency narrowed to (app, guild_id, emoid); emoji/animated moved to guild_emojis");
+      console.log(
+        "db: migration applied: narrowed emoji_frequency to (app, guild_id, emoid), dropped emoji/animated columns",
+      );
+    }
+  } else {
+    console.log("db: schema ok: emoji_frequency already narrowed (no emoji/animated columns)");
+  }
+
+  // Repair step: an earlier version of the narrowing migration above (SQLite only) mistakenly
+  // added a real FK (emoid -> guild_emojis.id, ON DELETE CASCADE). Since emoid is part of this
+  // table's PRIMARY KEY it can't be nulled, so that FK would silently cascade-delete usage history
+  // the moment a guild_emojis row is replaced by the next catalog sync — strip it if present.
+  // PRAGMA foreign_key_list doesn't round-trip through db.js's query wrapper correctly (it isn't
+  // a SELECT), so detect via the table's stored CREATE TABLE text instead (same technique as
+  // getColumnDeclaredType above).
+  const emojiFrequencyDdl = isSqlite
+    ? (
+        await db.query("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'emoji_frequency'")
+      )[0]?.[0]?.sql
+    : null;
+  if (isSqlite && emojiFrequencyDdl && /REFERENCES\s+guild_emojis/i.test(emojiFrequencyDdl)) {
+    await db.query(`
+      CREATE TABLE emoji_frequency_new (
+        app TEXT NOT NULL,
+        guild_id TEXT NOT NULL,
+        emoid TEXT NOT NULL,
+        frequency INTEGER NOT NULL DEFAULT 0,
+        type TEXT DEFAULT NULL,
+        PRIMARY KEY (app, guild_id, emoid)
+      )
+    `);
+    await db.query(`
+      INSERT INTO emoji_frequency_new (app, guild_id, emoid, frequency, type)
+      SELECT app, guild_id, emoid, frequency, type FROM emoji_frequency
+    `);
+    await db.query("DROP TABLE emoji_frequency");
+    await db.query("ALTER TABLE emoji_frequency_new RENAME TO emoji_frequency");
+    applied.push("emoji_frequency.emoid FK to guild_emojis removed (was unsafe ON DELETE CASCADE)");
+    console.log(
+      "db: migration applied: removed emoji_frequency.emoid's FK to guild_emojis (was unsafe ON DELETE CASCADE)",
+    );
+  }
+
   if (applied.length === 0) {
     console.log("db: schema valid; no migrations applied");
   } else {
