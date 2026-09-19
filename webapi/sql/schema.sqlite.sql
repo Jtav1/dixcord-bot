@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   managed INTEGER NULL,
   requires_colons INTEGER NULL,
   roles TEXT NULL,
-  frequency INTEGER NOT NULL DEFAULT 0,  -- migrated from emoji_frequency by discord-bot/scripts/cleanup-guild-emojis.js
+  frequency INTEGER NOT NULL DEFAULT 0,  -- synced from emoji_frequency by discord-bot/scripts/sync-emoji-frequency.js
   synced_at TEXT DEFAULT (datetime('now'))
 );
 

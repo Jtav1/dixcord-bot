@@ -245,31 +245,30 @@ export async function getPlusPlusTopVoters(limit, app) {
   return Array.isArray(rows) ? rows : [];
 }
 
-// --- Emoji (emoji_frequency) ---
+// --- Emoji (guild_emojis.frequency) ---
 
-const EMOJI_FREQUENCY_WHERE = "type = 'emoji' OR type IS NULL";
+const EMOJI_FREQUENCY_WHERE = "(type = 'emoji' OR type IS NULL) AND frequency > 0";
 
 /**
- * Paginated emoji usage leaderboard from emoji_frequency (emojis only, excludes stickers).
+ * Paginated emoji usage leaderboard from guild_emojis (emojis only, excludes stickers and
+ * never-used catalog rows).
  * @param {number} [limit] Max rows per page (default 5, max 50).
  * @param {number} [offset] Rows to skip (default 0).
- * @returns {Promise<{ rows: Array<{ emoji: object }>, total: number }>} `emoji` is the full emoji_frequency row (see attachEmojiObjects).
+ * @returns {Promise<{ rows: Array<{ emoji: object }>, total: number }>} `emoji` is the full guild_emojis row (see attachEmojiObjects).
  */
 export async function listEmojiFrequency(limit, offset = 0) {
   const n = parseLimit(limit, 5, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
-  // GROUP BY/SUM: emoji_frequency is per-guild, so sum usage across guilds into one ranked total.
   const [countRows] = await db.query(
-    `SELECT COUNT(DISTINCT emoid) AS total FROM emoji_frequency WHERE ${EMOJI_FREQUENCY_WHERE}`,
+    `SELECT COUNT(*) AS total FROM guild_emojis WHERE ${EMOJI_FREQUENCY_WHERE}`,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT emoid, SUM(frequency) AS total_frequency FROM emoji_frequency
+    `SELECT id AS emoid FROM guild_emojis
      WHERE ${EMOJI_FREQUENCY_WHERE}
-     GROUP BY emoid
-     ORDER BY total_frequency DESC LIMIT ? OFFSET ?`,
+     ORDER BY frequency DESC LIMIT ? OFFSET ?`,
     [n, off],
   );
 
@@ -282,7 +281,7 @@ export async function listEmojiFrequency(limit, offset = 0) {
 /**
  * Top used emojis (backward-compatible wrapper for Discord bot).
  * @param {number} [limit]
- * @returns {Promise<Array<{ emoji: object }>>} `emoji` is the full emoji_frequency row (see attachEmojiObjects).
+ * @returns {Promise<Array<{ emoji: object }>>} `emoji` is the full guild_emojis row (see attachEmojiObjects).
  */
 export async function getTopEmoji(limit) {
   const { rows } = await listEmojiFrequency(limit, 0);
@@ -302,7 +301,7 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
   const n = parseLimit(limit, 50, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
-  // Joins guild_emojis (one row per emoid) for type, not emoji_frequency (per-guild, would inflate totals).
+  // Joins guild_emojis for type only; per-user totals come from member_emoji_tracking.
   const isEmojiType = "ge.type = 'emoji' OR ge.type IS NULL";
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT uet.userid) AS total
@@ -334,31 +333,30 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
   };
 }
 
-// --- Sticker (emoji_frequency, type = 'sticker') ---
+// --- Sticker (guild_emojis.frequency, type = 'sticker') ---
 
-const STICKER_FREQUENCY_WHERE = "type = 'sticker'";
+const STICKER_FREQUENCY_WHERE = "type = 'sticker' AND frequency > 0";
 
 /**
- * Paginated sticker usage leaderboard from emoji_frequency (stickers only).
+ * Paginated sticker usage leaderboard from guild_emojis (stickers only, excludes never-used
+ * catalog rows).
  * @param {number} [limit] Max rows per page (default 5, max 50).
  * @param {number} [offset] Rows to skip (default 0).
- * @returns {Promise<{ rows: Array<{ emoji: object }>, total: number }>} `emoji` is the full emoji_frequency row (see attachEmojiObjects).
+ * @returns {Promise<{ rows: Array<{ emoji: object }>, total: number }>} `emoji` is the full guild_emojis row (see attachEmojiObjects).
  */
 export async function listStickerFrequency(limit, offset = 0) {
   const n = parseLimit(limit, 5, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
-  // GROUP BY/SUM: emoji_frequency is per-guild, so sum usage across guilds into one ranked total.
   const [countRows] = await db.query(
-    `SELECT COUNT(DISTINCT emoid) AS total FROM emoji_frequency WHERE ${STICKER_FREQUENCY_WHERE}`,
+    `SELECT COUNT(*) AS total FROM guild_emojis WHERE ${STICKER_FREQUENCY_WHERE}`,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT emoid, SUM(frequency) AS total_frequency FROM emoji_frequency
+    `SELECT id AS emoid FROM guild_emojis
      WHERE ${STICKER_FREQUENCY_WHERE}
-     GROUP BY emoid
-     ORDER BY total_frequency DESC LIMIT ? OFFSET ?`,
+     ORDER BY frequency DESC LIMIT ? OFFSET ?`,
     [n, off],
   );
 
@@ -381,7 +379,7 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
   const n = parseLimit(limit, 50, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
-  // Joins guild_emojis for type, not emoji_frequency — see listEmojiUsersByTotalUsage's comment.
+  // Joins guild_emojis for type only; per-user totals come from member_emoji_tracking.
   const isStickerType = "ge.type = 'sticker'";
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT uet.userid) AS total

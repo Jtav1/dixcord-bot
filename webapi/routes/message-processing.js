@@ -7,10 +7,7 @@ import {
   recordPlusMinusReaction,
   countRepost,
   importGuildAssetFrequencyList,
-  listEmojiCatalogWithGuild,
-  deleteEmojiCatalogRow,
-  setEmojiCatalogRowType,
-  migrateEmojiCatalogFrequency,
+  syncGuildEmojiFrequency,
   isMessageAlreadyPinned,
   logPinnedMessage,
 } from "../services/messageProcessing.js";
@@ -41,7 +38,7 @@ const router = express.Router();
  *     tags: [Message Processing]
  *     summary: Record emoji usage in a message
  *     description: >
- *       Increments emoji_frequency / member_emoji_tracking for each emoji in the message.
+ *       Increments guild_emojis.frequency / member_emoji_tracking for each emoji in the message.
  *       If isReply is true and the emojis are exactly one configured plusplus/minusminus emoji
  *       (guild_config, resolved via resolveConfigEmojiValue and compared with emojisMatch), also
  *       records a single +/- vote for repliedUserId instead of counting it as emoji usage.
@@ -125,7 +122,7 @@ router.post("/emoji-count", authenticate, requireOwnGuildOrAdmin, async (req, re
  *     tags: [Message Processing]
  *     summary: Record sticker usage in a message
  *     description: >
- *       Increments emoji_frequency (type='sticker', now per-guild) / member_emoji_tracking for each
+ *       Increments guild_emojis.frequency (type='sticker') / member_emoji_tracking for each
  *       sticker in the message. Unlike emoji-count, there is no plus/minus branch — Discord has no
  *       reply-with-sticker vote mechanism.
  *     requestBody:
@@ -366,8 +363,9 @@ router.post("/count-repost", authenticate, async (req, res) => {
 /**
  * POST /api/message-processing/emoji-import
  * Sync server emoji list (mirrors bot api/emojis.js POST to this route).
- * Fully replaces this guild's guild_emojis catalog rows (type='emoji'); emoji_frequency usage
- * counts are untouched. Gracefully no-ops (imported:0) if guildId isn't a known guild.
+ * Replaces this guild's guild_emojis catalog rows (type='emoji'), keeping rows with usage
+ * history (frequency > 0) even if no longer live on Discord; guild_emojis.frequency itself is
+ * untouched. Gracefully no-ops (imported:0) if guildId isn't a known guild.
  * Body: { app: "discord", guildId: string, emojis: Array<{ id: string, name: string, animated?: boolean, available?: boolean, managed?: boolean, requiresColons?: boolean, roles?: string[] }> }
  * Response: { ok: true, imported: number }
  * Auth: required.
@@ -378,8 +376,9 @@ router.post("/count-repost", authenticate, async (req, res) => {
  *     tags: [Message Processing]
  *     summary: Sync the guild's custom emoji catalog
  *     description: >
- *       Fully replaces this guild's guild_emojis rows of type 'emoji' (mirrors guild_channels/
- *       guild_roles sync). emoji_frequency usage counts are untouched. Gracefully discards the
+ *       Replaces this guild's guild_emojis rows of type 'emoji' (mirrors guild_channels/
+ *       guild_roles sync), keeping rows with usage history (frequency > 0) even if no longer
+ *       live on Discord. guild_emojis.frequency itself is untouched. Gracefully discards the
  *       whole sync (imported:0, no error) if guildId isn't a known guild (guild_info).
  *     requestBody:
  *       required: true
@@ -444,157 +443,55 @@ router.post("/emoji-import", authenticate, async (req, res) => {
 });
 
 /**
- * GET /api/message-processing/emoji-catalog
- * List guild_emojis catalog rows that carry a guild_id (custom emoji/sticker, not unicode).
- * Includes rows of any `type`, including NULL (never backfilled). Used by
- * discord-bot/scripts/cleanup-guild-emojis.js to find rows misattributed to the wrong guild,
- * and to fix a wrong/missing `type`, by checking each id against that guild's live Discord
- * emoji and sticker lists.
- * Query: { app: "discord" }
+ * POST /api/message-processing/emoji-frequency-sync
+ * Admin maintenance for discord-bot/scripts/sync-emoji-frequency.js. First deletes guild_emojis
+ * rows attributed to another guild (misattributed/legacy), then copies frequency from
+ * emoji_frequency into guild_emojis for this guild — updating existing catalog rows and
+ * inserting any missing ones (emoji_frequency is the source of truth for id/type/frequency when
+ * a catalog row doesn't exist yet). Covers both emoji and sticker rows.
+ * dryRun:true computes the same counts without writing anything.
+ * Body: { app: "discord", guildId: string, dryRun?: boolean }
  * Auth: bot or admin.
  * @openapi
- * /api/message-processing/emoji-catalog:
- *   get:
- *     operationId: listEmojiCatalog
+ * /api/message-processing/emoji-frequency-sync:
+ *   post:
+ *     operationId: syncEmojiFrequency
  *     tags: [Message Processing]
- *     summary: List custom emoji/sticker catalog rows (with guild_id)
+ *     summary: Sync guild_emojis frequency/rows from emoji_frequency for one guild
  *     description: >
- *       Returns every guild_emojis row that has a guild_id (i.e. custom, not unicode), of any
- *       type (including NULL — legacy rows that were never backfilled). Intended for the
- *       emoji-cleanup admin script, not general browsing.
- *     parameters:
- *       - name: app
- *         in: query
- *         required: true
- *         schema: { type: string, enum: [discord] }
- *     responses:
- *       '200':
- *         description: Catalog rows.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok: { type: boolean, enum: [true] }
- *                 emojis:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id: { type: string }
- *                       guildId: { type: string }
- *                       name: { type: string }
- *                       type: { type: string, nullable: true, enum: [emoji, sticker, null] }
- *                       animated: { type: boolean }
- *                       frequency: { type: integer, description: "Current guild_emojis.frequency value." }
- *                       sourceFrequency: { type: integer, description: "emoji_frequency total; what migrate-frequency would write. Only meaningful for type=emoji." }
- *                       hasFrequencyHistory: { type: boolean, description: "True if any emoji_frequency row exists for this emoid — a fallback 'this is an emoji' signal when the id is no longer live on Discord." }
- *       '400':
- *         description: Missing/invalid app parameter.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       '401':
- *         $ref: '#/components/responses/Unauthorized'
- *       '403':
- *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
- *       '500':
- *         $ref: '#/components/responses/ServerError'
- */
-router.get("/emoji-catalog", authenticate, requireBotOrAdmin, async (req, res) => {
-  try {
-    if (!resolveChatAppFromRequest(req)) {
-      return res.status(400).json(CHAT_APP_PARAM_ERROR);
-    }
-    const emojis = await listEmojiCatalogWithGuild(req.query.app);
-    res.json({ ok: true, emojis });
-  } catch (err) {
-    console.error("GET /api/message-processing/emoji-catalog error:", err);
-    res.status(500).json({ ok: false, error: "Failed to list emoji catalog" });
-  }
-});
-
-/**
- * DELETE /api/message-processing/emoji-catalog/:id
- * Delete one guild_emojis row by id, regardless of type. Used by the emoji-cleanup admin script
- * to remove rows that don't actually belong to the guild_id they're stored under.
- * Auth: bot or admin.
- * @openapi
- * /api/message-processing/emoji-catalog/{id}:
- *   delete:
- *     operationId: deleteEmojiCatalogRow
- *     tags: [Message Processing]
- *     summary: Delete one custom emoji/sticker catalog row
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         schema: { type: string }
- *     responses:
- *       '200':
- *         description: Row deleted (or already absent).
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok: { type: boolean, enum: [true] }
- *       '401':
- *         $ref: '#/components/responses/Unauthorized'
- *       '403':
- *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
- *       '500':
- *         $ref: '#/components/responses/ServerError'
- */
-router.delete("/emoji-catalog/:id", authenticate, requireBotOrAdmin, async (req, res) => {
-  try {
-    await deleteEmojiCatalogRow(req.params.id);
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("DELETE /api/message-processing/emoji-catalog/:id error:", err);
-    res.status(500).json({ ok: false, error: "Failed to delete emoji catalog row" });
-  }
-});
-
-/**
- * PATCH /api/message-processing/emoji-catalog/:id/type
- * Set a guild_emojis row's type ("emoji" or "sticker"). Used by the emoji-cleanup admin script
- * to correct rows whose type is wrong or was never backfilled, after checking Discord for what
- * the id actually is.
- * Body: { type: "emoji" | "sticker" }
- * Auth: bot or admin.
- * @openapi
- * /api/message-processing/emoji-catalog/{id}/type:
- *   patch:
- *     operationId: setEmojiCatalogRowType
- *     tags: [Message Processing]
- *     summary: Correct one custom emoji/sticker catalog row's type
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         schema: { type: string }
+ *       Deletes guild_emojis rows whose guild_id belongs to a different guild (app matches, but
+ *       guild_id doesn't), then for every emoji_frequency row belonging to (app, guildId) — emoji
+ *       and sticker alike, per emoji_frequency.type (NULL = emoji) — copies its frequency into
+ *       the matching guild_emojis row (keyed on id), inserting one if it doesn't exist yet using
+ *       only what emoji_frequency has (name falls back to the id). dryRun:true previews the same
+ *       counts (deleted/inserted/updated) without writing anything.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [type]
+ *             required: [app, guildId]
  *             properties:
- *               type: { type: string, enum: [emoji, sticker] }
+ *               app: { type: string, enum: [discord] }
+ *               guildId: { type: string }
+ *               dryRun: { type: boolean, default: false }
  *     responses:
  *       '200':
- *         description: Type updated.
+ *         description: Sync complete (or previewed, if dryRun).
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
  *                 ok: { type: boolean, enum: [true] }
+ *                 dryRun: { type: boolean }
+ *                 deleted: { type: integer, description: "guild_emojis rows removed (misattributed to another guild)." }
+ *                 inserted: { type: integer, description: "guild_emojis rows newly created from emoji_frequency." }
+ *                 updated: { type: integer, description: "Existing guild_emojis rows whose frequency was copied over." }
+ *                 synced: { type: integer, description: "inserted + updated." }
  *       '400':
- *         description: Missing/invalid type.
+ *         description: Missing/invalid app or guildId.
  *         content:
  *           application/json:
  *             schema:
@@ -606,86 +503,36 @@ router.delete("/emoji-catalog/:id", authenticate, requireBotOrAdmin, async (req,
  *       '500':
  *         $ref: '#/components/responses/ServerError'
  */
-router.patch("/emoji-catalog/:id/type", authenticate, requireBotOrAdmin, async (req, res) => {
+router.post("/emoji-frequency-sync", authenticate, requireBotOrAdmin, async (req, res) => {
   try {
-    const { type } = req.body ?? {};
-    if (type !== "emoji" && type !== "sticker") {
-      return res.status(400).json({ ok: false, error: "type must be 'emoji' or 'sticker'" });
+    if (!resolveChatAppFromRequest(req)) {
+      return res.status(400).json(CHAT_APP_PARAM_ERROR);
     }
-    await setEmojiCatalogRowType(req.params.id, type);
-    res.json({ ok: true });
+    const { app, guildId, dryRun } = req.body ?? {};
+    const result = await syncGuildEmojiFrequency(app, guildId, Boolean(dryRun));
+    if (!result.ok) {
+      return res.status(400).json({ ok: false, error: "guildId is required" });
+    }
+    res.json({
+      ok: true,
+      dryRun: Boolean(dryRun),
+      deleted: result.deleted ?? 0,
+      inserted: result.inserted ?? 0,
+      updated: result.updated ?? 0,
+      synced: result.synced ?? 0,
+    });
   } catch (err) {
-    console.error("PATCH /api/message-processing/emoji-catalog/:id/type error:", err);
-    res.status(500).json({ ok: false, error: "Failed to update emoji catalog row type" });
+    console.error("POST /api/message-processing/emoji-frequency-sync error:", err);
+    res.status(500).json({ ok: false, error: "Failed to sync emoji frequency" });
   }
 });
 
 /**
- * POST /api/message-processing/emoji-catalog/:id/migrate-frequency
- * Sum emoji_frequency rows for this emoid and write the total into guild_emojis.frequency.
- * No-ops with a 404-shaped error if the id isn't in guild_emojis (e.g. already deleted by the
- * emoji-cleanup script's stale-row pass, which must run before this).
- * Auth: bot or admin.
- * @openapi
- * /api/message-processing/emoji-catalog/{id}/migrate-frequency:
- *   post:
- *     operationId: migrateEmojiCatalogFrequency
- *     tags: [Message Processing]
- *     summary: Migrate one emoji's usage total from emoji_frequency into guild_emojis.frequency
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         schema: { type: string }
- *     responses:
- *       '200':
- *         description: Frequency migrated.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok: { type: boolean, enum: [true] }
- *                 frequency: { type: integer }
- *       '404':
- *         description: id not found in guild_emojis.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       '401':
- *         $ref: '#/components/responses/Unauthorized'
- *       '403':
- *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
- *       '500':
- *         $ref: '#/components/responses/ServerError'
- */
-router.post(
-  "/emoji-catalog/:id/migrate-frequency",
-  authenticate,
-  requireBotOrAdmin,
-  async (req, res) => {
-    try {
-      const result = await migrateEmojiCatalogFrequency(req.params.id);
-      if (!result.ok) {
-        return res.status(404).json({ ok: false, error: result.error });
-      }
-      res.json({ ok: true, frequency: result.frequency });
-    } catch (err) {
-      console.error(
-        "POST /api/message-processing/emoji-catalog/:id/migrate-frequency error:",
-        err,
-      );
-      res.status(500).json({ ok: false, error: "Failed to migrate emoji frequency" });
-    }
-  },
-);
-
-/**
  * POST /api/message-processing/sticker-import
  * Sync server sticker list (like emoji-import; no animated field).
- * Fully replaces this guild's guild_emojis catalog rows (type='sticker'); emoji_frequency usage
- * counts are untouched. Gracefully no-ops (imported:0) if guildId isn't a known guild.
+ * Replaces this guild's guild_emojis catalog rows (type='sticker'), keeping rows with usage
+ * history (frequency > 0) even if no longer live on Discord; guild_emojis.frequency itself is
+ * untouched. Gracefully no-ops (imported:0) if guildId isn't a known guild.
  * Body: { app: "discord", guildId: string, stickers: Array<{ id: string, name: string }> }
  * Response: { ok: true, imported: number }
  * Auth: required.
@@ -696,8 +543,9 @@ router.post(
  *     tags: [Message Processing]
  *     summary: Sync the guild's sticker catalog
  *     description: >
- *       Fully replaces this guild's guild_emojis rows of type 'sticker' (mirrors emoji-import).
- *       emoji_frequency usage counts are untouched. Gracefully discards the whole sync
+ *       Replaces this guild's guild_emojis rows of type 'sticker' (mirrors emoji-import), keeping
+ *       rows with usage history (frequency > 0) even if no longer live on Discord.
+ *       guild_emojis.frequency itself is untouched. Gracefully discards the whole sync
  *       (imported:0, no error) if guildId isn't a known guild (guild_info).
  *     requestBody:
  *       required: true

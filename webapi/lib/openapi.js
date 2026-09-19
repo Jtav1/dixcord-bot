@@ -119,8 +119,8 @@ const definition = {
       EmojiFrequency: {
         type: "object",
         description:
-          "A resolved emoji_frequency row — the shape every webapi response uses for an emoji " +
-          "or sticker, in place of a bare emoid. If the emoid has no matching emoji_frequency " +
+          "A resolved guild_emojis row — the shape every webapi response uses for an emoji " +
+          "or sticker, in place of a bare emoid. If the emoid has no matching guild_emojis " +
           "row (deleted), only emoid is populated and the rest are null.",
         properties: {
           emoid: { type: "string", description: "Discord emoji/sticker snowflake, or the literal unicode character for a built-in emoji." },
@@ -135,7 +135,7 @@ const definition = {
         type: "object",
         description:
           "Resolved value of an \"emoji\"-typed config entry (pin_emoji, plusplus_emoji, " +
-          "minusminus_emoji, repost_emoji). If the stored value matches a synced emoji_frequency " +
+          "minusminus_emoji, repost_emoji). If the stored value matches a synced guild_emojis " +
           "row, this is that row (app is the real app name). If it's freeform text an admin typed " +
           "by hand that was never synced, app/emoid are null and `emoji` holds the raw text — " +
           "comparisons should fall back to matching that string (see emojisMatch).",

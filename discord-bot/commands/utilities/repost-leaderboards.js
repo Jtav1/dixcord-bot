@@ -14,7 +14,7 @@ const data = new SlashCommandBuilder()
 const execute = async (interaction) => {
   let top5 = await getTopReposters(5);
 
-  // emoid only present when matched to a synced emoji_frequency row; else fall back to raw text.
+  // emoid only present when matched to a synced guild_emojis row; else fall back to raw text.
   const repostEmojiValue = getRepostEmoji();
   const repostEmojiDisplay = repostEmojiValue?.emoid
     ? `<:repost:${repostEmojiValue.emoid}>`

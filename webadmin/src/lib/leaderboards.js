@@ -21,7 +21,7 @@ export async function fetchPlusplusTopVoters({ limit = 10 } = {}) {
 /**
  * Top used emojis, paginated.
  * @param {{ limit?: number, offset?: number }} [options]
- * @returns {Promise<{ items: Array<{emoji:{emoid:string,app:string,emoji:string,frequency:number,animated:number,type:string}}>, total: number }>} `emoji` is the full emoji_frequency row — use `.emoji.emoji` for display name, not `.emoji.emoid`.
+ * @returns {Promise<{ items: Array<{emoji:{emoid:string,app:string,emoji:string,frequency:number,animated:number,type:string}}>, total: number }>} `emoji` is the full guild_emojis row — use `.emoji.emoji` for display name, not `.emoji.emoid`.
  */
 export async function fetchEmojiLeaderboard({ limit = 10, offset = 0 } = {}) {
   const data = await apiFetchJson("POST", "/leaderboards/emoji", { limit, offset }, "Emoji leaderboard");
@@ -46,7 +46,7 @@ export async function fetchEmojiUserLeaderboard({ limit = 10, offset = 0 } = {})
 /**
  * Top used stickers, paginated.
  * @param {{ limit?: number, offset?: number }} [options]
- * @returns {Promise<{ items: Array<{emoji:{emoid:string,app:string,emoji:string,frequency:number,animated:number,type:string}}>, total: number }>} `emoji` is the full emoji_frequency row — use `.emoji.emoji` for display name, not `.emoji.emoid`.
+ * @returns {Promise<{ items: Array<{emoji:{emoid:string,app:string,emoji:string,frequency:number,animated:number,type:string}}>, total: number }>} `emoji` is the full guild_emojis row — use `.emoji.emoji` for display name, not `.emoji.emoid`.
  */
 export async function fetchStickerLeaderboard({ limit = 10, offset = 0 } = {}) {
   const data = await apiFetchJson("POST", "/leaderboards/sticker", { limit, offset }, "Sticker leaderboard");

@@ -377,7 +377,7 @@ router.post("/plusplus/top-voters", authenticate, async (req, res) => {
  *     operationId: getEmojiLeaderboard
  *     tags: [Leaderboards]
  *     summary: Top used emojis
- *     description: Paginated emoji usage leaderboard from emoji_frequency (emojis only, excludes stickers).
+ *     description: Paginated emoji usage leaderboard from guild_emojis (emojis only, excludes stickers).
  *     requestBody:
  *       required: false
  *       content:
@@ -504,7 +504,7 @@ router.post("/emoji/users", authenticate, async (req, res) => {
  *     operationId: getStickerLeaderboard
  *     tags: [Leaderboards]
  *     summary: Top used stickers
- *     description: Paginated sticker usage leaderboard from emoji_frequency (stickers only).
+ *     description: Paginated sticker usage leaderboard from guild_emojis (stickers only).
  *     requestBody:
  *       required: false
  *       content:

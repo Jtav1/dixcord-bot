@@ -177,7 +177,7 @@ router.get("/reposts", authenticate, async (req, res) => {
 
 /**
  * GET /api/events/stickers
- * Sticker catalog from emoji_frequency (type=sticker).
+ * Sticker catalog from guild_emojis (type=sticker).
  * Query: ?limit=
  * Auth: admin required.
  * @openapi

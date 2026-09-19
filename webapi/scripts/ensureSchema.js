@@ -1521,9 +1521,8 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: guild_emojis.type column already exists");
   }
 
-  // guild_emojis.frequency: usage count migrated from emoji_frequency (by emoid) via
-  // discord-bot/scripts/cleanup-guild-emojis.js. Starts at 0; not auto-backfilled here — the
-  // migration deliberately only runs after that script's stale-row cleanup.
+  // guild_emojis.frequency: usage count synced from emoji_frequency (by emoid) via
+  // discord-bot/scripts/sync-emoji-frequency.js. Starts at 0; not auto-backfilled here.
   if (
     (await tableExists(db, "guild_emojis", isSqlite)) &&
     !(await columnExists(db, "guild_emojis", "frequency", isSqlite))
