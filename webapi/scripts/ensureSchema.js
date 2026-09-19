@@ -1670,6 +1670,114 @@ export async function ensureSchemaMigrations() {
     );
   }
 
+  // MySQL only. Two separate unicode-emoji bugs, both fixed here:
+  //
+  // 1. A table/database left on utf8/utf8mb3 (or latin1) silently mangles 4-byte unicode emoji
+  //    into an identical fallback character on insert. Convert every table to utf8mb4.
+  //
+  // 2. Even on utf8mb4, MySQL's default collations (utf8mb4_general_ci / utf8mb4_unicode_ci) are
+  //    linguistic (case/accent-insensitive) and don't assign distinct comparison weights to most
+  //    emoji (supplementary-plane characters) — so `WHERE id = ?` in ensureAndIncrementEmoji
+  //    (services/messageProcessing.js) treats many different emoji as equal, always matching
+  //    whatever unicode emoji was inserted first and incrementing *its* row instead of inserting
+  //    a new one. No error, no truncated bytes — just silent permanent misattribution onto the
+  //    first-ever emoji. Fix: force utf8mb4_bin (exact byte comparison) on the identity columns
+  //    used for exact lookups (guild_emojis.id, member_emoji_tracking.emoid,
+  //    emoji_frequency.emoid) — display columns like guild_emojis.name are unaffected and stay ci.
+  //
+  // Either fix invalidates existing unicode-emoji rows (app/guild_id IS NULL, per schema.sql) —
+  // their frequency/name may already be an unrecoverable merge of multiple distinct emoji — so
+  // both purge those rows (and matching member_emoji_tracking/emoji_frequency rows) once applied.
+  // SQLite stores TEXT as UTF-8 with byte-exact comparison natively, so this whole block is a
+  // no-op there.
+  if (!isSqlite) {
+    let identityFixApplied = false;
+
+    try {
+      const [dbCollationRows] = await db.query(
+        "SELECT DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = DATABASE()",
+      );
+      const dbCollation = String(dbCollationRows?.[0]?.DEFAULT_COLLATION_NAME ?? "");
+      if (!dbCollation.startsWith("utf8mb4")) {
+        await db.query("ALTER DATABASE CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+      }
+    } catch (err) {
+      console.error(
+        "db: could not set database default charset to utf8mb4 (likely missing ALTER privilege on the schema) — continuing with per-table conversion:",
+        err.message,
+      );
+    }
+
+    const [tableRows] = await db.query(
+      `SELECT TABLE_NAME, TABLE_COLLATION FROM information_schema.TABLES
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'`,
+    );
+    const nonUtf8mb4Tables = (tableRows ?? [])
+      .filter((r) => !String(r.TABLE_COLLATION ?? "").startsWith("utf8mb4"))
+      .map((r) => r.TABLE_NAME);
+
+    if (nonUtf8mb4Tables.length > 0) {
+      for (const table of nonUtf8mb4Tables) {
+        await db.query(
+          `ALTER TABLE \`${table}\` CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`,
+        );
+      }
+      identityFixApplied = identityFixApplied || nonUtf8mb4Tables.includes("guild_emojis");
+      applied.push(
+        `converted ${nonUtf8mb4Tables.length} table(s) to utf8mb4 (${nonUtf8mb4Tables.join(", ")})`,
+      );
+      console.log(`db: migration applied: converted to utf8mb4: ${nonUtf8mb4Tables.join(", ")}`);
+    }
+
+    const emoidColumns = [
+      { table: "guild_emojis", column: "id", ddl: "id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL" },
+      { table: "member_emoji_tracking", column: "emoid", ddl: "emoid VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL" },
+      { table: "emoji_frequency", column: "emoid", ddl: "emoid VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL" },
+    ];
+    const fixedColumns = [];
+    for (const { table, column, ddl } of emoidColumns) {
+      if (!(await tableExists(db, table, isSqlite))) continue;
+      const [colRows] = await db.query(
+        `SELECT COLLATION_NAME FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+        [table, column],
+      );
+      const collation = String(colRows?.[0]?.COLLATION_NAME ?? "");
+      if (collation === "utf8mb4_bin") continue;
+      await db.query(`ALTER TABLE \`${table}\` MODIFY COLUMN ${ddl}`);
+      fixedColumns.push(`${table}.${column}`);
+      if (table === "guild_emojis") identityFixApplied = true;
+    }
+    if (fixedColumns.length > 0) {
+      applied.push(`switched to utf8mb4_bin for exact-match emoji identity columns (${fixedColumns.join(", ")})`);
+      console.log(
+        `db: migration applied: switched to utf8mb4_bin (exact comparison) on ${fixedColumns.join(", ")} — a linguistic _ci collation was treating distinct unicode emoji as equal`,
+      );
+    }
+
+    if (identityFixApplied) {
+      const [staleUnicodeRows] = await db.query(
+        "SELECT id FROM guild_emojis WHERE app IS NULL AND guild_id IS NULL",
+      );
+      const staleIds = (staleUnicodeRows ?? []).map((r) => String(r.id));
+      if (staleIds.length > 0) {
+        const placeholders = staleIds.map(() => "?").join(",");
+        await db.query(
+          `DELETE FROM member_emoji_tracking WHERE emoid IN (${placeholders})`,
+          staleIds,
+        );
+        await db.query(`DELETE FROM emoji_frequency WHERE emoid IN (${placeholders})`, staleIds);
+        await db.query(`DELETE FROM guild_emojis WHERE id IN (${placeholders})`, staleIds);
+        applied.push(
+          `reset ${staleIds.length} pre-fix unicode guild_emojis row(s) (usage may have been merged under one collapsed id)`,
+        );
+        console.log(
+          `db: migration applied: reset ${staleIds.length} unicode guild_emojis row(s), and matching member_emoji_tracking/emoji_frequency rows, that predate the utf8mb4/utf8mb4_bin fix`,
+        );
+      }
+    }
+  }
+
   if (applied.length === 0) {
     console.log("db: schema valid; no migrations applied");
   } else {
