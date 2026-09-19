@@ -2,7 +2,8 @@ import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import * as api from "../../api/client.js";
 import { sendPinAlert } from "../../events/messages/utilities/messagePinner.js";
 import { announceMilestones } from "../../utilities/milestoneNotifier.js";
-import { getPinMessageRoleIds } from "../../configStore.js";
+import { getPinEmoji, getPinMessageRoleIds } from "../../configStore.js";
+import { emojisMatch, toEmojiObject } from "../../utilities/emojiCompare.js";
 
 // Guild slash commands: after changing command definitions, run from discord-bot:
 //   node deploy-commands.js
@@ -71,8 +72,23 @@ const execute = async (interaction) => {
     throw e;
   }
 
+  const pinnerIds = new Set([interaction.user.id]);
+  const pinEmoji = getPinEmoji();
+  if (pinEmoji) {
+    const allReactions = targetMessage.reactions.valueOf();
+    const pinReaction = [...allReactions.values()].find((r) =>
+      emojisMatch(toEmojiObject(r.emoji), pinEmoji),
+    );
+    if (pinReaction) {
+      const reactedUsers = await pinReaction.users.fetch();
+      reactedUsers.each((u) => {
+        if (!u.bot) pinnerIds.add(u.id);
+      });
+    }
+  }
+
   const result = await sendPinAlert(targetMessage, interaction.client, [
-    interaction.user.id,
+    ...pinnerIds,
   ]);
 
   if (result.sent) {
