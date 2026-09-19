@@ -10,18 +10,18 @@ CREATE TABLE IF NOT EXISTS users (
   guild_id VARCHAR(64) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS chat_member_mapping (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL UNIQUE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
 CREATE TABLE IF NOT EXISTS configurations (
   config VARCHAR(255) PRIMARY KEY,
   value VARCHAR(255)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS eight_ball_responses (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS eight_ball_responses (
   sentiment ENUM('positive', 'negative', 'neutral') NOT NULL,
   frequency INT DEFAULT 0,
   UNIQUE KEY unique_response (response_string, sentiment)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS plusplus_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   value VARCHAR(500) DEFAULT NULL,
   CONSTRAINT fk_plusplus_voter FOREIGN KEY (voter) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Emoji/sticker catalog identity: one row per known emoji, custom or unicode. Custom Discord
 -- emoji: app="discord" + a real guild_id (owning guild). Unicode emoji: app/guild_id both NULL
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
 -- guild_channels/guild_roles); unicode rows are added lazily on first use, never synced from Discord
 -- (no such API exists — see discord-bot/api/emojis.js).
 CREATE TABLE IF NOT EXISTS guild_emojis (
-  id VARCHAR(255) PRIMARY KEY,
+  id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin PRIMARY KEY, -- exact-match identity (custom snowflake or unicode emoji char); a linguistic _ci collation treats many distinct emoji as equal
   app VARCHAR(20) NULL,
   guild_id VARCHAR(64) NULL,
   type VARCHAR(50) NULL,              -- "emoji" | "sticker" | NULL (unicode); scopes the per-kind full-replace sync
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   frequency INT NOT NULL DEFAULT 0,   -- synced from emoji_frequency by discord-bot/scripts/sync-emoji-frequency.js
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_guild_emojis_guild (app, guild_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Per-guild usage counter for any emoji/sticker seen in a message/reaction. `type` classifies the
 -- row (emoji/sticker/unicode) for leaderboard filtering; display identity (name, animated) lives
@@ -73,17 +73,17 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
 CREATE TABLE IF NOT EXISTS emoji_frequency (
   app VARCHAR(20) NOT NULL,
   guild_id VARCHAR(64) NOT NULL,
-  emoid VARCHAR(255) NOT NULL,
+  emoid VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
   frequency INT NOT NULL DEFAULT 0,
   type VARCHAR(50) DEFAULT NULL,
   PRIMARY KEY (app, guild_id, emoid)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sticker_frequency (
   stickerid VARCHAR(255) PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   frequency INT NOT NULL DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS pin_history (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -97,16 +97,16 @@ CREATE TABLE IF NOT EXISTS pin_history (
   pinners TEXT NULL,
   hydrated TINYINT(1) NOT NULL DEFAULT 1,
   CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
   userid INT NOT NULL,
-  emoid VARCHAR(255) NOT NULL,
+  emoid VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
   frequency INT DEFAULT 1,
   UNIQUE KEY unique_user_emoji (userid, emoid),
   CONSTRAINT fk_user_emoji_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS member_repost_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -118,19 +118,19 @@ CREATE TABLE IF NOT EXISTS member_repost_tracking (
   UNIQUE KEY unique_repost_accusation (userid, msgid, accuser),
   CONSTRAINT fk_repost_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   CONSTRAINT fk_repost_accuser FOREIGN KEY (accuser) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS link_replacements (
   id INT AUTO_INCREMENT PRIMARY KEY,
   source_host VARCHAR(255) NOT NULL UNIQUE,
   target_host VARCHAR(255) NOT NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS pin_quips (
   id INT AUTO_INCREMENT PRIMARY KEY,
   quip VARCHAR(500) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Triggers: one row per unique trigger string (selection_mode for random vs ordered)
 CREATE TABLE IF NOT EXISTS triggers (
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS triggers (
   selection_mode VARCHAR(10) NOT NULL DEFAULT 'random' CHECK (selection_mode IN ('random', 'ordered', 'weighted')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   frequency INT DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Responses: reusable response strings (many-to-many with triggers via trigger_response)
 CREATE TABLE IF NOT EXISTS responses (
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS responses (
   response_string VARCHAR(1000) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   frequency INT DEFAULT 0
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Catalog of trigger response function keys (referenced by trigger_response.response_function)
 CREATE TABLE IF NOT EXISTS trigger_response_functions (
@@ -155,7 +155,7 @@ CREATE TABLE IF NOT EXISTS trigger_response_functions (
   function_name VARCHAR(255) NOT NULL UNIQUE,
   frequency INT DEFAULT 0,
   display_name VARCHAR(255) NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Junction: which responses belong to which trigger, with optional order and weight (0-100 or null)
 CREATE TABLE IF NOT EXISTS trigger_response (
@@ -171,14 +171,14 @@ CREATE TABLE IF NOT EXISTS trigger_response (
   FOREIGN KEY (response_id) REFERENCES responses(id) ON DELETE CASCADE,
   CONSTRAINT fk_trigger_response_response_function FOREIGN KEY (response_function) REFERENCES trigger_response_functions(id) ON DELETE SET NULL,
   UNIQUE KEY unique_trigger_response (trigger_id, response_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Round-robin state: last-used response_order per trigger (for ordered selection)
 CREATE TABLE IF NOT EXISTS trigger_response_state (
   trigger_id INT PRIMARY KEY,
   last_used_response_order INT NULL,
   FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- History: one row per (user, trigger_response) usage, for audit/analytics
 CREATE TABLE IF NOT EXISTS trigger_response_user_history (
@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS trigger_response_user_history (
   KEY idx_trigger_response_user_history_trigger_response (trigger_response_id),
   CONSTRAINT fk_trigger_response_user_history_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   CONSTRAINT fk_trigger_response_user_history_trigger_response FOREIGN KEY (trigger_response_id) REFERENCES trigger_response(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Scheduled messages (bot polls due rows and posts to channel). Requester is chat_member_mapping.id (per-app user rows).
 CREATE TABLE IF NOT EXISTS scheduled_messages (
@@ -206,7 +206,7 @@ CREATE TABLE IF NOT EXISTS scheduled_messages (
   KEY idx_scheduled_messages_due (status, scheduled_at),
   KEY idx_scheduled_messages_user (user_id, status),
   CONSTRAINT fk_scheduled_messages_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS audit_log (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
   details TEXT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS bot_status (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -231,13 +231,13 @@ CREATE TABLE IF NOT EXISTS bot_status (
   ws_ping_ms INT NULL,
   metrics_json TEXT NULL,
   UNIQUE KEY uniq_bot_status_app_guild (app, guild_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS system_state (
   state_key VARCHAR(100) PRIMARY KEY,
   state_value VARCHAR(255) NOT NULL,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Chat-platform guild snapshots (app-scoped: "discord" today, other chat platforms possible later)
 CREATE TABLE IF NOT EXISTS guild_info (
@@ -254,7 +254,7 @@ CREATE TABLE IF NOT EXISTS guild_info (
   guild_created_at TIMESTAMP NULL,
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (app, guild_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS guild_channels (
   app VARCHAR(20) NOT NULL,
@@ -267,7 +267,7 @@ CREATE TABLE IF NOT EXISTS guild_channels (
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (app, id),
   KEY idx_guild_channels_guild (app, guild_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS guild_roles (
   app VARCHAR(20) NOT NULL,
@@ -281,7 +281,7 @@ CREATE TABLE IF NOT EXISTS guild_roles (
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (app, id),
   KEY idx_guild_roles_guild (app, guild_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Per-(app, guild_id) configuration/feature-flags; each server gets its own fully
 -- independent set, superseding the single global `configurations` table above.
@@ -291,7 +291,7 @@ CREATE TABLE IF NOT EXISTS guild_config (
   config VARCHAR(255) NOT NULL,
   value VARCHAR(255) NULL,
   PRIMARY KEY (app, guild_id, config)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Per-(app, guild_id, platform_user_id) server membership: Discord handle/nickname/roles/
 -- joined-at held in that server. chat_member_mapping stays the single global cross-server
@@ -309,7 +309,7 @@ CREATE TABLE IF NOT EXISTS guild_members (
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_guild_members_app_guild_platform (app, guild_id, platform_user_id),
   KEY idx_guild_members_app_guild (app, guild_id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Links one chat_member_mapping identity to many guild_members rows (one-to-many). A
 -- guild_member row is "unlinked" until an admin creates this row (see GET
@@ -323,7 +323,7 @@ CREATE TABLE IF NOT EXISTS member_aliases (
   KEY idx_member_aliases_chat_member (chat_member_mapping_id),
   CONSTRAINT fk_member_aliases_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   CONSTRAINT fk_member_aliases_guild_member FOREIGN KEY (guild_member_id) REFERENCES guild_members(id) ON DELETE CASCADE
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Admin-defined usage-stat thresholds. `type` is the fine-grained metric key (see
 -- webapi/services/milestoneTypes.js), `item` scopes it to one entity (null = global), `object`
@@ -339,7 +339,7 @@ CREATE TABLE IF NOT EXISTS milestones (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_milestones_lookup (type, item, achieved)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Vote-to-timeout: mutable ledger, one row per active vote (deleted on reaction-remove).
 CREATE TABLE IF NOT EXISTS timeout_vote_tracking (
@@ -354,7 +354,7 @@ CREATE TABLE IF NOT EXISTS timeout_vote_tracking (
   UNIQUE KEY uniq_timeout_vote (message_id, voter),
   CONSTRAINT fk_timeout_vote_target FOREIGN KEY (target) REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
   CONSTRAINT fk_timeout_vote_voter FOREIGN KEY (voter) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Vote-to-timeout: immutable record of fired timeouts. UNIQUE(message_id) is the idempotency
 -- guard — once a row exists here, further votes on that message never re-trigger.
@@ -368,4 +368,4 @@ CREATE TABLE IF NOT EXISTS timeout_history (
   duration_seconds INT NOT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_timeout_history_target FOREIGN KEY (target) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

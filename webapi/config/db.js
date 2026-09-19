@@ -70,6 +70,7 @@ if (DB_TYPE === "sqlite") {
     user: process.env.DB_USER || "root",
     password: process.env.DB_PASSWORD || "",
     database: process.env.DB_NAME || "api_template",
+    charset: "utf8mb4", // 3-byte utf8/utf8mb3 silently mangles 4-byte emoji into identical fallback chars
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
