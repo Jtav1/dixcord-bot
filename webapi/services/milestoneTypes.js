@@ -12,7 +12,7 @@ export const MILESTONE_TYPES = Object.freeze({
   emoji_frequency_per_app: {
     itemRequired: true,
     description:
-      "Sum of emoji_frequency.frequency for one app. item = app name.",
+      "Sum of guild_emojis.frequency for one app. item = app name.",
   },
   emoji_frequency_item: {
     itemRequired: true,

@@ -85,8 +85,8 @@ Per-`(app, guildId)`: each server a community operates gets its own fully indepe
 Response `statistics` object fields:
 
 - `chatMemberMappings` — row count in `chat_member_mapping`
-- `emojiCatalog` — `{ emojis, stickers, total }` from `emoji_frequency` row counts by type
-- `emojiUsage` — `{ emojis, stickers, total }` from `emoji_frequency` frequency sums by type
+- `emojiCatalog` — `{ emojis, stickers, total }` from `guild_emojis` row counts by type
+- `emojiUsage` — `{ emojis, stickers, total }` from `guild_emojis` frequency sums by type
 - `pinHistory` — row count in `pin_history`
 - `plusplusTracking` — row count in `plusplus_tracking`
 - `triggers` — row count in `triggers`

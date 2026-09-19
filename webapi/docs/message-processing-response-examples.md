@@ -160,49 +160,18 @@ or
 
 ---
 
-## GET /api/message-processing/emoji-catalog
+## POST /api/message-processing/emoji-frequency-sync
 
 **200 OK**
 
 ```json
 {
   "ok": true,
-  "emojis": [
-    {
-      "id": "123456789012345678",
-      "guildId": "999888777666555444",
-      "name": "pepehands",
-      "type": "emoji",
-      "animated": false,
-      "frequency": 0,
-      "sourceFrequency": 42,
-      "hasFrequencyHistory": true
-    }
-  ]
-}
-```
-
----
-
-## DELETE /api/message-processing/emoji-catalog/:id
-
-**200 OK**
-
-```json
-{
-  "ok": true
-}
-```
-
----
-
-## PATCH /api/message-processing/emoji-catalog/:id/type
-
-**200 OK**
-
-```json
-{
-  "ok": true
+  "dryRun": false,
+  "deleted": 2,
+  "inserted": 5,
+  "updated": 52,
+  "synced": 57
 }
 ```
 
@@ -211,29 +180,16 @@ or
 ```json
 {
   "ok": false,
-  "error": "type must be 'emoji' or 'sticker'"
+  "error": "guildId is required"
 }
 ```
 
----
-
-## POST /api/message-processing/emoji-catalog/:id/migrate-frequency
-
-**200 OK**
-
-```json
-{
-  "ok": true,
-  "frequency": 42
-}
-```
-
-**404 Not Found**
+**500 Internal Server Error**
 
 ```json
 {
   "ok": false,
-  "error": "Emoji not found in guild_emojis"
+  "error": "Failed to sync emoji frequency"
 }
 ```
 

@@ -30,6 +30,8 @@ import {
   computeStickerUsedGlobal,
 } from "./milestones.js";
 
+const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
+
 /**
  * @param {Record<string, unknown> | null | undefined} payload
  * @returns {{ ok: true, app: string } | { ok: false, error: string }}
@@ -53,11 +55,14 @@ function isNumericEmoid(emoid) {
 }
 
 /**
- * Ensure emoji_frequency has a per-guild row for this emoji/sticker; increment frequency.
- * If no row exists, insert one with frequency 1. Numeric (custom) ids are gracefully discarded
- * (no row written) unless guildId is a known guild (guild_info) — see reactionHandler.js's
- * mirror-image guard on the bot side for external/unknown-guild emoji.
- * @param {string} app - e.g. "discord"; emoji_frequency.app has no default, so this is required on insert.
+ * Ensure guild_emojis has a row for this emoji/sticker; increment its frequency. If no row
+ * exists, insert one with frequency 1. Numeric (custom) ids are gracefully discarded (no row
+ * written) unless guildId is a known guild (guild_info) — see reactionHandler.js's mirror-image
+ * guard on the bot side for external/unknown-guild emoji. Custom ids are globally unique
+ * (Discord snowflakes), so their row is scoped to the owning (app, guildId); unicode emoji have
+ * no owning guild, so they get a shared, guild-less identity row (app/guild_id NULL) — usage is
+ * one global count across every guild, matching how frequency is already displayed elsewhere.
+ * @param {string} app - e.g. "discord"
  * @param {string} guildId
  * @param {string} [emojiType] - Type from request (e.g. 'emoji'); if missing, type is stored as null.
  * @returns {Promise<{ frequency: number|null, inserted: boolean }>} frequency is null if the row was discarded/not written (missing id/name, or unknown guild)
@@ -83,7 +88,9 @@ async function ensureAndIncrementEmoji(
     return { frequency: null, inserted: false };
   }
 
-  if (isNumericEmoid(id)) {
+  const numeric = isNumericEmoid(id);
+
+  if (numeric) {
     const [knownGuild] = await db.query(
       "SELECT 1 FROM guild_info WHERE app = ? AND guild_id = ?",
       [app, gid],
@@ -94,33 +101,17 @@ async function ensureAndIncrementEmoji(
     }
   }
 
-  const [existing] = await db.query(
-    "SELECT frequency FROM emoji_frequency WHERE app = ? AND guild_id = ? AND emoid = ?",
-    [app, gid, id],
-  );
+  const [existing] = await db.query("SELECT frequency FROM guild_emojis WHERE id = ?", [id]);
 
   if (existing && existing.length > 0) {
-    await db.query(
-      "UPDATE emoji_frequency SET frequency = frequency + 1 WHERE app = ? AND guild_id = ? AND emoid = ?",
-      [app, gid, id],
-    );
+    await db.query("UPDATE guild_emojis SET frequency = frequency + 1 WHERE id = ?", [id]);
     return { frequency: Number(existing[0].frequency) + 1, inserted: false };
   }
 
-  // Unicode emoji have no sync path, so their catalog row is created lazily here; custom (numeric) ones never are.
-  if (!isNumericEmoid(id)) {
-    const [catalogRow] = await db.query("SELECT id FROM guild_emojis WHERE id = ?", [id]);
-    if (!catalogRow || catalogRow.length === 0) {
-      await db.query(
-        "INSERT INTO guild_emojis (id, app, guild_id, type, name, animated) VALUES (?, NULL, NULL, ?, ?, ?)",
-        [id, type, name, emojiAnimated ? 1 : 0],
-      );
-    }
-  }
-
   await db.query(
-    "INSERT INTO emoji_frequency (app, guild_id, emoid, frequency, type) VALUES (?, ?, ?, 1, ?)",
-    [app, gid, id, type],
+    `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, frequency)
+     VALUES (?, ?, ?, ?, ?, ?, 1)`,
+    [id, numeric ? app : null, numeric ? gid : null, type, name, emojiAnimated ? 1 : 0],
   );
   return { frequency: 1, inserted: true };
 }
@@ -192,8 +183,8 @@ export async function countEmoji(payload) {
     getGuildConfigValue(chatApp, guildId, "plusplus_emoji"),
     getGuildConfigValue(chatApp, guildId, "minusminus_emoji"),
   ]);
-  const plusEmoji = await resolveConfigEmojiValue(chatApp, guildId, plusValue);
-  const minusEmoji = await resolveConfigEmojiValue(chatApp, guildId, minusValue);
+  const plusEmoji = await resolveConfigEmojiValue(plusValue);
+  const minusEmoji = await resolveConfigEmojiValue(minusValue);
 
   if (!authorId || !Array.isArray(emojis) || emojis.length === 0) {
     return { ok: false };
@@ -630,28 +621,23 @@ export async function countRepost(payload) {
   return { ok: false };
 }
 
-// --- Guild emoji / sticker catalog (emoji_frequency; type = 'emoji' | 'sticker') ---
+// --- Guild emoji / sticker catalog + usage counter (guild_emojis; type = 'emoji' | 'sticker' | NULL) ---
 
 /**
- * Sync guild custom emojis or stickers into `emoji_frequency`.
- * Rows are distinguished by `emoji_frequency.type`: `"emoji"` or `"sticker"` (not Discord API subtype).
- * Deletes only zero-frequency rows of the same asset kind (and app), then inserts missing ids with frequency 0.
- * @param {Array<{ id: string, name: string, animated?: boolean }>} items - From guild.emojis / guild.stickers
- * @param {"emoji"|"sticker"} assetKind
- * @param {string} app - e.g. "discord"; emoji_frequency.app has no default, so this is required on insert.
- * @returns {Promise<{ ok: boolean, imported?: number }>} imported = new rows added (existing emoids skipped)
- */
-/**
- * Fully replace this guild's custom emoji/sticker catalog in guild_emojis (mirrors
- * guildInfo.js's upsertGuildSnapshot delete+insert for channels/roles). Gracefully discards the
- * whole sync if guildId isn't a known guild (guild_info) — see reactionHandler.js's mirror-image
- * guard on the bot side. Usage counts in emoji_frequency are untouched; they're created lazily by
- * ensureAndIncrementEmoji on first actual use, and survive a catalog entry disappearing here.
+ * Replace this guild's custom emoji/sticker catalog in guild_emojis, keeping any row with usage
+ * history: rows of this (app, guild_id, type) are deleted unless frequency IS NOT NULL AND > 0
+ * (those survive even if the emoji/sticker is gone from Discord, so historical stats keep their
+ * name/type). Every currently-live item is then upserted (keyed on id), so a kept row that's
+ * still live gets its metadata refreshed in place rather than duplicated, and its frequency is
+ * left untouched (upsert only writes the identity columns, never frequency) since it's
+ * incremented separately by ensureAndIncrementEmoji on actual use. Gracefully discards the whole
+ * sync if guildId isn't a known guild (guild_info) — see reactionHandler.js's mirror-image guard
+ * on the bot side.
  * @param {Array<{id?: string, name?: string, animated?: boolean, available?: boolean|null, managed?: boolean|null, requiresColons?: boolean|null, roles?: string[]}>} items
  * @param {"emoji"|"sticker"} assetKind
  * @param {string} app
  * @param {string} guildId
- * @returns {Promise<{ ok: boolean, imported?: number }>} imported = catalog rows written this sync
+ * @returns {Promise<{ ok: boolean, imported?: number }>} imported = catalog rows upserted this sync
  */
 export async function importGuildAssetFrequencyList(items, assetKind, app, guildId) {
   if (!Array.isArray(items)) return { ok: false };
@@ -673,21 +659,12 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
     (e) => e != null && (e.id != null || e.name != null),
   );
 
-  // Carry frequency forward across the delete+insert replace below, or every restart would reset it to 0.
-  const [existingRows] = await db.query(
-    "SELECT id, frequency FROM guild_emojis WHERE app = ? AND guild_id = ? AND type = ?",
+  // Scoped by (app, guild_id, type) so replacing one kind's catalog never touches the other's.
+  // Rows with usage history (frequency > 0) are kept even if no longer live on Discord.
+  await db.query(
+    "DELETE FROM guild_emojis WHERE app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)",
     [app, gid, assetKind],
   );
-  const frequencyById = new Map(
-    (existingRows ?? []).map((r) => [r.id, Number(r.frequency) || 0]),
-  );
-
-  // Scoped by (app, guild_id, type) so replacing one kind's catalog never touches the other's.
-  await db.query("DELETE FROM guild_emojis WHERE app = ? AND guild_id = ? AND type = ?", [
-    app,
-    gid,
-    assetKind,
-  ]);
 
   let imported = 0;
   for (const e of list) {
@@ -696,126 +673,140 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
     if (id.length === 0 && name === "?") continue;
     const emoid = id || name;
 
-    await db.query(
-      `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles, frequency)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        emoid,
-        app,
-        gid,
-        assetKind,
-        name,
-        e.animated ? 1 : 0,
-        e.available == null ? null : e.available ? 1 : 0,
-        e.managed == null ? null : e.managed ? 1 : 0,
-        e.requiresColons == null ? null : e.requiresColons ? 1 : 0,
-        Array.isArray(e.roles) && e.roles.length > 0 ? JSON.stringify(e.roles) : null,
-        frequencyById.get(emoid) ?? 0,
-      ],
-    );
+    const params = [
+      emoid,
+      app,
+      gid,
+      assetKind,
+      name,
+      e.animated ? 1 : 0,
+      e.available == null ? null : e.available ? 1 : 0,
+      e.managed == null ? null : e.managed ? 1 : 0,
+      e.requiresColons == null ? null : e.requiresColons ? 1 : 0,
+      Array.isArray(e.roles) && e.roles.length > 0 ? JSON.stringify(e.roles) : null,
+    ];
+
+    if (isSqlite) {
+      await db.query(
+        `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           app = excluded.app,
+           guild_id = excluded.guild_id,
+           type = excluded.type,
+           name = excluded.name,
+           animated = excluded.animated,
+           available = excluded.available,
+           managed = excluded.managed,
+           requires_colons = excluded.requires_colons,
+           roles = excluded.roles,
+           synced_at = CURRENT_TIMESTAMP`,
+        params,
+      );
+    } else {
+      await db.query(
+        `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           app = VALUES(app),
+           guild_id = VALUES(guild_id),
+           type = VALUES(type),
+           name = VALUES(name),
+           animated = VALUES(animated),
+           available = VALUES(available),
+           managed = VALUES(managed),
+           requires_colons = VALUES(requires_colons),
+           roles = VALUES(roles),
+           synced_at = CURRENT_TIMESTAMP`,
+        params,
+      );
+    }
     imported++;
   }
   return { ok: true, imported };
 }
 
 /**
- * List guild_emojis rows that carry a guild_id (custom emoji/sticker, not unicode), for the
- * emoji-cleanup admin script (discord-bot/scripts/cleanup-guild-emojis.js) to verify against
- * each guild's live Discord emoji/sticker lists. Includes rows of any `type` (including NULL —
- * legacy rows that never got backfilled) so the script can detect and fix a wrong/missing type,
- * not just emoji rows. `sourceFrequency` is the emoji_frequency total that
- * migrateEmojiCatalogFrequency would write into `frequency` (only meaningful for emoji rows).
- * `hasFrequencyHistory` flags any emoji_frequency row for this emoid (even a zero-frequency one) —
- * a fallback "this was a real emoji" signal for ids no longer live on Discord (deleted since),
- * since sticker usage is tracked in the separate sticker_frequency table and never appears here.
+ * Admin maintenance for the discord-bot sync-emoji-frequency script: a one-time backfill for
+ * installs with historical usage counts still sitting in the now-legacy emoji_frequency table
+ * (counting has since moved entirely to guild_emojis.frequency — see ensureAndIncrementEmoji).
+ * Two steps, in order:
+ *
+ * 1. Delete guild_emojis rows attributed to another guild (app matches, guild_id set but not
+ *    this one) — legacy/misattributed rows, not normal churn from an emoji being removed on
+ *    Discord (that leaves guild_id correct and is left alone).
+ * 2. For every emoji_frequency row belonging to this (app, guildId) — emoji and sticker alike,
+ *    distinguished by emoji_frequency.type (NULL = emoji) — copy its frequency into the matching
+ *    guild_emojis row (keyed on id = emoid). If no such catalog row exists yet, insert one using
+ *    only what emoji_frequency has: id, app, guild_id, type (NULL treated as "emoji"), frequency,
+ *    and name falls back to the id itself (emoji_frequency carries no display name).
+ *
+ * With dryRun, every count below is still computed (via SELECT, not the actual DELETE/INSERT/
+ * UPDATE) so a caller can preview exactly what a real run would do.
  * @param {string} app
- * @returns {Promise<Array<{id: string, guildId: string, name: string, type: string|null, animated: boolean, frequency: number, sourceFrequency: number, hasFrequencyHistory: boolean}>>}
+ * @param {string} guildId
+ * @param {boolean} [dryRun]
+ * @returns {Promise<{ok: boolean, dryRun?: boolean, deleted?: number, inserted?: number, updated?: number, synced?: number}>}
  */
-export async function listEmojiCatalogWithGuild(app) {
-  const [rows] = await db.query(
-    `SELECT ge.id, ge.guild_id, ge.name, ge.type, ge.animated, ge.frequency,
-            (SELECT COALESCE(SUM(ef.frequency), 0) FROM emoji_frequency ef WHERE ef.emoid = ge.id AND ef.app = ge.app) AS source_frequency,
-            (SELECT COUNT(*) FROM emoji_frequency ef WHERE ef.emoid = ge.id AND ef.app = ge.app) AS frequency_row_count
-     FROM guild_emojis ge
-     WHERE ge.app = ? AND ge.guild_id IS NOT NULL
-     ORDER BY ge.guild_id, ge.name`,
-    [app],
+export async function syncGuildEmojiFrequency(app, guildId, dryRun = false) {
+  if (!isChatMemberAppSupported(app)) return { ok: false };
+  const gid = String(guildId ?? "").trim();
+  if (!gid) return { ok: false };
+
+  const [staleRows] = await db.query(
+    "SELECT id FROM guild_emojis WHERE app = ? AND guild_id IS NOT NULL AND guild_id <> ?",
+    [app, gid],
   );
-  return (rows ?? []).map((r) => ({
-    id: r.id,
-    guildId: r.guild_id,
-    name: r.name,
-    type: r.type,
-    animated: Boolean(r.animated),
-    frequency: Number(r.frequency) || 0,
-    sourceFrequency: Number(r.source_frequency) || 0,
-    hasFrequencyHistory: (Number(r.frequency_row_count) || 0) > 0,
-  }));
-}
-
-/**
- * Delete one guild_emojis row by id, regardless of type (used by the emoji-cleanup admin script
- * to remove rows misattributed to a guild they don't actually belong to).
- * @param {string} id
- * @returns {Promise<boolean>} true if a row was deleted
- */
-export async function deleteEmojiCatalogRow(id) {
-  if (!id || String(id).trim() === "") return false;
-  const [result] = await db.query("DELETE FROM guild_emojis WHERE id = ?", [
-    String(id).trim(),
-  ]);
-  return (result?.affectedRows ?? 0) > 0;
-}
-
-/**
- * Set a guild_emojis row's `type`, used by the emoji-cleanup admin script to correct rows whose
- * type is wrong or was never backfilled (NULL), after checking Discord for what the id actually is.
- * @param {string} id
- * @param {"emoji"|"sticker"} type
- * @returns {Promise<boolean>} true if a row was updated
- */
-export async function setEmojiCatalogRowType(id, type) {
-  if (!id || String(id).trim() === "") return false;
-  if (type !== "emoji" && type !== "sticker") return false;
-  const [result] = await db.query("UPDATE guild_emojis SET type = ? WHERE id = ?", [
-    type,
-    String(id).trim(),
-  ]);
-  return (result?.affectedRows ?? 0) > 0;
-}
-
-/**
- * Migrate one emoji's usage total from emoji_frequency into guild_emojis.frequency, keyed by
- * emoid. Only writes when the row is still present in guild_emojis (i.e. the emoji-cleanup
- * script's stale-row deletion has already run) — recomputes the sum server-side rather than
- * trusting a client-supplied total.
- * @param {string} id
- * @returns {Promise<{ok: boolean, frequency?: number, error?: string}>}
- */
-export async function migrateEmojiCatalogFrequency(id) {
-  if (!id || String(id).trim() === "") return { ok: false, error: "id is required" };
-  const trimmedId = String(id).trim();
-
-  const [catalogRows] = await db.query(
-    "SELECT app FROM guild_emojis WHERE id = ? AND type = 'emoji'",
-    [trimmedId],
-  );
-  if (!catalogRows || catalogRows.length === 0) {
-    return { ok: false, error: "Emoji not found in guild_emojis" };
+  const deleted = (staleRows ?? []).length;
+  if (!dryRun && deleted > 0) {
+    await db.query(
+      "DELETE FROM guild_emojis WHERE app = ? AND guild_id IS NOT NULL AND guild_id <> ?",
+      [app, gid],
+    );
   }
-  const app = catalogRows[0].app;
 
-  const [sumRows] = await db.query(
-    "SELECT COALESCE(SUM(frequency), 0) AS total FROM emoji_frequency WHERE emoid = ? AND app = ?",
-    [trimmedId, app],
+  const [freqRows] = await db.query(
+    "SELECT emoid, type, frequency FROM emoji_frequency WHERE app = ? AND guild_id = ?",
+    [app, gid],
   );
-  const total = Number(sumRows?.[0]?.total ?? 0);
 
-  await db.query(
-    "UPDATE guild_emojis SET frequency = ? WHERE id = ? AND type = 'emoji'",
-    [total, trimmedId],
-  );
-  return { ok: true, frequency: total };
+  let inserted = 0;
+  let updated = 0;
+  for (const row of freqRows ?? []) {
+    const emoid = String(row.emoid ?? "").trim();
+    if (!emoid) continue;
+    const type = row.type ?? "emoji";
+    const frequency = Number(row.frequency) || 0;
+
+    const [existingRows] = await db.query("SELECT id FROM guild_emojis WHERE id = ?", [emoid]);
+    const exists = (existingRows ?? []).length > 0;
+    if (exists) {
+      updated++;
+    } else {
+      inserted++;
+    }
+
+    if (dryRun) continue;
+
+    const params = [emoid, app, gid, type, emoid, frequency];
+    if (isSqlite) {
+      await db.query(
+        `INSERT INTO guild_emojis (id, app, guild_id, type, name, frequency)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET frequency = excluded.frequency`,
+        params,
+      );
+    } else {
+      await db.query(
+        `INSERT INTO guild_emojis (id, app, guild_id, type, name, frequency)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE frequency = VALUES(frequency)`,
+        params,
+      );
+    }
+  }
+
+  return { ok: true, dryRun, deleted, inserted, updated, synced: inserted + updated };
 }
 
 // --- Pin history (for pin decision + log) ---

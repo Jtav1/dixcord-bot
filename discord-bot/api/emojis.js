@@ -25,43 +25,24 @@ export const importEmojiList = async (emojiObjectList) => {
 };
 
 /**
- * List custom emoji/sticker catalog rows that carry a guild_id, any type (including NULL).
- * GET /api/message-processing/emoji-catalog
- * @returns {Promise<Array<{ id: string, guildId: string, name: string, type: string|null, animated: boolean, frequency: number, sourceFrequency: number, hasFrequencyHistory: boolean }>>}
+ * Sync this guild's guild_emojis rows/frequency from emoji_frequency: deletes rows
+ * misattributed to another guild, then copies frequency for every emoji_frequency row into
+ * guild_emojis (inserting missing catalog rows). POST /api/message-processing/emoji-frequency-sync
+ * @param {boolean} [dryRun] - Preview counts without writing anything.
+ * @returns {Promise<{ deleted: number, inserted: number, updated: number, synced: number }>}
  */
-export const listEmojiCatalog = async () => {
-  const { data } = await api.get("/api/message-processing/emoji-catalog", {
-    params: { app: "discord" },
+export const syncEmojiFrequency = async (dryRun = false) => {
+  const { data } = await api.post("/api/message-processing/emoji-frequency-sync", {
+    app: "discord",
+    guildId,
+    dryRun,
   });
-  return Array.isArray(data?.emojis) ? data.emojis : [];
-};
-
-/**
- * Delete one custom emoji/sticker catalog row by id. DELETE /api/message-processing/emoji-catalog/:id
- * @param {string} id
- */
-export const deleteEmojiCatalogRow = async (id) => {
-  await api.del(`/api/message-processing/emoji-catalog/${id}`);
-};
-
-/**
- * Correct one catalog row's type. PATCH /api/message-processing/emoji-catalog/:id/type
- * @param {string} id
- * @param {"emoji"|"sticker"} type
- */
-export const setEmojiCatalogRowType = async (id, type) => {
-  await api.patch(`/api/message-processing/emoji-catalog/${id}/type`, { type });
-};
-
-/**
- * Migrate one emoji's usage total from emoji_frequency into guild_emojis.frequency.
- * POST /api/message-processing/emoji-catalog/:id/migrate-frequency
- * @param {string} id
- * @returns {Promise<number>} the frequency written
- */
-export const migrateEmojiCatalogFrequency = async (id) => {
-  const { data } = await api.post(`/api/message-processing/emoji-catalog/${id}/migrate-frequency`);
-  return Number(data?.frequency) || 0;
+  return {
+    deleted: Number(data?.deleted) || 0,
+    inserted: Number(data?.inserted) || 0,
+    updated: Number(data?.updated) || 0,
+    synced: Number(data?.synced) || 0,
+  };
 };
 
 /**
@@ -91,7 +72,7 @@ export const countEmoji = async (emojiName, emojiId, userid = null) => {
 /**
  * Top used emojis. POST /api/leaderboards/emoji
  * @param {number} number - Limit (default 5, max 50)
- * @returns {Promise<Array<{ emoji: { emoid: string, app: string, emoji: string, frequency: number, animated: number, type: string } }>>} `emoji` is the full emoji_frequency row.
+ * @returns {Promise<Array<{ emoji: { emoid: string, app: string, emoji: string, frequency: number, animated: number, type: string } }>>} `emoji` is the full guild_emojis row.
  */
 export const getTopEmoji = async (number = 5) => {
   const { data } = await api.post("/api/leaderboards/emoji", {

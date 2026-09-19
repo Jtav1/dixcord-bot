@@ -60,7 +60,7 @@ export function getPinThreshold() {
 }
 
 /**
- * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object (see webapi's resolveConfigEmojiValue); null if unset. app: null means freeform text never synced to emoji_frequency — compare with emojisMatch, not by id/name directly.
+ * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object (see webapi's resolveConfigEmojiValue); null if unset. app: null means freeform text never synced to guild_emojis — compare with emojisMatch, not by id/name directly.
  */
 export function getPinEmoji() {
   return getConfigValue("pin_emoji");

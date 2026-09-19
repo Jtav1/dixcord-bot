@@ -40,7 +40,7 @@ export const countSticker = async (stickerName, stickerId, userid = null) => {
 /**
  * Top used stickers. POST /api/leaderboards/sticker
  * @param {number} number - Limit (default 5, max 50)
- * @returns {Promise<Array<{ emoji: { emoid: string, app: string, emoji: string, frequency: number, animated: number, type: string } }>>} `emoji` is the full emoji_frequency row.
+ * @returns {Promise<Array<{ emoji: { emoid: string, app: string, emoji: string, frequency: number, animated: number, type: string } }>>} `emoji` is the full guild_emojis row.
  */
 export const getTopStickers = async (number = 5) => {
   const { data } = await api.post("/api/leaderboards/sticker", {

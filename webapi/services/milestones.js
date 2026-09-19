@@ -61,41 +61,45 @@ export async function computePinTotal() {
   return Number(rows?.[0]?.total ?? 0);
 }
 
-/** @param {string} app - e.g. "discord" */
+/**
+ * @param {string} app - e.g. "discord"
+ * Custom emoji rows carry this app directly; unicode emoji rows have app NULL (shared, guild-less
+ * identity — see ensureAndIncrementEmoji), so they're included in every app's total.
+ */
 export async function computeEmojiFrequencyPerApp(app) {
   const [rows] = await db.query(
-    "SELECT COALESCE(SUM(frequency), 0) AS total FROM emoji_frequency WHERE app = ?",
+    "SELECT COALESCE(SUM(frequency), 0) AS total FROM guild_emojis WHERE (app = ? OR app IS NULL) AND (type = 'emoji' OR type IS NULL)",
     [app],
   );
   return Number(rows?.[0]?.total ?? 0);
 }
 
+// "Tracked" = has been used at least once (frequency > 0), not merely synced into the catalog —
+// guild_emojis also holds never-used rows from emoji-import/sticker-import.
 export async function computeEmojiTrackedGlobal() {
-  // DISTINCT emoid: emoji_frequency is now per-guild, so the same emoji tracked in two guilds
-  // has two rows — this counts distinct emoji ever tracked, not usage-rows.
   const [rows] = await db.query(
-    "SELECT COUNT(DISTINCT emoid) AS total FROM emoji_frequency WHERE type = 'emoji' OR type IS NULL",
+    "SELECT COUNT(*) AS total FROM guild_emojis WHERE (type = 'emoji' OR type IS NULL) AND frequency > 0",
   );
   return Number(rows?.[0]?.total ?? 0);
 }
 
 export async function computeStickerTrackedGlobal() {
   const [rows] = await db.query(
-    "SELECT COUNT(DISTINCT emoid) AS total FROM emoji_frequency WHERE type = 'sticker'",
+    "SELECT COUNT(*) AS total FROM guild_emojis WHERE type = 'sticker' AND frequency > 0",
   );
   return Number(rows?.[0]?.total ?? 0);
 }
 
 export async function computeEmojiUsedGlobal() {
   const [rows] = await db.query(
-    "SELECT COALESCE(SUM(frequency), 0) AS total FROM emoji_frequency WHERE type = 'emoji' OR type IS NULL",
+    "SELECT COALESCE(SUM(frequency), 0) AS total FROM guild_emojis WHERE type = 'emoji' OR type IS NULL",
   );
   return Number(rows?.[0]?.total ?? 0);
 }
 
 export async function computeStickerUsedGlobal() {
   const [rows] = await db.query(
-    "SELECT COALESCE(SUM(frequency), 0) AS total FROM emoji_frequency WHERE type = 'sticker'",
+    "SELECT COALESCE(SUM(frequency), 0) AS total FROM guild_emojis WHERE type = 'sticker'",
   );
   return Number(rows?.[0]?.total ?? 0);
 }

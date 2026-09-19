@@ -139,7 +139,6 @@ export async function listRepostEvents(opts = {}) {
   return { events, total };
 }
 
-// Joins guild_emojis (one row per emoid) for type, not emoji_frequency (per-guild, would fan out rows).
 const EMOJI_FREQUENCY_WHERE = "ge.type = 'emoji' OR ge.type IS NULL";
 
 /**
@@ -147,7 +146,7 @@ const EMOJI_FREQUENCY_WHERE = "ge.type = 'emoji' OR ge.type IS NULL";
  * @param {string} userId - platform user id
  * @param {string} app
  * @param {number} [limit] When omitted, returns all rows.
- * @returns {Promise<Array<{ frequency: number, emoji: object }>>} `frequency` is this user's own usage count (member_emoji_tracking); `emoji` is the full emoji_frequency row (see attachEmojiObjects) — its own `frequency` is the emoji's global count, a different number.
+ * @returns {Promise<Array<{ frequency: number, emoji: object }>>} `frequency` is this user's own usage count (member_emoji_tracking); `emoji` is the full guild_emojis row (see attachEmojiObjects) — its own `frequency` is the emoji's global count, a different number.
  */
 export async function getEmojiStatsForUser(userId, app, limit) {
   if (!isChatMemberAppSupported(app)) return [];
@@ -184,7 +183,7 @@ const STICKER_FREQUENCY_WHERE = "ge.type = 'sticker'";
  * @param {string} userId - platform user id
  * @param {string} app
  * @param {number} [limit] When omitted, returns all rows.
- * @returns {Promise<Array<{ frequency: number, emoji: object }>>} `frequency` is this user's own usage count (member_emoji_tracking); `emoji` is the full emoji_frequency row (see attachEmojiObjects) — its own `frequency` is the sticker's global count, a different number.
+ * @returns {Promise<Array<{ frequency: number, emoji: object }>>} `frequency` is this user's own usage count (member_emoji_tracking); `emoji` is the full guild_emojis row (see attachEmojiObjects) — its own `frequency` is the sticker's global count, a different number.
  */
 export async function getStickerStatsForUser(userId, app, limit) {
   if (!isChatMemberAppSupported(app)) return [];
@@ -215,19 +214,16 @@ export async function getStickerStatsForUser(userId, app, limit) {
 }
 
 /**
- * List sticker catalog from emoji_frequency where type = sticker.
+ * List sticker catalog from guild_emojis where type = sticker, ranked by usage.
  * @param {number} [limit]
- * @returns {Promise<Array<{ emoji: object }>>} `emoji` is the full emoji_frequency row (see attachEmojiObjects).
+ * @returns {Promise<Array<{ emoji: object }>>} `emoji` is the full guild_emojis row (see attachEmojiObjects).
  */
 export async function listStickerCatalog(limit) {
   const n = parseLimit(limit, 50, 200);
-  // emoji_frequency is per-guild now — GROUP BY/SUM so the same sticker used in multiple guilds
-  // appears once, ranked by its total usage across all of them.
   const [rows] = await db.query(
-    `SELECT emoid, SUM(frequency) AS total_frequency FROM emoji_frequency
+    `SELECT id AS emoid FROM guild_emojis
      WHERE type = 'sticker'
-     GROUP BY emoid
-     ORDER BY total_frequency DESC
+     ORDER BY frequency DESC
      LIMIT ?`,
     [n],
   );

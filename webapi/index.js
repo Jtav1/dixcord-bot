@@ -417,6 +417,7 @@ app.get("/", publicLimiter, (req, res) => {
           "POST /api/message-processing/count-repost",
           "POST /api/message-processing/emoji-import",
           "POST /api/message-processing/sticker-import",
+          "POST /api/message-processing/emoji-frequency-sync",
           "POST /api/message-processing/pin-check",
           "POST /api/message-processing/pin-log",
           "POST /api/message-processing/timeout-vote",

@@ -153,7 +153,7 @@ function formatFrequency(value) {
 
 /**
  * Record a failed image load for a custom emoji.
- * @param {{ emoid?: string|number }} emoji Resolved emoji object (emoji_frequency row).
+ * @param {{ emoid?: string|number }} emoji Resolved emoji object (guild_emojis row).
  * @returns {void}
  */
 function markImageMissing(emoji) {
@@ -166,7 +166,7 @@ function markImageMissing(emoji) {
 
 /**
  * Whether a custom emoji image failed to load.
- * @param {{ emoid?: string|number }} emoji Resolved emoji object (emoji_frequency row).
+ * @param {{ emoid?: string|number }} emoji Resolved emoji object (guild_emojis row).
  * @returns {boolean}
  */
 function isImageMissing(emoji) {
