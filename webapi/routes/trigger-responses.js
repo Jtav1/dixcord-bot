@@ -513,20 +513,23 @@ router.post("/bulk", authenticate, requireAdmin, async (req, res) => {
 
 /**
  * PUT /api/trigger-responses/triggers/:id
- * Update trigger: selection_mode and/or responses (set order/weight by link id, or add new response).
- * Body: { selection_mode?, responses?: [ { id: linkId, order?, weight? } | { response_string, order?, weight? } ] }
+ * Update trigger: trigger_string, selection_mode, and/or responses (set order/weight by link id, or add new response).
+ * Body: { trigger_string?, selection_mode?, responses?: [ { id: linkId, order?, weight? } | { response_string, order?, weight? } ] }
  * Auth: required.
  * @openapi
  * /api/trigger-responses/triggers/{id}:
  *   put:
  *     operationId: updateTrigger
  *     tags: [Trigger Responses]
- *     summary: Update a trigger's selection_mode and/or its response list
+ *     summary: Update a trigger's text, selection_mode, and/or its response list
  *     description: >
- *       Requires the admin role. Each entry in `responses` is either `{ id: linkId, order?, weight? }` to
- *       update an existing trigger_response link's order/weight, or `{ response_string, order?, weight? }`
- *       to add a new response (deduped by response_string) to this trigger. Entries matching neither shape
- *       are silently skipped. Both fields are optional; an empty body is a no-op that still returns 200.
+ *       Requires the admin role. trigger_string renames the trigger in place (unlike PUT
+ *       /api/trigger-responses/{id}, which re-points a link at a different get-or-created trigger); a
+ *       value colliding with another trigger's trigger_string returns 409. Each entry in `responses` is
+ *       either `{ id: linkId, order?, weight? }` to update an existing trigger_response link's
+ *       order/weight, or `{ response_string, order?, weight? }` to add a new response (deduped by
+ *       response_string) to this trigger. Entries matching neither shape are silently skipped. All fields
+ *       are optional; an empty body is a no-op that still returns 200.
  *     parameters:
  *       - name: id
  *         in: path
@@ -539,6 +542,7 @@ router.post("/bulk", authenticate, requireAdmin, async (req, res) => {
  *           schema:
  *             type: object
  *             properties:
+ *               trigger_string: { type: string, description: Renames this trigger in place. }
  *               selection_mode:
  *                 type: string
  *                 enum: [random, ordered, weighted]
@@ -586,6 +590,12 @@ router.post("/bulk", authenticate, requireAdmin, async (req, res) => {
  *         $ref: '#/components/responses/ForbiddenRole'
  *       '404':
  *         $ref: '#/components/responses/NotFound'
+ *       '409':
+ *         description: Another trigger already uses this trigger_string.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '500':
  *         $ref: '#/components/responses/ServerError'
  */
@@ -595,8 +605,8 @@ router.put("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
     if (Number.isNaN(id)) {
       return res.status(400).json({ ok: false, error: "Invalid trigger id" });
     }
-    const { selection_mode, responses } = req.body ?? {};
-    const updated = await triggerResponses.updateTrigger(id, { selection_mode, responses });
+    const { trigger_string, selection_mode, responses } = req.body ?? {};
+    const updated = await triggerResponses.updateTrigger(id, { trigger_string, selection_mode, responses });
     if (!updated) {
       return res.status(404).json({ ok: false, error: "Trigger not found" });
     }
@@ -604,6 +614,9 @@ router.put("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
     await bumpCacheVersion();
     res.json({ ok: true, ...trigger });
   } catch (err) {
+    if (err.code === "ER_DUP_ENTRY" || err.message?.includes("UNIQUE")) {
+      return res.status(409).json({ ok: false, error: "Another trigger already uses this trigger_string" });
+    }
     console.error("PUT /api/trigger-responses/triggers/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to update trigger" });
   }

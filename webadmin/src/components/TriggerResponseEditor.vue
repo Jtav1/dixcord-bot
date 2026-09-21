@@ -41,7 +41,10 @@
 
         <v-card v-else-if="detail" class="glass-card pa-6">
           <div class="d-flex align-center justify-space-between flex-wrap ga-4 mb-4">
-            <h2 class="text-h6">{{ detail.trigger_string }}</h2>
+            <div class="d-flex align-center ga-2">
+              <h2 class="text-h6">{{ detail.trigger_string }}</h2>
+              <v-btn icon="mdi-pencil" variant="text" size="small" @click="openEditTriggerDialog" />
+            </div>
             <div class="d-flex align-center ga-4">
               <v-select
                 :model-value="detail.selection_mode"
@@ -174,6 +177,27 @@
       </v-card>
     </v-dialog>
 
+    <v-dialog v-model="editTriggerDialogOpen" max-width="480">
+      <v-card class="glass-card">
+        <v-card-title class="text-h6">Edit Trigger Phrase</v-card-title>
+        <v-card-text>
+          <v-text-field
+            v-model="editTriggerForm.trigger_string"
+            label="Trigger text"
+            :error-messages="editTriggerError"
+            @keydown.enter="onEditTrigger"
+          />
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="editTriggerDialogOpen = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="editingTrigger" @click="onEditTrigger">
+            Save
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <v-dialog v-model="bulkDialogOpen" max-width="640">
       <v-card class="glass-card">
         <v-card-title class="text-h6">Bulk Add</v-card-title>
@@ -279,6 +303,7 @@ import {
   updateResponseText,
   updateTriggerResponseLinkFields,
   updateTriggerSelectionMode,
+  updateTriggerString,
 } from "../lib/triggerResponses.js";
 import { defaultParametersFor } from "../lib/triggerResponseFunctions.js";
 
@@ -308,6 +333,11 @@ const functions = ref([]);
 const functionItems = computed(() =>
   functions.value.map((fn) => ({ title: fn.display_name || fn.function_name, value: fn.function_name })),
 );
+
+const editTriggerDialogOpen = ref(false);
+const editingTrigger = ref(false);
+const editTriggerError = ref("");
+const editTriggerForm = reactive({ trigger_string: "" });
 
 const createDialogOpen = ref(false);
 const creating = ref(false);
@@ -436,6 +466,37 @@ async function onSelectionModeChange(mode) {
     notify(err instanceof Error ? err.message : "Failed to update selection mode", {
       color: "error",
     });
+  }
+}
+
+/**
+ * @returns {void}
+ */
+function openEditTriggerDialog() {
+  if (!detail.value) return;
+  editTriggerForm.trigger_string = detail.value.trigger_string;
+  editTriggerError.value = "";
+  editTriggerDialogOpen.value = true;
+}
+
+/**
+ * @returns {Promise<void>}
+ */
+async function onEditTrigger() {
+  if (!detail.value || !editTriggerForm.trigger_string.trim()) return;
+  editingTrigger.value = true;
+  editTriggerError.value = "";
+  try {
+    const id = detail.value.id;
+    await updateTriggerString(id, editTriggerForm.trigger_string.trim());
+    notify("Trigger updated");
+    editTriggerDialogOpen.value = false;
+    await loadTriggers();
+    await selectTrigger(id);
+  } catch (err) {
+    editTriggerError.value = err instanceof Error ? err.message : "Failed to update trigger";
+  } finally {
+    editingTrigger.value = false;
   }
 }
 

@@ -112,7 +112,16 @@ curl -s -X POST "${BASE_URL}/api/trigger-responses/bulk" \
 
 ---
 
-## Update a trigger (selection_mode and/or response order / new responses)
+## Update a trigger (trigger_string, selection_mode, and/or response order / new responses)
+
+Rename the trigger phrase in place (409 if another trigger already uses that text):
+
+```bash
+curl -s -X PUT "${BASE_URL}/api/trigger-responses/triggers/1" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{ "trigger_string": "take a look at this" }'
+```
 
 Set selection_mode and set order for existing links (use `id` = linkId from GET trigger):
 

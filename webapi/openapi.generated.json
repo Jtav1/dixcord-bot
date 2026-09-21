@@ -218,7 +218,7 @@
       },
       "EmojiFrequency": {
         "type": "object",
-        "description": "A resolved emoji_frequency row — the shape every webapi response uses for an emoji or sticker, in place of a bare emoid. If the emoid has no matching emoji_frequency row (deleted), only emoid is populated and the rest are null.",
+        "description": "A resolved guild_emojis row — the shape every webapi response uses for an emoji or sticker, in place of a bare emoid. If the emoid has no matching guild_emojis row (deleted), only emoid is populated and the rest are null.",
         "properties": {
           "emoid": {
             "type": "string",
@@ -260,7 +260,7 @@
       },
       "ConfigEmojiValue": {
         "type": "object",
-        "description": "Resolved value of an \"emoji\"-typed config entry (pin_emoji, plusplus_emoji, minusminus_emoji, repost_emoji). If the stored value matches a synced emoji_frequency row, this is that row (app is the real app name). If it's freeform text an admin typed by hand that was never synced, app/emoid are null and `emoji` holds the raw text — comparisons should fall back to matching that string (see emojisMatch).",
+        "description": "Resolved value of an \"emoji\"-typed config entry (pin_emoji, plusplus_emoji, minusminus_emoji, repost_emoji). If the stored value matches a synced guild_emojis row, this is that row (app is the real app name). If it's freeform text an admin typed by hand that was never synced, app/emoid are null and `emoji` holds the raw text — comparisons should fall back to matching that string (see emojisMatch).",
         "properties": {
           "emoid": {
             "type": "string",
@@ -1698,8 +1698,8 @@
         "tags": [
           "Trigger Responses"
         ],
-        "summary": "Update a trigger's selection_mode and/or its response list",
-        "description": "Requires the admin role. Each entry in `responses` is either `{ id: linkId, order?, weight? }` to update an existing trigger_response link's order/weight, or `{ response_string, order?, weight? }` to add a new response (deduped by response_string) to this trigger. Entries matching neither shape are silently skipped. Both fields are optional; an empty body is a no-op that still returns 200.\n",
+        "summary": "Update a trigger's text, selection_mode, and/or its response list",
+        "description": "Requires the admin role. trigger_string renames the trigger in place (unlike PUT /api/trigger-responses/{id}, which re-points a link at a different get-or-created trigger); a value colliding with another trigger's trigger_string returns 409. Each entry in `responses` is either `{ id: linkId, order?, weight? }` to update an existing trigger_response link's order/weight, or `{ response_string, order?, weight? }` to add a new response (deduped by response_string) to this trigger. Entries matching neither shape are silently skipped. All fields are optional; an empty body is a no-op that still returns 200.\n",
         "parameters": [
           {
             "name": "id",
@@ -1717,6 +1717,10 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "trigger_string": {
+                    "type": "string",
+                    "description": "Renames this trigger in place."
+                  },
                   "selection_mode": {
                     "type": "string",
                     "enum": [
@@ -1850,6 +1854,16 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "description": "Another trigger already uses this trigger_string.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -5980,7 +5994,7 @@
           "Message Processing"
         ],
         "summary": "Record emoji usage in a message",
-        "description": "Increments emoji_frequency / member_emoji_tracking for each emoji in the message. If isReply is true and the emojis are exactly one configured plusplus/minusminus emoji (guild_config, resolved via resolveConfigEmojiValue and compared with emojisMatch), also records a single +/- vote for repliedUserId instead of counting it as emoji usage.\n",
+        "description": "Increments guild_emojis.frequency / member_emoji_tracking for each emoji in the message. If isReply is true and the emojis are exactly one configured plusplus/minusminus emoji (guild_config, resolved via resolveConfigEmojiValue and compared with emojisMatch), also records a single +/- vote for repliedUserId instead of counting it as emoji usage.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -6097,7 +6111,7 @@
           "Message Processing"
         ],
         "summary": "Record sticker usage in a message",
-        "description": "Increments emoji_frequency (type='sticker', now per-guild) / member_emoji_tracking for each sticker in the message. Unlike emoji-count, there is no plus/minus branch — Discord has no reply-with-sticker vote mechanism.\n",
+        "description": "Increments guild_emojis.frequency (type='sticker') / member_emoji_tracking for each sticker in the message. Unlike emoji-count, there is no plus/minus branch — Discord has no reply-with-sticker vote mechanism.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -6467,7 +6481,7 @@
           "Message Processing"
         ],
         "summary": "Sync the guild's custom emoji catalog",
-        "description": "Fully replaces this guild's guild_emojis rows of type 'emoji' (mirrors guild_channels/ guild_roles sync). emoji_frequency usage counts are untouched. Gracefully discards the whole sync (imported:0, no error) if guildId isn't a known guild (guild_info).\n",
+        "description": "Replaces this guild's guild_emojis rows of type 'emoji' (mirrors guild_channels/ guild_roles sync), keeping rows with usage history (frequency > 0) even if no longer live on Discord. guild_emojis.frequency itself is untouched. Gracefully discards the whole sync (imported:0, no error) if guildId isn't a known guild (guild_info).\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -6571,174 +6585,14 @@
         }
       }
     },
-    "/api/message-processing/emoji-catalog": {
-      "get": {
-        "operationId": "listEmojiCatalog",
+    "/api/message-processing/emoji-frequency-sync": {
+      "post": {
+        "operationId": "syncEmojiFrequency",
         "tags": [
           "Message Processing"
         ],
-        "summary": "List custom emoji/sticker catalog rows (with guild_id)",
-        "description": "Returns every guild_emojis row that has a guild_id (i.e. custom, not unicode), of any type (including NULL — legacy rows that were never backfilled). Intended for the emoji-cleanup admin script, not general browsing.\n",
-        "parameters": [
-          {
-            "name": "app",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "enum": [
-                "discord"
-              ]
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Catalog rows.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "emojis": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "guildId": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "type": {
-                            "type": "string",
-                            "nullable": true,
-                            "enum": [
-                              "emoji",
-                              "sticker",
-                              null
-                            ]
-                          },
-                          "animated": {
-                            "type": "boolean"
-                          },
-                          "frequency": {
-                            "type": "integer",
-                            "description": "Current guild_emojis.frequency value."
-                          },
-                          "sourceFrequency": {
-                            "type": "integer",
-                            "description": "emoji_frequency total; what migrate-frequency would write. Only meaningful for type=emoji."
-                          },
-                          "hasFrequencyHistory": {
-                            "type": "boolean",
-                            "description": "True if any emoji_frequency row exists for this emoid — a fallback 'this is an emoji' signal when the id is no longer live on Discord."
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Missing/invalid app parameter.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/ForbiddenBotOrAdmin"
-          },
-          "500": {
-            "$ref": "#/components/responses/ServerError"
-          }
-        }
-      }
-    },
-    "/api/message-processing/emoji-catalog/{id}": {
-      "delete": {
-        "operationId": "deleteEmojiCatalogRow",
-        "tags": [
-          "Message Processing"
-        ],
-        "summary": "Delete one custom emoji/sticker catalog row",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Row deleted (or already absent).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/ForbiddenBotOrAdmin"
-          },
-          "500": {
-            "$ref": "#/components/responses/ServerError"
-          }
-        }
-      }
-    },
-    "/api/message-processing/emoji-catalog/{id}/type": {
-      "patch": {
-        "operationId": "setEmojiCatalogRowType",
-        "tags": [
-          "Message Processing"
-        ],
-        "summary": "Correct one custom emoji/sticker catalog row's type",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "summary": "Sync guild_emojis frequency/rows from emoji_frequency for one guild",
+        "description": "Deletes guild_emojis rows whose guild_id belongs to a different guild (app matches, but guild_id doesn't), then for every emoji_frequency row belonging to (app, guildId) — emoji and sticker alike, per emoji_frequency.type (NULL = emoji) — copies its frequency into the matching guild_emojis row (keyed on id), inserting one if it doesn't exist yet using only what emoji_frequency has (name falls back to the id). dryRun:true previews the same counts (deleted/inserted/updated) without writing anything.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -6746,15 +6600,22 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "type"
+                  "app",
+                  "guildId"
                 ],
                 "properties": {
-                  "type": {
+                  "app": {
                     "type": "string",
                     "enum": [
-                      "emoji",
-                      "sticker"
+                      "discord"
                     ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "dryRun": {
+                    "type": "boolean",
+                    "default": false
                   }
                 }
               }
@@ -6763,65 +6624,7 @@
         },
         "responses": {
           "200": {
-            "description": "Type updated.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Missing/invalid type.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/ForbiddenBotOrAdmin"
-          },
-          "500": {
-            "$ref": "#/components/responses/ServerError"
-          }
-        }
-      }
-    },
-    "/api/message-processing/emoji-catalog/{id}/migrate-frequency": {
-      "post": {
-        "operationId": "migrateEmojiCatalogFrequency",
-        "tags": [
-          "Message Processing"
-        ],
-        "summary": "Migrate one emoji's usage total from emoji_frequency into guild_emojis.frequency",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Frequency migrated.",
+            "description": "Sync complete (or previewed, if dryRun).",
             "content": {
               "application/json": {
                 "schema": {
@@ -6833,10 +6636,36 @@
                         true
                       ]
                     },
-                    "frequency": {
-                      "type": "integer"
+                    "dryRun": {
+                      "type": "boolean"
+                    },
+                    "deleted": {
+                      "type": "integer",
+                      "description": "guild_emojis rows removed (misattributed to another guild)."
+                    },
+                    "inserted": {
+                      "type": "integer",
+                      "description": "guild_emojis rows newly created from emoji_frequency."
+                    },
+                    "updated": {
+                      "type": "integer",
+                      "description": "Existing guild_emojis rows whose frequency was copied over."
+                    },
+                    "synced": {
+                      "type": "integer",
+                      "description": "inserted + updated."
                     }
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing/invalid app or guildId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -6846,16 +6675,6 @@
           },
           "403": {
             "$ref": "#/components/responses/ForbiddenBotOrAdmin"
-          },
-          "404": {
-            "description": "id not found in guild_emojis.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -6870,7 +6689,7 @@
           "Message Processing"
         ],
         "summary": "Sync the guild's sticker catalog",
-        "description": "Fully replaces this guild's guild_emojis rows of type 'sticker' (mirrors emoji-import). emoji_frequency usage counts are untouched. Gracefully discards the whole sync (imported:0, no error) if guildId isn't a known guild (guild_info).\n",
+        "description": "Replaces this guild's guild_emojis rows of type 'sticker' (mirrors emoji-import), keeping rows with usage history (frequency > 0) even if no longer live on Discord. guild_emojis.frequency itself is untouched. Gracefully discards the whole sync (imported:0, no error) if guildId isn't a known guild (guild_info).\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -8165,7 +7984,7 @@
           "Leaderboards"
         ],
         "summary": "Top used emojis",
-        "description": "Paginated emoji usage leaderboard from emoji_frequency (emojis only, excludes stickers).",
+        "description": "Paginated emoji usage leaderboard from guild_emojis (emojis only, excludes stickers).",
         "requestBody": {
           "required": false,
           "content": {
@@ -8347,7 +8166,7 @@
           "Leaderboards"
         ],
         "summary": "Top used stickers",
-        "description": "Paginated sticker usage leaderboard from emoji_frequency (stickers only).",
+        "description": "Paginated sticker usage leaderboard from guild_emojis (stickers only).",
         "requestBody": {
           "required": false,
           "content": {

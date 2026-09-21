@@ -797,17 +797,28 @@ export async function bulkLinkTriggersAndResponses({
 }
 
 /**
- * Update a trigger: selection_mode and/or response list (set order/weight for existing links, add new responses).
- * responses: [ { id: linkId, order?, weight? } ] to set order/weight, or [ { response_string, order?, weight? } ] to add new.
+ * Update a trigger: trigger_string, selection_mode, and/or response list (set order/weight for existing
+ * links, add new responses). responses: [ { id: linkId, order?, weight? } ] to set order/weight, or
+ * [ { response_string, order?, weight? } ] to add new.
  * @param {number} triggerId
- * @param {{ selection_mode?: string, responses?: Array<{ id?: number, response_string?: string, order?: number|null, weight?: number, response_function?: string|null }> }} updates
- * @returns {Promise<boolean>}
+ * @param {{ trigger_string?: string, selection_mode?: string, responses?: Array<{ id?: number, response_string?: string, order?: number|null, weight?: number, response_function?: string|null }> }} updates
+ * @returns {Promise<boolean>} false if the trigger doesn't exist; throws on a duplicate trigger_string.
  */
-export async function updateTrigger(triggerId, { selection_mode, responses }) {
+export async function updateTrigger(triggerId, { trigger_string, selection_mode, responses }) {
   const [tRows] = await db.query("SELECT id FROM triggers WHERE id = ?", [
     triggerId,
   ]);
   if (!tRows || tRows.length === 0) return false;
+  if (
+    trigger_string !== undefined &&
+    typeof trigger_string === "string" &&
+    trigger_string.trim()
+  ) {
+    await db.query("UPDATE triggers SET trigger_string = ? WHERE id = ?", [
+      trigger_string.trim(),
+      triggerId,
+    ]);
+  }
   if (selection_mode !== undefined) {
     const mode =
       selection_mode && VALID_MODES.includes(selection_mode.toLowerCase())

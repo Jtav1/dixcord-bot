@@ -52,6 +52,21 @@ export async function updateTriggerSelectionMode(id, selectionMode) {
 }
 
 /**
+ * Rename a trigger's phrase (trigger_string) in place.
+ * @param {number} id
+ * @param {string} triggerString
+ * @returns {Promise<object>}
+ */
+export async function updateTriggerString(id, triggerString) {
+  return apiFetchJson(
+    "PUT",
+    `/trigger-responses/triggers/${id}`,
+    { trigger_string: triggerString },
+    "Update trigger",
+  );
+}
+
+/**
  * Add a new response to an existing trigger.
  * @param {number} id
  * @param {{ response_string: string, order?: number|null, weight?: number|null, response_function?: string|null }} response

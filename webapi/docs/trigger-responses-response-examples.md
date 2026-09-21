@@ -210,6 +210,15 @@ See also [trigger-responses-examples.md](trigger-responses-examples.md) for samp
 }
 ```
 
+**409 Conflict** (trigger_string collides with another trigger)
+
+```json
+{
+  "ok": false,
+  "error": "Another trigger already uses this trigger_string"
+}
+```
+
 ---
 
 ## GET /api/trigger-responses/random?trigger=xxx
