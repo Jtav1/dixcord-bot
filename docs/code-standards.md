@@ -5,7 +5,7 @@ Conventions observed across this repository's four Node.js/ESM services:
 - **`discord-bot/`** — Discord.js v14 bot; depends on `webapi` for almost all behavior.
 - **`webapi/`** — Express REST API (MySQL or SQLite), JWT auth; backend for all other services.
 - **`webview/`** — Vue 3 + Vuetify public read-only stats site, with a small Express prod server.
-- **`webadmin/`** — Admin panel frontend; currently an early-stage Vite scaffold (no framework chosen yet).
+- **`webadmin/`** — Vue 3 + Vuetify admin panel, with a small Express prod server.
 
 This document describes what the code **actually does**, not an aspirational style — match neighboring files in the service you're editing over anything written here if the two disagree. There is no ESLint/Prettier config anywhere in the repo; these conventions are enforced by review, not tooling.
 
@@ -63,9 +63,9 @@ This document describes what the code **actually does**, not an aspirational sty
 
 ## webapi/
 
-- **Routes**: `router.<method>("path", authenticate, [requireAdmin|requireBotOrAdmin,] async (req, res) => { try { ... } catch (err) { console.error("<context> error:", err); res.status(NNN).json({ ok: false, error: "..." }); } })`. Apply `authenticate` per route, matching the majority of route files — `routes/users.js` hoists it to a single `router.use(authenticate)`, which is an outlier, not the pattern to copy for new routes.
+- **Routes**: `router.<method>("path", authenticate, [requireAdmin|requireBotOrAdmin,] async (req, res) => { try { ... } catch (err) { console.error("<context> error:", err); res.status(NNN).json({ ok: false, error: "..." }); } })`. Apply `authenticate` per route, matching the majority of route files — `routes/users.js` and `routes/service-accounts.js` hoist it via `router.use(...)`, which are outliers, not the pattern to copy for new routes.
 - **Auth**: JWT via `middleware/auth.js` (`signToken`, `authenticate`, `requireAdmin`, `requireBotOrAdmin`, `optionalAuth`). Three roles: `admin`, `bot`, `webview`; `webview`-role tokens are further restricted to an explicit allowlist of routes/prefixes. The process exits at startup if `JWT_SECRET` is unset.
-- **Response shape**: success is `{ ok: true, ...fields }` — lists use a named plural key (`{ ok: true, triggers: [...] }`), sometimes with `total`/pagination metadata; creates return `201`; deletes return `{ ok: true }` with no other body. Errors are `{ ok: false, error: "..." }`. Don't introduce a `message` field or a bare `{ error }` shape — `middleware/auth.js` currently omits `ok: false` in a couple of spots, which is a known inconsistency, not the target shape.
+- **Response shape**: success is `{ ok: true, ...fields }` — lists use a named plural key (`{ ok: true, triggers: [...] }`), sometimes with `total`/pagination metadata; creates return `201`; deletes return `{ ok: true }` with no other body. Errors are `{ ok: false, error: "..." }`. Don't introduce a `message` field or a bare `{ error }` shape — most error responses in `middleware/auth.js` omit `ok: false`, which is a known inconsistency, not the target shape.
 - **DB access**: raw parameterized SQL only, via `db.query(sql, params)` with `?` placeholders — no ORM or query builder. `config/db.js` abstracts MySQL (`mysql2/promise`) vs SQLite (`better-sqlite3`) behind one `.query()` shape; dialect differences (`RAND()`/`RANDOM()`, `ON DUPLICATE KEY UPDATE`/`ON CONFLICT ... DO UPDATE`) are handled inline in services/routes behind an `isSqlite` check, not hidden inside the adapter.
 - **Schema**: hand-written `sql/schema.sql` (MySQL) and `sql/schema.sqlite.sql` (SQLite), reconciled at startup by `scripts/ensureSchema.js` using idempotent `tableExists`/`columnExists`/`constraintExists` checks. There is no versioned migration framework — when adding a column or table, update **both** schema files and `ensureSchema.js`.
 - **Validation**: hand-rolled inline in handlers (`typeof`/`trim()`/`Array.isArray` + early `400`) — no Joi/Zod/express-validator. Match the neighboring route rather than introducing a validation library.
@@ -83,9 +83,8 @@ This document describes what the code **actually does**, not an aspirational sty
 
 ## webadmin/
 
-- Currently a minimal scaffold (`src/main.js`, `src/lib/api.js`, `style.css`) with no frontend framework chosen yet — don't infer component conventions from it.
-- `server.js` mirrors webview's Express-static-plus-`/api`-proxy shape (health check, `http-proxy-middleware`, static `dist/`, SPA fallback) but **does not yet** attach a service-account JWT to the proxied requests the way webview's does. If/when webadmin starts calling authenticated webapi routes, follow webview's `lib/webapiAuth.js` pattern rather than inventing a second approach.
-- Otherwise follows the shared ESM/naming/JSDoc conventions above.
+- Same Vue 3 `<script setup>` + Vuetify layout as webview (`src/views/*View.vue`, `src/components/`, `src/composables/`, `src/lib/`); follow the webview conventions above.
+- `server.js` and `vite.config.js` attach the `admin` service-account JWT to the `/api` proxy via `lib/webapiAuth.js` / `lib/webapiAuthProxyPlugin.js` — reuse them rather than adding a second token path.
 
 ---
 

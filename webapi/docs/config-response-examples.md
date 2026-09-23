@@ -2,7 +2,7 @@
 
 Every route requires `app` and `guildId` (query for GET/DELETE, body for POST/PUT) — each server gets its own fully independent config, auto-seeded with defaults when first registered via `POST /api/guild/sync`.
 
-## GET /api/config?app=discord&guildId=710671234471559228
+## GET /api/config?app=discord&guildId=100000000000000001
 
 **200 OK**
 
@@ -11,13 +11,13 @@ Every route requires `app` and `guildId` (query for GET/DELETE, body for POST/PU
   "ok": true,
   "config": {
     "pin_threshold": "3",
-    "pin_channel_id": "915462110761349201",
+    "pin_channel_id": "100000000000000003",
     "twitter_fix_enabled": "true",
     "plusplus_enabled": "true"
   },
   "entries": [
     { "config": "pin_threshold", "value": "3" },
-    { "config": "pin_channel_id", "value": "915462110761349201" },
+    { "config": "pin_channel_id", "value": "100000000000000003" },
     { "config": "twitter_fix_enabled", "value": "true" },
     { "config": "plusplus_enabled", "value": "true" }
   ]
@@ -51,7 +51,7 @@ Every route requires `app` and `guildId` (query for GET/DELETE, body for POST/PU
 ```json
 {
   "app": "discord",
-  "guildId": "710671234471559228",
+  "guildId": "100000000000000001",
   "config": "twitter_fix_enabled",
   "value": "true"
 }

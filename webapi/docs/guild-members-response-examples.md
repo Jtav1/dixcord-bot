@@ -11,13 +11,13 @@ Per-`(app, guild_id, platform_user_id)` server membership (Discord handle, nickn
 ```json
 {
   "app": "discord",
-  "guildId": "710671234471559228",
+  "guildId": "100000000000000001",
   "members": [
     {
-      "platformUserId": "164208106291724298",
+      "platformUserId": "100000000000000006",
       "handle": "normal_justin",
       "nickname": "JT",
-      "roles": ["612842488302141441"],
+      "roles": ["100000000000000004"],
       "joinedAt": "2024-01-01T00:00:00Z"
     }
   ]
@@ -56,7 +56,7 @@ Per-`(app, guild_id, platform_user_id)` server membership (Discord handle, nickn
 
 ---
 
-## GET /api/guild-members?app=discord&guildId=710671234471559228
+## GET /api/guild-members?app=discord&guildId=100000000000000001
 
 **200 OK**
 
@@ -68,11 +68,11 @@ Per-`(app, guild_id, platform_user_id)` server membership (Discord handle, nickn
       "id": 1,
       "name": "Justin flavored sauce",
       "handle": "normal_justin",
-      "platformUserId": "164208106291724298",
+      "platformUserId": "100000000000000006",
       "nickname": "JT",
       "roles": [
         {
-          "id": "612842488302141441",
+          "id": "100000000000000004",
           "app": "discord",
           "name": "Moderator",
           "color": "#5865F2",
@@ -102,7 +102,7 @@ The second entry has no `member_aliases` row yet — `id`/`name` are null. See `
 
 ---
 
-## GET /api/guild-members/unlinked?app=discord&guildId=710671234471559228&search=ghost
+## GET /api/guild-members/unlinked?app=discord&guildId=100000000000000001&search=ghost
 
 Admin-only. Read-only list of `guild_members` rows with no `member_aliases` row linking them to an identity. `search` (optional) is a case-insensitive substring match against `handle` or `nickname`. `id` is `guild_members.id` — pass it to `POST /api/guild-members/{guildMemberId}/link` to create the alias link.
 
@@ -115,7 +115,7 @@ Admin-only. Read-only list of `guild_members` rows with no `member_aliases` row 
     {
       "id": 42,
       "app": "discord",
-      "guildId": "710671234471559228",
+      "guildId": "100000000000000001",
       "platformUserId": "999999999999999999",
       "handle": "ghost_user",
       "nickname": "Ghost",
@@ -150,8 +150,8 @@ Admin-only. Every `guild_members` row, linked or not — the manual-link picker'
     {
       "id": 7,
       "app": "discord",
-      "guildId": "710671234471559228",
-      "platformUserId": "164208106291724298",
+      "guildId": "100000000000000001",
+      "platformUserId": "100000000000000006",
       "handle": "normal_justin",
       "nickname": "JT",
       "roles": [],
@@ -163,7 +163,7 @@ Admin-only. Every `guild_members` row, linked or not — the manual-link picker'
     {
       "id": 42,
       "app": "discord",
-      "guildId": "710671234471559228",
+      "guildId": "100000000000000001",
       "platformUserId": "999999999999999999",
       "handle": "ghost_user",
       "nickname": "Ghost",
@@ -192,14 +192,14 @@ Admin-only. Every `guild_members` row currently linked (via `member_aliases`) to
     {
       "id": 7,
       "app": "discord",
-      "guildId": "710671234471559228",
+      "guildId": "100000000000000001",
       "guildName": "Dixon Cox Butte Preservation Society",
-      "platformUserId": "164208106291724298",
+      "platformUserId": "100000000000000006",
       "handle": "normal_justin",
       "nickname": "JT",
       "roles": [
         {
-          "id": "612842488302141441",
+          "id": "100000000000000004",
           "app": "discord",
           "name": "Moderator",
           "color": "#5865F2",
@@ -280,12 +280,12 @@ Every server this internal `chat_member_mapping.id` belongs to — the primitive
   "servers": [
     {
       "app": "discord",
-      "guildId": "710671234471559228",
+      "guildId": "100000000000000001",
       "guildName": "Dixon Cox Butte Preservation Society",
       "nickname": "JT",
       "roles": [
         {
-          "id": "612842488302141441",
+          "id": "100000000000000004",
           "app": "discord",
           "name": "Moderator",
           "color": "#5865F2",

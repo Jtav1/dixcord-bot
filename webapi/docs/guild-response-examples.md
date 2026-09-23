@@ -9,9 +9,9 @@
   "ok": true,
   "guild": {
     "app": "discord",
-    "guildId": "710671234471559228",
+    "guildId": "100000000000000001",
     "name": "Dixon Cox Butte Preservation Society",
-    "iconUrl": "https://cdn.discordapp.com/icons/710671234471559228/abc123.png",
+    "iconUrl": "https://cdn.discordapp.com/icons/100000000000000001/abc123.png",
     "description": null,
     "ownerId": "111111111111111111",
     "boostTier": 1,
@@ -21,13 +21,13 @@
     "createdAt": "2020-05-14T02:11:00.000Z"
   },
   "channels": [
-    { "id": "710671234471559229", "name": "general", "type": "0", "position": 0, "parent_id": null }
+    { "id": "100000000000000002", "name": "general", "type": "0", "position": 0, "parent_id": null }
   ],
   "roles": [
-    { "id": "612842488302141441", "name": "Mods", "color": "#e74c3c", "position": 5, "mentionable": 0, "hoisted": 1 }
+    { "id": "100000000000000004", "name": "Mods", "color": "#e74c3c", "position": 5, "mentionable": 0, "hoisted": 1 }
   ],
   "emojis": [
-    { "emoid": "1072368151922233404", "emoji": "repost", "frequency": 42, "animated": 0, "type": "emoji" }
+    { "emoid": "100000000000000005", "emoji": "repost", "frequency": 42, "animated": 0, "type": "emoji" }
   ],
   "stickers": [
     { "stickerid": "999999999999999999", "name": "wave", "frequency": 3 }
@@ -54,11 +54,11 @@
 ```json
 {
   "app": "discord",
-  "guildId": "710671234471559228",
+  "guildId": "100000000000000001",
   "guild": {
-    "id": "710671234471559228",
+    "id": "100000000000000001",
     "name": "Dixon Cox Butte Preservation Society",
-    "iconUrl": "https://cdn.discordapp.com/icons/710671234471559228/abc123.png",
+    "iconUrl": "https://cdn.discordapp.com/icons/100000000000000001/abc123.png",
     "ownerId": "111111111111111111",
     "boostTier": 1,
     "boostCount": 3,
@@ -67,10 +67,10 @@
     "createdAt": "2020-05-14T02:11:00.000Z"
   },
   "channels": [
-    { "id": "710671234471559229", "name": "general", "type": "0", "position": 0, "parentId": null }
+    { "id": "100000000000000002", "name": "general", "type": "0", "position": 0, "parentId": null }
   ],
   "roles": [
-    { "id": "612842488302141441", "name": "Mods", "color": "#e74c3c", "position": 5, "mentionable": false, "hoisted": true }
+    { "id": "100000000000000004", "name": "Mods", "color": "#e74c3c", "position": 5, "mentionable": false, "hoisted": true }
   ]
 }
 ```
