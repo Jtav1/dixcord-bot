@@ -112,3 +112,5 @@ config.ignore
 *.txt
 
 dump*.sql
+
+CLAUDE.md
