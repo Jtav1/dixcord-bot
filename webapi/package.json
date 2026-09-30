@@ -41,7 +41,7 @@
     "swagger-jsdoc": "^6.3.0"
   },
   "devDependencies": {
-    "@scalar/cli": "^2.5.1"
+    "@scalar/cli": "^2.8.0"
   },
   "optionalDependencies": {
     "better-sqlite3": "^13.0.3"
