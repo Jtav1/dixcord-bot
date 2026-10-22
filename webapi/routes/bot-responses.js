@@ -71,7 +71,7 @@ router.post("/fortune", authenticate, async (req, res) => {
  *             required: [app, guildId]
  *             properties:
  *               message: { type: string }
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string }
  *     responses:
  *       '200':

@@ -30,8 +30,8 @@ const router = express.Router();
  *       - name: app
  *         in: query
  *         required: true
- *         description: Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently only "discord" is supported.
- *         schema: { type: string, enum: [discord] }
+ *         description: Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently "discord" and "fluxer" are supported.
+ *         schema: { type: string, enum: [discord, fluxer] }
  *       - name: limit
  *         in: query
  *         required: false
@@ -110,8 +110,8 @@ router.get("/", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         description: Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently only "discord" is supported.
- *         schema: { type: string, enum: [discord] }
+ *         description: Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently "discord" and "fluxer" are supported.
+ *         schema: { type: string, enum: [discord, fluxer] }
  *     responses:
  *       '200':
  *         description: The user mapping.
@@ -181,8 +181,8 @@ router.get("/:id", authenticate, async (req, res) => {
  *             properties:
  *               app:
  *                 type: string
- *                 enum: [discord]
- *                 description: Chat app, validated but otherwise unused. Currently only "discord" is supported.
+ *                 enum: [discord, fluxer]
+ *                 description: Chat app, validated but otherwise unused. Currently "discord" and "fluxer" are supported.
  *               name: { type: string }
  *     responses:
  *       '201':
@@ -265,8 +265,8 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  *             properties:
  *               app:
  *                 type: string
- *                 enum: [discord]
- *                 description: Chat app, validated but otherwise unused. Currently only "discord" is supported.
+ *                 enum: [discord, fluxer]
+ *                 description: Chat app, validated but otherwise unused. Currently "discord" and "fluxer" are supported.
  *               name: { type: string }
  *     responses:
  *       '200':
@@ -346,8 +346,8 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         description: Chat app, validated but otherwise unused. Currently only "discord" is supported.
- *         schema: { type: string, enum: [discord] }
+ *         description: Chat app, validated but otherwise unused. Currently "discord" and "fluxer" are supported.
+ *         schema: { type: string, enum: [discord, fluxer] }
  *     responses:
  *       '200':
  *         description: Deleted.

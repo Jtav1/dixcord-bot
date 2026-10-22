@@ -41,7 +41,7 @@ function requireChatAppFromPayload(payload) {
   if (!isChatMemberAppSupported(app)) {
     return {
       ok: false,
-      error: 'Parameter "app" is required and must be "discord".',
+      error: 'Parameter "app" is required and must be a supported chat app.',
     };
   }
   return { ok: true, app };
@@ -850,12 +850,17 @@ export async function logPinnedMessage(payload) {
 
   const { author, contents, attachments, channelId, channelName, pinners } =
     normalized.row;
+  const guildIdRaw = typeof payload === "object" ? payload?.guildId : null;
+  const guildId =
+    guildIdRaw == null || String(guildIdRaw).trim() === ""
+      ? null
+      : String(guildIdRaw).trim();
 
   await db.query(
     `INSERT INTO pin_history (
-      msgid, author, contents, attachments, channel_id, channel_name, pinners, hydrated
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, author, contents, attachments, channelId, channelName, pinners, 1],
+      msgid, author, contents, attachments, channel_id, channel_name, pinners, hydrated, guild_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, author, contents, attachments, channelId, channelName, pinners, 1, guildId],
   );
 
   const milestones = [];

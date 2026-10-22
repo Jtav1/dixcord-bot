@@ -136,7 +136,7 @@ export async function upsertGuildSnapshot({ app, guildId, guild, channels, roles
   if (!isChatMemberAppSupported(app)) {
     return {
       ok: false,
-      error: 'Unsupported app; currently only "discord" is accepted.',
+      error: "Unsupported app.",
     };
   }
   const gid = String(guildId ?? "").trim();

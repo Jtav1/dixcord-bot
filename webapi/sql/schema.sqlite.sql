@@ -119,7 +119,8 @@ CREATE TABLE IF NOT EXISTS pin_history (
   channel_id TEXT NULL,
   channel_name TEXT NULL,
   pinners TEXT NULL,
-  hydrated INTEGER NOT NULL DEFAULT 1
+  hydrated INTEGER NOT NULL DEFAULT 1,
+  guild_id TEXT NULL
 );
 
 CREATE TABLE IF NOT EXISTS link_replacements (
@@ -191,9 +192,10 @@ CREATE INDEX IF NOT EXISTS idx_trigger_response_user_history_trigger_response ON
 -- Scheduled messages (bot polls due rows and posts to channel). Requester is chat_member_mapping.id.
 CREATE TABLE IF NOT EXISTS scheduled_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
   user_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
-  discord_channel_id TEXT NOT NULL,
-  discord_guild_id TEXT,
+  channel_id TEXT NOT NULL,
+  guild_id TEXT,
   message_body TEXT NOT NULL,
   scheduled_at TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent')),
@@ -202,7 +204,7 @@ CREATE TABLE IF NOT EXISTS scheduled_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_scheduled_messages_due ON scheduled_messages (status, scheduled_at);
-CREATE INDEX IF NOT EXISTS idx_scheduled_messages_user ON scheduled_messages (user_id, status);
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_app_user ON scheduled_messages (app, user_id, status);
 
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

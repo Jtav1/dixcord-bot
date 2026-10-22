@@ -24,7 +24,7 @@ const router = express.Router();
  *       - name: app
  *         in: query
  *         required: false
- *         schema: { type: string, enum: [discord], default: discord }
+ *         schema: { type: string, enum: [discord, fluxer], default: discord }
  *       - name: from
  *         in: query
  *         required: false
@@ -105,7 +105,7 @@ router.get("/plusplus", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: false
- *         schema: { type: string, enum: [discord], default: discord }
+ *         schema: { type: string, enum: [discord, fluxer], default: discord }
  *       - name: userId
  *         in: query
  *         required: false

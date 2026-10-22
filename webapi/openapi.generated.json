@@ -567,11 +567,12 @@
             "name": "app",
             "in": "query",
             "required": true,
-            "description": "Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently only \"discord\" is supported.",
+            "description": "Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently \"discord\" and \"fluxer\" are supported.",
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           },
@@ -683,9 +684,10 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ],
-                    "description": "Chat app, validated but otherwise unused. Currently only \"discord\" is supported."
+                    "description": "Chat app, validated but otherwise unused. Currently \"discord\" and \"fluxer\" are supported."
                   },
                   "name": {
                     "type": "string"
@@ -764,11 +766,12 @@
             "name": "app",
             "in": "query",
             "required": true,
-            "description": "Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently only \"discord\" is supported.",
+            "description": "Chat app, validated but otherwise unused — chat_member_mapping is no longer app-scoped. Currently \"discord\" and \"fluxer\" are supported.",
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           }
@@ -852,9 +855,10 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ],
-                    "description": "Chat app, validated but otherwise unused. Currently only \"discord\" is supported."
+                    "description": "Chat app, validated but otherwise unused. Currently \"discord\" and \"fluxer\" are supported."
                   },
                   "name": {
                     "type": "string"
@@ -935,11 +939,12 @@
             "name": "app",
             "in": "query",
             "required": true,
-            "description": "Chat app, validated but otherwise unused. Currently only \"discord\" is supported.",
+            "description": "Chat app, validated but otherwise unused. Currently \"discord\" and \"fluxer\" are supported.",
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           }
@@ -2072,7 +2077,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           },
@@ -2417,11 +2423,12 @@
             "name": "app",
             "in": "query",
             "required": true,
-            "description": "Chat app to scope the mapping to. Currently only \"discord\" is supported.",
+            "description": "Chat app to scope the mapping to. Currently \"discord\" and \"fluxer\" are supported.",
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           }
@@ -3282,7 +3289,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "guildId": {
@@ -3814,10 +3822,11 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             },
-            "description": "Chat app key. Currently only \"discord\" is supported."
+            "description": "Chat app key. Currently \"discord\" and \"fluxer\" are supported."
           },
           {
             "name": "scope",
@@ -3915,7 +3924,8 @@
                           "app": {
                             "type": "string",
                             "enum": [
-                              "discord"
+                              "discord",
+                              "fluxer"
                             ]
                           },
                           "chat_channel_id": {
@@ -4022,7 +4032,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "requesterUserId": {
@@ -4075,7 +4086,8 @@
                         "app": {
                           "type": "string",
                           "enum": [
-                            "discord"
+                            "discord",
+                            "fluxer"
                           ]
                         },
                         "chat_channel_id": {
@@ -4163,10 +4175,11 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             },
-            "description": "Chat app key. Currently only \"discord\" is supported."
+            "description": "Chat app key. Currently \"discord\" and \"fluxer\" are supported."
           },
           {
             "name": "requesterUserId",
@@ -4204,7 +4217,8 @@
                         "app": {
                           "type": "string",
                           "enum": [
-                            "discord"
+                            "discord",
+                            "fluxer"
                           ]
                         },
                         "chat_channel_id": {
@@ -4300,7 +4314,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             },
             "description": "Chat app key. May be supplied here or in the request body; required either way."
@@ -4319,7 +4334,8 @@
                       "app": {
                         "type": "string",
                         "enum": [
-                          "discord"
+                          "discord",
+                          "fluxer"
                         ]
                       },
                       "requesterUserId": {
@@ -4378,7 +4394,8 @@
                       "app": {
                         "type": "string",
                         "enum": [
-                          "discord"
+                          "discord",
+                          "fluxer"
                         ]
                       },
                       "message_body": {
@@ -4421,7 +4438,8 @@
                         "app": {
                           "type": "string",
                           "enum": [
-                            "discord"
+                            "discord",
+                            "fluxer"
                           ]
                         },
                         "chat_channel_id": {
@@ -4529,7 +4547,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             },
             "description": "Chat app key. May be supplied here or in the request body; required for requester scope (not read for `scope=admin`).\n"
@@ -4560,7 +4579,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "requesterUserId": {
@@ -5077,6 +5097,15 @@
               "type": "integer",
               "default": 0
             }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Scope to one guild/community's pins. Omit to list every guild's pins (current/legacy behavior)."
           }
         ],
         "responses": {
@@ -5137,6 +5166,10 @@
                           },
                           "hydrated": {
                             "type": "boolean"
+                          },
+                          "guildId": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -5190,6 +5223,15 @@
               "type": "integer",
               "default": 0
             }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Scope to one guild/community's unhydrated pins — lets a bot's hydration loop skip other platforms' rows. Omit to list every guild's (current/legacy behavior)."
           }
         ],
         "responses": {
@@ -5250,6 +5292,10 @@
                           },
                           "hydrated": {
                             "type": "boolean"
+                          },
+                          "guildId": {
+                            "type": "string",
+                            "nullable": true
                           }
                         }
                       }
@@ -5350,6 +5396,10 @@
                         },
                         "hydrated": {
                           "type": "boolean"
+                        },
+                        "guildId": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     }
@@ -5444,6 +5494,11 @@
                   },
                   "hydrated": {
                     "type": "boolean"
+                  },
+                  "guildId": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Guild/community id this pin belongs to."
                   }
                 }
               }
@@ -5506,6 +5561,10 @@
                         },
                         "hydrated": {
                           "type": "boolean"
+                        },
+                        "guildId": {
+                          "type": "string",
+                          "nullable": true
                         }
                       }
                     }
@@ -6011,7 +6070,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "guildId": {
@@ -6128,7 +6188,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "guildId": {
@@ -6223,7 +6284,8 @@
                       "app": {
                         "type": "string",
                         "enum": [
-                          "discord"
+                          "discord",
+                          "fluxer"
                         ]
                       },
                       "type": {
@@ -6276,7 +6338,8 @@
                       "app": {
                         "type": "string",
                         "enum": [
-                          "discord"
+                          "discord",
+                          "fluxer"
                         ]
                       },
                       "type": {
@@ -6388,7 +6451,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "userid": {
@@ -6497,7 +6561,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "guildId": {
@@ -6607,7 +6672,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "guildId": {
@@ -6705,7 +6771,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "guildId": {
@@ -6845,7 +6912,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "messageId": {
@@ -6888,6 +6956,10 @@
                       "type": "string"
                     },
                     "description": "Discord snowflakes of users who pinned the message."
+                  },
+                  "guildId": {
+                    "type": "string",
+                    "description": "Guild/community id the pin belongs to, for scoping pin-history hydration per app."
                   }
                 }
               }
@@ -6963,7 +7035,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "guildId": {
@@ -7071,7 +7144,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "messageId": {
@@ -7482,7 +7556,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "limit": {
@@ -7618,7 +7693,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           },
@@ -7743,7 +7819,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           },
@@ -7839,7 +7916,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           }
@@ -7911,7 +7989,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "limit": {
@@ -8002,6 +8081,10 @@
                     "type": "integer",
                     "default": 0,
                     "minimum": 0
+                  },
+                  "guildId": {
+                    "type": "string",
+                    "description": "Scope to one guild/community. Omit to mix every guild's emoji into one pool (current/legacy behavior)."
                   }
                 }
               }
@@ -8078,7 +8161,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "limit": {
@@ -8184,6 +8268,10 @@
                     "type": "integer",
                     "default": 0,
                     "minimum": 0
+                  },
+                  "guildId": {
+                    "type": "string",
+                    "description": "Scope to one guild/community. Omit to mix every guild's stickers into one pool (current/legacy behavior)."
                   }
                 }
               }
@@ -8260,7 +8348,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "limit": {
@@ -8361,7 +8450,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "limit": {
@@ -8469,7 +8559,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           }
@@ -8546,7 +8637,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           },
@@ -8647,7 +8739,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           },
@@ -8738,7 +8831,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           },
@@ -9986,7 +10080,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ],
               "default": "discord"
             }
@@ -10109,7 +10204,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ],
               "default": "discord"
             }
@@ -10674,7 +10770,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           },
@@ -10821,7 +10918,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "guildId": {
@@ -10910,7 +11008,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "guildId": {
@@ -10995,7 +11094,8 @@
             "schema": {
               "type": "string",
               "enum": [
-                "discord"
+                "discord",
+                "fluxer"
               ]
             }
           },
@@ -11111,7 +11211,8 @@
                   "app": {
                     "type": "string",
                     "enum": [
-                      "discord"
+                      "discord",
+                      "fluxer"
                     ]
                   },
                   "guildId": {

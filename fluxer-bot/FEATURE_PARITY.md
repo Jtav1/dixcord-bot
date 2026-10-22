@@ -93,9 +93,9 @@ mechanics, for porting:
 - **Server-side tally**: `POST /api/message-processing/timeout-vote` (webapi,
   `services/timeoutVotes.js`) inserts into `timeout_vote_tracking` (unique per message+voter,
   mirrors `plusplus_tracking`) and sums `weight` for the message. No change needed on webapi for
-  fluxer-bot — same endpoint, same `app` discriminator pattern (pass `"fluxer"` instead of
-  `"discord"` once webapi's chat-app enum is extended — **not yet done**, flag before wiring this
-  up).
+  fluxer-bot — same endpoint, same `app` discriminator pattern. **webapi's chat-app enum now
+  includes `"fluxer"`** (`CHAT_MEMBER_APP_CONFIG` in `services/chatMemberMapping.js`) — just pass
+  `app: "fluxer"` instead of `"discord"` when wiring this up from fluxer-bot.
 - **Threshold + action**: once the running weighted total ≥ `timeout_vote_threshold` (guild_config,
   integer), webapi inserts a `timeout_history` row (unique per `message_id` — the idempotency
   guard; further votes or un-votes on that message become no-ops) and returns

@@ -6,32 +6,6 @@
 import db from "../config/db.js";
 
 /**
- * Per-app scheduled message channel/guild column mapping.
- * Extend this map when adding new chat clients.
- */
-export const SCHEDULED_MESSAGE_APP_CONFIG = Object.freeze({
-  discord: {
-    channelIdColumn: "discord_channel_id",
-    guildIdColumn: "discord_guild_id",
-  },
-});
-
-/**
- * Get scheduled message column config for an app.
- * @param {string} app - Chat app key.
- * @returns {{ channelIdColumn: string, guildIdColumn: string }|null} Column config or null.
- */
-export function getScheduledMessageAppConfig(app) {
-  if (
-    typeof app !== "string" ||
-    !Object.prototype.hasOwnProperty.call(SCHEDULED_MESSAGE_APP_CONFIG, app)
-  ) {
-    return null;
-  }
-  return SCHEDULED_MESSAGE_APP_CONFIG[app];
-}
-
-/**
  * Convert unknown input into an ISO 8601 UTC timestamp string ending with Z.
  * @param {unknown} value - Input datetime value.
  * @returns {string|null} ISO UTC string (e.g. 2026-05-01T14:00:00.000Z), or null when invalid.
@@ -70,21 +44,19 @@ export function dbDatetimeToUtcIso(value) {
 }
 
 /**
- * Serialize one scheduled_messages row for API responses.
+ * Serialize one scheduled_messages row for API responses. `app`/`channel_id`/`guild_id` are
+ * real generic columns now (not resolved per-app) — the HTTP contract still uses
+ * `chat_channel_id`/`chat_guild_id` field names.
  * @param {Record<string, unknown>} row - DB row.
- * @param {string} app - Chat app key used for channel/guild column mapping.
  * @returns {{ id: number, user_id: number, app: string, chat_channel_id: string, chat_guild_id: string|null, message_body: string, scheduled_at: string|null, status: string, sent_at: string|null, created_at: string|null }}
  */
-export function serializeScheduledMessageRow(row, app) {
-  const cfg = getScheduledMessageAppConfig(app);
-  if (!cfg) throw new Error(`Unsupported scheduled message app: ${app}`);
+export function serializeScheduledMessageRow(row) {
   return {
     id: Number(row.id),
     user_id: Number(row.user_id),
-    app,
-    chat_channel_id: String(row[cfg.channelIdColumn]),
-    chat_guild_id:
-      row[cfg.guildIdColumn] == null ? null : String(row[cfg.guildIdColumn]),
+    app: String(row.app),
+    chat_channel_id: String(row.channel_id),
+    chat_guild_id: row.guild_id == null ? null : String(row.guild_id),
     message_body: String(row.message_body),
     scheduled_at: dbDatetimeToUtcIso(row.scheduled_at),
     status: String(row.status),
@@ -99,15 +71,14 @@ export function serializeScheduledMessageRow(row, app) {
  * @returns {Promise<number|null>} Inserted row id.
  */
 export async function createScheduledMessage(payload) {
-  const cfg = getScheduledMessageAppConfig(payload.app);
-  if (!cfg) return null;
   const scheduledAtSql = utcIsoToSqlDatetime(payload.scheduledAtUtcIso);
   if (!scheduledAtSql) return null;
   const [result] = await db.query(
     `INSERT INTO scheduled_messages
-      (user_id, \`${cfg.channelIdColumn}\`, \`${cfg.guildIdColumn}\`, message_body, scheduled_at, status, sent_at)
-     VALUES (?, ?, ?, ?, ?, 'pending', NULL)`,
+      (app, user_id, channel_id, guild_id, message_body, scheduled_at, status, sent_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL)`,
     [
+      payload.app,
       payload.userId,
       payload.chatChannelId,
       payload.chatGuildId ?? null,
@@ -119,18 +90,18 @@ export async function createScheduledMessage(payload) {
 }
 
 /**
- * Get one scheduled message by id.
+ * Get one scheduled message by id, scoped to app (defense-in-depth against cross-app id probing).
  * @param {string} app - Chat app key.
  * @param {number} id - scheduled_messages.id
  * @returns {Promise<ReturnType<typeof serializeScheduledMessageRow>|null>} Serialized row or null.
  */
 export async function getScheduledMessageById(app, id) {
   const [rows] = await db.query(
-    "SELECT * FROM scheduled_messages WHERE id = ?",
-    [id],
+    "SELECT * FROM scheduled_messages WHERE id = ? AND app = ?",
+    [id, app],
   );
   if (!rows || rows.length === 0) return null;
-  return serializeScheduledMessageRow(rows[0], app);
+  return serializeScheduledMessageRow(rows[0]);
 }
 
 /**
@@ -140,18 +111,14 @@ export async function getScheduledMessageById(app, id) {
  * @returns {Promise<Array<ReturnType<typeof serializeScheduledMessageRow>>>} User-owned pending/future rows.
  */
 export async function getUpcomingScheduledMessagesByUserId(app, userId) {
-  const cfg = getScheduledMessageAppConfig(app);
-  if (!cfg) return [];
   const nowSql = utcIsoToSqlDatetime(new Date().toISOString());
   const [rows] = await db.query(
     `SELECT * FROM scheduled_messages
-     WHERE user_id = ? AND status = 'pending' AND scheduled_at > ? AND \`${cfg.channelIdColumn}\` IS NOT NULL
+     WHERE app = ? AND user_id = ? AND status = 'pending' AND scheduled_at > ?
      ORDER BY scheduled_at ASC, id ASC`,
-    [userId, nowSql],
+    [app, userId, nowSql],
   );
-  return Array.isArray(rows)
-    ? rows.map((row) => serializeScheduledMessageRow(row, app))
-    : [];
+  return Array.isArray(rows) ? rows.map(serializeScheduledMessageRow) : [];
 }
 
 /**
@@ -160,16 +127,13 @@ export async function getUpcomingScheduledMessagesByUserId(app, userId) {
  * @returns {Promise<Array<ReturnType<typeof serializeScheduledMessageRow>>>} Pending rows sorted by schedule time.
  */
 export async function getPendingScheduledMessagesForBot(app) {
-  const cfg = getScheduledMessageAppConfig(app);
-  if (!cfg) return [];
   const [rows] = await db.query(
     `SELECT * FROM scheduled_messages
-     WHERE status = 'pending' AND \`${cfg.channelIdColumn}\` IS NOT NULL
+     WHERE app = ? AND status = 'pending'
      ORDER BY scheduled_at ASC, id ASC`,
+    [app],
   );
-  return Array.isArray(rows)
-    ? rows.map((row) => serializeScheduledMessageRow(row, app))
-    : [];
+  return Array.isArray(rows) ? rows.map(serializeScheduledMessageRow) : [];
 }
 
 /**
@@ -180,18 +144,14 @@ export async function getPendingScheduledMessagesForBot(app) {
  * @returns {Promise<Array<ReturnType<typeof serializeScheduledMessageRow>>>} Due rows sorted by schedule time.
  */
 export async function getDueScheduledMessagesForBot(app) {
-  const cfg = getScheduledMessageAppConfig(app);
-  if (!cfg) return [];
   const nowSql = utcIsoToSqlDatetime(new Date().toISOString());
   const [rows] = await db.query(
     `SELECT * FROM scheduled_messages
-     WHERE status = 'pending' AND scheduled_at <= ? AND \`${cfg.channelIdColumn}\` IS NOT NULL
+     WHERE app = ? AND status = 'pending' AND scheduled_at <= ?
      ORDER BY scheduled_at ASC, id ASC`,
-    [nowSql],
+    [app, nowSql],
   );
-  return Array.isArray(rows)
-    ? rows.map((row) => serializeScheduledMessageRow(row, app))
-    : [];
+  return Array.isArray(rows) ? rows.map(serializeScheduledMessageRow) : [];
 }
 
 /**
@@ -239,15 +199,16 @@ export async function updateScheduledMessageById(id, updates) {
 }
 
 /**
- * Delete a pending scheduled message by id and owner.
+ * Delete a pending scheduled message by id, owner, and app.
+ * @param {string} app - Chat app key.
  * @param {number} id - scheduled_messages.id
  * @param {number} userId - chat_member_mapping.id owner.
  * @returns {Promise<boolean>} True when a row was deleted.
  */
-export async function deletePendingScheduledMessageByIdForUser(id, userId) {
+export async function deletePendingScheduledMessageByIdForUser(app, id, userId) {
   const [result] = await db.query(
-    "DELETE FROM scheduled_messages WHERE id = ? AND user_id = ? AND status = 'pending'",
-    [id, userId],
+    "DELETE FROM scheduled_messages WHERE id = ? AND app = ? AND user_id = ? AND status = 'pending'",
+    [id, app, userId],
   );
   return (result?.affectedRows ?? result?.changes ?? 0) > 0;
 }
@@ -264,21 +225,18 @@ export async function getScheduledMessagesForAdmin(
   status = "all",
   opts = {},
 ) {
-  const cfg = getScheduledMessageAppConfig(app);
-  if (!cfg) return { rows: [], total: 0 };
-
   const limit = Math.min(Math.max(1, opts.limit ?? 50), 200);
   const offset = Math.max(0, opts.offset ?? 0);
 
-  const where = [" `" + cfg.channelIdColumn + "` IS NOT NULL"];
-  const params = [];
+  const where = ["app = ?"];
+  const params = [app];
 
   if (status === "pending" || status === "sent") {
     where.push("status = ?");
     params.push(status);
   }
 
-  const whereClause = where.length ? ` WHERE ${where.join(" AND ")}` : "";
+  const whereClause = ` WHERE ${where.join(" AND ")}`;
 
   const [countRows] = await db.query(
     `SELECT COUNT(*) AS total FROM scheduled_messages${whereClause}`,
@@ -294,15 +252,13 @@ export async function getScheduledMessagesForAdmin(
   );
 
   return {
-    rows: Array.isArray(rows)
-      ? rows.map((row) => serializeScheduledMessageRow(row, app))
-      : [],
+    rows: Array.isArray(rows) ? rows.map(serializeScheduledMessageRow) : [],
     total,
   };
 }
 
 /**
- * Delete a scheduled message by id (admin; any status).
+ * Delete a scheduled message by id (admin; any status/app).
  * @param {number} id
  * @returns {Promise<boolean>}
  */

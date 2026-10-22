@@ -9,6 +9,7 @@ import db from "../config/db.js";
  */
 export const CHAT_MEMBER_APP_CONFIG = Object.freeze({
   discord: {},
+  fluxer: {},
 });
 
 /**

@@ -1778,6 +1778,113 @@ export async function ensureSchemaMigrations() {
     }
   }
 
+  // scheduled_messages: generalize discord_channel_id/discord_guild_id (resolved via a per-app
+  // column-name map) to a plain app/channel_id/guild_id shape, matching every other app-scoped
+  // table. Pre-existing rows predate multi-app support, so backfilling app='discord' is safe.
+  if (
+    (await tableExists(db, "scheduled_messages", isSqlite)) &&
+    !(await columnExists(db, "scheduled_messages", "channel_id", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE scheduled_messages_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          user_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          channel_id TEXT NOT NULL,
+          guild_id TEXT,
+          message_body TEXT NOT NULL,
+          scheduled_at TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent')),
+          sent_at TEXT,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      await db.query(`
+        INSERT INTO scheduled_messages_new
+          (id, app, user_id, channel_id, guild_id, message_body, scheduled_at, status, sent_at, created_at)
+        SELECT id, 'discord', user_id, discord_channel_id, discord_guild_id, message_body, scheduled_at, status, sent_at, created_at
+        FROM scheduled_messages
+      `);
+      await db.query("DROP TABLE scheduled_messages");
+      await db.query("ALTER TABLE scheduled_messages_new RENAME TO scheduled_messages");
+      await db.query(
+        "CREATE INDEX idx_scheduled_messages_due ON scheduled_messages (status, scheduled_at)",
+      );
+      await db.query(
+        "CREATE INDEX idx_scheduled_messages_app_user ON scheduled_messages (app, user_id, status)",
+      );
+    } else {
+      await db.query("ALTER TABLE scheduled_messages ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE scheduled_messages SET app = 'discord' WHERE app IS NULL");
+      await db.query(
+        "ALTER TABLE scheduled_messages MODIFY COLUMN app VARCHAR(20) NOT NULL",
+      );
+      await db.query(
+        "ALTER TABLE scheduled_messages CHANGE discord_channel_id channel_id VARCHAR(32) NOT NULL",
+      );
+      await db.query(
+        "ALTER TABLE scheduled_messages CHANGE discord_guild_id guild_id VARCHAR(32) NULL",
+      );
+      await db.query(
+        "ALTER TABLE scheduled_messages ADD KEY idx_scheduled_messages_app_user (app, user_id, status)",
+      );
+    }
+    applied.push(
+      "scheduled_messages: generalized discord_channel_id/discord_guild_id to app/channel_id/guild_id",
+    );
+    console.log(
+      "db: migration applied: scheduled_messages generalized to app/channel_id/guild_id (backfilled app='discord')",
+    );
+  } else {
+    console.log("db: schema ok: scheduled_messages already generalized");
+  }
+
+  // pin_history.guild_id: lets each app's bot hydration loop (and admin filtering) scope to its
+  // own pins instead of a mixed-app stream, now that more than one platform can create pins.
+  // No app column (per design: a single guild_id already disambiguates, since every bot
+  // instance is single-guild and Discord/Fluxer id spaces don't collide in practice).
+  if (
+    (await tableExists(db, "pin_history", isSqlite)) &&
+    !(await columnExists(db, "pin_history", "guild_id", isSqlite))
+  ) {
+    await db.query(
+      isSqlite
+        ? "ALTER TABLE pin_history ADD COLUMN guild_id TEXT NULL"
+        : "ALTER TABLE pin_history ADD COLUMN guild_id VARCHAR(64) NULL",
+    );
+
+    // Backfill: every pre-existing row predates multi-app support, so they all belong to
+    // whatever the single Discord guild was at the time. Only safe to infer when exactly one
+    // guild_info row exists for app='discord' — otherwise leave guild_id NULL (unknown/legacy).
+    let backfilled = false;
+    if (await tableExists(db, "guild_info", isSqlite)) {
+      const [discordGuildRows] = await db.query(
+        "SELECT guild_id FROM guild_info WHERE app = 'discord'",
+      );
+      if (Array.isArray(discordGuildRows) && discordGuildRows.length === 1) {
+        const knownGuildId = discordGuildRows[0].guild_id;
+        await db.query(
+          "UPDATE pin_history SET guild_id = ? WHERE guild_id IS NULL",
+          [knownGuildId],
+        );
+        backfilled = true;
+        applied.push("pin_history.guild_id column (backfilled from guild_info)");
+        console.log(
+          `db: migration applied: added pin_history.guild_id column, backfilled from guild_info (${knownGuildId})`,
+        );
+      }
+    }
+    if (!backfilled) {
+      applied.push("pin_history.guild_id column (left NULL — ambiguous/no guild_info match)");
+      console.log(
+        "db: migration applied: added pin_history.guild_id column; could not uniquely determine the pre-existing Discord guild from guild_info — left NULL (legacy/unknown)",
+      );
+    }
+  } else {
+    console.log("db: schema ok: pin_history.guild_id column already exists");
+  }
+
   if (applied.length === 0) {
     console.log("db: schema valid; no migrations applied");
   } else {

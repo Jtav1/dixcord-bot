@@ -30,6 +30,11 @@ const router = express.Router();
  *         in: query
  *         required: false
  *         schema: { type: integer, default: 0 }
+ *       - name: guildId
+ *         in: query
+ *         required: false
+ *         schema: { type: string }
+ *         description: Scope to one guild/community's pins. Omit to list every guild's pins (current/legacy behavior).
  *     responses:
  *       '200':
  *         description: Page of pin history entries, newest first.
@@ -58,6 +63,7 @@ const router = express.Router();
  *                         type: array
  *                         items: { type: integer }
  *                       hydrated: { type: boolean }
+ *                       guildId: { type: string, nullable: true }
  *                 total: { type: integer }
  *                 limit: { type: integer }
  *                 offset: { type: integer }
@@ -70,7 +76,11 @@ router.get("/", authenticate, async (req, res) => {
   try {
     const limit = req.query.limit != null ? parseInt(req.query.limit, 10) : 50;
     const offset = req.query.offset != null ? parseInt(req.query.offset, 10) : 0;
-    const { entries, total } = await listPinHistory({ limit, offset });
+    const { entries, total } = await listPinHistory({
+      limit,
+      offset,
+      guildId: req.query.guildId,
+    });
     res.json({ ok: true, pinHistory: entries, total, limit, offset });
   } catch (err) {
     console.error("GET /api/pin-history error:", err);
@@ -99,6 +109,11 @@ router.get("/", authenticate, async (req, res) => {
  *         in: query
  *         required: false
  *         schema: { type: integer, default: 0 }
+ *       - name: guildId
+ *         in: query
+ *         required: false
+ *         schema: { type: string }
+ *         description: Scope to one guild/community's unhydrated pins — lets a bot's hydration loop skip other platforms' rows. Omit to list every guild's (current/legacy behavior).
  *     responses:
  *       '200':
  *         description: Page of unhydrated pin history entries.
@@ -127,6 +142,7 @@ router.get("/", authenticate, async (req, res) => {
  *                         type: array
  *                         items: { type: integer }
  *                       hydrated: { type: boolean }
+ *                       guildId: { type: string, nullable: true }
  *                 total: { type: integer }
  *                 limit: { type: integer }
  *                 offset: { type: integer }
@@ -139,7 +155,11 @@ router.get("/incomplete", authenticate, async (req, res) => {
   try {
     const limit = req.query.limit != null ? parseInt(req.query.limit, 10) : 50;
     const offset = req.query.offset != null ? parseInt(req.query.offset, 10) : 0;
-    const { entries, total } = await listIncompletePinHistory({ limit, offset });
+    const { entries, total } = await listIncompletePinHistory({
+      limit,
+      offset,
+      guildId: req.query.guildId,
+    });
     res.json({ ok: true, pinHistory: entries, total, limit, offset });
   } catch (err) {
     console.error("GET /api/pin-history/incomplete error:", err);
@@ -188,6 +208,7 @@ router.get("/incomplete", authenticate, async (req, res) => {
  *                       type: array
  *                       items: { type: integer }
  *                     hydrated: { type: boolean }
+ *                     guildId: { type: string, nullable: true }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -260,6 +281,7 @@ router.get("/:id", authenticate, async (req, res) => {
  *                 items: { type: string }
  *                 description: Platform user ids, resolved via app.
  *               hydrated: { type: boolean }
+ *               guildId: { type: string, nullable: true, description: "Guild/community id this pin belongs to." }
  *     responses:
  *       '200':
  *         description: Updated pin history entry.
@@ -286,6 +308,7 @@ router.get("/:id", authenticate, async (req, res) => {
  *                       type: array
  *                       items: { type: integer }
  *                     hydrated: { type: boolean }
+ *                     guildId: { type: string, nullable: true }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
