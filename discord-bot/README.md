@@ -26,6 +26,7 @@ The bot **depends on the web API** for almost all behavior. It loads configurati
 - **Plus/minus votes** – Add/remove configured +/- emoji to record or reverse a vote (no self-vote).
 - **Emoji stats** – Other emoji reactions count toward leaderboards.
 - **Repost** – Configured repost emoji records or withdraws an accusation.
+- **Timeout vote** – Configured timeout-vote emoji records a role-weighted vote (1x normally, 2x/3x for holders of the configured double/triple-vote roles, highest applicable weight wins) toward timing out the message's author; no self-votes. Once the running weighted total crosses the threshold, the bot times the author out for the configured duration and posts the configured response message — a one-time action per message (`timeout_history` is the idempotency guard; further votes, or un-votes via reaction-remove, on an already-triggered message are no-ops).
 
 ### Slash commands
 
@@ -72,6 +73,7 @@ available regardless.
 | `plusplus_enabled` | ++/-- voting (text, reactions, emoji-reply shortcut) and its leaderboard commands |
 | `repost_detection_enabled` | Repost accusation tracking and its leaderboard commands |
 | `pin_system_enabled` | Auto-pin threshold and `/pin-message` |
+| `timeout_vote_enabled` | Timeout-vote reactions. **Defaults to `"false"`** (unseeded = off), unlike every other key above — this is a moderation action, not opt-out content. Its emoji, role weights, vote threshold, timeout duration, and response message are separate `guild_config` keys (`timeout_vote_emoji`, `timeout_vote_double_role_id`, `timeout_vote_triple_role_id`, `timeout_vote_threshold`, `timeout_vote_duration_seconds`, `timeout_vote_response_message`), not env vars. |
 
 ---
 

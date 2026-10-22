@@ -125,6 +125,17 @@ services:
     #   - MYSQL_DB=api_template
     restart: unless-stopped
 
+  fluxer-bot:
+    build:
+      context: ./fluxer-bot
+      dockerfile: Dockerfile
+    depends_on:
+      webapi:
+        condition: service_healthy
+    env_file:
+      - ./fluxer-bot/.env
+    restart: unless-stopped
+
   # MySQL (optional). Uncomment this service and the depends_on/env blocks above to use it.
   # mysql:
   #   image: mysql:8.0

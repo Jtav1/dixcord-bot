@@ -1,0 +1,114 @@
+# fluxer-bot feature parity checklist
+
+Tracks porting `discord-bot/` features to `fluxer-bot/` (see root `CLAUDE.md` and
+`discord-bot/README.md` for the canonical description of each). Check items off as they land;
+leave a short note + PR/commit link when a port deviates from the Discord behavior (e.g. a
+fluxer.js API gap forces a different implementation).
+
+## Message handling (every non-bot message)
+
+- [ ] Link fixing — rewrite configured social hosts into embed-friendly links (`twitter_fix_enabled`)
+- [ ] Trigger responses — string match → `random`/`ordered`/`weighted` reply selection, optional `response_function` dispatch (`trigger_responses_enabled`)
+- [ ] 8-ball/fortune — `@bot ...?` → random fortune (`eight_ball_enabled`)
+- [ ] Emoji tracking (message content) — records emoji usage (`emoji_tracking_enabled`)
+- [ ] Sticker tracking — records sticker usage (`sticker_tracking_enabled`)
+- [ ] Plus/minus from text — `word++` / `user++` / `--` parsing, plus milestone announcements (`plusplus_enabled`)
+- [ ] Scheduled reminders (create) — `@bot remind me ...` natural-language parse → stored for later delivery (`reminders_enabled`)
+
+## Reaction handling
+
+- [ ] Pinning — threshold reached → pin embed + log + optional pin quip (`pin_system_enabled`)
+- [ ] Plus/minus votes — add/remove configured emoji (no self-vote), plus the "reply with one +/- emoji" shortcut (`plusplus_enabled`)
+- [ ] Emoji stats (reactions) — other emoji reactions count toward leaderboards (`emoji_tracking_enabled`)
+- [ ] Repost accusation — add/remove configured emoji records or withdraws (`repost_detection_enabled`)
+- [ ] **Timeout vote** — role-weighted reaction voting that times out a message's author (`timeout_vote_enabled`, defaults `"false"`). See [Timeout vote detail](#timeout-vote-detail) below — this one needs a fluxer.js moderation-action equivalent confirmed before porting.
+
+## Slash commands (12)
+
+- [ ] `/dixbot` — short help/reference
+- [ ] `/plusplus-total` — ++ score for a word or user
+- [ ] `/plusplus-leaderboard` — top and bottom 5 plusplus scores
+- [ ] `/plusplus-top-voters` — top 3 plusplus voters
+- [ ] `/plusplus-voter-frequency` — how many times a user has +/-'d something
+- [ ] `/top-emojis` — top 5 most used emojis
+- [ ] `/reposts-by-user` — repost count for a user
+- [ ] `/top-reposters` — top 5 reposters
+- [ ] `/pin-message` — manually pin a message into the pin flow
+- [ ] `/scheduled-list` — list your upcoming scheduled reminders (UTC)
+- [ ] `/scheduled-update` — update a pending reminder's time and/or message
+- [ ] `/scheduled-delete` — delete a pending reminder by id
+
+Needs `@fluxerjs/builders` (command builder) + `@fluxerjs/rest` (deploy) adopted first — not installed yet (see `fluxer-bot/README.md`).
+
+## Background/runtime behavior
+
+- [ ] webapi JWT auth with auto-relogin on 401 — `api/client.js` plumbing already exists in the base template, unused
+- [ ] Cache-version polling → refresh in-memory triggers/link-hosts/config
+- [ ] Heartbeat to webapi; `wait-for-webapi` health gate on container start — already in the base template
+- [ ] Guild snapshot sync (metadata/channels/roles) on startup + every 5 min
+- [ ] Guild member sync (nickname/roles/joined-at) on startup + every 5 min — unlinked members synced, not skipped
+- [ ] `guildMemberAdd`-equivalent → immediate single-member sync
+- [ ] Emoji/sticker catalog import from guild on ready
+- [ ] Pin-history hydration on startup
+- [ ] In-process scheduler delivering reminders at their scheduled time
+- [ ] Optional slash-command clear+redeploy on container start (`DEPLOY_SLASH_COMMANDS`)
+- [ ] Online-announce message on ready (prod posts to announce channel; dev just logs)
+- [ ] Metrics counters (messages/commands/errors/joins/leaves/rate-limits/etc.)
+
+## Maintenance scripts
+
+- [ ] `deploy-commands.js` / `delete-all-commands.js` equivalents
+- [ ] `scripts/sync-emoji-frequency.js --dry-run` equivalent (only needed if fluxer-bot ever carries the same legacy-table history; likely N/A for a fresh install)
+
+## Feature toggles (webapi `configurations`, hot-reloaded ≤30s)
+
+All of these are webapi-side config, not bot code — the bot side of the work is just honoring the
+same keys. Listed here so nothing gets ported without checking its toggle still gates it in
+fluxer-bot.
+
+- [ ] `twitter_fix_enabled`
+- [ ] `trigger_responses_enabled`
+- [ ] `reminders_enabled`
+- [ ] `eight_ball_enabled`
+- [ ] `emoji_tracking_enabled`
+- [ ] `sticker_tracking_enabled`
+- [ ] `plusplus_enabled`
+- [ ] `repost_detection_enabled`
+- [ ] `pin_system_enabled`
+- [ ] `timeout_vote_enabled` (defaults `"false"`, unlike the rest)
+
+---
+
+## Timeout vote detail
+
+Undocumented in `discord-bot/README.md` until this pass — now also written up there. Full
+mechanics, for porting:
+
+- **Trigger**: react to a message with the configured `timeout_vote_emoji`. No self-votes.
+- **Vote weight**: 1x by default; 2x if the voter holds `timeout_vote_double_role_id`; 3x if they
+  hold `timeout_vote_triple_role_id` (triple checked first, so triple wins if a user holds both).
+  Resolved client-side in `discord-bot/events/messages/utilities/reactionHandler.js`
+  (`resolveTimeoutVoteWeight`) from the reacting member's roles — Fluxer's role/member cache
+  equivalent needs the same lookup.
+- **Server-side tally**: `POST /api/message-processing/timeout-vote` (webapi,
+  `services/timeoutVotes.js`) inserts into `timeout_vote_tracking` (unique per message+voter,
+  mirrors `plusplus_tracking`) and sums `weight` for the message. No change needed on webapi for
+  fluxer-bot — same endpoint, same `app` discriminator pattern (pass `"fluxer"` instead of
+  `"discord"` once webapi's chat-app enum is extended — **not yet done**, flag before wiring this
+  up).
+- **Threshold + action**: once the running weighted total ≥ `timeout_vote_threshold` (guild_config,
+  integer), webapi inserts a `timeout_history` row (unique per `message_id` — the idempotency
+  guard; further votes or un-votes on that message become no-ops) and returns
+  `{ triggered: true, durationSeconds, responseMessage, voteWeightTotal }`.
+  - `durationSeconds` = `timeout_vote_duration_seconds` (guild_config), clamped `[1, 86400]`
+    (platform max timeout is capped at 24h for Discord — confirm Fluxer's own member-timeout max
+    duration, if it has an equivalent action at all, before reusing this clamp).
+  - `responseMessage` = `timeout_vote_response_message` (guild_config), with `{user}` replaced by
+    a mention of the timed-out user; defaults to `"{user} has been timed out by community vote."`.
+- **Un-vote**: reaction-remove → `POST /api/message-processing/timeout-vote/remove`, deletes the
+  voter's row from `timeout_vote_tracking` (no-op if the message already triggered).
+- **Apply the timeout**: `discord-bot/utilities/timeoutMember.js` calls discord.js's
+  `GuildMember#timeout()` (communication-disabled, max 24h, requires Moderate Members permission +
+  role hierarchy above the target). **This is the piece that needs a confirmed fluxer.js
+  equivalent before porting** — check whether Fluxer has a member-mute/timeout moderation action at
+  all, and if so its permission model and max duration, before assuming this maps 1:1.
