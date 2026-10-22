@@ -6,14 +6,13 @@ import { pathToFileURL } from "node:url";
 
 import { token } from "./configVars.js";
 import { client } from "./fluxerClient.js";
+import { commands } from "./commandRegistry.js";
 
 // EventEmitter throws if an "error" event has no listener; without this, a failed
 // login or dropped gateway connection crashes the process instead of just logging.
 client.on(Events.Error, (error) => {
   console.error("bot: Fluxer client error:", error);
 });
-
-const commands = [];
 
 /**
  * Wrap an event handler so a thrown/rejected execute() is logged instead of crashing the
@@ -56,9 +55,8 @@ for (const category of eventCategories) {
   }
 }
 
-// Mirrors discord-bot's command loader shape ({ cmdName, data, execute }); commands/
-// is currently empty — wire up dispatch (e.g. an interaction/command-create event) once
-// fluxer.js's slash-command equivalent (@fluxerjs/builders + @fluxerjs/rest) is adopted.
+// Mirrors discord-bot's command loader shape ({ cmdName, data, execute }). fluxer.js has no
+// slash commands, so these run as prefix commands from events/messages/messageCreate.js.
 const commandsPath = path.join(import.meta.dirname, "commands");
 const commandsCategories = fs
   .readdirSync(commandsPath)

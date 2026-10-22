@@ -687,6 +687,32 @@ export async function ensureSchemaMigrations() {
     }
   }
 
+  // guild_members.pending_link: id of the guild_members row that requested an account link
+  // (link-accounts); cleared by confirm-link.
+  if (await tableExists(db, "guild_members", isSqlite)) {
+    if (!(await columnExists(db, "guild_members", "pending_link", isSqlite))) {
+      await db.query(
+        isSqlite
+          ? "ALTER TABLE guild_members ADD COLUMN pending_link INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL"
+          : "ALTER TABLE guild_members ADD COLUMN pending_link INT NULL",
+      );
+      applied.push("guild_members.pending_link column");
+      console.log("db: migration applied: added guild_members.pending_link column");
+    } else {
+      console.log("db: schema ok: guild_members.pending_link column already exists");
+    }
+    if (
+      !isSqlite &&
+      !(await constraintExists(db, "guild_members", "fk_guild_members_pending_link", isSqlite))
+    ) {
+      await db.query(
+        "ALTER TABLE guild_members ADD CONSTRAINT fk_guild_members_pending_link FOREIGN KEY (pending_link) REFERENCES guild_members(id) ON DELETE SET NULL",
+      );
+      applied.push("guild_members.pending_link foreign key");
+      console.log("db: migration applied: added guild_members.pending_link foreign key");
+    }
+  }
+
   // Backfill guild_members.handle from chat_member_mapping.discord_handle (the OLD table's own
   // column name — unrelated to the rename above), matching directly on
   // chat_member_mapping.discord_id = guild_members.platform_user_id — the authoritative identity

@@ -306,6 +306,9 @@ CREATE TABLE IF NOT EXISTS guild_members (
   roles TEXT NULL,
   joined_at TEXT NULL,
   synced_at TEXT DEFAULT (datetime('now')),
+  -- guild_members.id of a user who asked (link-accounts) to link their account to this one;
+  -- NULL = no pending request. Cleared by confirm-link.
+  pending_link INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL,
   UNIQUE (app, guild_id, platform_user_id)
 );
 

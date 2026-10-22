@@ -391,6 +391,8 @@ app.get("/", publicLimiter, (req, res) => {
           "GET /api/guild-members/user/:chatMemberMappingId",
           "GET /api/guild-members/public-aliases/:chatMemberMappingId (handle/nickname per guild, public-safe)",
           "POST /api/guild-members/sync (body: { app, guildId, members }); upserts, never removes members",
+          "POST /api/guild-members/link-request (body: { app, guildId, requesterUserId, targetUserId }); flags target for account link",
+          "POST /api/guild-members/link-confirm (body: { app, guildId, userId }); confirms a pending account link",
         ],
         adminRoutes: ["GET /api/guild-members/unlinked?app=&guildId="],
       },

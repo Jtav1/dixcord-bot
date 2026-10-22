@@ -37,6 +37,7 @@ fluxer.js API gap forces a different implementation).
 - [ ] `/scheduled-list` — list your upcoming scheduled reminders (UTC)
 - [ ] `/scheduled-update` — update a pending reminder's time and/or message
 - [ ] `/scheduled-delete` — delete a pending reminder by id
+- [x] `link-accounts` / `confirm-link` — user-initiated account linking (new in both bots). fluxer.js has no slash commands, so these are prefix commands (`FLUXER_COMMAND_PREFIX`, default `!`)
 
 Needs `@fluxerjs/builders` (command builder) + `@fluxerjs/rest` (deploy) adopted first — not installed yet (see `fluxer-bot/README.md`).
 

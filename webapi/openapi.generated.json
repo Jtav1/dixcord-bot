@@ -10065,6 +10065,158 @@
         }
       }
     },
+    "/api/guild-members/link-request": {
+      "post": {
+        "operationId": "requestAccountLink",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "Request an account link (link-accounts command)",
+        "description": "Sets pending_link on every guild_members row for targetUserId outside the requester's server, pointing at the requester's guild_members row.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "requesterUserId",
+                  "targetUserId"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "discord"
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "requesterUserId": {
+                    "type": "string"
+                  },
+                  "targetUserId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Request recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "flagged": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members/link-confirm": {
+      "post": {
+        "operationId": "confirmAccountLink",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "Confirm a pending account link (confirm-link command)",
+        "description": "Fails without changes if the confirmer has no pending request, zero or multiple chat_member_mapping identities, or the requester's row is already linked.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "userId"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "discord"
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "userId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Linked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "requesterHandle": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "chatMemberMappingId": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/events/plusplus": {
       "get": {
         "operationId": "listPlusplusEvents",

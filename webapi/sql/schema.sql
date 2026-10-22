@@ -309,8 +309,12 @@ CREATE TABLE IF NOT EXISTS guild_members (
   roles TEXT NULL,
   joined_at DATETIME NULL,
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  -- guild_members.id of a user who asked (link-accounts) to link their account to this one;
+  -- NULL = no pending request. Cleared by confirm-link.
+  pending_link INT NULL,
   UNIQUE KEY uniq_guild_members_app_guild_platform (app, guild_id, platform_user_id),
-  KEY idx_guild_members_app_guild (app, guild_id)
+  KEY idx_guild_members_app_guild (app, guild_id),
+  CONSTRAINT fk_guild_members_pending_link FOREIGN KEY (pending_link) REFERENCES guild_members(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Links one chat_member_mapping identity to many guild_members rows (one-to-many). A

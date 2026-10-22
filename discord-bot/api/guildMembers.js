@@ -123,3 +123,49 @@ export function startGuildMembersSync(client) {
   tick();
   setInterval(tick, GUILD_MEMBERS_SYNC_INTERVAL_MS);
 }
+
+/**
+ * POST a link action; webapi 400s carry a user-facing { error }, surfaced instead of thrown.
+ * @param {string} path
+ * @param {object} body
+ * @returns {Promise<{ ok: boolean, error?: string, [key: string]: any }>}
+ */
+async function postLinkAction(path, body) {
+  try {
+    const { data } = await api.post(path, body);
+    return data;
+  } catch (err) {
+    if (err.response?.status === 400 && err.response.data?.error) {
+      return { ok: false, error: err.response.data.error };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Flag another server's account for linking to the requester's. POST /api/guild-members/link-request.
+ * @param {string} requesterUserId
+ * @param {string} targetUserId
+ * @returns {Promise<{ ok: boolean, error?: string }>}
+ */
+export function requestAccountLink(requesterUserId, targetUserId) {
+  return postLinkAction("/api/guild-members/link-request", {
+    app: "discord",
+    guildId,
+    requesterUserId,
+    targetUserId,
+  });
+}
+
+/**
+ * Confirm a pending account link. POST /api/guild-members/link-confirm.
+ * @param {string} userId
+ * @returns {Promise<{ ok: boolean, error?: string, requesterHandle?: string|null }>}
+ */
+export function confirmAccountLink(userId) {
+  return postLinkAction("/api/guild-members/link-confirm", {
+    app: "discord",
+    guildId,
+    userId,
+  });
+}

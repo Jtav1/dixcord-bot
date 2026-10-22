@@ -22,7 +22,7 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 - **Pin history** – Paginated pin log (and shared pin file storage via `PIN_FILES_DIR`).
 - **System** – Health, status, cache version / invalidate, bot heartbeat.
 - **Guild** – App/guild-scoped snapshot of platform-client guild metadata, channels, roles, and the emoji/sticker catalog; pushed periodically by a platform client (discord-bot today), read by admin panel/webview.
-- **Guild members** – App/guild-scoped server membership (Discord handle, nickname, roles held, joined-at), keyed on the platform's own user id. Sync only ever upserts `guild_members` — it never creates or removes rows and never touches `chat_member_mapping`/`member_aliases`; linking a member to a canonical identity is a separate, manual admin action — see `GET /api/guild-members/unlinked` for the admin follow-up. Includes a reverse lookup ("every server this user belongs to") for future cross-server delivery features.
+- **Guild members** – App/guild-scoped server membership (Discord handle, nickname, roles held, joined-at), keyed on the platform's own user id. Sync only ever upserts `guild_members` — it never creates or removes rows and never touches `chat_member_mapping`/`member_aliases`; linking a member to a canonical identity is a separate action — an admin (see `GET /api/guild-members/unlinked`) or the members themselves via `link-request`/`link-confirm` (the `link-accounts` / `confirm-link` bot commands). Includes a reverse lookup ("every server this user belongs to") for future cross-server delivery features.
 - **Service accounts** – Admin-only provisioning of extra `bot`/`webview` accounts, optionally bound to one `guildId`; a guild-bound bot account can only call guild-scoped routes for its own guild (`admin` and unrestricted accounts are never scope-limited).
 - **Statistics** – Aggregate counts across tracking tables (used by web-view).
 - **Scheduled messages** – Create/list/update/delete reminders for bot delivery; admin scope for moderation.
@@ -164,6 +164,8 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/guild-members/:guildMemberId/link` | admin | Link (or move) a guild_member to a chat_member_mapping identity (body: `{ chatMemberMappingId }`) |
 | DELETE | `/api/guild-members/:guildMemberId/link` | admin | Unlink a guild_member from its identity |
 | POST | `/api/guild-members/sync` | ✓ | Upsert a server's membership list (body: `{ app, guildId, members }`); never removes members, safe for a full roster or a single incremental push |
+| POST | `/api/guild-members/link-request` | bot/admin | User-initiated: flag a user's rows in other servers as pending link to the requester (body: `{ app, guildId, requesterUserId, targetUserId }`) |
+| POST | `/api/guild-members/link-confirm` | bot/admin | Confirm a pending link: requester's row becomes an alias of the confirmer's existing identity (body: `{ app, guildId, userId }`); errors if 0 or multiple identities |
 | GET | `/api/events/plusplus` | ✓ | Raw plusplus events |
 | GET | `/api/events/reposts` | ✓ | Raw repost events |
 | GET | `/api/audit-log` | admin | Audit log |

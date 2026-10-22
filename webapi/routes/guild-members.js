@@ -1,7 +1,8 @@
 import express from "express";
-import { authenticate, requireAdmin, requireOwnGuildOrAdmin } from "../middleware/auth.js";
+import { authenticate, requireAdmin, requireBotOrAdmin, requireOwnGuildOrAdmin } from "../middleware/auth.js";
 import {
   guildMemberExists,
+  confirmAccountLink,
   linkGuildMemberAlias,
   listAliasesForMapping,
   listAllGuildMembers,
@@ -10,6 +11,7 @@ import {
   listServersForUser,
   listUnlinkedGuildMembers,
   unlinkGuildMemberAlias,
+  requestAccountLink,
   upsertGuildMembers,
 } from "../services/guildMembers.js";
 import { getUserMappingById } from "../services/userMappings.js";
@@ -641,6 +643,152 @@ router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
   } catch (err) {
     console.error("GET /api/guild-members error:", err);
     res.status(500).json({ ok: false, error: "Failed to list guild members" });
+  }
+});
+
+/**
+ * POST /api/guild-members/link-request
+ * A user asks to link their account to another user's: flags the target's guild_members row(s)
+ * in other servers (pending_link = requester's guild_members.id).
+ * Body: { app, guildId, requesterUserId, targetUserId }
+ * Auth: bot or admin.
+ * @openapi
+ * /api/guild-members/link-request:
+ *   post:
+ *     operationId: requestAccountLink
+ *     tags: [Guild Members]
+ *     summary: Request an account link (link-accounts command)
+ *     description: >
+ *       Sets pending_link on every guild_members row for targetUserId outside the requester's
+ *       server, pointing at the requester's guild_members row.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, guildId, requesterUserId, targetUserId]
+ *             properties:
+ *               app: { type: string, example: discord }
+ *               guildId: { type: string }
+ *               requesterUserId: { type: string }
+ *               targetUserId: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Request recorded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 flagged: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/link-request", authenticate, requireBotOrAdmin, requireOwnGuildOrAdmin, async (req, res) => {
+  try {
+    const { app, guildId, requesterUserId, targetUserId } = req.body ?? {};
+    const gid = String(guildId ?? "").trim();
+    const requester = String(requesterUserId ?? "").trim();
+    const target = String(targetUserId ?? "").trim();
+    if (!gid || !requester || !target) {
+      return res
+        .status(400)
+        .json({ ok: false, error: "guildId, requesterUserId and targetUserId are required" });
+    }
+
+    const result = await requestAccountLink({ app, guildId: gid, requesterUserId: requester, targetUserId: target });
+    if (!result.ok) return res.status(400).json({ ok: false, error: result.error });
+
+    await recordAudit(req.user.id, "link_request", "guild_members", null, {
+      app,
+      guildId: gid,
+      requesterUserId: requester,
+      targetUserId: target,
+    });
+    res.json({ ok: true, flagged: result.flagged });
+  } catch (err) {
+    console.error("POST /api/guild-members/link-request error:", err);
+    res.status(500).json({ ok: false, error: "Failed to request account link" });
+  }
+});
+
+/**
+ * POST /api/guild-members/link-confirm
+ * The target user accepts a pending link: the requester's guild_members row becomes an alias
+ * of the confirmer's existing chat_member_mapping identity, and pending_link is cleared.
+ * Body: { app, guildId, userId }
+ * Auth: bot or admin.
+ * @openapi
+ * /api/guild-members/link-confirm:
+ *   post:
+ *     operationId: confirmAccountLink
+ *     tags: [Guild Members]
+ *     summary: Confirm a pending account link (confirm-link command)
+ *     description: >
+ *       Fails without changes if the confirmer has no pending request, zero or multiple
+ *       chat_member_mapping identities, or the requester's row is already linked.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, guildId, userId]
+ *             properties:
+ *               app: { type: string, example: discord }
+ *               guildId: { type: string }
+ *               userId: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Linked.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 requesterHandle: { type: string, nullable: true }
+ *                 chatMemberMappingId: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/link-confirm", authenticate, requireBotOrAdmin, requireOwnGuildOrAdmin, async (req, res) => {
+  try {
+    const { app, guildId, userId } = req.body ?? {};
+    const gid = String(guildId ?? "").trim();
+    const uid = String(userId ?? "").trim();
+    if (!gid || !uid) {
+      return res.status(400).json({ ok: false, error: "guildId and userId are required" });
+    }
+
+    const result = await confirmAccountLink({ app, guildId: gid, userId: uid });
+    if (!result.ok) return res.status(400).json({ ok: false, error: result.error });
+
+    await recordAudit(req.user.id, "link_confirm", "member_aliases", result.requesterGuildMemberId, {
+      chatMemberMappingId: result.chatMemberMappingId,
+    });
+    res.json({
+      ok: true,
+      requesterHandle: result.requesterHandle,
+      chatMemberMappingId: result.chatMemberMappingId,
+    });
+  } catch (err) {
+    console.error("POST /api/guild-members/link-confirm error:", err);
+    res.status(500).json({ ok: false, error: "Failed to confirm account link" });
   }
 });
 
