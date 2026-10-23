@@ -12,9 +12,15 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- handle/app/primary_guild_member_id snapshot the alias an admin has designated as this
+-- identity's primary account (see webadmin "Edit Mapping" and services/guildMembers.js
+-- setPrimaryAlias) — kept in sync when that alias is unlinked or moved elsewhere.
 CREATE TABLE IF NOT EXISTS chat_member_mapping (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL UNIQUE
+  name VARCHAR(255) NOT NULL UNIQUE,
+  handle VARCHAR(255) NULL,
+  app VARCHAR(20) NULL,
+  primary_guild_member_id INT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
@@ -330,6 +336,11 @@ CREATE TABLE IF NOT EXISTS member_aliases (
   CONSTRAINT fk_member_aliases_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   CONSTRAINT fk_member_aliases_guild_member FOREIGN KEY (guild_member_id) REFERENCES guild_members(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Added here (not inline above) because chat_member_mapping is declared before guild_members.
+ALTER TABLE chat_member_mapping
+  ADD CONSTRAINT fk_chat_member_mapping_primary_guild_member
+    FOREIGN KEY (primary_guild_member_id) REFERENCES guild_members(id) ON DELETE SET NULL;
 
 -- Admin-defined usage-stat thresholds. `type` is the fine-grained metric key (see
 -- webapi/services/milestoneTypes.js), `item` scopes it to one entity (null = global), `object`

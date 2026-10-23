@@ -18,7 +18,7 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 - **Trigger–responses** – Triggers with selection modes (`random`, `ordered` round-robin, `weighted`), responses, junction links, trigger response function catalog, frequency tracking, per-user usage history. See [trigger-responses-examples.md](trigger-responses-examples.md).
 - **Leaderboards** – Plusplus, emoji, and repost rankings and per-user totals.
 - **Eight-ball responses** – Fortune string catalog (admin writes).
-- **User mappings** – Bare canonical identity (`id`, `name`) for `chat_member_mapping`; linking it to a person's per-guild `guild_members` aliases is a separate, future admin action.
+- **User mappings** – Canonical identity (`id`, `name`) for `chat_member_mapping`; linking it to a person's per-guild `guild_members` aliases is a separate admin action (see Guild members below). An admin can also designate one already-linked alias as the identity's primary account, snapshotting its `app`/`handle` onto the mapping itself (`POST /api/user-mappings/:id/primary-alias`) — cleared automatically if that alias is later unlinked or moved to a different identity.
 - **Pin history** – Paginated pin log (and shared pin file storage via `PIN_FILES_DIR`).
 - **System** – Health, status, cache version / invalidate, bot heartbeat.
 - **Guild** – App/guild-scoped snapshot of platform-client guild metadata, channels, roles, and the emoji/sticker catalog; pushed periodically by a platform client (discord-bot today), read by admin panel/webview.
@@ -144,7 +144,8 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/leaderboards/timeout/history/:historyId` | ✓ | Voters for one fired vote-to-timeout event |
 | GET | `/api/eight-ball-responses` | ✓ | List eight-ball responses |
 | POST | `/api/eight-ball-responses` | admin | Create eight-ball response |
-| GET | `/api/user-mappings?app=discord` | ✓ | List user mappings (id, name, and discordHandle if that legacy column exists and is non-null) |
+| GET | `/api/user-mappings?app=discord` | ✓ | List user mappings (id, name, handle/app/primaryGuildMemberId if a primary alias is set, and discordHandle if that legacy column exists and is non-null) |
+| POST | `/api/user-mappings/:id/primary-alias` | admin | Set a user mapping's primary alias (body: `{ guildMemberId }`, must already be linked via `member_aliases`) |
 | GET | `/api/pin-history` | ✓ | Pin history log |
 | DELETE | `/api/pin-history/:id` | admin | Delete a pin history entry |
 | GET | `/api/statistics` | ✓ | Aggregate usage statistics |

@@ -18,9 +18,15 @@ CREATE TRIGGER IF NOT EXISTS users_updated_at
     UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id;
   END;
 
+-- handle/app/primary_guild_member_id snapshot the alias an admin has designated as this
+-- identity's primary account (see webadmin "Edit Mapping" and services/guildMembers.js
+-- setPrimaryAlias) — kept in sync when that alias is unlinked or moved elsewhere.
 CREATE TABLE IF NOT EXISTS chat_member_mapping (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE
+  name TEXT NOT NULL UNIQUE,
+  handle TEXT NULL,
+  app TEXT NULL,
+  primary_guild_member_id INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL
 );
 
 -- Bot response tables (shared with dixcord-bot when using same DB)

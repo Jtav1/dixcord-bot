@@ -7,6 +7,7 @@ import {
   listUserMappings,
   updateUserMapping,
 } from "../services/userMappings.js";
+import { setPrimaryAlias } from "../services/guildMembers.js";
 import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
@@ -323,6 +324,93 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("PUT /api/user-mappings/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to update user mapping" });
+  }
+});
+
+/**
+ * POST /api/user-mappings/:id/primary-alias
+ * Designate one of this mapping's already-linked guild_members aliases as its primary account,
+ * snapshotting that alias's app/handle onto chat_member_mapping itself.
+ * Body: { guildMemberId }
+ * Auth: admin required.
+ * @openapi
+ * /api/user-mappings/{id}/primary-alias:
+ *   post:
+ *     operationId: setUserMappingPrimaryAlias
+ *     tags: [User Mappings]
+ *     summary: Set a user mapping's primary alias
+ *     description: >
+ *       Requires the admin role. guildMemberId must already be linked to this mapping via
+ *       member_aliases (link it first with POST /api/guild-members/{guildMemberId}/link).
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [guildMemberId]
+ *             properties:
+ *               guildMemberId: { type: integer }
+ *     responses:
+ *       '200':
+ *         description: Updated user mapping.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 userMapping:
+ *                   type: object
+ *                   properties:
+ *                     id: { type: integer }
+ *                     name: { type: string }
+ *                     handle: { type: string }
+ *                     app: { type: string }
+ *                     primaryGuildMemberId: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/:id/primary-alias", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ ok: false, error: "Invalid id" });
+    }
+    const guildMemberId = parseInt(req.body?.guildMemberId, 10);
+    if (Number.isNaN(guildMemberId)) {
+      return res.status(400).json({ ok: false, error: "guildMemberId is required" });
+    }
+
+    const existing = await getUserMappingById(id);
+    if (!existing) {
+      return res.status(404).json({ ok: false, error: "User mapping not found" });
+    }
+
+    const result = await setPrimaryAlias(id, guildMemberId);
+    if (!result) {
+      return res.status(404).json({ ok: false, error: "Guild member is not an alias of this mapping" });
+    }
+
+    const row = await getUserMappingById(id);
+    await recordAudit(req.user.id, "set-primary", "chat_member_mapping", id, { guildMemberId });
+    res.json({ ok: true, userMapping: row });
+  } catch (err) {
+    console.error("POST /api/user-mappings/:id/primary-alias error:", err);
+    res.status(500).json({ ok: false, error: "Failed to set primary alias" });
   }
 });
 

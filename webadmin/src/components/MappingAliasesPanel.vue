@@ -16,6 +16,7 @@
           <th>Roles</th>
           <th>Joined At</th>
           <th>Synced At</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -37,6 +38,11 @@
           </td>
           <td>{{ alias.joinedAt || "—" }}</td>
           <td>{{ alias.syncedAt }}</td>
+          <td>
+            <v-chip v-if="alias.id === props.primaryGuildMemberId" size="x-small" color="primary" variant="tonal">
+              primary
+            </v-chip>
+          </td>
         </tr>
       </tbody>
     </v-table>
@@ -49,6 +55,7 @@ import { fetchAliasesForMapping } from "../lib/guildMembers.js";
 
 const props = defineProps({
   mappingId: { type: Number, required: true },
+  primaryGuildMemberId: { type: Number, default: null },
 });
 
 const aliases = ref([]);

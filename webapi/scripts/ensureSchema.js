@@ -853,6 +853,63 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: dropped guild_members.chat_member_mapping_id");
   }
 
+  // chat_member_mapping.handle/app/primary_guild_member_id: snapshot of the alias an admin has
+  // designated as this identity's primary account (webadmin "Edit Mapping"). Added after
+  // guild_members/member_aliases above since primary_guild_member_id references guild_members.
+  if (await tableExists(db, "chat_member_mapping", isSqlite)) {
+    if (!(await columnExists(db, "chat_member_mapping", "handle", isSqlite))) {
+      await db.query(
+        isSqlite
+          ? "ALTER TABLE chat_member_mapping ADD COLUMN handle TEXT NULL"
+          : "ALTER TABLE chat_member_mapping ADD COLUMN handle VARCHAR(255) NULL",
+      );
+      applied.push("chat_member_mapping.handle column");
+      console.log("db: migration applied: added chat_member_mapping.handle column");
+    } else {
+      console.log("db: schema ok: chat_member_mapping.handle column already exists");
+    }
+
+    if (!(await columnExists(db, "chat_member_mapping", "app", isSqlite))) {
+      await db.query(
+        isSqlite
+          ? "ALTER TABLE chat_member_mapping ADD COLUMN app TEXT NULL"
+          : "ALTER TABLE chat_member_mapping ADD COLUMN app VARCHAR(20) NULL",
+      );
+      applied.push("chat_member_mapping.app column");
+      console.log("db: migration applied: added chat_member_mapping.app column");
+    } else {
+      console.log("db: schema ok: chat_member_mapping.app column already exists");
+    }
+
+    if (!(await columnExists(db, "chat_member_mapping", "primary_guild_member_id", isSqlite))) {
+      await db.query(
+        isSqlite
+          ? "ALTER TABLE chat_member_mapping ADD COLUMN primary_guild_member_id INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL"
+          : "ALTER TABLE chat_member_mapping ADD COLUMN primary_guild_member_id INT NULL",
+      );
+      applied.push("chat_member_mapping.primary_guild_member_id column");
+      console.log("db: migration applied: added chat_member_mapping.primary_guild_member_id column");
+    } else {
+      console.log("db: schema ok: chat_member_mapping.primary_guild_member_id column already exists");
+    }
+
+    if (
+      !isSqlite &&
+      !(await constraintExists(
+        db,
+        "chat_member_mapping",
+        "fk_chat_member_mapping_primary_guild_member",
+        isSqlite,
+      ))
+    ) {
+      await db.query(
+        "ALTER TABLE chat_member_mapping ADD CONSTRAINT fk_chat_member_mapping_primary_guild_member FOREIGN KEY (primary_guild_member_id) REFERENCES guild_members(id) ON DELETE SET NULL",
+      );
+      applied.push("chat_member_mapping.primary_guild_member_id foreign key");
+      console.log("db: migration applied: added chat_member_mapping.primary_guild_member_id foreign key");
+    }
+  }
+
   // chat_member_mapping.discord_handle/discord_id are DELIBERATELY NOT auto-dropped here.
   // Production has existing chat_member_mapping rows but guild_members is net new — this
   // migration always runs before the bot ever gets a chance to sync (see the member_aliases

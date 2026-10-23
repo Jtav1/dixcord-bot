@@ -266,6 +266,9 @@ export async function linkGuildMemberAlias(guildMemberId, chatMemberMappingId) {
       [chatMemberMappingId, guildMemberId],
     );
   }
+  // If this guild_member was the primary alias of a *different* identity, it no longer belongs
+  // there — clear that identity's stale primary snapshot.
+  await clearStalePrimaryAlias(guildMemberId, chatMemberMappingId);
 }
 
 /**
@@ -278,7 +281,57 @@ export async function unlinkGuildMemberAlias(guildMemberId) {
     "DELETE FROM member_aliases WHERE guild_member_id = ?",
     [guildMemberId],
   );
+  await clearStalePrimaryAlias(guildMemberId);
   return (result?.affectedRows ?? result?.changes ?? 0) > 0;
+}
+
+/**
+ * Clear chat_member_mapping.handle/app/primary_guild_member_id on any identity whose primary
+ * alias is this guild_member, except (optionally) the identity it's being linked to right now.
+ * @param {number} guildMemberId
+ * @param {number} [exceptChatMemberMappingId]
+ * @returns {Promise<void>}
+ */
+async function clearStalePrimaryAlias(guildMemberId, exceptChatMemberMappingId) {
+  if (exceptChatMemberMappingId != null) {
+    await db.query(
+      `UPDATE chat_member_mapping SET handle = NULL, app = NULL, primary_guild_member_id = NULL
+       WHERE primary_guild_member_id = ? AND id <> ?`,
+      [guildMemberId, exceptChatMemberMappingId],
+    );
+  } else {
+    await db.query(
+      `UPDATE chat_member_mapping SET handle = NULL, app = NULL, primary_guild_member_id = NULL
+       WHERE primary_guild_member_id = ?`,
+      [guildMemberId],
+    );
+  }
+}
+
+/**
+ * Designate one of a chat_member_mapping identity's already-linked aliases as its primary
+ * account, snapshotting that alias's app/handle onto the identity itself.
+ * @param {number} chatMemberMappingId
+ * @param {number} guildMemberId
+ * @returns {Promise<{ handle: string|null, app: string }|null>} null if guildMemberId isn't an alias of this identity.
+ */
+export async function setPrimaryAlias(chatMemberMappingId, guildMemberId) {
+  const [rows] = await db.query(
+    `SELECT gm.app AS app, gm.handle AS handle, gm.nickname AS nickname
+     FROM member_aliases ma
+     JOIN guild_members gm ON gm.id = ma.guild_member_id
+     WHERE ma.guild_member_id = ? AND ma.chat_member_mapping_id = ?`,
+    [guildMemberId, chatMemberMappingId],
+  );
+  if (!rows || rows.length === 0) return null;
+
+  const alias = rows[0];
+  const handle = alias.handle || alias.nickname || null;
+  await db.query(
+    "UPDATE chat_member_mapping SET handle = ?, app = ?, primary_guild_member_id = ? WHERE id = ?",
+    [handle, alias.app, guildMemberId, chatMemberMappingId],
+  );
+  return { handle, app: alias.app };
 }
 
 /**

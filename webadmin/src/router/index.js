@@ -8,6 +8,7 @@ import PinQuipsView from "../views/PinQuipsView.vue";
 import EightBallView from "../views/EightBallView.vue";
 import LinkReplacementsView from "../views/LinkReplacementsView.vue";
 import UserMappingsView from "../views/UserMappingsView.vue";
+import UnmappedUsersView from "../views/UnmappedUsersView.vue";
 import RemindersView from "../views/RemindersView.vue";
 import ActivityView from "../views/ActivityView.vue";
 import MilestonesView from "../views/MilestonesView.vue";
@@ -23,6 +24,7 @@ const FEATURE_COMPONENTS = {
   "eight-ball": EightBallView,
   "link-replacements": LinkReplacementsView,
   "user-mappings": UserMappingsView,
+  "unmapped-users": UnmappedUsersView,
   reminders: RemindersView,
   activity: ActivityView,
   milestones: MilestonesView,

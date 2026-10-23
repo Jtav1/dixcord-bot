@@ -338,6 +338,7 @@ app.get("/", publicLimiter, (req, res) => {
         adminRoutes: [
           "POST /api/user-mappings",
           "PUT /api/user-mappings/:id",
+          "POST /api/user-mappings/:id/primary-alias",
           "DELETE /api/user-mappings/:id?app=discord",
         ],
       },
