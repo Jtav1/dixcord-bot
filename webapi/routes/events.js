@@ -58,6 +58,7 @@ const router = express.Router();
  *                     type: object
  *                     properties:
  *                       id: { type: integer }
+ *                       app: { type: string, nullable: true, description: "Platform that cast the vote. Not filtered by the `app` query param — see summary." }
  *                       type: { type: string }
  *                       string: { type: string, nullable: true }
  *                       value: { type: string, nullable: true }
@@ -144,6 +145,7 @@ router.get("/plusplus", authenticate, async (req, res) => {
  *                     type: object
  *                     properties:
  *                       id: { type: integer }
+ *                       app: { type: string, nullable: true, description: "Platform the accusation was recorded on. Not filtered by the `app` query param — see summary." }
  *                       msgid: { type: string }
  *                       msgcontents: { type: string, nullable: true }
  *                       useridPlatformId: { type: string }

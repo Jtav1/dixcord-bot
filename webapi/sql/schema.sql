@@ -37,8 +37,12 @@ CREATE TABLE IF NOT EXISTS eight_ball_responses (
   UNIQUE KEY unique_response (response_string, sentiment)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- app records which platform cast the vote; totals/leaderboards deliberately never filter on it
+-- (see services/leaderboards.js, services/milestones.js) so a word's or user's score is one
+-- cross-platform number, not fragmented per app.
 CREATE TABLE IF NOT EXISTS plusplus_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  app VARCHAR(20) NOT NULL,
   type VARCHAR(10) NOT NULL,
   string VARCHAR(500) DEFAULT NULL,
   voter INT DEFAULT NULL,
@@ -91,9 +95,12 @@ CREATE TABLE IF NOT EXISTS sticker_frequency (
   frequency INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- app + msgid is the dedup key (not msgid alone): message ids are only guaranteed unique within
+-- their own platform, so two apps' message ids could otherwise collide (see isMessageAlreadyPinned).
 CREATE TABLE IF NOT EXISTS pin_history (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  msgid VARCHAR(255) NOT NULL UNIQUE,
+  app VARCHAR(20) NOT NULL,
+  msgid VARCHAR(255) NOT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   author INT NULL,
   contents VARCHAR(5000) NULL,
@@ -103,6 +110,7 @@ CREATE TABLE IF NOT EXISTS pin_history (
   pinners TEXT NULL,
   hydrated TINYINT(1) NOT NULL DEFAULT 1,
   guild_id VARCHAR(64) NULL,
+  UNIQUE KEY unique_pin_history_app_msgid (app, msgid),
   CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -115,14 +123,18 @@ CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   CONSTRAINT fk_user_emoji_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- app is part of the accusation key (not just userid/msgid/accuser) for the same reason as
+-- pin_history: msgid is only unique within its own platform. Global/user repost totals
+-- (services/leaderboards.js, services/milestones.js) never filter on it.
 CREATE TABLE IF NOT EXISTS member_repost_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  app VARCHAR(20) NOT NULL,
   userid INT NOT NULL,
   msgid VARCHAR(500) NOT NULL,
   accuser INT NOT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   msgcontents TEXT DEFAULT NULL,
-  UNIQUE KEY unique_repost_accusation (userid, msgid, accuser),
+  UNIQUE KEY unique_repost_accusation (app, userid, msgid, accuser),
   CONSTRAINT fk_repost_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   CONSTRAINT fk_repost_accuser FOREIGN KEY (accuser) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

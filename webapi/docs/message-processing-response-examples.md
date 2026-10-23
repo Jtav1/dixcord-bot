@@ -244,6 +244,15 @@ or
 }
 ```
 
+**400 Bad Request** (app missing/unsupported — the pin dedup key is now `app` + `messageId`, since message ids are only unique within their own platform)
+
+```json
+{
+  "ok": false,
+  "error": "Parameter \"app\" is required and must be one of: discord, fluxer."
+}
+```
+
 **500 Internal Server Error**
 
 ```json

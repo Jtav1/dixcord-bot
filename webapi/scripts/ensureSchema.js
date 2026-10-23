@@ -1925,8 +1925,6 @@ export async function ensureSchemaMigrations() {
 
   // pin_history.guild_id: lets each app's bot hydration loop (and admin filtering) scope to its
   // own pins instead of a mixed-app stream, now that more than one platform can create pins.
-  // No app column (per design: a single guild_id already disambiguates, since every bot
-  // instance is single-guild and Discord/Fluxer id spaces don't collide in practice).
   if (
     (await tableExists(db, "pin_history", isSqlite)) &&
     !(await columnExists(db, "pin_history", "guild_id", isSqlite))
@@ -1966,6 +1964,146 @@ export async function ensureSchemaMigrations() {
     }
   } else {
     console.log("db: schema ok: pin_history.guild_id column already exists");
+  }
+
+  // pin_history: add `app` column + composite (app, msgid) uniqueness, replacing the msgid-only
+  // unique key — message ids are only guaranteed unique within their own platform, so two apps'
+  // ids could otherwise collide (see services/messageProcessing.js isMessageAlreadyPinned).
+  // Backfill existing rows to 'discord' (every pre-existing row predates multi-app support).
+  if (
+    (await tableExists(db, "pin_history", isSqlite)) &&
+    !(await columnExists(db, "pin_history", "app", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE pin_history_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          msgid TEXT NOT NULL,
+          timestamp TEXT DEFAULT (datetime('now')),
+          author INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+          contents TEXT NULL,
+          attachments TEXT NULL,
+          channel_id TEXT NULL,
+          channel_name TEXT NULL,
+          pinners TEXT NULL,
+          hydrated INTEGER NOT NULL DEFAULT 1,
+          guild_id TEXT NULL,
+          UNIQUE (app, msgid)
+        )
+      `);
+      await db.query(`
+        INSERT INTO pin_history_new (
+          id, app, msgid, timestamp, author, contents, attachments, channel_id, channel_name,
+          pinners, hydrated, guild_id
+        )
+        SELECT id, 'discord', msgid, timestamp, author, contents, attachments, channel_id,
+          channel_name, pinners, hydrated, guild_id
+        FROM pin_history
+      `);
+      await db.query("DROP TABLE pin_history");
+      await db.query("ALTER TABLE pin_history_new RENAME TO pin_history");
+    } else {
+      await db.query("ALTER TABLE pin_history ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE pin_history SET app = 'discord' WHERE app IS NULL");
+      await db.query("ALTER TABLE pin_history MODIFY COLUMN app VARCHAR(20) NOT NULL");
+      // The msgid-only unique index is named "msgid" on a fresh install (inline UNIQUE) or
+      // "unique_pin_history_msgid" on an install upgraded via the older surrogate-id migration
+      // above — drop whichever is actually present before adding the composite replacement.
+      if (await indexExists(db, "pin_history", "msgid", isSqlite)) {
+        await db.query("ALTER TABLE pin_history DROP INDEX msgid");
+      } else if (await indexExists(db, "pin_history", "unique_pin_history_msgid", isSqlite)) {
+        await db.query("ALTER TABLE pin_history DROP INDEX unique_pin_history_msgid");
+      }
+      await db.query(
+        "ALTER TABLE pin_history ADD UNIQUE KEY unique_pin_history_app_msgid (app, msgid)",
+      );
+    }
+    applied.push("pin_history.app column + composite unique(app, msgid)");
+    console.log(
+      "db: migration applied: added pin_history.app column, backfilled 'discord' for pre-existing rows, and replaced the msgid-only unique key with (app, msgid)",
+    );
+  } else {
+    console.log("db: schema ok: pin_history.app column already exists");
+  }
+
+  // member_repost_tracking: add `app` column + composite (app, userid, msgid, accuser)
+  // uniqueness, replacing the (userid, msgid, accuser) unique key — msgid is only guaranteed
+  // unique within its own platform. Global/per-user repost totals never filter on app (see
+  // services/leaderboards.js, services/milestones.js), so this only prevents cross-platform
+  // msgid collisions, not a per-app split in the stats.
+  if (
+    (await tableExists(db, "member_repost_tracking", isSqlite)) &&
+    !(await columnExists(db, "member_repost_tracking", "app", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE member_repost_tracking_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          msgid TEXT NOT NULL,
+          accuser INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          timestamp TEXT DEFAULT (datetime('now')),
+          msgcontents TEXT,
+          UNIQUE (app, userid, msgid, accuser)
+        )
+      `);
+      await db.query(`
+        INSERT INTO member_repost_tracking_new (
+          id, app, userid, msgid, accuser, timestamp, msgcontents
+        )
+        SELECT id, 'discord', userid, msgid, accuser, timestamp, msgcontents
+        FROM member_repost_tracking
+      `);
+      await db.query("DROP TABLE member_repost_tracking");
+      await db.query("ALTER TABLE member_repost_tracking_new RENAME TO member_repost_tracking");
+    } else {
+      await db.query("ALTER TABLE member_repost_tracking ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE member_repost_tracking SET app = 'discord' WHERE app IS NULL");
+      await db.query(
+        "ALTER TABLE member_repost_tracking MODIFY COLUMN app VARCHAR(20) NOT NULL",
+      );
+      if (await indexExists(db, "member_repost_tracking", "unique_repost_accusation", isSqlite)) {
+        await db.query(
+          "ALTER TABLE member_repost_tracking DROP INDEX unique_repost_accusation",
+        );
+      }
+      await db.query(
+        "ALTER TABLE member_repost_tracking ADD UNIQUE KEY unique_repost_accusation (app, userid, msgid, accuser)",
+      );
+    }
+    applied.push(
+      "member_repost_tracking.app column + composite unique(app, userid, msgid, accuser)",
+    );
+    console.log(
+      "db: migration applied: added member_repost_tracking.app column, backfilled 'discord' for pre-existing rows, and replaced the (userid, msgid, accuser) unique key with (app, userid, msgid, accuser)",
+    );
+  } else {
+    console.log("db: schema ok: member_repost_tracking.app column already exists");
+  }
+
+  // plusplus_tracking.app column: which platform cast the vote. Global/per-word/per-user totals
+  // (services/leaderboards.js, services/milestones.js) never filter on it — a word's or user's
+  // score stays one cross-platform number, not fragmented per app.
+  if (
+    (await tableExists(db, "plusplus_tracking", isSqlite)) &&
+    !(await columnExists(db, "plusplus_tracking", "app", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query("ALTER TABLE plusplus_tracking ADD COLUMN app TEXT");
+      await db.query("UPDATE plusplus_tracking SET app = 'discord' WHERE app IS NULL");
+    } else {
+      await db.query("ALTER TABLE plusplus_tracking ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE plusplus_tracking SET app = 'discord' WHERE app IS NULL");
+      await db.query("ALTER TABLE plusplus_tracking MODIFY COLUMN app VARCHAR(20) NOT NULL");
+    }
+    applied.push("plusplus_tracking.app column (backfilled 'discord' for pre-existing rows)");
+    console.log(
+      "db: migration applied: added plusplus_tracking.app column, backfilled 'discord' for pre-existing rows",
+    );
+  } else {
+    console.log("db: schema ok: plusplus_tracking.app column already exists");
   }
 
   if (applied.length === 0) {

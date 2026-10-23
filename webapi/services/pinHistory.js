@@ -117,6 +117,7 @@ export async function normalizePinLogPayload(payload, app) {
 function mapPinHistoryRow(row) {
   return {
     id: Number(row.id),
+    app: row.app == null ? null : String(row.app),
     msgid: String(row.msgid),
     timestamp: row.timestamp,
     author: row.author == null ? null : Number(row.author),
@@ -131,33 +132,49 @@ function mapPinHistoryRow(row) {
 }
 
 /**
- * List pin history entries with pagination, optionally scoped to one guild.
- * @param {{ limit?: number, offset?: number, guildId?: string }} opts - Omitting `guildId` returns
- *   every app's rows (current/legacy behavior, unchanged).
- * @returns {Promise<{ entries: Array<{ id: number, msgid: string, timestamp: string, author: number|null, contents: string|null, attachments: string[], channelId: string|null, channelName: string|null, pinners: number[], guildId: string|null }>, total: number }>}
+ * Build an optional WHERE clause from app/guildId filters shared by listPinHistory and
+ * listIncompletePinHistory.
+ * @param {{ app?: string, guildId?: string }} opts
+ * @returns {{ clauses: string[], params: Array<string> }}
+ */
+function buildPinHistoryFilters(opts) {
+  const clauses = [];
+  const params = [];
+  if (opts.app != null && String(opts.app).trim() !== "") {
+    clauses.push("app = ?");
+    params.push(String(opts.app).trim());
+  }
+  if (opts.guildId != null && String(opts.guildId).trim() !== "") {
+    clauses.push("guild_id = ?");
+    params.push(String(opts.guildId).trim());
+  }
+  return { clauses, params };
+}
+
+/**
+ * List pin history entries with pagination, optionally scoped to one app and/or guild.
+ * @param {{ limit?: number, offset?: number, app?: string, guildId?: string }} opts - Omitting
+ *   `app`/`guildId` returns every row (current/legacy behavior, unchanged).
+ * @returns {Promise<{ entries: Array<{ id: number, app: string|null, msgid: string, timestamp: string, author: number|null, contents: string|null, attachments: string[], channelId: string|null, channelName: string|null, pinners: number[], guildId: string|null }>, total: number }>}
  */
 export async function listPinHistory(opts = {}) {
   const limit = Math.min(Math.max(1, opts.limit ?? 50), 200);
   const offset = Math.max(0, opts.offset ?? 0);
-  const guildId =
-    opts.guildId != null && String(opts.guildId).trim() !== ""
-      ? String(opts.guildId).trim()
-      : null;
-  const guildClause = guildId ? " WHERE guild_id = ?" : "";
-  const guildParams = guildId ? [guildId] : [];
+  const { clauses, params } = buildPinHistoryFilters(opts);
+  const whereClause = clauses.length > 0 ? ` WHERE ${clauses.join(" AND ")}` : "";
 
   const [countRows] = await db.query(
-    `SELECT COUNT(*) AS total FROM pin_history${guildClause}`,
-    guildParams,
+    `SELECT COUNT(*) AS total FROM pin_history${whereClause}`,
+    params,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT id, msgid, timestamp, author, contents, attachments, channel_id, channel_name, pinners, hydrated, guild_id
-     FROM pin_history${guildClause}
+    `SELECT id, app, msgid, timestamp, author, contents, attachments, channel_id, channel_name, pinners, hydrated, guild_id
+     FROM pin_history${whereClause}
      ORDER BY timestamp DESC
      LIMIT ? OFFSET ?`,
-    [...guildParams, limit, offset],
+    [...params, limit, offset],
   );
 
   const entries = (Array.isArray(rows) ? rows : []).map(mapPinHistoryRow);
@@ -169,23 +186,18 @@ export async function listPinHistory(opts = {}) {
 const INCOMPLETE_PIN_HISTORY_WHERE = "hydrated = 0";
 
 /**
- * List pin_history rows not yet hydrated (`hydrated = false`), optionally scoped to one guild.
- * @param {{ limit?: number, offset?: number, guildId?: string }} opts - Omitting `guildId` returns
- *   every app's unhydrated rows (current/legacy behavior, unchanged) — pass it to scope a bot's
- *   hydration loop to its own pins instead of a mixed-app stream.
- * @returns {Promise<{ entries: Array<{ id: number, msgid: string, timestamp: string, author: number|null, contents: string|null, attachments: string[], channelId: string|null, channelName: string|null, pinners: number[], guildId: string|null }>, total: number }>}
+ * List pin_history rows not yet hydrated (`hydrated = false`), optionally scoped to one app
+ * and/or guild.
+ * @param {{ limit?: number, offset?: number, app?: string, guildId?: string }} opts - Omitting
+ *   `app`/`guildId` returns every unhydrated row (current/legacy behavior, unchanged) — pass
+ *   them to scope a bot's hydration loop to its own pins instead of a mixed-platform stream.
+ * @returns {Promise<{ entries: Array<{ id: number, app: string|null, msgid: string, timestamp: string, author: number|null, contents: string|null, attachments: string[], channelId: string|null, channelName: string|null, pinners: number[], guildId: string|null }>, total: number }>}
  */
 export async function listIncompletePinHistory(opts = {}) {
   const limit = Math.min(Math.max(1, opts.limit ?? 50), 200);
   const offset = Math.max(0, opts.offset ?? 0);
-  const guildId =
-    opts.guildId != null && String(opts.guildId).trim() !== ""
-      ? String(opts.guildId).trim()
-      : null;
-  const where = guildId
-    ? `${INCOMPLETE_PIN_HISTORY_WHERE} AND guild_id = ?`
-    : INCOMPLETE_PIN_HISTORY_WHERE;
-  const params = guildId ? [guildId] : [];
+  const { clauses, params } = buildPinHistoryFilters(opts);
+  const where = [INCOMPLETE_PIN_HISTORY_WHERE, ...clauses].join(" AND ");
 
   const [countRows] = await db.query(
     `SELECT COUNT(*) AS total FROM pin_history WHERE ${where}`,
@@ -194,7 +206,7 @@ export async function listIncompletePinHistory(opts = {}) {
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT id, msgid, timestamp, author, contents, attachments, channel_id, channel_name, pinners, hydrated, guild_id
+    `SELECT id, app, msgid, timestamp, author, contents, attachments, channel_id, channel_name, pinners, hydrated, guild_id
      FROM pin_history
      WHERE ${where}
      ORDER BY id ASC
@@ -215,7 +227,7 @@ export async function getPinHistoryById(id) {
   if (!Number.isFinite(id) || id <= 0) return null;
 
   const [rows] = await db.query(
-    `SELECT id, msgid, timestamp, author, contents, attachments, channel_id, channel_name, pinners, hydrated, guild_id
+    `SELECT id, app, msgid, timestamp, author, contents, attachments, channel_id, channel_name, pinners, hydrated, guild_id
      FROM pin_history
      WHERE id = ?
      LIMIT 1`,

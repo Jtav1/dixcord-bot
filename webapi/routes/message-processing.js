@@ -607,7 +607,7 @@ router.post("/sticker-import", authenticate, async (req, res) => {
 /**
  * POST /api/message-processing/pin-check
  * Check if a message was already logged as pinned.
- * Body: { messageId: string }
+ * Body: { app: "discord", messageId: string }
  * Response: { alreadyPinned: boolean }
  * Auth: required.
  * @openapi
@@ -616,15 +616,19 @@ router.post("/sticker-import", authenticate, async (req, res) => {
  *     operationId: checkPinStatus
  *     tags: [Message Processing]
  *     summary: Check whether a message is already logged as pinned
+ *     description: >
+ *       Scoped to app + messageId: message ids are only unique within their own platform, so
+ *       app disambiguates a messageId that could otherwise collide across platforms.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [messageId]
+ *             required: [app, messageId]
  *             properties:
- *               messageId: { type: string, description: "Discord message snowflake." }
+ *               app: { type: string, enum: [discord, fluxer] }
+ *               messageId: { type: string, description: "Platform message snowflake." }
  *     responses:
  *       '200':
  *         description: Pin status.
@@ -634,6 +638,12 @@ router.post("/sticker-import", authenticate, async (req, res) => {
  *               type: object
  *               properties:
  *                 alreadyPinned: { type: boolean }
+ *       '400':
+ *         description: app missing/unsupported.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
@@ -641,8 +651,12 @@ router.post("/sticker-import", authenticate, async (req, res) => {
  */
 router.post("/pin-check", authenticate, async (req, res) => {
   try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) {
+      return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    }
     const { messageId } = req.body ?? {};
-    const alreadyPinned = await isMessageAlreadyPinned(messageId);
+    const alreadyPinned = await isMessageAlreadyPinned(messageId, app);
     res.json({ alreadyPinned });
   } catch (err) {
     console.error(err);

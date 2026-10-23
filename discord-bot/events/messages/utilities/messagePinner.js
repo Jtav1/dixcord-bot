@@ -8,13 +8,14 @@ import {
 
 /**
  * Check whether a message was already logged as pinned.
- * POST /api/message-processing/pin-check with { messageId }.
+ * POST /api/message-processing/pin-check with { app, messageId }.
  * @param {string} msgid - Message ID
  * @returns {Promise<boolean>}
  */
 export const isMessageAlreadyPinned = async (msgid) => {
   if (!msgid) return false;
   const { data } = await api.post("/api/message-processing/pin-check", {
+    app: "discord",
     messageId: msgid,
   });
   return Boolean(data?.alreadyPinned);

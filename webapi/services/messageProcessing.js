@@ -49,8 +49,13 @@ function requireChatAppFromPayload(payload) {
 
 // --- Emoji detector (count emoji usage) ---
 
-/** @param {string} emoid @returns {boolean} true if this looks like a real Discord snowflake (custom emoji/sticker), not a unicode character. */
-function isNumericEmoid(emoid) {
+/**
+ * @param {string} emoid
+ * @param {string} app - e.g. "discord"; accepted so a per-app check can be added once Fluxer's
+ *   custom emoji id format is known (currently every supported app uses this same numeric test).
+ * @returns {boolean} true if this looks like a real Discord snowflake (custom emoji/sticker), not a unicode character.
+ */
+function isNumericEmoid(emoid, app) {
   return /^\d+$/.test(String(emoid));
 }
 
@@ -88,7 +93,7 @@ async function ensureAndIncrementEmoji(
     return { frequency: null, inserted: false };
   }
 
-  const numeric = isNumericEmoid(id);
+  const numeric = isNumericEmoid(id, app);
 
   if (numeric) {
     const [knownGuild] = await db.query(
@@ -414,8 +419,8 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
   if (typestr === "word") {
     if (!target || String(target).trim() === "") return { ok: false, milestones: [] };
     await db.query(
-      "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
-      ["word", String(target), voterRes.id, value],
+      "INSERT INTO plusplus_tracking (app, type, string, voter, value) VALUES (?, ?, ?, ?, ?)",
+      [chatApp, "word", String(target), voterRes.id, value],
     );
     const milestones = await checkAllPlusPlusMilestones({ typestr, target, value, chatApp });
     return { ok: true, milestones };
@@ -425,8 +430,8 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
   if (!targetRes.ok) return { ok: false, milestones: [] };
 
   await db.query(
-    "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
-    ["user", String(targetRes.id), voterRes.id, value],
+    "INSERT INTO plusplus_tracking (app, type, string, voter, value) VALUES (?, ?, ?, ?, ?)",
+    [chatApp, "user", String(targetRes.id), voterRes.id, value],
   );
   const milestones = await checkAllPlusPlusMilestones({ typestr, target, value, chatApp });
   return { ok: true, milestones };
@@ -573,19 +578,19 @@ export async function countRepost(payload) {
 
   if (repost === 1) {
     const [existing] = await db.query(
-      "SELECT 1 FROM member_repost_tracking WHERE userid = ? AND msgid = ? AND accuser = ?",
-      [authorId, msgid, accuserId],
+      "SELECT 1 FROM member_repost_tracking WHERE app = ? AND userid = ? AND msgid = ? AND accuser = ?",
+      [chatApp, authorId, msgid, accuserId],
     );
     if (existing && existing.length > 0) {
       const now = new Date().toISOString().slice(0, 19).replace("T", " ");
       await db.query(
-        "UPDATE member_repost_tracking SET msgcontents = ?, timestamp = ? WHERE userid = ? AND msgid = ? AND accuser = ?",
-        [msgcontents || null, now, authorId, msgid, accuserId],
+        "UPDATE member_repost_tracking SET msgcontents = ?, timestamp = ? WHERE app = ? AND userid = ? AND msgid = ? AND accuser = ?",
+        [msgcontents || null, now, chatApp, authorId, msgid, accuserId],
       );
     } else {
       await db.query(
-        "INSERT INTO member_repost_tracking (userid, msgid, accuser, msgcontents) VALUES (?, ?, ?, ?)",
-        [authorId, msgid, accuserId, msgcontents || null],
+        "INSERT INTO member_repost_tracking (app, userid, msgid, accuser, msgcontents) VALUES (?, ?, ?, ?, ?)",
+        [chatApp, authorId, msgid, accuserId, msgcontents || null],
       );
     }
 
@@ -611,8 +616,8 @@ export async function countRepost(payload) {
 
   if (repost === -1) {
     const [result] = await db.query(
-      "DELETE FROM member_repost_tracking WHERE msgid = ? AND accuser = ?",
-      [msgid, accuserId],
+      "DELETE FROM member_repost_tracking WHERE app = ? AND msgid = ? AND accuser = ?",
+      [chatApp, msgid, accuserId],
     );
     const deleted = result?.affectedRows ?? result?.changes ?? 0;
     return { ok: true, action: "withdrawn", deleted, milestones: [] };
@@ -812,21 +817,26 @@ export async function syncGuildEmojiFrequency(app, guildId, dryRun = false) {
 // --- Pin history (for pin decision + log) ---
 
 /**
- * Check if a message was already logged as pinned.
- * @param {string} messageId - Discord message ID (snowflake)
+ * Check if a message was already logged as pinned. Scoped to `app`: message ids are only
+ * guaranteed unique within their own platform, so a messageId lookup without app could match
+ * (or appear to match) an unrelated pin from a different platform.
+ * @param {string} messageId - platform message id (snowflake)
+ * @param {string} app - e.g. "discord"
  * @returns {Promise<boolean>}
  */
-export async function isMessageAlreadyPinned(messageId) {
+export async function isMessageAlreadyPinned(messageId, app) {
   if (!messageId || String(messageId).trim() === "") return false;
+  if (!isChatMemberAppSupported(app)) return false;
   const id = String(messageId).trim();
-  const [rows] = await db.query("SELECT 1 FROM pin_history WHERE msgid = ?", [
+  const [rows] = await db.query("SELECT 1 FROM pin_history WHERE app = ? AND msgid = ?", [
+    app,
     id,
   ]);
   return Array.isArray(rows) && rows.length > 0;
 }
 
 /**
- * Log a message as pinned (idempotent: no-op if already logged).
+ * Log a message as pinned (idempotent: no-op if already logged for this app+messageId).
  * @param {{ messageId?: string, app?: string, authorId?: string, contents?: string, attachments?: unknown, channelId?: string, channelName?: string, pinnerIds?: string[] }} payload
  * @returns {Promise<{ ok: boolean, error?: string, milestones?: Array }>}
  */
@@ -837,13 +847,14 @@ export async function logPinnedMessage(payload) {
     return { ok: false };
   }
   const id = String(messageId).trim();
-  const already = await isMessageAlreadyPinned(id);
-  if (already) return { ok: true, milestones: [] };
 
   const appCheck = requireChatAppFromPayload(
     typeof payload === "object" && payload != null ? payload : {},
   );
   if (!appCheck.ok) return appCheck;
+
+  const already = await isMessageAlreadyPinned(id, appCheck.app);
+  if (already) return { ok: true, milestones: [] };
 
   const normalized = await normalizePinLogPayload(payload, appCheck.app);
   if (!normalized.ok) return normalized;
@@ -858,9 +869,9 @@ export async function logPinnedMessage(payload) {
 
   await db.query(
     `INSERT INTO pin_history (
-      msgid, author, contents, attachments, channel_id, channel_name, pinners, hydrated, guild_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, author, contents, attachments, channelId, channelName, pinners, 1, guildId],
+      app, msgid, author, contents, attachments, channel_id, channel_name, pinners, hydrated, guild_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [appCheck.app, id, author, contents, attachments, channelId, channelName, pinners, 1, guildId],
   );
 
   const milestones = [];

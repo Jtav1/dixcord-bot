@@ -55,7 +55,7 @@ export async function listPlusplusEvents(opts = {}) {
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT pt.id, pt.type, pt.string, pt.value, pt.timestamp,
+    `SELECT pt.id, pt.app, pt.type, pt.string, pt.value, pt.timestamp,
             ${representativePlatformIdSubquery("pt.voter")} AS voter_platform_id
      FROM plusplus_tracking pt
      ${whereClause}
@@ -66,6 +66,7 @@ export async function listPlusplusEvents(opts = {}) {
 
   const events = (Array.isArray(rows) ? rows : []).map((row) => ({
     id: Number(row.id),
+    app: row.app == null ? null : String(row.app),
     type: String(row.type),
     string: row.string,
     value: row.value,
@@ -117,7 +118,7 @@ export async function listRepostEvents(opts = {}) {
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT r.id, r.msgid, r.msgcontents, r.timestamp,
+    `SELECT r.id, r.app, r.msgid, r.msgcontents, r.timestamp,
             ${representativePlatformIdSubquery("r.userid")} AS userid_platform_id,
             ${representativePlatformIdSubquery("r.accuser")} AS accuser_platform_id
      FROM member_repost_tracking r
@@ -129,6 +130,7 @@ export async function listRepostEvents(opts = {}) {
 
   const events = (Array.isArray(rows) ? rows : []).map((row) => ({
     id: Number(row.id),
+    app: row.app == null ? null : String(row.app),
     msgid: String(row.msgid),
     msgcontents: row.msgcontents,
     useridPlatformId: row.userid_platform_id != null ? String(row.userid_platform_id) : null,

@@ -30,6 +30,11 @@ const router = express.Router();
  *         in: query
  *         required: false
  *         schema: { type: integer, default: 0 }
+ *       - name: app
+ *         in: query
+ *         required: false
+ *         schema: { type: string }
+ *         description: Scope to one chat app's pins (e.g. discord, fluxer). Omit to list every app's pins (current/legacy behavior).
  *       - name: guildId
  *         in: query
  *         required: false
@@ -50,6 +55,7 @@ const router = express.Router();
  *                     type: object
  *                     properties:
  *                       id: { type: integer }
+ *                       app: { type: string, nullable: true }
  *                       msgid: { type: string }
  *                       timestamp: { type: string }
  *                       author: { type: integer, nullable: true }
@@ -79,6 +85,7 @@ router.get("/", authenticate, async (req, res) => {
     const { entries, total } = await listPinHistory({
       limit,
       offset,
+      app: req.query.app,
       guildId: req.query.guildId,
     });
     res.json({ ok: true, pinHistory: entries, total, limit, offset });
@@ -109,6 +116,11 @@ router.get("/", authenticate, async (req, res) => {
  *         in: query
  *         required: false
  *         schema: { type: integer, default: 0 }
+ *       - name: app
+ *         in: query
+ *         required: false
+ *         schema: { type: string }
+ *         description: Scope to one chat app's unhydrated pins — lets a bot's hydration loop skip other platforms' rows. Omit to list every app's (current/legacy behavior).
  *       - name: guildId
  *         in: query
  *         required: false
@@ -129,6 +141,7 @@ router.get("/", authenticate, async (req, res) => {
  *                     type: object
  *                     properties:
  *                       id: { type: integer }
+ *                       app: { type: string, nullable: true }
  *                       msgid: { type: string }
  *                       timestamp: { type: string }
  *                       author: { type: integer, nullable: true }
@@ -158,6 +171,7 @@ router.get("/incomplete", authenticate, async (req, res) => {
     const { entries, total } = await listIncompletePinHistory({
       limit,
       offset,
+      app: req.query.app,
       guildId: req.query.guildId,
     });
     res.json({ ok: true, pinHistory: entries, total, limit, offset });
@@ -195,6 +209,7 @@ router.get("/incomplete", authenticate, async (req, res) => {
  *                   type: object
  *                   properties:
  *                     id: { type: integer }
+ *                     app: { type: string, nullable: true }
  *                     msgid: { type: string }
  *                     timestamp: { type: string }
  *                     author: { type: integer, nullable: true }
@@ -295,6 +310,7 @@ router.get("/:id", authenticate, async (req, res) => {
  *                   type: object
  *                   properties:
  *                     id: { type: integer }
+ *                     app: { type: string, nullable: true }
  *                     msgid: { type: string }
  *                     timestamp: { type: string }
  *                     author: { type: integer, nullable: true }

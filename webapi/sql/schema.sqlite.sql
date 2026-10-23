@@ -43,8 +43,12 @@ CREATE TABLE IF NOT EXISTS eight_ball_responses (
   UNIQUE (response_string, sentiment)
 );
 
+-- app records which platform cast the vote; totals/leaderboards deliberately never filter on it
+-- (see services/leaderboards.js, services/milestones.js) so a word's or user's score is one
+-- cross-platform number, not fragmented per app.
 CREATE TABLE IF NOT EXISTS plusplus_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
   type TEXT NOT NULL,
   string TEXT,
   voter INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
@@ -105,19 +109,26 @@ CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   UNIQUE (userid, emoid)
 );
 
+-- app is part of the accusation key (not just userid/msgid/accuser) for the same reason as
+-- pin_history: msgid is only unique within its own platform. Global/user repost totals
+-- (services/leaderboards.js, services/milestones.js) never filter on it.
 CREATE TABLE IF NOT EXISTS member_repost_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
   userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   msgid TEXT NOT NULL,
   accuser INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   timestamp TEXT DEFAULT (datetime('now')),
   msgcontents TEXT,
-  UNIQUE (userid, msgid, accuser)
+  UNIQUE (app, userid, msgid, accuser)
 );
 
+-- app + msgid is the dedup key (not msgid alone): message ids are only guaranteed unique within
+-- their own platform, so two apps' message ids could otherwise collide (see isMessageAlreadyPinned).
 CREATE TABLE IF NOT EXISTS pin_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  msgid TEXT NOT NULL UNIQUE,
+  app TEXT NOT NULL,
+  msgid TEXT NOT NULL,
   timestamp TEXT DEFAULT (datetime('now')),
   author INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
   contents TEXT NULL,
@@ -126,7 +137,8 @@ CREATE TABLE IF NOT EXISTS pin_history (
   channel_name TEXT NULL,
   pinners TEXT NULL,
   hydrated INTEGER NOT NULL DEFAULT 1,
-  guild_id TEXT NULL
+  guild_id TEXT NULL,
+  UNIQUE (app, msgid)
 );
 
 CREATE TABLE IF NOT EXISTS link_replacements (
