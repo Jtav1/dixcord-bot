@@ -42,7 +42,7 @@ function parseRangeFromRequest(req) {
  *             type: object
  *             required: [app]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               limit: { type: integer, default: 5, minimum: 1, maximum: 50 }
  *               from: { type: string, format: date-time, description: "Optional inclusive lower bound on vote timestamp." }
  *               to: { type: string, format: date-time, description: "Optional inclusive upper bound on vote timestamp." }
@@ -120,7 +120,7 @@ router.post("/plusplus", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *       - name: type
  *         in: query
  *         required: false
@@ -199,7 +199,7 @@ router.get("/plusplus/history/:rowId", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *       - name: type
  *         in: query
  *         required: false
@@ -268,7 +268,7 @@ router.get("/plusplus/total", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *     responses:
  *       '200':
  *         description: Voter's total votes cast (0 if the voter has no chat_member_mapping row).
@@ -326,7 +326,7 @@ router.get("/plusplus/voter/:userId", authenticate, async (req, res) => {
  *             type: object
  *             required: [app]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               limit: { type: integer, default: 3, minimum: 1, maximum: 50 }
  *     responses:
  *       '200':
@@ -387,6 +387,7 @@ router.post("/plusplus/top-voters", authenticate, async (req, res) => {
  *             properties:
  *               limit: { type: integer, default: 5, minimum: 1, maximum: 50 }
  *               offset: { type: integer, default: 0, minimum: 0 }
+ *               guildId: { type: string, description: "Scope to one guild/community. Omit to mix every guild's emoji into one pool (current/legacy behavior)." }
  *     responses:
  *       '200':
  *         description: Emoji usage page.
@@ -415,7 +416,11 @@ router.post("/emoji", authenticate, async (req, res) => {
     const limit = leaderboards.parseLimit(req.body?.limit, 5, 50);
     const offset =
       req.body?.offset != null ? Math.max(0, parseInt(req.body.offset, 10) || 0) : 0;
-    const { rows, total } = await leaderboards.listEmojiFrequency(limit, offset);
+    const { rows, total } = await leaderboards.listEmojiFrequency(
+      limit,
+      offset,
+      req.body?.guildId,
+    );
     res.json({ ok: true, limit, offset, total, top: rows });
   } catch (err) {
     console.error("POST /api/leaderboards/emoji error:", err);
@@ -443,7 +448,7 @@ router.post("/emoji", authenticate, async (req, res) => {
  *             type: object
  *             required: [app]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               limit: { type: integer, default: 50, minimum: 1, maximum: 50 }
  *               offset: { type: integer, default: 0, minimum: 0 }
  *     responses:
@@ -514,6 +519,7 @@ router.post("/emoji/users", authenticate, async (req, res) => {
  *             properties:
  *               limit: { type: integer, default: 5, minimum: 1, maximum: 50 }
  *               offset: { type: integer, default: 0, minimum: 0 }
+ *               guildId: { type: string, description: "Scope to one guild/community. Omit to mix every guild's stickers into one pool (current/legacy behavior)." }
  *     responses:
  *       '200':
  *         description: Sticker usage page.
@@ -542,7 +548,11 @@ router.post("/sticker", authenticate, async (req, res) => {
     const limit = leaderboards.parseLimit(req.body?.limit, 5, 50);
     const offset =
       req.body?.offset != null ? Math.max(0, parseInt(req.body.offset, 10) || 0) : 0;
-    const { rows, total } = await leaderboards.listStickerFrequency(limit, offset);
+    const { rows, total } = await leaderboards.listStickerFrequency(
+      limit,
+      offset,
+      req.body?.guildId,
+    );
     res.json({ ok: true, limit, offset, total, top: rows });
   } catch (err) {
     console.error("POST /api/leaderboards/sticker error:", err);
@@ -570,7 +580,7 @@ router.post("/sticker", authenticate, async (req, res) => {
  *             type: object
  *             required: [app]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               limit: { type: integer, default: 50, minimum: 1, maximum: 50 }
  *               offset: { type: integer, default: 0, minimum: 0 }
  *     responses:
@@ -639,7 +649,7 @@ router.post("/sticker/users", authenticate, async (req, res) => {
  *             type: object
  *             required: [app]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               limit: { type: integer, default: 5, minimum: 1, maximum: 50 }
  *               from: { type: string, format: date-time, description: "Optional inclusive lower bound on accusation timestamp." }
  *               to: { type: string, format: date-time, description: "Optional inclusive upper bound on accusation timestamp." }
@@ -704,7 +714,7 @@ router.post("/repost", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *     responses:
  *       '200':
  *         description: Repost accusation count (0 if the user has no chat_member_mapping row).
@@ -764,7 +774,7 @@ router.get("/repost/user/:userId", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *       - name: limit
  *         in: query
  *         required: false
@@ -836,7 +846,7 @@ router.get("/emoji/user/:userId", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *       - name: limit
  *         in: query
  *         required: false
@@ -902,7 +912,7 @@ router.get("/sticker/user/:userId", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *       - name: limit
  *         in: query
  *         required: false

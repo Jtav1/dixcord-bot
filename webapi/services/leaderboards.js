@@ -254,22 +254,27 @@ const EMOJI_FREQUENCY_WHERE = "(type = 'emoji' OR type IS NULL) AND frequency > 
  * never-used catalog rows).
  * @param {number} [limit] Max rows per page (default 5, max 50).
  * @param {number} [offset] Rows to skip (default 0).
+ * @param {string} [guildId] Scope to one guild/community. Omit to mix every guild's emoji
+ *   into one pool (current/legacy behavior — unchanged default).
  * @returns {Promise<{ rows: Array<{ emoji: object }>, total: number }>} `emoji` is the full guild_emojis row (see attachEmojiObjects).
  */
-export async function listEmojiFrequency(limit, offset = 0) {
+export async function listEmojiFrequency(limit, offset = 0, guildId) {
   const n = parseLimit(limit, 5, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
+  const where = guildId ? `${EMOJI_FREQUENCY_WHERE} AND guild_id = ?` : EMOJI_FREQUENCY_WHERE;
+  const params = guildId ? [guildId] : [];
 
   const [countRows] = await db.query(
-    `SELECT COUNT(*) AS total FROM guild_emojis WHERE ${EMOJI_FREQUENCY_WHERE}`,
+    `SELECT COUNT(*) AS total FROM guild_emojis WHERE ${where}`,
+    params,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
     `SELECT id AS emoid FROM guild_emojis
-     WHERE ${EMOJI_FREQUENCY_WHERE}
+     WHERE ${where}
      ORDER BY frequency DESC LIMIT ? OFFSET ?`,
-    [n, off],
+    [...params, n, off],
   );
 
   return {
@@ -342,22 +347,27 @@ const STICKER_FREQUENCY_WHERE = "type = 'sticker' AND frequency > 0";
  * catalog rows).
  * @param {number} [limit] Max rows per page (default 5, max 50).
  * @param {number} [offset] Rows to skip (default 0).
+ * @param {string} [guildId] Scope to one guild/community. Omit to mix every guild's stickers
+ *   into one pool (current/legacy behavior — unchanged default).
  * @returns {Promise<{ rows: Array<{ emoji: object }>, total: number }>} `emoji` is the full guild_emojis row (see attachEmojiObjects).
  */
-export async function listStickerFrequency(limit, offset = 0) {
+export async function listStickerFrequency(limit, offset = 0, guildId) {
   const n = parseLimit(limit, 5, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
+  const where = guildId ? `${STICKER_FREQUENCY_WHERE} AND guild_id = ?` : STICKER_FREQUENCY_WHERE;
+  const params = guildId ? [guildId] : [];
 
   const [countRows] = await db.query(
-    `SELECT COUNT(*) AS total FROM guild_emojis WHERE ${STICKER_FREQUENCY_WHERE}`,
+    `SELECT COUNT(*) AS total FROM guild_emojis WHERE ${where}`,
+    params,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
     `SELECT id AS emoid FROM guild_emojis
-     WHERE ${STICKER_FREQUENCY_WHERE}
+     WHERE ${where}
      ORDER BY frequency DESC LIMIT ? OFFSET ?`,
-    [n, off],
+    [...params, n, off],
   );
 
   return {

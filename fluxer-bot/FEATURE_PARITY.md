@@ -37,6 +37,7 @@ fluxer.js API gap forces a different implementation).
 - [ ] `/scheduled-list` — list your upcoming scheduled reminders (UTC)
 - [ ] `/scheduled-update` — update a pending reminder's time and/or message
 - [ ] `/scheduled-delete` — delete a pending reminder by id
+- [x] `link-accounts` / `confirm-link` — user-initiated account linking (new in both bots). fluxer.js has no slash commands, so these are prefix commands (`FLUXER_COMMAND_PREFIX`, default `!`)
 
 Needs `@fluxerjs/builders` (command builder) + `@fluxerjs/rest` (deploy) adopted first — not installed yet (see `fluxer-bot/README.md`).
 
@@ -93,9 +94,9 @@ mechanics, for porting:
 - **Server-side tally**: `POST /api/message-processing/timeout-vote` (webapi,
   `services/timeoutVotes.js`) inserts into `timeout_vote_tracking` (unique per message+voter,
   mirrors `plusplus_tracking`) and sums `weight` for the message. No change needed on webapi for
-  fluxer-bot — same endpoint, same `app` discriminator pattern (pass `"fluxer"` instead of
-  `"discord"` once webapi's chat-app enum is extended — **not yet done**, flag before wiring this
-  up).
+  fluxer-bot — same endpoint, same `app` discriminator pattern. **webapi's chat-app enum now
+  includes `"fluxer"`** (`CHAT_MEMBER_APP_CONFIG` in `services/chatMemberMapping.js`) — just pass
+  `app: "fluxer"` instead of `"discord"` when wiring this up from fluxer-bot.
 - **Threshold + action**: once the running weighted total ≥ `timeout_vote_threshold` (guild_config,
   integer), webapi inserts a `timeout_history` row (unique per `message_id` — the idempotency
   guard; further votes or un-votes on that message become no-ops) and returns

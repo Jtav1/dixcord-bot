@@ -25,6 +25,7 @@ if (process.env.DEV_FLAG == false) {
 
 const token = process.env.FLUXER_TOKEN;
 const guildId = process.env.FLUXER_GUILD_ID; // Community/guild the bot operates in
+const commandPrefix = process.env.FLUXER_COMMAND_PREFIX || "!"; // prefix for text commands (no slash commands in fluxer.js)
 const instanceUrl = process.env.FLUXER_INSTANCE_URL || null; // self-hosted instance origin; unset = hosted fluxer.app
 
 //prettier-ignore
@@ -44,6 +45,7 @@ export {
   token,
   guildId,
   instanceUrl,
+  commandPrefix,
   dataDirectory,
   isDev,
   version,

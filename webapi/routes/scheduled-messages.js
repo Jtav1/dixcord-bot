@@ -180,8 +180,8 @@ router.post("/parse-reminder", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         schema: { type: string, enum: [discord] }
- *         description: Chat app key. Currently only "discord" is supported.
+ *         schema: { type: string, enum: [discord, fluxer] }
+ *         description: Chat app key. Currently "discord" and "fluxer" are supported.
  *       - name: scope
  *         in: query
  *         required: false
@@ -233,7 +233,7 @@ router.post("/parse-reminder", authenticate, async (req, res) => {
  *                     properties:
  *                       id: { type: integer }
  *                       user_id: { type: integer }
- *                       app: { type: string, enum: [discord] }
+ *                       app: { type: string, enum: [discord, fluxer] }
  *                       chat_channel_id: { type: string }
  *                       chat_guild_id: { type: string, nullable: true }
  *                       message_body: { type: string }
@@ -347,8 +347,8 @@ router.get("/", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         schema: { type: string, enum: [discord] }
- *         description: Chat app key. Currently only "discord" is supported.
+ *         schema: { type: string, enum: [discord, fluxer] }
+ *         description: Chat app key. Currently "discord" and "fluxer" are supported.
  *       - name: requesterUserId
  *         in: query
  *         required: true
@@ -368,7 +368,7 @@ router.get("/", authenticate, async (req, res) => {
  *                   properties:
  *                     id: { type: integer }
  *                     user_id: { type: integer }
- *                     app: { type: string, enum: [discord] }
+ *                     app: { type: string, enum: [discord, fluxer] }
  *                     chat_channel_id: { type: string }
  *                     chat_guild_id: { type: string, nullable: true }
  *                     message_body: { type: string }
@@ -519,7 +519,7 @@ router.post("/parse-time", authenticate, async (req, res) => {
  *             type: object
  *             required: [app, requesterUserId, chat_channel_id, message_body, scheduled_at]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               requesterUserId:
  *                 type: string
  *                 description: Platform user id (e.g. Discord snowflake) resolved to a chat_member_mapping row.
@@ -544,7 +544,7 @@ router.post("/parse-time", authenticate, async (req, res) => {
  *                   properties:
  *                     id: { type: integer }
  *                     user_id: { type: integer }
- *                     app: { type: string, enum: [discord] }
+ *                     app: { type: string, enum: [discord, fluxer] }
  *                     chat_channel_id: { type: string }
  *                     chat_guild_id: { type: string, nullable: true }
  *                     message_body: { type: string }
@@ -661,7 +661,7 @@ router.post("/", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: false
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *         description: Chat app key. May be supplied here or in the request body; required either way.
  *     requestBody:
  *       required: true
@@ -672,7 +672,7 @@ router.post("/", authenticate, async (req, res) => {
  *               - title: RequesterUpdate
  *                 type: object
  *                 properties:
- *                   app: { type: string, enum: [discord] }
+ *                   app: { type: string, enum: [discord, fluxer] }
  *                   requesterUserId:
  *                     type: string
  *                     description: Platform user id (e.g. Discord snowflake) resolved to a chat_member_mapping row.
@@ -693,7 +693,7 @@ router.post("/", authenticate, async (req, res) => {
  *                 required: [scope]
  *                 properties:
  *                   scope: { type: string, enum: [admin] }
- *                   app: { type: string, enum: [discord] }
+ *                   app: { type: string, enum: [discord, fluxer] }
  *                   message_body: { type: string }
  *                   scheduled_at: { type: string, format: date-time }
  *     responses:
@@ -710,7 +710,7 @@ router.post("/", authenticate, async (req, res) => {
  *                   properties:
  *                     id: { type: integer }
  *                     user_id: { type: integer }
- *                     app: { type: string, enum: [discord] }
+ *                     app: { type: string, enum: [discord, fluxer] }
  *                     chat_channel_id: { type: string }
  *                     chat_guild_id: { type: string, nullable: true }
  *                     message_body: { type: string }
@@ -919,7 +919,7 @@ router.put("/:id", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: false
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *         description: >
  *           Chat app key. May be supplied here or in the request body;
  *           required for requester scope (not read for `scope=admin`).
@@ -939,7 +939,7 @@ router.put("/:id", authenticate, async (req, res) => {
  *             type: object
  *             properties:
  *               scope: { type: string, enum: [admin] }
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               requesterUserId: { type: string }
  *     responses:
  *       '200':
@@ -1009,6 +1009,7 @@ router.delete("/:id", authenticate, async (req, res) => {
     }
 
     const deleted = await deletePendingScheduledMessageByIdForUser(
+      requester.app,
       id,
       requester.userId,
     );

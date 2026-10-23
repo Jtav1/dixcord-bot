@@ -1,8 +1,9 @@
 # JavaScript code standards
 
-Conventions observed across this repository's four Node.js/ESM services:
+Conventions observed across this repository's five Node.js/ESM services:
 
 - **`discord-bot/`** — Discord.js v14 bot; depends on `webapi` for almost all behavior.
+- **`fluxer-bot/`** — fluxer.js bot for [Fluxer](https://github.com/fluxerapp/fluxer); base template only today, growing toward feature parity with `discord-bot/`; same `webapi` dependency once features are ported.
 - **`webapi/`** — Express REST API (MySQL or SQLite), JWT auth; backend for all other services.
 - **`webview/`** — Vue 3 + Vuetify public read-only stats site, with a small Express prod server.
 - **`webadmin/`** — Vue 3 + Vuetify admin panel, with a small Express prod server.
@@ -11,7 +12,7 @@ This document describes what the code **actually does**, not an aspirational sty
 
 ---
 
-## Shared conventions (all four services)
+## Shared conventions (all five services)
 
 ### Language and format
 
@@ -61,6 +62,15 @@ This document describes what the code **actually does**, not an aspirational sty
 - **Logging**: no library; raw `console.log`/`console.error`/`console.warn`, prefixed with a lowercase module tag (`"bot: ..."`, `"scheduler: ..."`, `"config: ..."`). Use `console.error` for actual failures — several older files log real errors with `console.log`, which is a known inconsistency, not something to copy.
 - Deliberate no-op catches (`.catch(() => null)`) are acceptable for genuinely non-critical Discord actions (e.g. reacting with an emoji) but should stay the exception, not the default for error handling.
 
+## fluxer-bot/
+
+- Mirrors `discord-bot/`'s shape wherever fluxer.js's actual API allows it — same `{ cmdName, data, execute }` command shape and `{ name, execute, once }` event shape, same dynamic `fs.readdirSync` + `import()` loader in `bot.js`, same `api/client.js` (webapi JWT client, auto-relogin-on-401) and `configVars.js`/`configStore.js` split once the latter is needed.
+- One deliberate divergence: fluxer.js doesn't pass the client into event handlers (unlike discord.js's `readyClient` arg), so the `Client` singleton lives in its own `fluxerClient.js` and event files import it directly rather than receiving it as a handler argument.
+- `@fluxerjs/core` has no Discord-style gateway intents; don't introduce an intents-equivalent option unless a future fluxer.js version adds one.
+- Self-hosted Fluxer instances need discovery (`Client.fromDiscovery(origin)`) rather than a bare `new Client()` — see `fluxerClient.js` and the `FLUXER_INSTANCE_URL` env var.
+- Feature parity tracking lives in [`fluxer-bot/FEATURE_PARITY.md`](../fluxer-bot/FEATURE_PARITY.md) — check a feature off there (or note why it deviates) as it's ported.
+- No feature commands/events are implemented yet (base template only) — don't infer additional conventions beyond what's listed here until real features land.
+
 ## webapi/
 
 - **Routes**: `router.<method>("path", authenticate, [requireAdmin|requireBotOrAdmin,] async (req, res) => { try { ... } catch (err) { console.error("<context> error:", err); res.status(NNN).json({ ok: false, error: "..." }); } })`. Apply `authenticate` per route, matching the majority of route files — `routes/users.js` and `routes/service-accounts.js` hoist it via `router.use(...)`, which are outliers, not the pattern to copy for new routes.
@@ -101,6 +111,7 @@ This document describes what the code **actually does**, not an aspirational sty
 ## Reference files
 
 - Discord bot shape + JSDoc style: [`discord-bot/events/messages/utilities/messagePinner.js`](../discord-bot/events/messages/utilities/messagePinner.js)
+- Fluxer bot base template + loader shape: [`fluxer-bot/bot.js`](../fluxer-bot/bot.js)
 - Web API route + error/response envelope: [`webapi/routes/trigger-responses.js`](../webapi/routes/trigger-responses.js)
 - Web API service module layout: [`webapi/services/messageProcessing.js`](../webapi/services/messageProcessing.js)
 - Web API auth middleware: [`webapi/middleware/auth.js`](../webapi/middleware/auth.js)

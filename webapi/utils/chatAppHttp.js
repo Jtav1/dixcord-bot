@@ -1,8 +1,11 @@
-import { isChatMemberAppSupported } from "../services/chatMemberMapping.js";
+import {
+  CHAT_MEMBER_APP_CONFIG,
+  isChatMemberAppSupported,
+} from "../services/chatMemberMapping.js";
 
 export const CHAT_APP_PARAM_ERROR = {
   ok: false,
-  error: 'Parameter "app" is required and must be "discord".',
+  error: `Parameter "app" is required and must be one of: ${Object.keys(CHAT_MEMBER_APP_CONFIG).join(", ")}.`,
 };
 
 /**

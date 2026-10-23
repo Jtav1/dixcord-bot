@@ -50,7 +50,7 @@ const router = express.Router();
  *             type: object
  *             required: [app, guildId, authorId, emojis]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string, description: "Needed to resolve this server's plusplus_emoji/minusminus_emoji from guild_config." }
  *               authorId: { type: string, description: "Discord snowflake of the message author." }
  *               emojis:
@@ -133,7 +133,7 @@ router.post("/emoji-count", authenticate, requireOwnGuildOrAdmin, async (req, re
  *             type: object
  *             required: [app, guildId, authorId, stickers]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string }
  *               authorId: { type: string, description: "Discord snowflake of the message author." }
  *               stickers:
@@ -215,7 +215,7 @@ router.post("/sticker-count", authenticate, async (req, res) => {
  *               - type: object
  *                 required: [app, message, voterId]
  *                 properties:
- *                   app: { type: string, enum: [discord] }
+ *                   app: { type: string, enum: [discord, fluxer] }
  *                   type: { type: string, enum: [message] }
  *                   message:
  *                     type: object
@@ -231,7 +231,7 @@ router.post("/sticker-count", authenticate, async (req, res) => {
  *               - type: object
  *                 required: [app, type, targetUserId, reactorId, value]
  *                 properties:
- *                   app: { type: string, enum: [discord] }
+ *                   app: { type: string, enum: [discord, fluxer] }
  *                   type: { type: string, enum: [reaction] }
  *                   targetUserId: { type: string, description: "Discord snowflake receiving the vote." }
  *                   reactorId: { type: string, description: "Discord snowflake who reacted." }
@@ -313,7 +313,7 @@ router.post("/plusminus", authenticate, async (req, res) => {
  *             type: object
  *             required: [app, userid, msgid, accuser, repost]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               userid: { type: string, description: "Discord snowflake of the message author accused of reposting." }
  *               msgid: { type: string, description: "Discord snowflake of the accused message." }
  *               accuser: { type: string, description: "Discord snowflake of the user who added the repost emoji." }
@@ -388,7 +388,7 @@ router.post("/count-repost", authenticate, async (req, res) => {
  *             type: object
  *             required: [app, guildId, emojis]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string }
  *               emojis:
  *                 type: array
@@ -473,7 +473,7 @@ router.post("/emoji-import", authenticate, async (req, res) => {
  *             type: object
  *             required: [app, guildId]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string }
  *               dryRun: { type: boolean, default: false }
  *     responses:
@@ -555,7 +555,7 @@ router.post("/emoji-frequency-sync", authenticate, requireBotOrAdmin, async (req
  *             type: object
  *             required: [app, guildId, stickers]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string }
  *               stickers:
  *                 type: array
@@ -685,7 +685,7 @@ router.post("/pin-check", authenticate, async (req, res) => {
  *             type: object
  *             required: [messageId, app]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               messageId: { type: string, description: "Discord message snowflake." }
  *               authorId: { type: string, description: "Discord snowflake of the message author." }
  *               contents: { type: string, description: "Truncated to 5000 characters." }
@@ -701,6 +701,7 @@ router.post("/pin-check", authenticate, async (req, res) => {
  *                 type: array
  *                 items: { type: string }
  *                 description: Discord snowflakes of users who pinned the message.
+ *               guildId: { type: string, description: "Guild/community id the pin belongs to, for scoping pin-history hydration per app." }
  *     responses:
  *       '200':
  *         description: Logged (or already logged; no-op).
@@ -766,7 +767,7 @@ router.post("/pin-log", authenticate, async (req, res) => {
  *             type: object
  *             required: [app, guildId, messageId, targetPlatformId, voterPlatformId]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string }
  *               messageId: { type: string, description: "Discord message snowflake." }
  *               targetPlatformId: { type: string, description: "Discord snowflake of the message author." }
@@ -845,7 +846,7 @@ router.post("/timeout-vote", authenticate, requireOwnGuildOrAdmin, async (req, r
  *             type: object
  *             required: [app, messageId, voterPlatformId]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               messageId: { type: string, description: "Discord message snowflake." }
  *               voterPlatformId: { type: string, description: "Discord snowflake of the user who un-reacted." }
  *     responses:

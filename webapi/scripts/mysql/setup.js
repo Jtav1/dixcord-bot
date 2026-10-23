@@ -1,19 +1,24 @@
 /**
- * MySQL database setup for dixcord-bot: initialization + default data import.
- * Combines former initialize.js and import.js. Creates all tables, seeds pin_quips,
- * configurations, and link_replacements.
+ * MySQL database setup for dixcord-bot: applies sql/schema.sql (the same source of truth
+ * ensureSchemaMigrations() reconciles against on every boot), runs it, then seeds pin_quips
+ * and link_replacements default data — the one thing not already handled elsewhere.
  *
  * Run: npm run db:setup:mysql  or  npm run db:migrate:mysql
  * Requires: DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME in .env
  */
 import "dotenv/config";
+
+// Force DB_TYPE so ensureSchemaMigrations() (which opens its own connection via
+// config/db.js, keyed off this env var) definitely targets MySQL regardless of .env's value.
+process.env.DB_TYPE = "mysql";
+
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 import mysql from "mysql2/promise";
-import {
-  columnExists,
-  constraintExists,
-  foreignKeyExists,
-  tableExists,
-} from "../schemaUtils.js";
+import { ensureSchemaMigrations } from "../ensureSchema.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || "localhost",
@@ -24,429 +29,49 @@ const pool = mysql.createPool({
   charset: "utf8mb4",
   waitForConnections: true,
   connectionLimit: 5,
+  // Only this one-time setup script needs to run the whole schema file as one query.
+  multipleStatements: true,
 });
 
-const execQuery = async (query, params = []) => {
-  try {
-    const [rows] = await pool.query(query, params);
-    return rows;
-  } catch (err) {
-    console.error("db: query error", err.message);
-    if (params.length === 0) console.error(query);
-    throw err;
-  }
-};
-
-const initializeDatabase = async () => {
-  // Users (for authentication and profile)
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS users (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      email VARCHAR(255) NOT NULL UNIQUE,
-      password_hash VARCHAR(255) NOT NULL,
-      name VARCHAR(255),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Discord user display/cache (snowflake -> stable id for FKs elsewhere)
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS chat_member_mapping (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      name VARCHAR(255) NOT NULL UNIQUE,
-      discord_handle VARCHAR(255) NOT NULL UNIQUE,
-      discord_id VARCHAR(255) NOT NULL UNIQUE
-    )
-  `);
-
-  // Configuration table
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS configurations (
-      config VARCHAR(255) PRIMARY KEY,
-      value VARCHAR(255)
-    )
-  `);
-
-  // Emoji tracking table
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS emoji_frequency (
-      emoid VARCHAR(255) NOT NULL,
-      emoji VARCHAR(255) NOT NULL,
-      frequency INT NOT NULL DEFAULT 0,
-      animated BOOLEAN,
-      type VARCHAR(50),
-      PRIMARY KEY (emoid)
-    )
-  `);
-
-  // Sticker tracking table (no animated column)
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS sticker_frequency (
-      stickerid VARCHAR(255) NOT NULL,
-      name VARCHAR(255) NOT NULL,
-      frequency INT NOT NULL DEFAULT 0,
-      PRIMARY KEY (stickerid)
-    )
-  `);
-
-  // Pinned message table (base columns; FK and later columns applied in migrateTables)
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS pin_history (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      msgid VARCHAR(255) NOT NULL UNIQUE,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Fortune (eight ball) responses table
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS eight_ball_responses (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      response_string VARCHAR(500) NOT NULL,
-      sentiment ENUM('positive', 'negative', 'neutral') NOT NULL,
-      frequency INT DEFAULT 0,
-      UNIQUE KEY unique_response (response_string, sentiment)
-    )
-  `);
-
-  // User emoji tracking table
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS user_emoji_tracking (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      userid VARCHAR(500) NOT NULL,
-      emoid VARCHAR(255) NOT NULL,
-      frequency INT DEFAULT 1,
-      CONSTRAINT unique_user_emoji UNIQUE (userid, emoid),
-      FOREIGN KEY (emoid) REFERENCES emoji_frequency(emoid)
-    )
-  `);
-
-  // Repost tracking table
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS user_repost_tracking (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      userid VARCHAR(500) NOT NULL,
-      msgid VARCHAR(500) NOT NULL,
-      accuser VARCHAR(500) NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      msgcontents TEXT,
-      CONSTRAINT unique_repost_accusation UNIQUE (userid, msgid, accuser)
-    )
-  `);
-
-  // Migration: add msgcontents if table existed before this column was added
-  if (
-    (await tableExists(pool, "user_repost_tracking", false)) &&
-    !(await columnExists(pool, "user_repost_tracking", "msgcontents", false))
-  ) {
-    await execQuery(
-      "ALTER TABLE user_repost_tracking ADD COLUMN msgcontents TEXT",
-    );
-  }
-
-  // PlusPlus tracking table
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS plusplus_tracking (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      type VARCHAR(10) NOT NULL,
-      string VARCHAR(500) DEFAULT NULL,
-      voter VARCHAR(500) DEFAULT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      value VARCHAR(500) DEFAULT NULL
-    )
-  `);
-
-  // Link replacements (twitter/social fixer: source host -> target host)
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS link_replacements (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      source_host VARCHAR(255) NOT NULL UNIQUE,
-      target_host VARCHAR(255) NOT NULL
-    )
-  `);
-
-  // Pin quips (messages said when bot pins a message)
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS pin_quips (
-      id INT PRIMARY KEY AUTO_INCREMENT,
-      quip VARCHAR(500) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  // Trigger-response: triggers, responses, junction, round-robin state
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS triggers (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      trigger_string VARCHAR(255) NOT NULL UNIQUE,
-      selection_mode VARCHAR(10) NOT NULL DEFAULT 'random',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      frequency INT DEFAULT 0
-    )
-  `);
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS responses (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      response_string VARCHAR(500) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      frequency INT DEFAULT 0
-    )
-  `);
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS trigger_response_functions (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      function_name VARCHAR(255) NOT NULL UNIQUE,
-      frequency INT DEFAULT 0,
-      display_name VARCHAR(255) NULL
-    )
-  `);
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS trigger_response (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      trigger_id INT NOT NULL,
-      response_id INT NOT NULL,
-      response_order INT NULL,
-      weight INT NULL DEFAULT NULL,
-      response_function INT NULL,
-      frequency INT DEFAULT 0,
-      FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE,
-      FOREIGN KEY (response_id) REFERENCES responses(id) ON DELETE CASCADE,
-      CONSTRAINT fk_trigger_response_response_function FOREIGN KEY (response_function) REFERENCES trigger_response_functions(id) ON DELETE SET NULL,
-      UNIQUE KEY unique_trigger_response (trigger_id, response_id)
-    )
-  `);
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS trigger_response_state (
-      trigger_id INT PRIMARY KEY,
-      last_used_response_order INT NULL,
-      FOREIGN KEY (trigger_id) REFERENCES triggers(id) ON DELETE CASCADE
-    )
-  `);
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS trigger_response_user_history (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT NOT NULL,
-      trigger_response_id INT NOT NULL,
-      timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-      KEY idx_trigger_response_user_history_user (user_id),
-      KEY idx_trigger_response_user_history_trigger_response (trigger_response_id),
-      CONSTRAINT fk_trigger_response_user_history_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
-      CONSTRAINT fk_trigger_response_user_history_trigger_response FOREIGN KEY (trigger_response_id) REFERENCES trigger_response(id) ON DELETE CASCADE
-    )
-  `);
-
-  await execQuery(`
-    CREATE TABLE IF NOT EXISTS scheduled_messages (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT NOT NULL,
-      discord_channel_id VARCHAR(32) NOT NULL,
-      discord_guild_id VARCHAR(32) NULL,
-      message_body TEXT NOT NULL,
-      scheduled_at DATETIME NOT NULL,
-      status ENUM('pending', 'sent') NOT NULL DEFAULT 'pending',
-      sent_at DATETIME NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      KEY idx_scheduled_messages_due (status, scheduled_at),
-      KEY idx_scheduled_messages_user (user_id, status),
-      CONSTRAINT fk_scheduled_messages_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
-    )
-  `);
-
-  await migrateTables();
-
-  const defaultPinQuips = [
-    "lmao saving this shit for later",
-    "PINNED",
-    "!!! MAJOR PIN ALERT !!!",
-    "Dixbot will remember that...",
-    "Lets FUCKING go dude I'm pinning this",
-    "Alright, fine...",
-    "Puttin a pin on this one",
-    "^ pinned this btw",
-    "Um... based? or cringe.",
-    "I'm only going to pin it once this time",
-  ];
-  const [pinQuipRows] = await pool.query(
-    "SELECT COUNT(*) as count FROM pin_quips",
-  );
-  const pinQuipsCount = pinQuipRows?.[0]?.count ?? 0;
-  if (pinQuipsCount === 0) {
-    for (const quip of defaultPinQuips) {
-      await pool.query("INSERT INTO pin_quips (quip) VALUES (?)", [quip]);
-    }
-    console.log("db: MySQL pin_quips seed complete");
-  }
-
-  console.log("db: MySQL table initialization complete");
-};
-
 /**
- * Apply incremental column, constraint, and table migrations idempotently.
+ * Apply sql/schema.sql in full (every statement is CREATE TABLE/INDEX IF NOT EXISTS — safe
+ * to re-run against an existing database).
  * @returns {Promise<void>}
  */
-const migrateTables = async () => {
-  const isSqlite = false;
+async function applySchema() {
+  const schemaPath = path.join(__dirname, "..", "..", "sql", "schema.sql");
+  const schema = fs.readFileSync(schemaPath, "utf8");
+  await pool.query(schema);
+  console.log("db: MySQL schema.sql applied");
+}
 
-  if (
-    (await tableExists(pool, "users", isSqlite)) &&
-    !(await columnExists(pool, "users", "role", isSqlite))
-  ) {
-    await execQuery(
-      "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL DEFAULT 'admin'",
-    );
+const DEFAULT_PIN_QUIPS = [
+  "lmao saving this shit for later",
+  "PINNED",
+  "!!! MAJOR PIN ALERT !!!",
+  "Dixbot will remember that...",
+  "Lets FUCKING go dude I'm pinning this",
+  "Alright, fine...",
+  "Puttin a pin on this one",
+  "^ pinned this btw",
+  "Um... based? or cringe.",
+  "I'm only going to pin it once this time",
+];
+
+/**
+ * Seed default pin_quips rows if the table is empty.
+ * @returns {Promise<void>}
+ */
+async function importPinQuips() {
+  const [rows] = await pool.query("SELECT COUNT(*) AS count FROM pin_quips");
+  if ((rows?.[0]?.count ?? 0) > 0) return;
+  for (const quip of DEFAULT_PIN_QUIPS) {
+    await pool.query("INSERT INTO pin_quips (quip) VALUES (?)", [quip]);
   }
+  console.log("db: MySQL pin_quips seed complete");
+}
 
-  if (!(await tableExists(pool, "audit_log", isSqlite))) {
-    await execQuery(`
-      CREATE TABLE audit_log (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        user_id INT NOT NULL,
-        action VARCHAR(50) NOT NULL,
-        resource VARCHAR(100) NOT NULL,
-        resource_id VARCHAR(255) NULL,
-        details TEXT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-      )
-    `);
-  }
-
-  if (!(await tableExists(pool, "bot_status", isSqlite))) {
-    await execQuery(`
-      CREATE TABLE bot_status (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        guild_id VARCHAR(32) NOT NULL UNIQUE,
-        version VARCHAR(50) NOT NULL,
-        last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        ready_at TIMESTAMP NULL,
-        member_count INT NULL,
-        channel_count INT NULL,
-        ws_ping_ms INT NULL
-      )
-    `);
-  }
-
-  if (!(await tableExists(pool, "system_state", isSqlite))) {
-    await execQuery(`
-      CREATE TABLE system_state (
-        state_key VARCHAR(100) PRIMARY KEY,
-        state_value VARCHAR(255) NOT NULL,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      )
-    `);
-  }
-
-  if (await tableExists(pool, "pin_history", isSqlite)) {
-    const pinHistoryColumns = [
-      { name: "author", sql: "author INT NULL" },
-      { name: "contents", sql: "contents VARCHAR(5000) NULL" },
-      { name: "attachments", sql: "attachments TEXT NULL" },
-      { name: "channel_id", sql: "channel_id VARCHAR(32) NULL" },
-      { name: "channel_name", sql: "channel_name VARCHAR(100) NULL" },
-      { name: "pinners", sql: "pinners TEXT NULL" },
-      { name: "hydrated", sql: "hydrated TINYINT(1) NOT NULL DEFAULT 1" },
-    ];
-
-    for (const col of pinHistoryColumns) {
-      if (!(await columnExists(pool, "pin_history", col.name, isSqlite))) {
-        await execQuery(`ALTER TABLE pin_history ADD COLUMN ${col.sql}`);
-      }
-    }
-
-    if (
-      !(await constraintExists(
-        pool,
-        "pin_history",
-        "fk_pin_history_author",
-        isSqlite,
-      )) &&
-      !(await foreignKeyExists(
-        pool,
-        "pin_history",
-        "author",
-        "chat_member_mapping",
-        isSqlite,
-      ))
-    ) {
-      await execQuery(
-        "ALTER TABLE pin_history ADD CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL",
-      );
-    }
-
-    if (!(await columnExists(pool, "pin_history", "id", isSqlite))) {
-      await execQuery(`
-        ALTER TABLE pin_history
-          DROP PRIMARY KEY,
-          ADD COLUMN id INT AUTO_INCREMENT PRIMARY KEY FIRST,
-          ADD UNIQUE KEY unique_pin_history_msgid (msgid)
-      `);
-    }
-  }
-
-  if (
-    (await tableExists(pool, "scheduled_messages", isSqlite)) &&
-    !(await constraintExists(
-      pool,
-      "scheduled_messages",
-      "fk_scheduled_messages_user",
-      isSqlite,
-    )) &&
-    !(await foreignKeyExists(
-      pool,
-      "scheduled_messages",
-      "user_id",
-      "chat_member_mapping",
-      isSqlite,
-    ))
-  ) {
-    await execQuery(
-      "ALTER TABLE scheduled_messages ADD CONSTRAINT fk_scheduled_messages_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE",
-    );
-  }
-};
-
-const importConfigs = async () => {
-  const isDev = process.env.NODE_ENV !== "production";
-  const pinThreshold = isDev ? 1 : 3;
-  const pinChannelId = isDev ? "710671234471559228" : "915462110761349201";
-  const announceChannelId = isDev ? "710671234471559228" : "911427650730487878";
-
-  const configArray = [
-    ["twitter_fix_enabled", "true"],
-    ["trigger_responses_enabled", "true"],
-    ["reminders_enabled", "true"],
-    ["eight_ball_enabled", "true"],
-    ["emoji_tracking_enabled", "true"],
-    ["sticker_tracking_enabled", "true"],
-    ["plusplus_enabled", "true"],
-    ["repost_detection_enabled", "true"],
-    ["pin_system_enabled", "true"],
-    ["pin_threshold", String(pinThreshold)],
-    ["pin_emoji", "\ud83d\udccc"],
-    ["repost_emoji", "1072368151922233404"],
-    ["announce_channel_id", announceChannelId],
-    ["pin_channel_id", pinChannelId],
-    ["plusplus_emoji", "1333222614033760326"],
-    ["minusminus_emoji", "1333222612683194442"],
-    [
-      "user_mapping_import_channel_id",
-      process.env.DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID ?? "",
-    ],
-  ];
-
-  const placeholders = configArray.map(() => "(?, ?)").join(", ");
-  const values = configArray.flat();
-
-  await execQuery(
-    `INSERT IGNORE INTO configurations (config, value) VALUES ${placeholders}`,
-    values,
-  );
-
-  console.log("db: MySQL configuration import complete");
-};
-
-const defaultLinkReplacements = [
+const DEFAULT_LINK_REPLACEMENTS = [
   ["x.com", "fixvx.com"],
   ["twitter.com", "fixvx.com"],
   ["instagram.com", "jgram.jtav.me"],
@@ -454,22 +79,31 @@ const defaultLinkReplacements = [
   ["bsky.app", "bskx.app"],
 ];
 
-const importLinkReplacements = async () => {
-  for (const [source_host, target_host] of defaultLinkReplacements) {
-    await execQuery(
-      `INSERT IGNORE INTO link_replacements (source_host, target_host) VALUES (?, ?)`,
+/**
+ * Seed default link_replacements rows (no-op for any source_host already present).
+ * @returns {Promise<void>}
+ */
+async function importLinkReplacements() {
+  for (const [source_host, target_host] of DEFAULT_LINK_REPLACEMENTS) {
+    await pool.query(
+      "INSERT IGNORE INTO link_replacements (source_host, target_host) VALUES (?, ?)",
       [source_host, target_host],
     );
   }
   console.log("db: MySQL link_replacements import complete");
-};
+}
 
 const run = async () => {
   try {
-    await initializeDatabase();
-    await importConfigs();
+    await applySchema();
+    // Same migrations + feature-toggle/guild_config seeding ensureSchemaMigrations() applies
+    // on every boot — running it here covers anything schema.sql's CREATE TABLE IF NOT EXISTS
+    // alone doesn't (column/constraint upgrades on a pre-existing install, config seeding).
+    await ensureSchemaMigrations();
+    await importPinQuips();
     await importLinkReplacements();
     await pool.end();
+    console.log("db: MySQL setup complete");
     process.exit(0);
   } catch (err) {
     console.error(err);

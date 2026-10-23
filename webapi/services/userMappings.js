@@ -9,13 +9,24 @@ import db from "../config/db.js";
  * Serialize a mapping row for API responses. `discordHandle` is included only when the
  * (legacy, not-auto-dropped) chat_member_mapping.discord_handle column exists and is non-null
  * for this row — SELECT * naturally omits the property when the column doesn't exist.
+ * `handle`/`app`/`primaryGuildMemberId` snapshot the alias an admin has designated as this
+ * identity's primary account (see services/guildMembers.js setPrimaryAlias).
  * @param {Record<string, unknown>} row
- * @returns {{ id: number, name: string, discordHandle?: string }}
+ * @returns {{ id: number, name: string, discordHandle?: string, handle?: string, app?: string, primaryGuildMemberId?: number }}
  */
 export function serializeUserMappingRow(row) {
   const result = { id: Number(row.id), name: String(row.name) };
   if (row.discord_handle != null) {
     result.discordHandle = String(row.discord_handle);
+  }
+  if (row.handle != null) {
+    result.handle = String(row.handle);
+  }
+  if (row.app != null) {
+    result.app = String(row.app);
+  }
+  if (row.primary_guild_member_id != null) {
+    result.primaryGuildMemberId = Number(row.primary_guild_member_id);
   }
   return result;
 }

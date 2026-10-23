@@ -17,6 +17,7 @@ export const CLIENTS = [
       { key: "reminders", label: "Reminders", icon: "mdi-clock-outline" },
       { key: "link-replacements", label: "Link Replacements", icon: "mdi-link-variant" },
       { key: "user-mappings", label: "User Mappings", icon: "mdi-account-multiple-outline" },
+      { key: "unmapped-users", label: "Unmapped Users", icon: "mdi-account-question-outline" },
       { key: "activity", label: "Leaderboards & Events", icon: "mdi-trophy-outline" },
       { key: "milestones", label: "Milestones", icon: "mdi-flag-checkered" },
       { key: "pin-archive", label: "Pin Archive", icon: "mdi-pin-outline" },

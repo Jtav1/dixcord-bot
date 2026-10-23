@@ -61,10 +61,12 @@ async function upsertOneGuildMember(app, guildId, member) {
  * member_aliases — identity linking is a fully separate, manual, future admin action.
  * Never deletes: a member who has left the guild keeps their guild_members row (and any
  * alias link) as a historical record. Safe to call with a full roster or a single member.
+ * `inserted` (a subset of `imported`) lets callers (e.g. a periodic sync) log only when the
+ * roster actually grew, rather than on every tick.
  * @param {string} app
  * @param {string} guildId
  * @param {Array<{ platformUserId: string, handle?: string|null, nickname?: string|null, roles?: string[], joinedAt?: string|null }>} members
- * @returns {Promise<{ ok: true, imported: number, skipped: number } | { ok: false, error: string }>}
+ * @returns {Promise<{ ok: true, imported: number, inserted: number, skipped: number } | { ok: false, error: string }>}
  */
 export async function upsertGuildMembers(app, guildId, members) {
   if (!getChatMemberAppConfig(app)) {
@@ -74,7 +76,14 @@ export async function upsertGuildMembers(app, guildId, members) {
     return { ok: false, error: "members must be an array" };
   }
 
+  const [existingRows] = await db.query(
+    "SELECT platform_user_id AS platformUserId FROM guild_members WHERE app = ? AND guild_id = ?",
+    [app, guildId],
+  );
+  const existingIds = new Set((existingRows ?? []).map((row) => String(row.platformUserId)));
+
   let imported = 0;
+  let inserted = 0;
   let skipped = 0;
   for (const member of members) {
     const result = await upsertOneGuildMember(app, guildId, member);
@@ -83,9 +92,15 @@ export async function upsertGuildMembers(app, guildId, members) {
       continue;
     }
     imported += 1;
+
+    const platformUserId = String(member.platformUserId).trim();
+    if (!existingIds.has(platformUserId)) {
+      inserted += 1;
+      existingIds.add(platformUserId); // a duplicate id later in the same batch is an update, not another insert
+    }
   }
 
-  return { ok: true, imported, skipped };
+  return { ok: true, imported, inserted, skipped };
 }
 
 /**
@@ -266,6 +281,9 @@ export async function linkGuildMemberAlias(guildMemberId, chatMemberMappingId) {
       [chatMemberMappingId, guildMemberId],
     );
   }
+  // If this guild_member was the primary alias of a *different* identity, it no longer belongs
+  // there — clear that identity's stale primary snapshot.
+  await clearStalePrimaryAlias(guildMemberId, chatMemberMappingId);
 }
 
 /**
@@ -278,7 +296,57 @@ export async function unlinkGuildMemberAlias(guildMemberId) {
     "DELETE FROM member_aliases WHERE guild_member_id = ?",
     [guildMemberId],
   );
+  await clearStalePrimaryAlias(guildMemberId);
   return (result?.affectedRows ?? result?.changes ?? 0) > 0;
+}
+
+/**
+ * Clear chat_member_mapping.handle/app/primary_guild_member_id on any identity whose primary
+ * alias is this guild_member, except (optionally) the identity it's being linked to right now.
+ * @param {number} guildMemberId
+ * @param {number} [exceptChatMemberMappingId]
+ * @returns {Promise<void>}
+ */
+async function clearStalePrimaryAlias(guildMemberId, exceptChatMemberMappingId) {
+  if (exceptChatMemberMappingId != null) {
+    await db.query(
+      `UPDATE chat_member_mapping SET handle = NULL, app = NULL, primary_guild_member_id = NULL
+       WHERE primary_guild_member_id = ? AND id <> ?`,
+      [guildMemberId, exceptChatMemberMappingId],
+    );
+  } else {
+    await db.query(
+      `UPDATE chat_member_mapping SET handle = NULL, app = NULL, primary_guild_member_id = NULL
+       WHERE primary_guild_member_id = ?`,
+      [guildMemberId],
+    );
+  }
+}
+
+/**
+ * Designate one of a chat_member_mapping identity's already-linked aliases as its primary
+ * account, snapshotting that alias's app/handle onto the identity itself.
+ * @param {number} chatMemberMappingId
+ * @param {number} guildMemberId
+ * @returns {Promise<{ handle: string|null, app: string }|null>} null if guildMemberId isn't an alias of this identity.
+ */
+export async function setPrimaryAlias(chatMemberMappingId, guildMemberId) {
+  const [rows] = await db.query(
+    `SELECT gm.app AS app, gm.handle AS handle, gm.nickname AS nickname
+     FROM member_aliases ma
+     JOIN guild_members gm ON gm.id = ma.guild_member_id
+     WHERE ma.guild_member_id = ? AND ma.chat_member_mapping_id = ?`,
+    [guildMemberId, chatMemberMappingId],
+  );
+  if (!rows || rows.length === 0) return null;
+
+  const alias = rows[0];
+  const handle = alias.handle || alias.nickname || null;
+  await db.query(
+    "UPDATE chat_member_mapping SET handle = ?, app = ?, primary_guild_member_id = ? WHERE id = ?",
+    [handle, alias.app, guildMemberId, chatMemberMappingId],
+  );
+  return { handle, app: alias.app };
 }
 
 /**
@@ -298,4 +366,101 @@ export async function listServersForUser(chatMemberMappingId) {
   );
   const parsed = (rows ?? []).map((row) => ({ ...row, roles: row.roles ? JSON.parse(row.roles) : [] }));
   return attachRoleObjects(parsed);
+}
+
+/**
+ * Flag every other-guild guild_members row of `targetUserId` as pending a link to the
+ * requester's row (sets pending_link = requester's guild_members.id).
+ * @param {{ app: string, guildId: string, requesterUserId: string, targetUserId: string }} params
+ * @returns {Promise<{ ok: true, flagged: number } | { ok: false, error: string }>}
+ */
+export async function requestAccountLink({ app, guildId, requesterUserId, targetUserId }) {
+  if (!getChatMemberAppConfig(app)) return { ok: false, error: "Unsupported app" };
+  if (requesterUserId === targetUserId) {
+    return { ok: false, error: "You can't link an account to itself" };
+  }
+
+  const [requesterRows] = await db.query(
+    "SELECT id FROM guild_members WHERE app = ? AND guild_id = ? AND platform_user_id = ?",
+    [app, guildId, requesterUserId],
+  );
+  if (!requesterRows?.length) {
+    return { ok: false, error: "Your membership hasn't been synced yet; try again in a few minutes" };
+  }
+
+  const [result] = await db.query(
+    `UPDATE guild_members SET pending_link = ?
+     WHERE platform_user_id = ? AND NOT (app = ? AND guild_id = ?)`,
+    [requesterRows[0].id, targetUserId, app, guildId],
+  );
+  const flagged = result?.affectedRows ?? result?.changes ?? 0;
+  if (flagged === 0) {
+    return { ok: false, error: "No member with that user ID was found in another server" };
+  }
+  return { ok: true, flagged };
+}
+
+/**
+ * Accept a pending link: alias the requester's guild_members row to the confirming user's
+ * existing chat_member_mapping identity, then clear the confirmer's pending_link. Takes no
+ * action if the confirmer has zero or multiple identities, or the requester is already linked.
+ * @param {{ app: string, guildId: string, userId: string }} params
+ * @returns {Promise<{ ok: true, requesterHandle: string|null, chatMemberMappingId: number, requesterGuildMemberId: number } | { ok: false, error: string }>}
+ */
+export async function confirmAccountLink({ app, guildId, userId }) {
+  if (!getChatMemberAppConfig(app)) return { ok: false, error: "Unsupported app" };
+
+  const [meRows] = await db.query(
+    "SELECT id, pending_link FROM guild_members WHERE app = ? AND guild_id = ? AND platform_user_id = ?",
+    [app, guildId, userId],
+  );
+  const me = meRows?.[0];
+  if (!me) return { ok: false, error: "Your membership hasn't been synced yet; try again in a few minutes" };
+  if (me.pending_link == null) return { ok: false, error: "You have no pending account link request" };
+
+  const [requesterRows] = await db.query(
+    "SELECT id, handle FROM guild_members WHERE id = ?",
+    [me.pending_link],
+  );
+  const requester = requesterRows?.[0];
+  if (!requester) return { ok: false, error: "The pending link request is no longer valid" };
+
+  const [identityRows] = await db.query(
+    `SELECT DISTINCT ma.chat_member_mapping_id AS id
+     FROM guild_members gm
+     JOIN member_aliases ma ON ma.guild_member_id = gm.id
+     WHERE gm.platform_user_id = ?`,
+    [userId],
+  );
+  if (!identityRows?.length) {
+    return { ok: false, error: "Your account isn't linked to an internal identity yet; ask an admin to link it first" };
+  }
+  if (identityRows.length > 1) {
+    console.error(
+      `confirmAccountLink: user ${userId} has multiple chat_member_mapping identities (${identityRows.map((r) => r.id).join(", ")}); no action taken`,
+    );
+    return { ok: false, error: "Your account is linked to multiple internal identities; ask an admin to sort this out" };
+  }
+
+  const [existingAlias] = await db.query(
+    "SELECT id FROM member_aliases WHERE guild_member_id = ?",
+    [requester.id],
+  );
+  if (existingAlias?.length) {
+    return { ok: false, error: "The requesting account is already linked to an identity" };
+  }
+
+  const chatMemberMappingId = Number(identityRows[0].id);
+  await db.query(
+    "INSERT INTO member_aliases (chat_member_mapping_id, guild_member_id) VALUES (?, ?)",
+    [chatMemberMappingId, requester.id],
+  );
+  await db.query("UPDATE guild_members SET pending_link = NULL WHERE id = ?", [me.id]);
+
+  return {
+    ok: true,
+    requesterHandle: requester.handle ?? null,
+    chatMemberMappingId,
+    requesterGuildMemberId: requester.id,
+  };
 }

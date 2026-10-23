@@ -12,9 +12,15 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- handle/app/primary_guild_member_id snapshot the alias an admin has designated as this
+-- identity's primary account (see webadmin "Edit Mapping" and services/guildMembers.js
+-- setPrimaryAlias) — kept in sync when that alias is unlinked or moved elsewhere.
 CREATE TABLE IF NOT EXISTS chat_member_mapping (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL UNIQUE
+  name VARCHAR(255) NOT NULL UNIQUE,
+  handle VARCHAR(255) NULL,
+  app VARCHAR(20) NULL,
+  primary_guild_member_id INT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
@@ -96,6 +102,7 @@ CREATE TABLE IF NOT EXISTS pin_history (
   channel_name VARCHAR(100) NULL,
   pinners TEXT NULL,
   hydrated TINYINT(1) NOT NULL DEFAULT 1,
+  guild_id VARCHAR(64) NULL,
   CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -195,16 +202,17 @@ CREATE TABLE IF NOT EXISTS trigger_response_user_history (
 -- Scheduled messages (bot polls due rows and posts to channel). Requester is chat_member_mapping.id (per-app user rows).
 CREATE TABLE IF NOT EXISTS scheduled_messages (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  app VARCHAR(20) NOT NULL,
   user_id INT NOT NULL,
-  discord_channel_id VARCHAR(32) NOT NULL,
-  discord_guild_id VARCHAR(32) NULL,
+  channel_id VARCHAR(32) NOT NULL,
+  guild_id VARCHAR(32) NULL,
   message_body TEXT NOT NULL,
   scheduled_at DATETIME NOT NULL,
   status ENUM('pending', 'sent') NOT NULL DEFAULT 'pending',
   sent_at DATETIME NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_scheduled_messages_due (status, scheduled_at),
-  KEY idx_scheduled_messages_user (user_id, status),
+  KEY idx_scheduled_messages_app_user (app, user_id, status),
   CONSTRAINT fk_scheduled_messages_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -307,8 +315,12 @@ CREATE TABLE IF NOT EXISTS guild_members (
   roles TEXT NULL,
   joined_at DATETIME NULL,
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  -- guild_members.id of a user who asked (link-accounts) to link their account to this one;
+  -- NULL = no pending request. Cleared by confirm-link.
+  pending_link INT NULL,
   UNIQUE KEY uniq_guild_members_app_guild_platform (app, guild_id, platform_user_id),
-  KEY idx_guild_members_app_guild (app, guild_id)
+  KEY idx_guild_members_app_guild (app, guild_id),
+  CONSTRAINT fk_guild_members_pending_link FOREIGN KEY (pending_link) REFERENCES guild_members(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Links one chat_member_mapping identity to many guild_members rows (one-to-many). A
@@ -324,6 +336,11 @@ CREATE TABLE IF NOT EXISTS member_aliases (
   CONSTRAINT fk_member_aliases_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   CONSTRAINT fk_member_aliases_guild_member FOREIGN KEY (guild_member_id) REFERENCES guild_members(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Added here (not inline above) because chat_member_mapping is declared before guild_members.
+ALTER TABLE chat_member_mapping
+  ADD CONSTRAINT fk_chat_member_mapping_primary_guild_member
+    FOREIGN KEY (primary_guild_member_id) REFERENCES guild_members(id) ON DELETE SET NULL;
 
 -- Admin-defined usage-stat thresholds. `type` is the fine-grained metric key (see
 -- webapi/services/milestoneTypes.js), `item` scopes it to one entity (null = global), `object`

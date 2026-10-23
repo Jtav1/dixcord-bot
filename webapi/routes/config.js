@@ -49,7 +49,7 @@ function resolveGuildScope(req) {
  *       - name: app
  *         in: query
  *         required: true
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *       - name: guildId
  *         in: query
  *         required: true
@@ -141,7 +141,7 @@ router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
  *             type: object
  *             required: [app, guildId, config]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string }
  *               config: { type: string, description: "Configuration key name." }
  *               value: { type: string }
@@ -225,7 +225,7 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  *             type: object
  *             required: [app, guildId, config]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string }
  *               config: { type: string, description: "Configuration key name." }
  *               value: { type: string }
@@ -298,7 +298,7 @@ router.put("/", authenticate, requireAdmin, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *       - name: guildId
  *         in: query
  *         required: true

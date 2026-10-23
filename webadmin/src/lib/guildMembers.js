@@ -12,27 +12,16 @@ export async function fetchAllGuildMembers({ app = "discord" } = {}) {
 
 /**
  * guild_members rows with no member_aliases link yet — candidates for linking as an alias.
+ * Omit `app` to return candidates across every app (Discord, Fluxer, ...), not just one.
  * @param {{ app?: string, guildId?: string, search?: string }} [options]
  * @returns {Promise<Array<{id:number,app:string,guildId:string,platformUserId:string,handle:string|null,nickname:string|null,roles:Array<{id:string,name:string|null}>,joinedAt:string|null,syncedAt:string}>>} `roles` entries are resolved guild_roles rows, not bare ids.
  */
-export async function fetchUnlinkedGuildMembers({ app = "discord", guildId, search } = {}) {
-  const params = new URLSearchParams({ app });
+export async function fetchUnlinkedGuildMembers({ app, guildId, search } = {}) {
+  const params = new URLSearchParams();
+  if (app) params.set("app", app);
   if (guildId) params.set("guildId", guildId);
   if (search) params.set("search", search);
   const data = await apiFetch(`/guild-members/unlinked?${params}`, undefined, "Unlinked guild members");
-  return data.members ?? [];
-}
-
-/**
- * Every guild_members row, including already-linked ones (with their mapping id/name) — for the admin manual-link picker.
- * @param {{ app?: string, guildId?: string, search?: string }} [options]
- * @returns {Promise<Array<{id:number,app:string,guildId:string,platformUserId:string,handle:string|null,nickname:string|null,roles:Array<{id:string,name:string|null}>,joinedAt:string|null,syncedAt:string,linkedMappingId:number|null,linkedMappingName:string|null}>>}
- */
-export async function fetchAllGuildMemberRows({ app = "discord", guildId, search } = {}) {
-  const params = new URLSearchParams({ app });
-  if (guildId) params.set("guildId", guildId);
-  if (search) params.set("search", search);
-  const data = await apiFetch(`/guild-members/all?${params}`, undefined, "All guild members");
   return data.members ?? [];
 }
 

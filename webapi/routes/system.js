@@ -198,7 +198,7 @@ router.post("/invalidate-cache", authenticate, requireAdmin, async (req, res) =>
  *             type: object
  *             required: [app, guildId, version]
  *             properties:
- *               app: { type: string, enum: [discord] }
+ *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string }
  *               version: { type: string }
  *               readyAt: { type: string, nullable: true, description: "When the bot's current gateway session became ready. Send the same value on every heartbeat within one process lifetime; only changes on restart." }

@@ -18,9 +18,15 @@ CREATE TRIGGER IF NOT EXISTS users_updated_at
     UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id;
   END;
 
+-- handle/app/primary_guild_member_id snapshot the alias an admin has designated as this
+-- identity's primary account (see webadmin "Edit Mapping" and services/guildMembers.js
+-- setPrimaryAlias) — kept in sync when that alias is unlinked or moved elsewhere.
 CREATE TABLE IF NOT EXISTS chat_member_mapping (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE
+  name TEXT NOT NULL UNIQUE,
+  handle TEXT NULL,
+  app TEXT NULL,
+  primary_guild_member_id INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL
 );
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
@@ -119,7 +125,8 @@ CREATE TABLE IF NOT EXISTS pin_history (
   channel_id TEXT NULL,
   channel_name TEXT NULL,
   pinners TEXT NULL,
-  hydrated INTEGER NOT NULL DEFAULT 1
+  hydrated INTEGER NOT NULL DEFAULT 1,
+  guild_id TEXT NULL
 );
 
 CREATE TABLE IF NOT EXISTS link_replacements (
@@ -191,9 +198,10 @@ CREATE INDEX IF NOT EXISTS idx_trigger_response_user_history_trigger_response ON
 -- Scheduled messages (bot polls due rows and posts to channel). Requester is chat_member_mapping.id.
 CREATE TABLE IF NOT EXISTS scheduled_messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
   user_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
-  discord_channel_id TEXT NOT NULL,
-  discord_guild_id TEXT,
+  channel_id TEXT NOT NULL,
+  guild_id TEXT,
   message_body TEXT NOT NULL,
   scheduled_at TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent')),
@@ -202,7 +210,7 @@ CREATE TABLE IF NOT EXISTS scheduled_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_scheduled_messages_due ON scheduled_messages (status, scheduled_at);
-CREATE INDEX IF NOT EXISTS idx_scheduled_messages_user ON scheduled_messages (user_id, status);
+CREATE INDEX IF NOT EXISTS idx_scheduled_messages_app_user ON scheduled_messages (app, user_id, status);
 
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -304,6 +312,9 @@ CREATE TABLE IF NOT EXISTS guild_members (
   roles TEXT NULL,
   joined_at TEXT NULL,
   synced_at TEXT DEFAULT (datetime('now')),
+  -- guild_members.id of a user who asked (link-accounts) to link their account to this one;
+  -- NULL = no pending request. Cleared by confirm-link.
+  pending_link INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL,
   UNIQUE (app, guild_id, platform_user_id)
 );
 

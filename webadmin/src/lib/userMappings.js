@@ -42,6 +42,22 @@ export async function updateUserMapping(id, fields) {
 }
 
 /**
+ * Designate one of a mapping's already-linked aliases as its primary account.
+ * @param {number} id
+ * @param {number} guildMemberId
+ * @returns {Promise<object>}
+ */
+export async function setPrimaryAlias(id, guildMemberId) {
+  const data = await apiFetchJson(
+    "POST",
+    `/user-mappings/${id}/primary-alias`,
+    { guildMemberId },
+    "Set primary alias",
+  );
+  return data.userMapping;
+}
+
+/**
  * @param {number} id
  * @returns {Promise<void>}
  */

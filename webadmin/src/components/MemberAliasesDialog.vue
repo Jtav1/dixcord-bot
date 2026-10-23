@@ -11,26 +11,43 @@
 
         <h3 class="text-subtitle-1 font-weight-bold mb-2">Current Aliases</h3>
         <v-skeleton-loader v-if="loadingAliases" type="list-item-two-line@2" class="mb-4" />
-        <v-list v-else-if="aliases.length" density="comfortable" class="glass-card mb-4">
-          <v-list-item v-for="alias in aliases" :key="alias.id">
-            <v-list-item-title>
-              {{ alias.handle || alias.nickname || alias.platformUserId }}
-            </v-list-item-title>
-            <v-list-item-subtitle>
-              {{ alias.guildName || alias.guildId }} · {{ alias.platformUserId }}
-            </v-list-item-subtitle>
-            <template #append>
-              <v-btn
-                icon="mdi-link-off"
-                size="small"
-                variant="text"
-                color="error"
-                :loading="unlinkingId === alias.id"
-                @click="onUnlink(alias)"
-              />
-            </template>
-          </v-list-item>
-        </v-list>
+        <template v-else-if="aliases.length">
+          <v-list density="comfortable" class="glass-card mb-4">
+            <v-list-item v-for="alias in aliases" :key="alias.id">
+              <v-list-item-title>
+                {{ alias.handle || alias.nickname || alias.platformUserId }}
+                <v-chip v-if="alias.id === mapping?.primaryGuildMemberId" size="x-small" color="primary" variant="tonal" class="ml-1">
+                  primary
+                </v-chip>
+              </v-list-item-title>
+              <v-list-item-subtitle>
+                {{ alias.guildName || alias.guildId }} · {{ alias.platformUserId }}
+              </v-list-item-subtitle>
+              <template #append>
+                <v-btn
+                  icon="mdi-link-off"
+                  size="small"
+                  variant="text"
+                  color="error"
+                  :loading="unlinkingId === alias.id"
+                  @click="onUnlink(alias)"
+                />
+              </template>
+            </v-list-item>
+          </v-list>
+
+          <v-select
+            v-model="selectedPrimaryId"
+            :items="primaryAliasItems"
+            label="Primary account"
+            density="comfortable"
+            variant="outlined"
+            hide-details
+            :loading="settingPrimary"
+            class="mb-4"
+            @update:model-value="onSetPrimary"
+          />
+        </template>
         <p v-else class="text-body-2 text-medium-emphasis mb-4">No aliases linked yet.</p>
 
         <h3 class="text-subtitle-1 font-weight-bold mb-2">Link an Unlinked Member</h3>
@@ -51,7 +68,7 @@
               {{ candidate.handle || candidate.nickname || candidate.platformUserId }}
             </v-list-item-title>
             <v-list-item-subtitle>
-              {{ candidate.guildId }} · {{ candidate.platformUserId }}
+              {{ candidate.app }} · {{ candidate.guildId }} · {{ candidate.platformUserId }}
             </v-list-item-subtitle>
             <template #append>
               <v-btn
@@ -87,6 +104,7 @@ import {
   linkGuildMemberAlias,
   unlinkGuildMemberAlias,
 } from "../lib/guildMembers.js";
+import { setPrimaryAlias } from "../lib/userMappings.js";
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -114,6 +132,16 @@ let searchDebounce = null;
 const linkingId = ref(null);
 const unlinkingId = ref(null);
 
+const selectedPrimaryId = ref(null);
+const settingPrimary = ref(false);
+
+const primaryAliasItems = computed(() =>
+  aliases.value.map((alias) => ({
+    title: `${alias.app} · ${alias.handle || alias.nickname || alias.platformUserId}`,
+    value: alias.id,
+  })),
+);
+
 /**
  * @returns {Promise<void>}
  */
@@ -127,6 +155,27 @@ async function loadAliases() {
     error.value = err instanceof Error ? err.message : "Failed to load aliases";
   } finally {
     loadingAliases.value = false;
+  }
+}
+
+/**
+ * @param {number} guildMemberId
+ * @returns {Promise<void>}
+ */
+async function onSetPrimary(guildMemberId) {
+  if (!guildMemberId || !props.mapping) return;
+  settingPrimary.value = true;
+  try {
+    const updated = await setPrimaryAlias(props.mapping.id, guildMemberId);
+    props.mapping.handle = updated.handle;
+    props.mapping.app = updated.app;
+    props.mapping.primaryGuildMemberId = updated.primaryGuildMemberId;
+    notify("Primary account set");
+  } catch (err) {
+    selectedPrimaryId.value = props.mapping.primaryGuildMemberId ?? null;
+    notify(err instanceof Error ? err.message : "Failed to set primary account", { color: "error" });
+  } finally {
+    settingPrimary.value = false;
   }
 }
 
@@ -177,6 +226,12 @@ async function onUnlink(alias) {
   unlinkingId.value = alias.id;
   try {
     await unlinkGuildMemberAlias(alias.id);
+    if (props.mapping && alias.id === props.mapping.primaryGuildMemberId) {
+      props.mapping.handle = undefined;
+      props.mapping.app = undefined;
+      props.mapping.primaryGuildMemberId = undefined;
+      selectedPrimaryId.value = null;
+    }
     notify("Member unlinked");
     await Promise.all([loadAliases(), loadCandidates()]);
   } catch (err) {
@@ -191,6 +246,7 @@ watch(
   (open) => {
     if (!open) return;
     search.value = "";
+    selectedPrimaryId.value = props.mapping?.primaryGuildMemberId ?? null;
     loadAliases();
     loadCandidates();
   },

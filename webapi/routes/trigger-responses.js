@@ -711,7 +711,7 @@ router.delete("/triggers/:id", authenticate, requireAdmin, async (req, res) => {
  *         in: query
  *         required: false
  *         description: Chat app key for userId, e.g. "discord". Required (together with userId) to log history.
- *         schema: { type: string, enum: [discord] }
+ *         schema: { type: string, enum: [discord, fluxer] }
  *       - name: userId
  *         in: query
  *         required: false
@@ -1055,8 +1055,8 @@ router.get("/functions", authenticate, async (req, res) => {
  *       - name: app
  *         in: query
  *         required: true
- *         description: Chat app to scope the mapping to. Currently only "discord" is supported.
- *         schema: { type: string, enum: [discord] }
+ *         description: Chat app to scope the mapping to. Currently "discord" and "fluxer" are supported.
+ *         schema: { type: string, enum: [discord, fluxer] }
  *     responses:
  *       '200':
  *         description: Users with at least one trigger-response history entry.
