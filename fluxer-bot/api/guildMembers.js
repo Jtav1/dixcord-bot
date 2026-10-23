@@ -46,21 +46,27 @@ async function fetchAllMembers(guild) {
 
 /**
  * Build and push the community's membership list. POST /api/guild-members/sync with
- * { app: "fluxer", guildId, members }.
+ * { app: "fluxer", guildId, members }. Only logs when webapi reports newly-inserted rows
+ * (existing members synced again are silent), so a steady roster doesn't spam the log.
  * @returns {Promise<void>}
  */
 export async function syncGuildMembers() {
   const guild = await client.guilds.resolve(guildId);
   const members = (await fetchAllMembers(guild)).map(toSyncMember);
 
+  let inserted = 0;
   for (let i = 0; i < members.length; i += POST_BATCH_SIZE) {
-    await api.post("/api/guild-members/sync", {
+    const { data } = await api.post("/api/guild-members/sync", {
       app: "fluxer",
       guildId,
       members: members.slice(i, i + POST_BATCH_SIZE),
     });
+    inserted += data?.inserted ?? 0;
   }
-  console.log(`bot: synced ${members.length} guild members`);
+
+  if (inserted > 0) {
+    console.log(`bot: synced ${inserted} new guild member(s)`);
+  }
 }
 
 /**

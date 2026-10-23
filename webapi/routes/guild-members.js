@@ -68,7 +68,8 @@ const router = express.Router();
  *               type: object
  *               properties:
  *                 ok: { type: boolean, enum: [true] }
- *                 imported: { type: integer, description: "Every row upserted." }
+ *                 imported: { type: integer, description: "Every row upserted (inserted + updated)." }
+ *                 inserted: { type: integer, description: "Subset of imported that were brand-new rows, not updates to an existing (app, guildId, platformUserId)." }
  *                 skipped: { type: integer, description: "Entries dropped because they had no platformUserId at all (malformed input)." }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
@@ -89,6 +90,7 @@ router.post("/sync", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
     res.json({
       ok: true,
       imported: result.imported,
+      inserted: result.inserted,
       skipped: result.skipped,
     });
   } catch (err) {

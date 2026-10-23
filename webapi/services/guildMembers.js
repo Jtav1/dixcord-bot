@@ -61,10 +61,12 @@ async function upsertOneGuildMember(app, guildId, member) {
  * member_aliases — identity linking is a fully separate, manual, future admin action.
  * Never deletes: a member who has left the guild keeps their guild_members row (and any
  * alias link) as a historical record. Safe to call with a full roster or a single member.
+ * `inserted` (a subset of `imported`) lets callers (e.g. a periodic sync) log only when the
+ * roster actually grew, rather than on every tick.
  * @param {string} app
  * @param {string} guildId
  * @param {Array<{ platformUserId: string, handle?: string|null, nickname?: string|null, roles?: string[], joinedAt?: string|null }>} members
- * @returns {Promise<{ ok: true, imported: number, skipped: number } | { ok: false, error: string }>}
+ * @returns {Promise<{ ok: true, imported: number, inserted: number, skipped: number } | { ok: false, error: string }>}
  */
 export async function upsertGuildMembers(app, guildId, members) {
   if (!getChatMemberAppConfig(app)) {
@@ -74,7 +76,14 @@ export async function upsertGuildMembers(app, guildId, members) {
     return { ok: false, error: "members must be an array" };
   }
 
+  const [existingRows] = await db.query(
+    "SELECT platform_user_id AS platformUserId FROM guild_members WHERE app = ? AND guild_id = ?",
+    [app, guildId],
+  );
+  const existingIds = new Set((existingRows ?? []).map((row) => String(row.platformUserId)));
+
   let imported = 0;
+  let inserted = 0;
   let skipped = 0;
   for (const member of members) {
     const result = await upsertOneGuildMember(app, guildId, member);
@@ -83,9 +92,15 @@ export async function upsertGuildMembers(app, guildId, members) {
       continue;
     }
     imported += 1;
+
+    const platformUserId = String(member.platformUserId).trim();
+    if (!existingIds.has(platformUserId)) {
+      inserted += 1;
+      existingIds.add(platformUserId); // a duplicate id later in the same batch is an update, not another insert
+    }
   }
 
-  return { ok: true, imported, skipped };
+  return { ok: true, imported, inserted, skipped };
 }
 
 /**
