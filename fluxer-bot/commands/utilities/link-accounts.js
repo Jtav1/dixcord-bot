@@ -3,23 +3,23 @@ import { requestAccountLink } from "../../api/guildMembers.js";
 const cmdName = "link-accounts";
 
 const data = {
-  description: "Request to link your account with your account on another server",
-  usage: "link-accounts <user-id>",
+  description: "Get a token to link your account with your account on another server",
+  usage: "link-accounts",
 };
 
-const execute = async (message, args) => {
-  const targetUserId = args[0]?.trim();
-  if (!targetUserId) {
-    await message.reply(`Usage: ${data.usage}`);
+const execute = async (message) => {
+  const result = await requestAccountLink(message.author.id);
+
+  if (!result.ok) {
+    await message.reply(`Couldn't request link: ${result.error}`);
     return;
   }
 
-  const result = await requestAccountLink(message.author.id, targetUserId);
-  await message.reply(
-    result.ok
-      ? "Link requested. Now run confirm-link from that account on the other server to finish."
-      : `Couldn't request link: ${result.error}`,
+  const dm = await message.author.createDM();
+  await dm.send(
+    `Your link token is \`${result.token}\`. Run confirm-link with this token from the account you want to link.`,
   );
+  await message.reply("Check your DMs for your link token.");
 };
 
 export { cmdName, data, execute };

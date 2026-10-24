@@ -687,30 +687,56 @@ export async function ensureSchemaMigrations() {
     }
   }
 
-  // guild_members.pending_link: id of the guild_members row that requested an account link
-  // (link-accounts); cleared by confirm-link.
-  if (await tableExists(db, "guild_members", isSqlite)) {
-    if (!(await columnExists(db, "guild_members", "pending_link", isSqlite))) {
-      await db.query(
-        isSqlite
-          ? "ALTER TABLE guild_members ADD COLUMN pending_link INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL"
-          : "ALTER TABLE guild_members ADD COLUMN pending_link INT NULL",
-      );
-      applied.push("guild_members.pending_link column");
-      console.log("db: migration applied: added guild_members.pending_link column");
-    } else {
-      console.log("db: schema ok: guild_members.pending_link column already exists");
-    }
+  // Drop guild_members.pending_link: superseded by pending_account_links (see below), which
+  // holds the link-accounts handshake token instead of a single FK column on guild_members.
+  if (await columnExists(db, "guild_members", "pending_link", isSqlite)) {
     if (
       !isSqlite &&
-      !(await constraintExists(db, "guild_members", "fk_guild_members_pending_link", isSqlite))
+      (await constraintExists(db, "guild_members", "fk_guild_members_pending_link", isSqlite))
     ) {
-      await db.query(
-        "ALTER TABLE guild_members ADD CONSTRAINT fk_guild_members_pending_link FOREIGN KEY (pending_link) REFERENCES guild_members(id) ON DELETE SET NULL",
-      );
-      applied.push("guild_members.pending_link foreign key");
-      console.log("db: migration applied: added guild_members.pending_link foreign key");
+      await db.query("ALTER TABLE guild_members DROP FOREIGN KEY fk_guild_members_pending_link");
     }
+    await db.query("ALTER TABLE guild_members DROP COLUMN pending_link");
+    applied.push("guild_members.pending_link column dropped");
+    console.log("db: migration applied: dropped guild_members.pending_link");
+  }
+
+  // pending_account_links table: link-accounts/confirm-link self-service handshake. `app` +
+  // `app_user_id` identify the requester; `chat_member_mapping_id` snapshots their existing
+  // identity at request time (NULL if they don't have one yet). Deleted on successful confirm.
+  if (!(await tableExists(db, "pending_account_links", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE pending_account_links (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          app_user_id TEXT NOT NULL,
+          chat_member_mapping_id INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          auth_token TEXT NOT NULL UNIQUE,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      await db.query(
+        "CREATE INDEX idx_pending_account_links_app_user ON pending_account_links (app, app_user_id)",
+      );
+    } else {
+      await db.query(`
+        CREATE TABLE pending_account_links (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          app VARCHAR(20) NOT NULL,
+          app_user_id VARCHAR(64) NOT NULL,
+          chat_member_mapping_id INT NULL,
+          auth_token CHAR(32) NOT NULL UNIQUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          KEY idx_pending_account_links_app_user (app, app_user_id),
+          CONSTRAINT fk_pending_account_links_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
+        )
+      `);
+    }
+    applied.push("pending_account_links table");
+    console.log("db: migration applied: created pending_account_links table");
+  } else {
+    console.log("db: schema ok: pending_account_links table already exists");
   }
 
   // Backfill guild_members.handle from chat_member_mapping.discord_handle (the OLD table's own

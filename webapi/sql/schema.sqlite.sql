@@ -324,9 +324,6 @@ CREATE TABLE IF NOT EXISTS guild_members (
   roles TEXT NULL,
   joined_at TEXT NULL,
   synced_at TEXT DEFAULT (datetime('now')),
-  -- guild_members.id of a user who asked (link-accounts) to link their account to this one;
-  -- NULL = no pending request. Cleared by confirm-link.
-  pending_link INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL,
   UNIQUE (app, guild_id, platform_user_id)
 );
 
@@ -343,6 +340,21 @@ CREATE TABLE IF NOT EXISTS member_aliases (
 );
 
 CREATE INDEX IF NOT EXISTS idx_member_aliases_chat_member ON member_aliases (chat_member_mapping_id);
+
+-- Self-service account-link handshake (link-accounts / confirm-link). `app`/`app_user_id` are
+-- the requester's own platform identity; `chat_member_mapping_id` snapshots their existing
+-- identity at request time (NULL if they don't have one yet — confirm-link then creates one).
+-- Row is deleted the moment confirm-link succeeds; it's a handshake, not a history table.
+CREATE TABLE IF NOT EXISTS pending_account_links (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
+  app_user_id TEXT NOT NULL,
+  chat_member_mapping_id INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  auth_token TEXT NOT NULL UNIQUE,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_account_links_app_user ON pending_account_links (app, app_user_id);
 
 -- Admin-defined usage-stat thresholds. `type` is the fine-grained metric key (see
 -- webapi/services/milestoneTypes.js), `item` scopes it to one entity (null = global), `object`

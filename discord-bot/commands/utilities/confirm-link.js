@@ -5,10 +5,17 @@ const cmdName = "confirm-link";
 
 const data = new SlashCommandBuilder()
   .setName("confirm-link")
-  .setDescription("Confirm a pending request to link another account with yours");
+  .setDescription("Confirm a pending account link using the token you were given")
+  .addStringOption((option) =>
+    option
+      .setName("token")
+      .setDescription("The token given by link-accounts on the other account")
+      .setRequired(true),
+  );
 
 const execute = async (interaction) => {
-  const result = await confirmAccountLink(interaction.user.id);
+  const token = interaction.options.getString("token").trim();
+  const result = await confirmAccountLink(interaction.user.id, token);
 
   if (!result.ok) {
     console.log(`bot: confirm-link failed for ${interaction.user.id}: ${result.error}`);
