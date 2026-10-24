@@ -86,7 +86,6 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/message-processing/count-repost` | ✓ | Record or withdraw repost accusation |
 | POST | `/api/message-processing/emoji-import` | ✓ | Sync server emoji list (body: `{ app, emojis }`) |
 | POST | `/api/message-processing/sticker-import` | ✓ | Sync server sticker list (body: `{ app, stickers }`) |
-| POST | `/api/message-processing/emoji-frequency-sync` | bot/admin | Delete guild_emojis rows misattributed to another guild, then copy emoji_frequency into guild_emojis for this guild (body: `{ app, guildId }`) |
 | POST | `/api/message-processing/pin-check` | ✓ | Check if message already pinned (body: `{ messageId }`) |
 | POST | `/api/message-processing/pin-log` | ✓ | Log message as pinned (body: `{ messageId }`) |
 | POST | `/api/message-processing/timeout-vote` | ✓ | Record a vote-to-timeout reaction (body: `{ app, guildId, messageId, targetPlatformId, voterPlatformId, weight? }`); returns `triggered:true` + duration/response message once threshold is reached |

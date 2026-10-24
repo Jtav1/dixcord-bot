@@ -72,28 +72,11 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   managed INTEGER NULL,
   requires_colons INTEGER NULL,
   roles TEXT NULL,
-  frequency INTEGER NOT NULL DEFAULT 0,  -- synced from emoji_frequency by discord-bot/scripts/sync-emoji-frequency.js
+  frequency INTEGER NOT NULL DEFAULT 0,  -- usage counter, incremented directly (see ensureAndIncrementEmoji)
   synced_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_guild_emojis_guild ON guild_emojis (app, guild_id);
-
--- Per-guild usage counter for any emoji/sticker seen in a message/reaction. `type` classifies the
--- row (emoji/sticker/unicode) for leaderboard filtering; display identity (name, animated) lives
--- in guild_emojis, joined via emoid.
--- emoid is a soft reference to guild_emojis.id, deliberately NOT a real FK: guild_emojis is fully
--- replaced (delete+insert) on every catalog sync, and emoid is part of this table's PRIMARY KEY
--- (so it can't be nulled out) — a real FK with ON DELETE CASCADE would silently destroy usage
--- history the moment an emoji/sticker is removed from Discord. Missing catalog rows resolve to a
--- placeholder object at read time (see attachEmojiObjects), matching guild_channels/guild_roles.
-CREATE TABLE IF NOT EXISTS emoji_frequency (
-  app TEXT NOT NULL,
-  guild_id TEXT NOT NULL,
-  emoid TEXT NOT NULL,
-  frequency INTEGER NOT NULL DEFAULT 0,
-  type TEXT DEFAULT NULL,
-  PRIMARY KEY (app, guild_id, emoid)
-);
 
 CREATE TABLE IF NOT EXISTS sticker_frequency (
   stickerid TEXT PRIMARY KEY,

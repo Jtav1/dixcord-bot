@@ -160,41 +160,6 @@ or
 
 ---
 
-## POST /api/message-processing/emoji-frequency-sync
-
-**200 OK**
-
-```json
-{
-  "ok": true,
-  "dryRun": false,
-  "deleted": 2,
-  "inserted": 5,
-  "updated": 52,
-  "synced": 57
-}
-```
-
-**400 Bad Request**
-
-```json
-{
-  "ok": false,
-  "error": "guildId is required"
-}
-```
-
-**500 Internal Server Error**
-
-```json
-{
-  "ok": false,
-  "error": "Failed to sync emoji frequency"
-}
-```
-
----
-
 ## POST /api/message-processing/sticker-import
 
 **200 OK**

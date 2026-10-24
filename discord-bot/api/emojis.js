@@ -25,27 +25,6 @@ export const importEmojiList = async (emojiObjectList) => {
 };
 
 /**
- * Sync this guild's guild_emojis rows/frequency from emoji_frequency: deletes rows
- * misattributed to another guild, then copies frequency for every emoji_frequency row into
- * guild_emojis (inserting missing catalog rows). POST /api/message-processing/emoji-frequency-sync
- * @param {boolean} [dryRun] - Preview counts without writing anything.
- * @returns {Promise<{ deleted: number, inserted: number, updated: number, synced: number }>}
- */
-export const syncEmojiFrequency = async (dryRun = false) => {
-  const { data } = await api.post("/api/message-processing/emoji-frequency-sync", {
-    app: "discord",
-    guildId,
-    dryRun,
-  });
-  return {
-    deleted: Number(data?.deleted) || 0,
-    inserted: Number(data?.inserted) || 0,
-    updated: Number(data?.updated) || 0,
-    synced: Number(data?.synced) || 0,
-  };
-};
-
-/**
  * Record emoji usage. POST /api/message-processing/emoji-count
  * guildId (this bot's own, from configVars) is required so webapi can resolve this server's
  * plusplus_emoji/minusminus_emoji from guild_config for the reply-vote comparison.

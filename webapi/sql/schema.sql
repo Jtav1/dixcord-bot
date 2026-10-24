@@ -67,26 +67,9 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   managed TINYINT(1) NULL,
   requires_colons TINYINT(1) NULL,
   roles TEXT NULL,
-  frequency INT NOT NULL DEFAULT 0,   -- synced from emoji_frequency by discord-bot/scripts/sync-emoji-frequency.js
+  frequency INT NOT NULL DEFAULT 0,   -- usage counter, incremented directly (see ensureAndIncrementEmoji)
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_guild_emojis_guild (app, guild_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Per-guild usage counter for any emoji/sticker seen in a message/reaction. `type` classifies the
--- row (emoji/sticker/unicode) for leaderboard filtering; display identity (name, animated) lives
--- in guild_emojis, joined via emoid.
--- emoid is a soft reference to guild_emojis.id, deliberately NOT a real FK: guild_emojis is fully
--- replaced (delete+insert) on every catalog sync, and emoid is part of this table's PRIMARY KEY
--- (so it can't be nulled out) — a real FK with ON DELETE CASCADE would silently destroy usage
--- history the moment an emoji/sticker is removed from Discord. Missing catalog rows resolve to a
--- placeholder object at read time (see attachEmojiObjects), matching guild_channels/guild_roles.
-CREATE TABLE IF NOT EXISTS emoji_frequency (
-  app VARCHAR(20) NOT NULL,
-  guild_id VARCHAR(64) NOT NULL,
-  emoid VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-  frequency INT NOT NULL DEFAULT 0,
-  type VARCHAR(50) DEFAULT NULL,
-  PRIMARY KEY (app, guild_id, emoid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sticker_frequency (

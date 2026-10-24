@@ -147,27 +147,3 @@ Registered for the guild in `DISCORD_GUILD_ID`:
 - **Remove all guild commands:** `node delete-all-commands.js`
 
 Run from the `discord-bot` directory after installing dependencies.
-
----
-
-## Emoji frequency sync
-
-Emoji/sticker usage counting now lives entirely in `guild_emojis.frequency` — the `emoji_frequency`
-table is legacy and no longer written to. This script is a one-time backfill for installs that
-still have historical usage counts sitting in `emoji_frequency` from before that change.
-
-`node scripts/sync-emoji-frequency.js [--dry-run]` (or `npm run sync-emoji-frequency -- --dry-run`)
-runs two steps, in order, scoped to this bot's own guild (`DISCORD_GUILD_ID`):
-
-1. Removes `guild_emojis` rows whose guild_id doesn't match `DISCORD_GUILD_ID` (e.g. legacy rows
-   from before catalog identity was split per-guild, or reactions to another guild's emoji
-   misattributed here). A row is **not** deleted just because its emoji/sticker was since removed
-   from Discord — that's normal churn, not foreign data, and its guild_id is still correct.
-2. Copies `frequency` from every `emoji_frequency` row for this guild into the matching
-   `guild_emojis` row, matched by id/emoid — both emoji and sticker rows (`emoji_frequency.type`:
-   NULL = emoji, `"sticker"` = sticker). If a `guild_emojis` row doesn't exist yet for an id, it's
-   inserted using what `emoji_frequency` has (id, app, guild_id, type, frequency); `name` falls
-   back to the id itself since `emoji_frequency` carries no display name.
-
-`--dry-run` previews both steps' counts (what would be deleted, inserted, updated) without writing
-anything. Run manually from the bot container terminal.

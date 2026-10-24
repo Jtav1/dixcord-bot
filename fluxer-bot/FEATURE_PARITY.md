@@ -59,7 +59,6 @@ Needs `@fluxerjs/builders` (command builder) + `@fluxerjs/rest` (deploy) adopted
 ## Maintenance scripts
 
 - [ ] `deploy-commands.js` / `delete-all-commands.js` equivalents
-- [ ] `scripts/sync-emoji-frequency.js --dry-run` equivalent (only needed if fluxer-bot ever carries the same legacy-table history; likely N/A for a fresh install)
 
 ## Feature toggles (webapi `configurations`, hot-reloaded ≤30s)
 

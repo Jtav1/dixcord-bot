@@ -1887,6 +1887,55 @@ export async function ensureSchemaMigrations() {
     }
   }
 
+  // Drop emoji_frequency: pure legacy — every read/write path moved to guild_emojis.frequency
+  // long ago (ensureAndIncrementEmoji in messageProcessing.js), and the one-time admin backfill
+  // script that used to copy leftover counts out of it (discord-bot/scripts/sync-emoji-frequency.js)
+  // is gone too. So this does that backfill itself, once, automatically: any frequency still
+  // sitting here is added onto guild_emojis.frequency (summed across however many (app, guild_id)
+  // rows share an emoid — SELECT only needs emoid/frequency, so this works regardless of which
+  // historical shape the table is still in), inserting a bare guild_emojis row (name falls back
+  // to the id) for any emoid with no catalog row at all. Then the table itself is dropped.
+  if (await tableExists(db, "emoji_frequency", isSqlite)) {
+    const [legacyRows] = await db.query("SELECT emoid, frequency FROM emoji_frequency");
+    const legacyTotals = new Map();
+    for (const row of legacyRows ?? []) {
+      const emoid = String(row.emoid ?? "").trim();
+      const frequency = Number(row.frequency) || 0;
+      if (!emoid || frequency === 0) continue;
+      legacyTotals.set(emoid, (legacyTotals.get(emoid) ?? 0) + frequency);
+    }
+
+    let merged = 0;
+    let inserted = 0;
+    for (const [emoid, legacyFrequency] of legacyTotals) {
+      const [existing] = await db.query("SELECT id FROM guild_emojis WHERE id = ?", [emoid]);
+      if (existing && existing.length > 0) {
+        await db.query("UPDATE guild_emojis SET frequency = frequency + ? WHERE id = ?", [
+          legacyFrequency,
+          emoid,
+        ]);
+        merged += 1;
+      } else {
+        await db.query("INSERT INTO guild_emojis (id, name, frequency) VALUES (?, ?, ?)", [
+          emoid,
+          emoid,
+          legacyFrequency,
+        ]);
+        inserted += 1;
+      }
+    }
+
+    await db.query("DROP TABLE emoji_frequency");
+    applied.push(
+      `emoji_frequency table dropped (merged into ${merged}, inserted ${inserted} guild_emojis row(s) first)`,
+    );
+    console.log(
+      `db: migration applied: dropped legacy emoji_frequency table (merged into ${merged}, inserted ${inserted} guild_emojis row(s) from its leftover counts first)`,
+    );
+  } else {
+    console.log("db: schema ok: emoji_frequency table already dropped");
+  }
+
   // scheduled_messages: generalize discord_channel_id/discord_guild_id (resolved via a per-app
   // column-name map) to a plain app/channel_id/guild_id shape, matching every other app-scoped
   // table. Pre-existing rows predate multi-app support, so backfilling app='discord' is safe.
