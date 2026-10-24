@@ -2,162 +2,178 @@
  * Static metadata for configuration keys exposed to admin consumers.
  */
 
+/**
+ * `CONFIG_DEFAULT_<KEY>` env var, falling back to `fallback` when unset — lets an operator
+ * override a config key's out-of-the-box default without touching code. Commented out (so
+ * unset) in .env/.env.example by default, which preserves `fallback` as the live behavior.
+ * @param {string} key - CONFIG_METADATA key, e.g. "pin_threshold"
+ * @param {string} fallback
+ * @returns {string}
+ */
+function envDefault(key, fallback) {
+  const value = process.env[`CONFIG_DEFAULT_${key.toUpperCase()}`];
+  return value !== undefined ? value : fallback;
+}
+
 /** @type {Record<string, { description: string, type: string, requiresBotRestart: boolean, deprecated?: boolean, defaultValue: string }>} */
 export const CONFIG_METADATA = Object.freeze({
   pin_threshold: {
     description: "Number of pin reactions required before auto-pin alert",
     type: "integer",
     requiresBotRestart: false,
-    defaultValue: "1",
+    defaultValue: envDefault("pin_threshold", "1"),
   },
   pin_emoji: {
     description: "Emoji used for pin reactions",
     type: "emoji",
     requiresBotRestart: false,
-    defaultValue: "",
+    defaultValue: envDefault("pin_emoji", ""),
   },
   pin_channel_id: {
     description: "Discord channel ID where pin embeds are posted",
     type: "string",
     requiresBotRestart: false,
-    defaultValue: "",
+    defaultValue: envDefault("pin_channel_id", ""),
   },
   repost_emoji: {
     description: "Emoji used for repost accusation reactions",
     type: "emoji",
     requiresBotRestart: false,
-    defaultValue: "",
+    defaultValue: envDefault("repost_emoji", ""),
   },
   announce_channel_id: {
     description:
       "Discord channel ID for bot online announcements (read once at bot startup)",
     type: "string",
     requiresBotRestart: true,
-    defaultValue: "",
+    defaultValue: envDefault("announce_channel_id", ""),
   },
   plusplus_emoji: {
     description: "Emoji used for plus votes",
     type: "emoji",
     requiresBotRestart: false,
-    defaultValue: "",
+    defaultValue: envDefault("plusplus_emoji", ""),
   },
   minusminus_emoji: {
     description: "Emoji used for minus votes",
     type: "emoji",
     requiresBotRestart: false,
-    defaultValue: "",
+    defaultValue: envDefault("minusminus_emoji", ""),
   },
   pin_message_role_ids: {
     description: "JSON array of Discord role IDs allowed to use /pin-message",
     type: "json",
     requiresBotRestart: false,
-    defaultValue: "[]",
+    defaultValue: envDefault("pin_message_role_ids", "[]"),
   },
   twitter_fix_enabled: {
     description: "Enable link fixer when message contains dd/dixbot/fix",
     type: "boolean",
     requiresBotRestart: false,
-    defaultValue: "true",
+    defaultValue: envDefault("twitter_fix_enabled", "true"),
   },
   trigger_responses_enabled: {
     description: "Enable trigger-string auto-reply matching on messages",
     type: "boolean",
     requiresBotRestart: false,
-    defaultValue: "true",
+    defaultValue: envDefault("trigger_responses_enabled", "true"),
   },
   reminders_enabled: {
     description:
       "Enable creating new reminders via '@bot remind me ...' (does not affect delivery or /scheduled-* management of existing ones)",
     type: "boolean",
     requiresBotRestart: false,
-    defaultValue: "true",
+    defaultValue: envDefault("reminders_enabled", "true"),
   },
   eight_ball_enabled: {
     description: "Enable 8-ball/fortune replies when mentioning the bot with a message ending in '?'",
     type: "boolean",
     requiresBotRestart: false,
-    defaultValue: "true",
+    defaultValue: envDefault("eight_ball_enabled", "true"),
   },
   emoji_tracking_enabled: {
     description:
       "Enable emoji usage tracking from message content and reactions (excludes the plusplus_enabled vote-reply shortcut)",
     type: "boolean",
     requiresBotRestart: false,
-    defaultValue: "true",
+    defaultValue: envDefault("emoji_tracking_enabled", "true"),
   },
   sticker_tracking_enabled: {
     description: "Enable sticker usage tracking from message content",
     type: "boolean",
     requiresBotRestart: false,
-    defaultValue: "true",
+    defaultValue: envDefault("sticker_tracking_enabled", "true"),
   },
   plusplus_enabled: {
     description:
       "Enable plus/minus reputation voting (++/-- text, vote reactions, emoji-reply shortcut) and its leaderboard commands",
     type: "boolean",
     requiresBotRestart: false,
-    defaultValue: "true",
+    defaultValue: envDefault("plusplus_enabled", "true"),
   },
   repost_detection_enabled: {
     description: "Enable repost accusation reaction tracking and its leaderboard commands",
     type: "boolean",
     requiresBotRestart: false,
-    defaultValue: "true",
+    defaultValue: envDefault("repost_detection_enabled", "true"),
   },
   pin_system_enabled: {
     description: "Enable auto-pin via reaction threshold and the /pin-message command",
     type: "boolean",
     requiresBotRestart: false,
-    defaultValue: "true",
+    defaultValue: envDefault("pin_system_enabled", "true"),
   },
   user_mapping_import_channel_id: {
     description:
       "Extra text channel merged into user-mapping sync; applied on next sync (bot startup)",
     type: "string",
     requiresBotRestart: true,
-    defaultValue: "",
+    defaultValue: envDefault("user_mapping_import_channel_id", ""),
   },
   timeout_vote_enabled: {
     description: "Enable vote-to-timeout via reaction threshold",
     type: "boolean",
     requiresBotRestart: false,
-    defaultValue: "false",
+    defaultValue: envDefault("timeout_vote_enabled", "false"),
   },
   timeout_vote_emoji: {
     description: "Emoji used for timeout votes",
     type: "emoji",
     requiresBotRestart: false,
-    defaultValue: "",
+    defaultValue: envDefault("timeout_vote_emoji", ""),
   },
   timeout_vote_threshold: {
     description: "Weighted vote total required to time out a message's author",
     type: "integer",
     requiresBotRestart: false,
-    defaultValue: "5",
+    defaultValue: envDefault("timeout_vote_threshold", "5"),
   },
   timeout_vote_duration_seconds: {
     description: "Timeout duration in seconds once the vote threshold is reached (capped at 86400, Discord's 24h max)",
     type: "integer",
     requiresBotRestart: false,
-    defaultValue: "300",
+    defaultValue: envDefault("timeout_vote_duration_seconds", "300"),
   },
   timeout_vote_response_message: {
     description: "Message the bot sends when a timeout vote succeeds; {user} is replaced with a mention",
     type: "string",
     requiresBotRestart: false,
-    defaultValue: "{user} has been timed out by community vote.",
+    defaultValue: envDefault(
+      "timeout_vote_response_message",
+      "{user} has been timed out by community vote.",
+    ),
   },
   timeout_vote_double_role_id: {
     description: "Discord role whose timeout votes count double",
     type: "string",
     requiresBotRestart: false,
-    defaultValue: "",
+    defaultValue: envDefault("timeout_vote_double_role_id", ""),
   },
   timeout_vote_triple_role_id: {
     description: "Discord role whose timeout votes count triple",
     type: "string",
     requiresBotRestart: false,
-    defaultValue: "",
+    defaultValue: envDefault("timeout_vote_triple_role_id", ""),
   },
 });
 

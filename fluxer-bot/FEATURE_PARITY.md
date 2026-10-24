@@ -60,7 +60,7 @@ Needs `@fluxerjs/builders` (command builder) + `@fluxerjs/rest` (deploy) adopted
 
 - [ ] `deploy-commands.js` / `delete-all-commands.js` equivalents
 
-## Feature toggles (webapi `configurations`, hot-reloaded ≤30s)
+## Feature toggles (webapi `guild_config`, hot-reloaded ≤30s)
 
 All of these are webapi-side config, not bot code — the bot side of the work is just honoring the
 same keys. Listed here so nothing gets ported without checking its toggle still gates it in

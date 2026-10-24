@@ -30,11 +30,6 @@ CREATE TABLE IF NOT EXISTS chat_member_mapping (
 );
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
-CREATE TABLE IF NOT EXISTS configurations (
-  config TEXT PRIMARY KEY,
-  value TEXT
-);
-
 CREATE TABLE IF NOT EXISTS eight_ball_responses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   response_string TEXT NOT NULL,
@@ -77,12 +72,6 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
 );
 
 CREATE INDEX IF NOT EXISTS idx_guild_emojis_guild ON guild_emojis (app, guild_id);
-
-CREATE TABLE IF NOT EXISTS sticker_frequency (
-  stickerid TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  frequency INTEGER NOT NULL DEFAULT 0
-);
 
 CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

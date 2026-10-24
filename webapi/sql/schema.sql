@@ -24,11 +24,6 @@ CREATE TABLE IF NOT EXISTS chat_member_mapping (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
-CREATE TABLE IF NOT EXISTS configurations (
-  config VARCHAR(255) PRIMARY KEY,
-  value VARCHAR(255)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS eight_ball_responses (
   id INT AUTO_INCREMENT PRIMARY KEY,
   response_string VARCHAR(500) NOT NULL,
@@ -70,12 +65,6 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   frequency INT NOT NULL DEFAULT 0,   -- usage counter, incremented directly (see ensureAndIncrementEmoji)
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   KEY idx_guild_emojis_guild (app, guild_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS sticker_frequency (
-  stickerid VARCHAR(255) PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  frequency INT NOT NULL DEFAULT 0
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- app + msgid is the dedup key (not msgid alone): message ids are only guaranteed unique within

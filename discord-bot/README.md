@@ -56,7 +56,7 @@ The bot **depends on the web API** for almost all behavior. It loads configurati
 
 ### Feature toggles
 
-Each key below is a webapi `configurations` boolean (not an env var), defaults to `"true"`, and
+Each key below is a webapi `guild_config` boolean (not an env var), defaults to `"true"`, and
 can be flipped to `"false"` via `PUT /api/config` — no bot restart required, picked up on the
 next cache-version poll (≤30s). Disabling a key only affects what's listed; adjacent
 functionality (e.g. `/scheduled-*` reminder management, pin-history startup hydration) stays

@@ -467,14 +467,13 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: guild_config table already exists");
   }
 
-  // One-time backfill: seed guild_config for every known server from global `configurations`/defaults
+  // One-time backfill: seed guild_config for every known server from CONFIG_METADATA's defaults
+  // (which are themselves CONFIG_DEFAULT_* env-overridable — see configMetadata.js).
   if (await tableExists(db, "guild_config", isSqlite)) {
     const [existingGuilds] = await db.query("SELECT app, guild_id FROM guild_info");
-    const [globalConfigRows] = await db.query("SELECT config, value FROM configurations");
-    const globalOverrides = Array.isArray(globalConfigRows) ? globalConfigRows : [];
     for (const guild of existingGuilds ?? []) {
       if (await guildConfigExistsFor(guild.app, guild.guild_id)) continue;
-      await seedDefaultConfigForGuild(guild.app, guild.guild_id, globalOverrides);
+      await seedDefaultConfigForGuild(guild.app, guild.guild_id);
       applied.push(`guild_config backfill for ${guild.app}/${guild.guild_id}`);
       console.log(
         `db: migration applied: seeded guild_config for ${guild.app}/${guild.guild_id}`,
@@ -1045,94 +1044,6 @@ export async function ensureSchemaMigrations() {
           ? "ALTER TABLE pin_history ADD COLUMN hydrated INTEGER NOT NULL DEFAULT 0"
           : "ALTER TABLE pin_history ADD COLUMN hydrated TINYINT(1) NOT NULL DEFAULT 0",
       );
-    }
-  }
-
-  // Seed pin_message_role_ids if missing
-  const [pinRoleRows] = await db.query(
-    "SELECT config FROM configurations WHERE config = 'pin_message_role_ids'",
-  );
-  if (!pinRoleRows || pinRoleRows.length === 0) {
-    await db.query("INSERT INTO configurations (config, value) VALUES (?, ?)", [
-      "pin_message_role_ids",
-      '["612842488302141441"]',
-    ]);
-    applied.push("pin_message_role_ids configuration seed");
-    console.log(
-      "db: migration applied: seeded pin_message_role_ids configuration",
-    );
-  } else {
-    console.log(
-      "db: schema ok: pin_message_role_ids configuration already exists",
-    );
-  }
-
-  // Seed user_mapping_import_channel_id if missing (migrated off the
-  // discord-bot DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID env var)
-  const [userMappingChannelRows] = await db.query(
-    "SELECT config FROM configurations WHERE config = 'user_mapping_import_channel_id'",
-  );
-  if (!userMappingChannelRows || userMappingChannelRows.length === 0) {
-    await db.query("INSERT INTO configurations (config, value) VALUES (?, ?)", [
-      "user_mapping_import_channel_id",
-      "",
-    ]);
-    applied.push("user_mapping_import_channel_id configuration seed");
-    console.log(
-      "db: migration applied: seeded user_mapping_import_channel_id configuration",
-    );
-  } else {
-    console.log(
-      "db: schema ok: user_mapping_import_channel_id configuration already exists",
-    );
-  }
-
-  // Seed feature-toggle configuration keys (default enabled) if missing
-  const featureToggleKeys = [
-    "trigger_responses_enabled",
-    "reminders_enabled",
-    "eight_ball_enabled",
-    "emoji_tracking_enabled",
-    "sticker_tracking_enabled",
-    "plusplus_enabled",
-    "repost_detection_enabled",
-    "pin_system_enabled",
-    "twitter_fix_enabled",
-  ];
-  for (const key of featureToggleKeys) {
-    const [rows] = await db.query(
-      "SELECT config FROM configurations WHERE config = ?",
-      [key],
-    );
-    if (!rows || rows.length === 0) {
-      await db.query(
-        "INSERT INTO configurations (config, value) VALUES (?, ?)",
-        [key, "true"],
-      );
-      applied.push(`${key} configuration seed`);
-      console.log(`db: migration applied: seeded ${key} configuration`);
-    } else {
-      console.log(`db: schema ok: ${key} configuration already exists`);
-    }
-  }
-
-  // Drop deprecated/unused configuration keys
-  const deprecatedConfigKeys = [
-    "rare_frequency",
-    "take_a_look_delay",
-    "take_a_look_repost_limit",
-    "timeout_emoji",
-    "timeout_vote_threshold",
-  ];
-  for (const key of deprecatedConfigKeys) {
-    const [rows] = await db.query(
-      "SELECT config FROM configurations WHERE config = ?",
-      [key],
-    );
-    if (rows && rows.length > 0) {
-      await db.query("DELETE FROM configurations WHERE config = ?", [key]);
-      applied.push(`${key} configuration removed`);
-      console.log(`db: migration applied: removed deprecated ${key} configuration`);
     }
   }
 
@@ -1934,6 +1845,32 @@ export async function ensureSchemaMigrations() {
     );
   } else {
     console.log("db: schema ok: emoji_frequency table already dropped");
+  }
+
+  // Drop sticker_frequency: pure legacy, never read or written by any code — sticker usage
+  // counting lives in guild_emojis (type = 'sticker'), same as emoji counting. No data to
+  // preserve first (nothing ever wrote to it).
+  if (await tableExists(db, "sticker_frequency", isSqlite)) {
+    await db.query("DROP TABLE sticker_frequency");
+    applied.push("sticker_frequency table dropped (unused legacy table)");
+    console.log("db: migration applied: dropped unused legacy sticker_frequency table");
+  } else {
+    console.log("db: schema ok: sticker_frequency table already dropped");
+  }
+
+  // Drop configurations: the single-global predecessor to guild_config (per-(app, guild_id)
+  // config), which is what every feature actually reads/writes today. Its only remaining
+  // consumer was the guild_config backfill above, which already ran (using whatever was in this
+  // table) earlier in this same migration pass — so by this point there's nothing left to
+  // preserve. New defaults for that backfill, and for brand-new guilds, now come from
+  // CONFIG_METADATA (optionally overridden via CONFIG_DEFAULT_* env vars — see configMetadata.js)
+  // instead of this table.
+  if (await tableExists(db, "configurations", isSqlite)) {
+    await db.query("DROP TABLE configurations");
+    applied.push("configurations table dropped (superseded by guild_config)");
+    console.log("db: migration applied: dropped legacy configurations table (superseded by guild_config)");
+  } else {
+    console.log("db: schema ok: configurations table already dropped");
   }
 
   // scheduled_messages: generalize discord_channel_id/discord_guild_id (resolved via a per-app
