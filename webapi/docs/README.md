@@ -165,8 +165,8 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/guild-members/:guildMemberId/link` | admin | Link (or move) a guild_member to a chat_member_mapping identity (body: `{ chatMemberMappingId }`) |
 | DELETE | `/api/guild-members/:guildMemberId/link` | admin | Unlink a guild_member from its identity |
 | POST | `/api/guild-members/sync` | ✓ | Upsert a server's membership list (body: `{ app, guildId, members }`); never removes members, safe for a full roster or a single incremental push |
-| POST | `/api/guild-members/link-request` | bot/admin | User-initiated: flag a user's rows in other servers as pending link to the requester (body: `{ app, guildId, requesterUserId, targetUserId }`) |
-| POST | `/api/guild-members/link-confirm` | bot/admin | Confirm a pending link: requester's row becomes an alias of the confirmer's existing identity (body: `{ app, guildId, userId }`); errors if 0 or multiple identities |
+| POST | `/api/guild-members/link-request` | bot/admin | User-initiated: generate a one-time link token for the requester, snapshotting their existing identity if they have one (body: `{ app, guildId, requesterUserId }`) |
+| POST | `/api/guild-members/link-confirm` | bot/admin | Confirm a pending link by token: confirmer's row becomes an alias of the requester's identity, creating one if the requester didn't have one yet (body: `{ app, guildId, userId, token }`) |
 | GET | `/api/events/plusplus` | ✓ | Raw plusplus events |
 | GET | `/api/events/reposts` | ✓ | Raw repost events |
 | GET | `/api/audit-log` | admin | Audit log |

@@ -650,9 +650,9 @@ router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
 
 /**
  * POST /api/guild-members/link-request
- * A user asks to link their account to another user's: flags the target's guild_members row(s)
- * in other servers (pending_link = requester's guild_members.id).
- * Body: { app, guildId, requesterUserId, targetUserId }
+ * A user asks to link their account to another one: snapshots their existing identity (if any)
+ * and a fresh one-time token into pending_account_links, for them to hand to the other account.
+ * Body: { app, guildId, requesterUserId }
  * Auth: bot or admin.
  * @openapi
  * /api/guild-members/link-request:
@@ -661,20 +661,20 @@ router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
  *     tags: [Guild Members]
  *     summary: Request an account link (link-accounts command)
  *     description: >
- *       Sets pending_link on every guild_members row for targetUserId outside the requester's
- *       server, pointing at the requester's guild_members row.
+ *       Creates a pending_account_links row keyed on a fresh one-time token, replacing any
+ *       earlier pending request from the same requester. The token must be handed to
+ *       confirm-link (as its own command/message, out of band) on the account to link to.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [app, guildId, requesterUserId, targetUserId]
+ *             required: [app, guildId, requesterUserId]
  *             properties:
  *               app: { type: string, example: discord }
  *               guildId: { type: string }
  *               requesterUserId: { type: string }
- *               targetUserId: { type: string }
  *     responses:
  *       '200':
  *         description: Request recorded.
@@ -684,7 +684,7 @@ router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
  *               type: object
  *               properties:
  *                 ok: { type: boolean, enum: [true] }
- *                 flagged: { type: integer }
+ *                 token: { type: string }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -696,26 +696,22 @@ router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
  */
 router.post("/link-request", authenticate, requireBotOrAdmin, requireOwnGuildOrAdmin, async (req, res) => {
   try {
-    const { app, guildId, requesterUserId, targetUserId } = req.body ?? {};
+    const { app, guildId, requesterUserId } = req.body ?? {};
     const gid = String(guildId ?? "").trim();
     const requester = String(requesterUserId ?? "").trim();
-    const target = String(targetUserId ?? "").trim();
-    if (!gid || !requester || !target) {
-      return res
-        .status(400)
-        .json({ ok: false, error: "guildId, requesterUserId and targetUserId are required" });
+    if (!gid || !requester) {
+      return res.status(400).json({ ok: false, error: "guildId and requesterUserId are required" });
     }
 
-    const result = await requestAccountLink({ app, guildId: gid, requesterUserId: requester, targetUserId: target });
+    const result = await requestAccountLink({ app, guildId: gid, requesterUserId: requester });
     if (!result.ok) return res.status(400).json({ ok: false, error: result.error });
 
-    await recordAudit(req.user.id, "link_request", "guild_members", null, {
+    await recordAudit(req.user.id, "link_request", "pending_account_links", null, {
       app,
       guildId: gid,
       requesterUserId: requester,
-      targetUserId: target,
     });
-    res.json({ ok: true, flagged: result.flagged });
+    res.json({ ok: true, token: result.token });
   } catch (err) {
     console.error("POST /api/guild-members/link-request error:", err);
     res.status(500).json({ ok: false, error: "Failed to request account link" });
@@ -724,9 +720,10 @@ router.post("/link-request", authenticate, requireBotOrAdmin, requireOwnGuildOrA
 
 /**
  * POST /api/guild-members/link-confirm
- * The target user accepts a pending link: the requester's guild_members row becomes an alias
- * of the confirmer's existing chat_member_mapping identity, and pending_link is cleared.
- * Body: { app, guildId, userId }
+ * The confirming user supplies the token they were given: their guild_members row becomes an
+ * alias of the requester's chat_member_mapping identity (creating one first if the requester
+ * didn't already have one), and the pending_account_links row is deleted.
+ * Body: { app, guildId, userId, token }
  * Auth: bot or admin.
  * @openapi
  * /api/guild-members/link-confirm:
@@ -735,19 +732,20 @@ router.post("/link-request", authenticate, requireBotOrAdmin, requireOwnGuildOrA
  *     tags: [Guild Members]
  *     summary: Confirm a pending account link (confirm-link command)
  *     description: >
- *       Fails without changes if the confirmer has no pending request, zero or multiple
- *       chat_member_mapping identities, or the requester's row is already linked.
+ *       Fails without changes for an unknown/expired token, a self-link attempt, or if the
+ *       confirmer is already linked to an identity.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [app, guildId, userId]
+ *             required: [app, guildId, userId, token]
  *             properties:
  *               app: { type: string, example: discord }
  *               guildId: { type: string }
  *               userId: { type: string }
+ *               token: { type: string }
  *     responses:
  *       '200':
  *         description: Linked.
@@ -770,17 +768,18 @@ router.post("/link-request", authenticate, requireBotOrAdmin, requireOwnGuildOrA
  */
 router.post("/link-confirm", authenticate, requireBotOrAdmin, requireOwnGuildOrAdmin, async (req, res) => {
   try {
-    const { app, guildId, userId } = req.body ?? {};
+    const { app, guildId, userId, token } = req.body ?? {};
     const gid = String(guildId ?? "").trim();
     const uid = String(userId ?? "").trim();
-    if (!gid || !uid) {
-      return res.status(400).json({ ok: false, error: "guildId and userId are required" });
+    const tok = String(token ?? "").trim();
+    if (!gid || !uid || !tok) {
+      return res.status(400).json({ ok: false, error: "guildId, userId and token are required" });
     }
 
-    const result = await confirmAccountLink({ app, guildId: gid, userId: uid });
+    const result = await confirmAccountLink({ app, guildId: gid, userId: uid, token: tok });
     if (!result.ok) return res.status(400).json({ ok: false, error: result.error });
 
-    await recordAudit(req.user.id, "link_confirm", "member_aliases", result.requesterGuildMemberId, {
+    await recordAudit(req.user.id, "link_confirm", "member_aliases", null, {
       chatMemberMappingId: result.chatMemberMappingId,
     });
     res.json({
