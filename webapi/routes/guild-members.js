@@ -650,8 +650,7 @@ router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
 
 /**
  * POST /api/guild-members/link-request
- * A user asks to link their account to another one: snapshots their existing identity (if any)
- * and a fresh one-time token into pending_account_links, for them to hand to the other account.
+ * Generates a one-time account-link token for the requester.
  * Body: { app, guildId, requesterUserId }
  * Auth: bot or admin.
  * @openapi
@@ -720,9 +719,7 @@ router.post("/link-request", authenticate, requireBotOrAdmin, requireOwnGuildOrA
 
 /**
  * POST /api/guild-members/link-confirm
- * The confirming user supplies the token they were given: their guild_members row becomes an
- * alias of the requester's chat_member_mapping identity (creating one first if the requester
- * didn't already have one), and the pending_account_links row is deleted.
+ * Confirms a pending account link by token.
  * Body: { app, guildId, userId, token }
  * Auth: bot or admin.
  * @openapi

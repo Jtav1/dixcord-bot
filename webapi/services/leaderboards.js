@@ -250,19 +250,15 @@ const EMOJI_TYPE_WHERE = "(type = 'emoji' OR type IS NULL)";
 const STICKER_TYPE_WHERE = "type = 'sticker'";
 
 /**
- * Shared paginated usage leaderboard behind listEmojiFrequency/listStickerFrequency: ranks and
- * combines by `name`, not by raw (app, id) row — the same emoji used under two different apps
- * (and so stored as two separate guild_emojis rows, since an id is only unique within its own
- * platform) is one entry here with its total summed across both, not two separate entries each
- * showing the same already-combined number. `byApp` is the per-app breakdown behind that total;
- * `emoid`/`app`/`animated` on the returned object are from whichever contributing row currently
- * has the highest frequency, picked only for display/linkability (not part of the total).
+ * Shared ranking behind listEmojiFrequency/listStickerFrequency: combines by `name`, not by raw
+ * (app, id) row, so the same emoji under two apps is one entry with totals summed, not two.
+ * `byApp` is the per-app breakdown; `emoid`/`app`/`animated` come from whichever contributing
+ * row currently has the highest frequency, for display only.
  * @param {string} typeWhere - EMOJI_TYPE_WHERE or STICKER_TYPE_WHERE
  * @param {number} limit
  * @param {number} offset
- * @param {string} [guildId] Scope to one guild/community. Omit to mix every guild's rows into
- *   one pool (current/legacy behavior — unchanged default).
- * @param {string} [appFilter] Scope to one app only (ranking, combined total, and byApp alike).
+ * @param {string} [guildId] Scope to one guild/community (default: every guild combined).
+ * @param {string} [appFilter] Scope ranking/totals/byApp to one app.
  * @returns {Promise<{ rows: Array<{ emoji: object }>, total: number }>} `emoji` matches the attachEmojiObjects shape (emoid, app, emoji, frequency, byApp, animated, type).
  * @private
  */
@@ -299,8 +295,7 @@ async function listFrequencyByName(typeWhere, limit, offset, guildId, appFilter)
   const names = (Array.isArray(nameRows) ? nameRows : []).map((r) => r.name);
   if (names.length === 0) return { rows: [], total };
 
-  // Every contributing row for this page's names (same filters), used to build both the byApp
-  // breakdown and the representative display row — one query, grouped in JS.
+  // One query for this page's names: builds both byApp and the representative display row.
   const namePlaceholders = names.map(() => "?").join(", ");
   const detailWhere = [...baseConditions, `name IN (${namePlaceholders})`].join(" AND ");
   const [detailRows] = await db.query(
@@ -339,14 +334,12 @@ async function listFrequencyByName(typeWhere, limit, offset, guildId, appFilter)
 }
 
 /**
- * Paginated emoji usage leaderboard from guild_emojis (emojis only, excludes stickers and
- * never-used catalog rows), ranked and combined by name across every app (see
- * listFrequencyByName) — pass `appFilter` to narrow to one app's own usage instead.
+ * Paginated emoji usage leaderboard (emojis only), combined by name across apps (see
+ * listFrequencyByName) — pass `appFilter` to narrow to one app.
  * @param {number} [limit] Max rows per page (default 5, max 50).
  * @param {number} [offset] Rows to skip (default 0).
- * @param {string} [guildId] Scope to one guild/community. Omit to mix every guild's emoji
- *   into one pool (current/legacy behavior — unchanged default).
- * @param {string} [appFilter] Scope to one app only (ranking and displayed totals alike).
+ * @param {string} [guildId] Scope to one guild/community (default: every guild combined).
+ * @param {string} [appFilter] Scope ranking and totals to one app.
  * @returns {Promise<{ rows: Array<{ emoji: object }>, total: number }>} `emoji` is the resolved shape (see attachEmojiObjects).
  */
 export async function listEmojiFrequency(limit, offset = 0, guildId, appFilter) {
@@ -377,8 +370,7 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
   const n = parseLimit(limit, 50, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
-  // Joins guild_emojis for type only; per-user totals come from member_emoji_tracking. Joined on
-  // (app, emoid) since emoid alone isn't unique across apps.
+  // Joined on (app, emoid): emoid alone isn't unique across apps.
   const isEmojiType = "ge.type = 'emoji' OR ge.type IS NULL";
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT uet.userid) AS total
@@ -413,14 +405,12 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
 // --- Sticker (guild_emojis.frequency, type = 'sticker') ---
 
 /**
- * Paginated sticker usage leaderboard from guild_emojis (stickers only, excludes never-used
- * catalog rows), ranked and combined by name across every app (see listFrequencyByName) — pass
- * `appFilter` to narrow to one app's own usage instead.
+ * Paginated sticker usage leaderboard (stickers only), combined by name across apps (see
+ * listFrequencyByName) — pass `appFilter` to narrow to one app.
  * @param {number} [limit] Max rows per page (default 5, max 50).
  * @param {number} [offset] Rows to skip (default 0).
- * @param {string} [guildId] Scope to one guild/community. Omit to mix every guild's stickers
- *   into one pool (current/legacy behavior — unchanged default).
- * @param {string} [appFilter] Scope to one app only (ranking and displayed totals alike).
+ * @param {string} [guildId] Scope to one guild/community (default: every guild combined).
+ * @param {string} [appFilter] Scope ranking and totals to one app.
  * @returns {Promise<{ rows: Array<{ emoji: object }>, total: number }>} `emoji` is the resolved shape (see attachEmojiObjects).
  */
 export async function listStickerFrequency(limit, offset = 0, guildId, appFilter) {
@@ -440,8 +430,7 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
   const n = parseLimit(limit, 50, 50);
   const off = Math.max(0, parseInt(offset, 10) || 0);
 
-  // Joins guild_emojis for type only; per-user totals come from member_emoji_tracking. Joined on
-  // (app, emoid) since emoid alone isn't unique across apps.
+  // Joined on (app, emoid): emoid alone isn't unique across apps.
   const isStickerType = "ge.type = 'sticker'";
   const [countRows] = await db.query(
     `SELECT COUNT(DISTINCT uet.userid) AS total

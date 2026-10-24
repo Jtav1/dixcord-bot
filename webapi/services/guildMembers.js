@@ -381,10 +381,8 @@ async function chatMemberMappingNameExists(name) {
 }
 
 /**
- * Create a brand-new chat_member_mapping identity for a self-service account link (confirm-link
- * found no existing identity to attach to). `name` is required/unique, unlike admin-created
- * mappings there's no human picking one, so this seeds it from the requester's own handle and
- * disambiguates with a numeric suffix on collision.
+ * Create a chat_member_mapping identity for a self-service link with no existing identity to
+ * attach to. Seeds the name from the requester's handle, disambiguating on collision.
  * @param {string|null} seedName
  * @returns {Promise<number>} the new chat_member_mapping.id
  * @private
@@ -400,10 +398,8 @@ async function createChatMemberMappingForSelfServiceLink(seedName) {
 }
 
 /**
- * Start a self-service account link: if the requester (identified by their own guild_members
- * row) already has a chat_member_mapping identity, snapshot it; otherwise leave it NULL and
- * confirm-link will create one. Generates a one-time token and stores it in
- * pending_account_links, replacing any earlier pending request from the same requester.
+ * Start a self-service account link: snapshots the requester's existing identity (if any),
+ * generates a one-time token, and replaces any earlier pending request from them.
  * @param {{ app: string, guildId: string, requesterUserId: string }} params
  * @returns {Promise<{ ok: true, token: string } | { ok: false, error: string }>}
  */
@@ -437,12 +433,9 @@ export async function requestAccountLink({ app, guildId, requesterUserId }) {
 }
 
 /**
- * Accept a self-service account link: look up the pending request by token, alias the
- * confirmer's own guild_members row to the requester's chat_member_mapping identity (creating
- * one first if the requester didn't already have one). Once a token resolves to a pending row,
- * that row is deleted no matter how this call ends — success or failure — so a token is only
- * ever usable for one attempt and can't be hijacked by retrying after someone else's failure.
- * An unknown token (no matching row at all) is a no-op, since there's nothing to consume.
+ * Accept a self-service account link: alias the confirmer to the requester's identity (creating
+ * one if needed), keyed by token. The pending row is always deleted once the token resolves —
+ * success or failure — so it's usable for exactly one attempt. An unknown token is a no-op.
  * @param {{ app: string, guildId: string, userId: string, token: string }} params
  * @returns {Promise<{ ok: true, requesterHandle: string|null, chatMemberMappingId: number } | { ok: false, error: string }>}
  */

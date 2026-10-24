@@ -32,9 +32,7 @@ CREATE TABLE IF NOT EXISTS eight_ball_responses (
   UNIQUE KEY unique_response (response_string, sentiment)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- app records which platform cast the vote; totals/leaderboards deliberately never filter on it
--- (see services/leaderboards.js, services/milestones.js) so a word's or user's score is one
--- cross-platform number, not fragmented per app.
+-- app records which platform cast the vote; totals never filter on it.
 CREATE TABLE IF NOT EXISTS plusplus_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
   app VARCHAR(20) NOT NULL,
@@ -51,10 +49,8 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
 -- (cross-platform, no owner). Fully replaced per-guild on each emoji-import sync (mirrors
 -- guild_channels/guild_roles); unicode rows are added lazily on first use, never synced from Discord
 -- (no such API exists — see discord-bot/api/emojis.js).
--- Keyed on (app, id), not id alone: a custom emoji id is only unique within its own platform, so
--- two apps could otherwise collide on the same id string and silently merge into one row. Every
--- row (including unicode) now belongs to exactly one app; see services/emojiFrequency.js for how
--- cross-app totals for the same emoji are computed (grouped by name, not by sharing a row).
+-- Keyed on (app, id), not id alone — an id isn't unique across apps (see emojiFrequency.js for
+-- how cross-app totals are computed, grouped by name).
 CREATE TABLE IF NOT EXISTS guild_emojis (
   id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL, -- exact-match identity (custom snowflake or unicode emoji char); a linguistic _ci collation treats many distinct emoji as equal
   app VARCHAR(20) NOT NULL,
@@ -73,8 +69,7 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   KEY idx_guild_emojis_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- app + msgid is the dedup key (not msgid alone): message ids are only guaranteed unique within
--- their own platform, so two apps' message ids could otherwise collide (see isMessageAlreadyPinned).
+-- app + msgid is the dedup key (not msgid alone) — msgid isn't unique across apps.
 CREATE TABLE IF NOT EXISTS pin_history (
   id INT AUTO_INCREMENT PRIMARY KEY,
   app VARCHAR(20) NOT NULL,
@@ -103,9 +98,7 @@ CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   CONSTRAINT fk_user_emoji_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- app is part of the accusation key (not just userid/msgid/accuser) for the same reason as
--- pin_history: msgid is only unique within its own platform. Global/user repost totals
--- (services/leaderboards.js, services/milestones.js) never filter on it.
+-- app is part of the accusation key too — msgid isn't unique across apps. Totals never filter on it.
 CREATE TABLE IF NOT EXISTS member_repost_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
   app VARCHAR(20) NOT NULL,
@@ -325,10 +318,7 @@ CREATE TABLE IF NOT EXISTS member_aliases (
   CONSTRAINT fk_member_aliases_guild_member FOREIGN KEY (guild_member_id) REFERENCES guild_members(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Self-service account-link handshake (link-accounts / confirm-link). `app`/`app_user_id` are
--- the requester's own platform identity; `chat_member_mapping_id` snapshots their existing
--- identity at request time (NULL if they don't have one yet — confirm-link then creates one).
--- Row is deleted the moment confirm-link succeeds; it's a handshake, not a history table.
+-- Self-service account-link handshake (link-accounts / confirm-link); deleted on confirm.
 CREATE TABLE IF NOT EXISTS pending_account_links (
   id INT AUTO_INCREMENT PRIMARY KEY,
   app VARCHAR(20) NOT NULL,

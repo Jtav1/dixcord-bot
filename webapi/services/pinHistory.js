@@ -187,10 +187,8 @@ const INCOMPLETE_PIN_HISTORY_WHERE = "hydrated = 0";
 
 /**
  * List pin_history rows not yet hydrated (`hydrated = false`), optionally scoped to one app
- * and/or guild.
- * @param {{ limit?: number, offset?: number, app?: string, guildId?: string }} opts - Omitting
- *   `app`/`guildId` returns every unhydrated row (current/legacy behavior, unchanged) — pass
- *   them to scope a bot's hydration loop to its own pins instead of a mixed-platform stream.
+ * and/or guild — e.g. to scope a bot's hydration loop to its own pins.
+ * @param {{ limit?: number, offset?: number, app?: string, guildId?: string }} opts - Omitting `app`/`guildId` returns every unhydrated row.
  * @returns {Promise<{ entries: Array<{ id: number, app: string|null, msgid: string, timestamp: string, author: number|null, contents: string|null, attachments: string[], channelId: string|null, channelName: string|null, pinners: number[], guildId: string|null }>, total: number }>}
  */
 export async function listIncompletePinHistory(opts = {}) {

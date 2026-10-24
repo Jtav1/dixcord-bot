@@ -63,8 +63,6 @@ export async function computePinTotal() {
 
 /**
  * @param {string} app - e.g. "discord"
- * Every guild_emojis row (unicode included) now belongs to exactly one app — see
- * ensureAndIncrementEmoji — so this is a plain per-app sum, no cross-app leakage.
  */
 export async function computeEmojiFrequencyPerApp(app) {
   const [rows] = await db.query(

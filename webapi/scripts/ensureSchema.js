@@ -17,8 +17,7 @@ import { guildConfigExistsFor, seedDefaultConfigForGuild } from "../services/gui
 const isSqlite = isSqliteDb();
 
 /**
- * Whether a column is currently declared NOT NULL. Used to guard idempotent nullable->NOT NULL
- * migrations (there's no ready-made helper for this in schemaUtils.js's introspection set).
+ * Whether a column is currently declared NOT NULL (guards idempotent nullable->NOT NULL migrations).
  * @param {import('mysql2/promise').Pool | { query: Function }} db
  * @param {string} table
  * @param {string} column
@@ -494,8 +493,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: guild_config table already exists");
   }
 
-  // One-time backfill: seed guild_config for every known server from CONFIG_METADATA's defaults
-  // (which are themselves CONFIG_DEFAULT_* env-overridable — see configMetadata.js).
+  // One-time backfill: seed guild_config for every known server from CONFIG_METADATA's defaults.
   if (await tableExists(db, "guild_config", isSqlite)) {
     const [existingGuilds] = await db.query("SELECT app, guild_id FROM guild_info");
     for (const guild of existingGuilds ?? []) {
@@ -713,8 +711,7 @@ export async function ensureSchemaMigrations() {
     }
   }
 
-  // Drop guild_members.pending_link: superseded by pending_account_links (see below), which
-  // holds the link-accounts handshake token instead of a single FK column on guild_members.
+  // Drop guild_members.pending_link: superseded by pending_account_links below.
   if (await columnExists(db, "guild_members", "pending_link", isSqlite)) {
     if (
       !isSqlite &&
@@ -727,9 +724,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: dropped guild_members.pending_link");
   }
 
-  // pending_account_links table: link-accounts/confirm-link self-service handshake. `app` +
-  // `app_user_id` identify the requester; `chat_member_mapping_id` snapshots their existing
-  // identity at request time (NULL if they don't have one yet). Deleted on successful confirm.
+  // pending_account_links: link-accounts/confirm-link self-service handshake token.
   if (!(await tableExists(db, "pending_account_links", isSqlite))) {
     if (isSqlite) {
       await db.query(`
@@ -1825,14 +1820,8 @@ export async function ensureSchemaMigrations() {
     }
   }
 
-  // Drop emoji_frequency: pure legacy — every read/write path moved to guild_emojis.frequency
-  // long ago (ensureAndIncrementEmoji in messageProcessing.js), and the one-time admin backfill
-  // script that used to copy leftover counts out of it (discord-bot/scripts/sync-emoji-frequency.js)
-  // is gone too. So this does that backfill itself, once, automatically: any frequency still
-  // sitting here is added onto guild_emojis.frequency (summed across however many (app, guild_id)
-  // rows share an emoid — SELECT only needs emoid/frequency, so this works regardless of which
-  // historical shape the table is still in), inserting a bare guild_emojis row (name falls back
-  // to the id) for any emoid with no catalog row at all. Then the table itself is dropped.
+  // Drop emoji_frequency (pure legacy — counting lives in guild_emojis.frequency now): merge any
+  // leftover frequency into guild_emojis by emoid first, then drop the table.
   if (await tableExists(db, "emoji_frequency", isSqlite)) {
     const [legacyRows] = await db.query("SELECT emoid, frequency FROM emoji_frequency");
     const legacyTotals = new Map();
@@ -1874,9 +1863,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: emoji_frequency table already dropped");
   }
 
-  // Drop sticker_frequency: pure legacy, never read or written by any code — sticker usage
-  // counting lives in guild_emojis (type = 'sticker'), same as emoji counting. No data to
-  // preserve first (nothing ever wrote to it).
+  // Drop sticker_frequency: pure legacy, never read or written by any code.
   if (await tableExists(db, "sticker_frequency", isSqlite)) {
     await db.query("DROP TABLE sticker_frequency");
     applied.push("sticker_frequency table dropped (unused legacy table)");
@@ -1885,13 +1872,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: sticker_frequency table already dropped");
   }
 
-  // Drop configurations: the single-global predecessor to guild_config (per-(app, guild_id)
-  // config), which is what every feature actually reads/writes today. Its only remaining
-  // consumer was the guild_config backfill above, which already ran (using whatever was in this
-  // table) earlier in this same migration pass — so by this point there's nothing left to
-  // preserve. New defaults for that backfill, and for brand-new guilds, now come from
-  // CONFIG_METADATA (optionally overridden via CONFIG_DEFAULT_* env vars — see configMetadata.js)
-  // instead of this table.
+  // Drop configurations: superseded by guild_config; the backfill above already consumed it.
   if (await tableExists(db, "configurations", isSqlite)) {
     await db.query("DROP TABLE configurations");
     applied.push("configurations table dropped (superseded by guild_config)");
@@ -1900,12 +1881,8 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: configurations table already dropped");
   }
 
-  // guild_emojis: re-key from PRIMARY KEY (id) to PRIMARY KEY (app, id) — a custom emoji id is
-  // only unique within its own platform, so two apps could otherwise collide on the same id and
-  // silently merge into one row (wrong app/guild_id/name, misattributed frequency). Every row,
-  // unicode included, now belongs to exactly one app; any row left over from before this fix
-  // (including ones the legacy emoji_frequency backfill above inserted with app NULL) is
-  // attributed to 'discord' — the only app that has ever written here.
+  // guild_emojis: re-key PRIMARY KEY (id) to (app, id) — an id alone isn't unique across apps.
+  // Rows left with app NULL (pre-fix) are attributed to 'discord', the only app that's written here.
   if (
     (await tableExists(db, "guild_emojis", isSqlite)) &&
     !(await isColumnNotNull(db, "guild_emojis", "app", isSqlite))
@@ -1954,8 +1931,7 @@ export async function ensureSchemaMigrations() {
   }
 
   // member_emoji_tracking: add app, scope unique_user_emoji to (userid, app, emoid) — same
-  // cross-app emoid collision reasoning as guild_emojis above. Existing rows are attributed to
-  // 'discord', the only app that has ever written here.
+  // reasoning as guild_emojis above. Existing rows are attributed to 'discord'.
   if (
     (await tableExists(db, "member_emoji_tracking", isSqlite)) &&
     !(await columnExists(db, "member_emoji_tracking", "app", isSqlite))
@@ -2099,10 +2075,8 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: pin_history.guild_id column already exists");
   }
 
-  // pin_history: add `app` column + composite (app, msgid) uniqueness, replacing the msgid-only
-  // unique key — message ids are only guaranteed unique within their own platform, so two apps'
-  // ids could otherwise collide (see services/messageProcessing.js isMessageAlreadyPinned).
-  // Backfill existing rows to 'discord' (every pre-existing row predates multi-app support).
+  // pin_history: add `app` column + composite (app, msgid) uniqueness — msgid alone isn't
+  // unique across apps. Backfill existing rows to 'discord'.
   if (
     (await tableExists(db, "pin_history", isSqlite)) &&
     !(await columnExists(db, "pin_history", "app", isSqlite))
@@ -2140,9 +2114,7 @@ export async function ensureSchemaMigrations() {
       await db.query("ALTER TABLE pin_history ADD COLUMN app VARCHAR(20) NULL");
       await db.query("UPDATE pin_history SET app = 'discord' WHERE app IS NULL");
       await db.query("ALTER TABLE pin_history MODIFY COLUMN app VARCHAR(20) NOT NULL");
-      // The msgid-only unique index is named "msgid" on a fresh install (inline UNIQUE) or
-      // "unique_pin_history_msgid" on an install upgraded via the older surrogate-id migration
-      // above — drop whichever is actually present before adding the composite replacement.
+      // Old unique index is named "msgid" (fresh install) or "unique_pin_history_msgid" (upgraded).
       if (await indexExists(db, "pin_history", "msgid", isSqlite)) {
         await db.query("ALTER TABLE pin_history DROP INDEX msgid");
       } else if (await indexExists(db, "pin_history", "unique_pin_history_msgid", isSqlite)) {
@@ -2161,10 +2133,7 @@ export async function ensureSchemaMigrations() {
   }
 
   // member_repost_tracking: add `app` column + composite (app, userid, msgid, accuser)
-  // uniqueness, replacing the (userid, msgid, accuser) unique key — msgid is only guaranteed
-  // unique within its own platform. Global/per-user repost totals never filter on app (see
-  // services/leaderboards.js, services/milestones.js), so this only prevents cross-platform
-  // msgid collisions, not a per-app split in the stats.
+  // uniqueness — msgid alone isn't unique across apps. Totals still never filter on app.
   if (
     (await tableExists(db, "member_repost_tracking", isSqlite)) &&
     !(await columnExists(db, "member_repost_tracking", "app", isSqlite))
@@ -2216,9 +2185,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: member_repost_tracking.app column already exists");
   }
 
-  // plusplus_tracking.app column: which platform cast the vote. Global/per-word/per-user totals
-  // (services/leaderboards.js, services/milestones.js) never filter on it — a word's or user's
-  // score stays one cross-platform number, not fragmented per app.
+  // plusplus_tracking.app column: which platform cast the vote. Totals never filter on it.
   if (
     (await tableExists(db, "plusplus_tracking", isSqlite)) &&
     !(await columnExists(db, "plusplus_tracking", "app", isSqlite))

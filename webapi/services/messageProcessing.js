@@ -51,8 +51,7 @@ function requireChatAppFromPayload(payload) {
 
 /**
  * @param {string} emoid
- * @param {string} app - e.g. "discord"; accepted so a per-app check can be added once Fluxer's
- *   custom emoji id format is known (currently every supported app uses this same numeric test).
+ * @param {string} app - e.g. "discord"; reserved for a future per-app numeric-id check.
  * @returns {boolean} true if this looks like a real Discord snowflake (custom emoji/sticker), not a unicode character.
  */
 function isNumericEmoid(emoid, app) {
@@ -106,8 +105,7 @@ async function ensureAndIncrementEmoji(
     }
   }
 
-  // Scoped to (app, id): an id is only unique within its own platform, so two apps could
-  // otherwise collide on the same id and silently merge into one row.
+  // Scoped to (app, id) — an id alone isn't unique across apps.
   const [existing] = await db.query(
     "SELECT frequency FROM guild_emojis WHERE app = ? AND id = ?",
     [app, id],
@@ -130,8 +128,8 @@ async function ensureAndIncrementEmoji(
 }
 
 /**
- * Upsert member_emoji_tracking. DB-agnostic: SELECT then INSERT or UPDATE. Scoped to
- * (userid, app, emoid): an emoid is only unique within its own platform (see guild_emojis).
+ * Upsert member_emoji_tracking (SELECT then INSERT/UPDATE), scoped to (userid, app, emoid) —
+ * emoid alone isn't unique across apps.
  * @param {number} chatMemberMappingId - chat_member_mapping.id
  * @param {string} app
  * @param {string} emojiId
@@ -640,15 +638,11 @@ export async function countRepost(payload) {
 // --- Guild emoji / sticker catalog + usage counter (guild_emojis; type = 'emoji' | 'sticker' | NULL) ---
 
 /**
- * Replace this guild's custom emoji/sticker catalog in guild_emojis, keeping any row with usage
- * history: rows of this (app, guild_id, type) are deleted unless frequency IS NOT NULL AND > 0
- * (those survive even if the emoji/sticker is gone from Discord, so historical stats keep their
- * name/type). Every currently-live item is then upserted (keyed on id), so a kept row that's
- * still live gets its metadata refreshed in place rather than duplicated, and its frequency is
- * left untouched (upsert only writes the identity columns, never frequency) since it's
- * incremented separately by ensureAndIncrementEmoji on actual use. Gracefully discards the whole
- * sync if guildId isn't a known guild (guild_info) — see reactionHandler.js's mirror-image guard
- * on the bot side.
+ * Replace this guild's custom emoji/sticker catalog in guild_emojis. Upserts live items first
+ * (keyed on (app, id)) — deleting a still-live row before re-inserting it would lose its name —
+ * then deletes rows no longer live with no usage history (frequency > 0 rows always survive). If
+ * the incoming name equals the id, the existing name is kept instead (Discord has been observed
+ * to briefly report a name as its own id). Discards the sync if guildId is unknown.
  * @param {Array<{id?: string, name?: string, animated?: boolean, available?: boolean|null, managed?: boolean|null, requiresColons?: boolean|null, roles?: string[]}>} items
  * @param {"emoji"|"sticker"} assetKind
  * @param {string} app
@@ -675,19 +669,15 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
     (e) => e != null && (e.id != null || e.name != null),
   );
 
-  // Scoped by (app, guild_id, type) so replacing one kind's catalog never touches the other's.
-  // Rows with usage history (frequency > 0) are kept even if no longer live on Discord.
-  await db.query(
-    "DELETE FROM guild_emojis WHERE app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)",
-    [app, gid, assetKind],
-  );
-
+  // Upsert live items first — deleting a still-live row before re-inserting it would lose its name.
   let imported = 0;
+  const liveIds = [];
   for (const e of list) {
     const id = String(e.id ?? "").trim();
     const name = String((e.name ?? id) || "?").trim();
     if (id.length === 0 && name === "?") continue;
     const emoid = id || name;
+    liveIds.push(emoid);
 
     const params = [
       emoid,
@@ -709,7 +699,7 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
          ON CONFLICT(app, id) DO UPDATE SET
            guild_id = excluded.guild_id,
            type = excluded.type,
-           name = excluded.name,
+           name = CASE WHEN excluded.name = excluded.id THEN guild_emojis.name ELSE excluded.name END,
            animated = excluded.animated,
            available = excluded.available,
            managed = excluded.managed,
@@ -726,7 +716,7 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
            app = VALUES(app),
            guild_id = VALUES(guild_id),
            type = VALUES(type),
-           name = VALUES(name),
+           name = IF(VALUES(name) = VALUES(id), name, VALUES(name)),
            animated = VALUES(animated),
            available = VALUES(available),
            managed = VALUES(managed),
@@ -738,15 +728,30 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
     }
     imported++;
   }
+
+  // Remove no-longer-live rows with no usage history; frequency > 0 rows are kept regardless.
+  if (liveIds.length > 0) {
+    const placeholders = liveIds.map(() => "?").join(", ");
+    await db.query(
+      `DELETE FROM guild_emojis
+       WHERE app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)
+         AND id NOT IN (${placeholders})`,
+      [app, gid, assetKind, ...liveIds],
+    );
+  } else {
+    await db.query(
+      "DELETE FROM guild_emojis WHERE app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)",
+      [app, gid, assetKind],
+    );
+  }
+
   return { ok: true, imported };
 }
 
 // --- Pin history (for pin decision + log) ---
 
 /**
- * Check if a message was already logged as pinned. Scoped to `app`: message ids are only
- * guaranteed unique within their own platform, so a messageId lookup without app could match
- * (or appear to match) an unrelated pin from a different platform.
+ * Check if a message was already logged as pinned. Scoped to `app` — messageId alone isn't unique across platforms.
  * @param {string} messageId - platform message id (snowflake)
  * @param {string} app - e.g. "discord"
  * @returns {Promise<boolean>}

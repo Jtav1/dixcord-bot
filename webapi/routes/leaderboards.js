@@ -10,9 +10,7 @@ import {
 } from "../utils/chatAppHttp.js";
 
 /**
- * Optional `app` filter shared by the emoji/sticker leaderboard routes below: when given, both
- * the listed rows and their displayed totals are scoped to that one app (see
- * services/emojiFrequency.js); omitted, totals are the combined cross-app total for the name.
+ * Optional `app` filter shared by the emoji/sticker leaderboard routes below.
  * @param {import('express').Request} req
  * @returns {{ ok: true, app?: string } | { ok: false, error: string }}
  */

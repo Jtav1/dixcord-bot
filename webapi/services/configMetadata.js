@@ -3,9 +3,7 @@
  */
 
 /**
- * `CONFIG_DEFAULT_<KEY>` env var, falling back to `fallback` when unset — lets an operator
- * override a config key's out-of-the-box default without touching code. Commented out (so
- * unset) in .env/.env.example by default, which preserves `fallback` as the live behavior.
+ * `CONFIG_DEFAULT_<KEY>` env var, falling back to `fallback` when unset.
  * @param {string} key - CONFIG_METADATA key, e.g. "pin_threshold"
  * @param {string} fallback
  * @returns {string}
