@@ -3,6 +3,7 @@
  * joined-at. The link to chat_member_mapping lives in member_aliases, not here.
  */
 
+import crypto from "node:crypto";
 import db from "../config/db.js";
 import { getChatMemberAppConfig } from "./chatMemberMapping.js";
 import { attachRoleObjects } from "./guildInfo.js";
@@ -369,98 +370,132 @@ export async function listServersForUser(chatMemberMappingId) {
 }
 
 /**
- * Flag every other-guild guild_members row of `targetUserId` as pending a link to the
- * requester's row (sets pending_link = requester's guild_members.id).
- * @param {{ app: string, guildId: string, requesterUserId: string, targetUserId: string }} params
- * @returns {Promise<{ ok: true, flagged: number } | { ok: false, error: string }>}
+ * Does `name` already exist in chat_member_mapping?
+ * @param {string} name
+ * @returns {Promise<boolean>}
+ * @private
  */
-export async function requestAccountLink({ app, guildId, requesterUserId, targetUserId }) {
-  if (!getChatMemberAppConfig(app)) return { ok: false, error: "Unsupported app" };
-  if (requesterUserId === targetUserId) {
-    return { ok: false, error: "You can't link an account to itself" };
+async function chatMemberMappingNameExists(name) {
+  const [rows] = await db.query("SELECT id FROM chat_member_mapping WHERE name = ?", [name]);
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+/**
+ * Create a chat_member_mapping identity for a self-service link with no existing identity to
+ * attach to. Seeds the name from the requester's handle, disambiguating on collision.
+ * @param {string|null} seedName
+ * @returns {Promise<number>} the new chat_member_mapping.id
+ * @private
+ */
+async function createChatMemberMappingForSelfServiceLink(seedName) {
+  const base = String(seedName ?? "").trim() || "linked-user";
+  let name = base;
+  for (let suffix = 1; await chatMemberMappingNameExists(name); suffix += 1) {
+    name = `${base}-${suffix}`;
   }
+  const [result] = await db.query("INSERT INTO chat_member_mapping (name) VALUES (?)", [name]);
+  return Number(result?.insertId ?? result?.lastInsertRowid);
+}
+
+/**
+ * Start a self-service account link: snapshots the requester's existing identity (if any),
+ * generates a one-time token, and replaces any earlier pending request from them.
+ * @param {{ app: string, guildId: string, requesterUserId: string }} params
+ * @returns {Promise<{ ok: true, token: string } | { ok: false, error: string }>}
+ */
+export async function requestAccountLink({ app, guildId, requesterUserId }) {
+  if (!getChatMemberAppConfig(app)) return { ok: false, error: "Unsupported app" };
 
   const [requesterRows] = await db.query(
     "SELECT id FROM guild_members WHERE app = ? AND guild_id = ? AND platform_user_id = ?",
     [app, guildId, requesterUserId],
   );
-  if (!requesterRows?.length) {
+  const requester = requesterRows?.[0];
+  if (!requester) {
     return { ok: false, error: "Your membership hasn't been synced yet; try again in a few minutes" };
   }
 
-  const [result] = await db.query(
-    `UPDATE guild_members SET pending_link = ?
-     WHERE platform_user_id = ? AND NOT (app = ? AND guild_id = ?)`,
-    [requesterRows[0].id, targetUserId, app, guildId],
+  const [aliasRows] = await db.query(
+    "SELECT chat_member_mapping_id AS id FROM member_aliases WHERE guild_member_id = ?",
+    [requester.id],
   );
-  const flagged = result?.affectedRows ?? result?.changes ?? 0;
-  if (flagged === 0) {
-    return { ok: false, error: "No member with that user ID was found in another server" };
-  }
-  return { ok: true, flagged };
+  const chatMemberMappingId = aliasRows?.[0]?.id ?? null;
+
+  const token = crypto.randomBytes(16).toString("hex");
+
+  await db.query("DELETE FROM pending_account_links WHERE app = ? AND app_user_id = ?", [app, requesterUserId]);
+  await db.query(
+    "INSERT INTO pending_account_links (app, app_user_id, chat_member_mapping_id, auth_token) VALUES (?, ?, ?, ?)",
+    [app, requesterUserId, chatMemberMappingId, token],
+  );
+
+  return { ok: true, token };
 }
 
 /**
- * Accept a pending link: alias the requester's guild_members row to the confirming user's
- * existing chat_member_mapping identity, then clear the confirmer's pending_link. Takes no
- * action if the confirmer has zero or multiple identities, or the requester is already linked.
- * @param {{ app: string, guildId: string, userId: string }} params
- * @returns {Promise<{ ok: true, requesterHandle: string|null, chatMemberMappingId: number, requesterGuildMemberId: number } | { ok: false, error: string }>}
+ * Accept a self-service account link: alias the confirmer to the requester's identity (creating
+ * one if needed), keyed by token. The pending row is always deleted once the token resolves —
+ * success or failure — so it's usable for exactly one attempt. An unknown token is a no-op.
+ * @param {{ app: string, guildId: string, userId: string, token: string }} params
+ * @returns {Promise<{ ok: true, requesterHandle: string|null, chatMemberMappingId: number } | { ok: false, error: string }>}
  */
-export async function confirmAccountLink({ app, guildId, userId }) {
+export async function confirmAccountLink({ app, guildId, userId, token }) {
   if (!getChatMemberAppConfig(app)) return { ok: false, error: "Unsupported app" };
 
-  const [meRows] = await db.query(
-    "SELECT id, pending_link FROM guild_members WHERE app = ? AND guild_id = ? AND platform_user_id = ?",
-    [app, guildId, userId],
-  );
-  const me = meRows?.[0];
-  if (!me) return { ok: false, error: "Your membership hasn't been synced yet; try again in a few minutes" };
-  if (me.pending_link == null) return { ok: false, error: "You have no pending account link request" };
+  const authToken = String(token ?? "").trim();
+  if (!authToken) return { ok: false, error: "A link token is required" };
 
-  const [requesterRows] = await db.query(
-    "SELECT id, handle FROM guild_members WHERE id = ?",
-    [me.pending_link],
+  const [pendingRows] = await db.query(
+    "SELECT id, app, app_user_id, chat_member_mapping_id FROM pending_account_links WHERE auth_token = ?",
+    [authToken],
   );
-  const requester = requesterRows?.[0];
-  if (!requester) return { ok: false, error: "The pending link request is no longer valid" };
+  const pending = pendingRows?.[0];
+  if (!pending) return { ok: false, error: "Invalid or expired link token" };
 
-  const [identityRows] = await db.query(
-    `SELECT DISTINCT ma.chat_member_mapping_id AS id
-     FROM guild_members gm
-     JOIN member_aliases ma ON ma.guild_member_id = gm.id
-     WHERE gm.platform_user_id = ?`,
-    [userId],
-  );
-  if (!identityRows?.length) {
-    return { ok: false, error: "Your account isn't linked to an internal identity yet; ask an admin to link it first" };
-  }
-  if (identityRows.length > 1) {
-    console.error(
-      `confirmAccountLink: user ${userId} has multiple chat_member_mapping identities (${identityRows.map((r) => r.id).join(", ")}); no action taken`,
+  try {
+    const [confirmerRows] = await db.query(
+      "SELECT id FROM guild_members WHERE app = ? AND guild_id = ? AND platform_user_id = ?",
+      [app, guildId, userId],
     );
-    return { ok: false, error: "Your account is linked to multiple internal identities; ask an admin to sort this out" };
+    const confirmer = confirmerRows?.[0];
+    if (!confirmer) {
+      return { ok: false, error: "Your membership hasn't been synced yet; try again in a few minutes" };
+    }
+
+    if (pending.app === app && pending.app_user_id === userId) {
+      return { ok: false, error: "You can't link an account to itself" };
+    }
+
+    const [existingAlias] = await db.query(
+      "SELECT id FROM member_aliases WHERE guild_member_id = ?",
+      [confirmer.id],
+    );
+    if (existingAlias?.length) {
+      return { ok: false, error: "Your account is already linked to an identity" };
+    }
+
+    const [requesterRows] = await db.query(
+      "SELECT id, handle, nickname FROM guild_members WHERE app = ? AND platform_user_id = ? ORDER BY synced_at DESC LIMIT 1",
+      [pending.app, pending.app_user_id],
+    );
+    const requester = requesterRows?.[0];
+    if (!requester) {
+      return { ok: false, error: "The account that requested this link is no longer available" };
+    }
+
+    let chatMemberMappingId = pending.chat_member_mapping_id;
+    if (chatMemberMappingId == null) {
+      chatMemberMappingId = await createChatMemberMappingForSelfServiceLink(
+        requester.handle ?? requester.nickname ?? pending.app_user_id,
+      );
+      await linkGuildMemberAlias(requester.id, chatMemberMappingId);
+      await setPrimaryAlias(chatMemberMappingId, requester.id);
+    }
+
+    await linkGuildMemberAlias(confirmer.id, chatMemberMappingId);
+
+    return { ok: true, requesterHandle: requester.handle ?? null, chatMemberMappingId };
+  } finally {
+    await db.query("DELETE FROM pending_account_links WHERE id = ?", [pending.id]);
   }
-
-  const [existingAlias] = await db.query(
-    "SELECT id FROM member_aliases WHERE guild_member_id = ?",
-    [requester.id],
-  );
-  if (existingAlias?.length) {
-    return { ok: false, error: "The requesting account is already linked to an identity" };
-  }
-
-  const chatMemberMappingId = Number(identityRows[0].id);
-  await db.query(
-    "INSERT INTO member_aliases (chat_member_mapping_id, guild_member_id) VALUES (?, ?)",
-    [chatMemberMappingId, requester.id],
-  );
-  await db.query("UPDATE guild_members SET pending_link = NULL WHERE id = ?", [me.id]);
-
-  return {
-    ok: true,
-    requesterHandle: requester.handle ?? null,
-    chatMemberMappingId,
-    requesterGuildMemberId: requester.id,
-  };
 }

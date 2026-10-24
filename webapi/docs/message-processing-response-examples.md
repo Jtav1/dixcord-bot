@@ -160,41 +160,6 @@ or
 
 ---
 
-## POST /api/message-processing/emoji-frequency-sync
-
-**200 OK**
-
-```json
-{
-  "ok": true,
-  "dryRun": false,
-  "deleted": 2,
-  "inserted": 5,
-  "updated": 52,
-  "synced": 57
-}
-```
-
-**400 Bad Request**
-
-```json
-{
-  "ok": false,
-  "error": "guildId is required"
-}
-```
-
-**500 Internal Server Error**
-
-```json
-{
-  "ok": false,
-  "error": "Failed to sync emoji frequency"
-}
-```
-
----
-
 ## POST /api/message-processing/sticker-import
 
 **200 OK**
@@ -241,6 +206,15 @@ or
 ```json
 {
   "alreadyPinned": false
+}
+```
+
+**400 Bad Request** (app missing/unsupported — the pin dedup key is now `app` + `messageId`, since message ids are only unique within their own platform)
+
+```json
+{
+  "ok": false,
+  "error": "Parameter \"app\" is required and must be one of: discord, fluxer."
 }
 ```
 

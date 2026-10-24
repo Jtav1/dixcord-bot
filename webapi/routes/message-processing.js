@@ -1,5 +1,5 @@
 import express from "express";
-import { authenticate, requireBotOrAdmin, requireOwnGuildOrAdmin } from "../middleware/auth.js";
+import { authenticate, requireOwnGuildOrAdmin } from "../middleware/auth.js";
 import {
   countEmoji,
   countSticker,
@@ -7,7 +7,6 @@ import {
   recordPlusMinusReaction,
   countRepost,
   importGuildAssetFrequencyList,
-  syncGuildEmojiFrequency,
   isMessageAlreadyPinned,
   logPinnedMessage,
 } from "../services/messageProcessing.js";
@@ -443,91 +442,6 @@ router.post("/emoji-import", authenticate, async (req, res) => {
 });
 
 /**
- * POST /api/message-processing/emoji-frequency-sync
- * Admin maintenance for discord-bot/scripts/sync-emoji-frequency.js. First deletes guild_emojis
- * rows attributed to another guild (misattributed/legacy), then copies frequency from
- * emoji_frequency into guild_emojis for this guild — updating existing catalog rows and
- * inserting any missing ones (emoji_frequency is the source of truth for id/type/frequency when
- * a catalog row doesn't exist yet). Covers both emoji and sticker rows.
- * dryRun:true computes the same counts without writing anything.
- * Body: { app: "discord", guildId: string, dryRun?: boolean }
- * Auth: bot or admin.
- * @openapi
- * /api/message-processing/emoji-frequency-sync:
- *   post:
- *     operationId: syncEmojiFrequency
- *     tags: [Message Processing]
- *     summary: Sync guild_emojis frequency/rows from emoji_frequency for one guild
- *     description: >
- *       Deletes guild_emojis rows whose guild_id belongs to a different guild (app matches, but
- *       guild_id doesn't), then for every emoji_frequency row belonging to (app, guildId) — emoji
- *       and sticker alike, per emoji_frequency.type (NULL = emoji) — copies its frequency into
- *       the matching guild_emojis row (keyed on id), inserting one if it doesn't exist yet using
- *       only what emoji_frequency has (name falls back to the id). dryRun:true previews the same
- *       counts (deleted/inserted/updated) without writing anything.
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [app, guildId]
- *             properties:
- *               app: { type: string, enum: [discord, fluxer] }
- *               guildId: { type: string }
- *               dryRun: { type: boolean, default: false }
- *     responses:
- *       '200':
- *         description: Sync complete (or previewed, if dryRun).
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok: { type: boolean, enum: [true] }
- *                 dryRun: { type: boolean }
- *                 deleted: { type: integer, description: "guild_emojis rows removed (misattributed to another guild)." }
- *                 inserted: { type: integer, description: "guild_emojis rows newly created from emoji_frequency." }
- *                 updated: { type: integer, description: "Existing guild_emojis rows whose frequency was copied over." }
- *                 synced: { type: integer, description: "inserted + updated." }
- *       '400':
- *         description: Missing/invalid app or guildId.
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       '401':
- *         $ref: '#/components/responses/Unauthorized'
- *       '403':
- *         $ref: '#/components/responses/ForbiddenBotOrAdmin'
- *       '500':
- *         $ref: '#/components/responses/ServerError'
- */
-router.post("/emoji-frequency-sync", authenticate, requireBotOrAdmin, async (req, res) => {
-  try {
-    if (!resolveChatAppFromRequest(req)) {
-      return res.status(400).json(CHAT_APP_PARAM_ERROR);
-    }
-    const { app, guildId, dryRun } = req.body ?? {};
-    const result = await syncGuildEmojiFrequency(app, guildId, Boolean(dryRun));
-    if (!result.ok) {
-      return res.status(400).json({ ok: false, error: "guildId is required" });
-    }
-    res.json({
-      ok: true,
-      dryRun: Boolean(dryRun),
-      deleted: result.deleted ?? 0,
-      inserted: result.inserted ?? 0,
-      updated: result.updated ?? 0,
-      synced: result.synced ?? 0,
-    });
-  } catch (err) {
-    console.error("POST /api/message-processing/emoji-frequency-sync error:", err);
-    res.status(500).json({ ok: false, error: "Failed to sync emoji frequency" });
-  }
-});
-
-/**
  * POST /api/message-processing/sticker-import
  * Sync server sticker list (like emoji-import; no animated field).
  * Replaces this guild's guild_emojis catalog rows (type='sticker'), keeping rows with usage
@@ -607,7 +521,7 @@ router.post("/sticker-import", authenticate, async (req, res) => {
 /**
  * POST /api/message-processing/pin-check
  * Check if a message was already logged as pinned.
- * Body: { messageId: string }
+ * Body: { app: "discord", messageId: string }
  * Response: { alreadyPinned: boolean }
  * Auth: required.
  * @openapi
@@ -616,15 +530,19 @@ router.post("/sticker-import", authenticate, async (req, res) => {
  *     operationId: checkPinStatus
  *     tags: [Message Processing]
  *     summary: Check whether a message is already logged as pinned
+ *     description: >
+ *       Scoped to app + messageId: message ids are only unique within their own platform, so
+ *       app disambiguates a messageId that could otherwise collide across platforms.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [messageId]
+ *             required: [app, messageId]
  *             properties:
- *               messageId: { type: string, description: "Discord message snowflake." }
+ *               app: { type: string, enum: [discord, fluxer] }
+ *               messageId: { type: string, description: "Platform message snowflake." }
  *     responses:
  *       '200':
  *         description: Pin status.
@@ -634,6 +552,12 @@ router.post("/sticker-import", authenticate, async (req, res) => {
  *               type: object
  *               properties:
  *                 alreadyPinned: { type: boolean }
+ *       '400':
+ *         description: app missing/unsupported.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
@@ -641,8 +565,12 @@ router.post("/sticker-import", authenticate, async (req, res) => {
  */
 router.post("/pin-check", authenticate, async (req, res) => {
   try {
+    const app = resolveChatAppFromRequest(req);
+    if (!app) {
+      return res.status(400).json(CHAT_APP_PARAM_ERROR);
+    }
     const { messageId } = req.body ?? {};
-    const alreadyPinned = await isMessageAlreadyPinned(messageId);
+    const alreadyPinned = await isMessageAlreadyPinned(messageId, app);
     res.json({ alreadyPinned });
   } catch (err) {
     console.error(err);

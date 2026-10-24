@@ -120,13 +120,25 @@ const definition = {
         type: "object",
         description:
           "A resolved guild_emojis row — the shape every webapi response uses for an emoji " +
-          "or sticker, in place of a bare emoid. If the emoid has no matching guild_emojis " +
-          "row (deleted), only emoid is populated and the rest are null.",
+          "or sticker, in place of a bare emoid. Keyed on (app, id); `frequency`/`byApp` are " +
+          "the combined total across every app sharing this emoji's name (narrow via the " +
+          "request's `app` filter, where supported). No matching row → only emoid/app populated.",
         properties: {
           emoid: { type: "string", description: "Discord emoji/sticker snowflake, or the literal unicode character for a built-in emoji." },
           app: { type: "string", nullable: true },
           emoji: { type: "string", nullable: true, description: "Display name (custom emoji/sticker) or the unicode character itself." },
-          frequency: { type: "integer", nullable: true, description: "Global usage count for this emoid." },
+          frequency: { type: "integer", nullable: true, description: "Usage count for this emoji's name, summed across every app (or just one app if the request's `app` filter narrowed it)." },
+          byApp: {
+            type: "array",
+            description: "Per-app breakdown behind `frequency`.",
+            items: {
+              type: "object",
+              properties: {
+                app: { type: "string" },
+                total: { type: "integer" },
+              },
+            },
+          },
           animated: { type: "integer", nullable: true, enum: [0, 1, null] },
           type: { type: "string", nullable: true, enum: ["emoji", "sticker", null] },
         },
@@ -135,15 +147,24 @@ const definition = {
         type: "object",
         description:
           "Resolved value of an \"emoji\"-typed config entry (pin_emoji, plusplus_emoji, " +
-          "minusminus_emoji, repost_emoji). If the stored value matches a synced guild_emojis " +
-          "row, this is that row (app is the real app name). If it's freeform text an admin typed " +
-          "by hand that was never synced, app/emoid are null and `emoji` holds the raw text — " +
-          "comparisons should fall back to matching that string (see emojisMatch).",
+          "minusminus_emoji, repost_emoji); frequency/byApp are the combined cross-app total " +
+          "for its display name. If it's freeform text never synced, app/emoid are null and " +
+          "`emoji` holds the raw text — comparisons fall back to matching that string (see emojisMatch).",
         properties: {
           emoid: { type: "string", nullable: true },
           app: { type: "string", nullable: true },
           emoji: { type: "string", nullable: true },
           frequency: { type: "integer", nullable: true },
+          byApp: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                app: { type: "string" },
+                total: { type: "integer" },
+              },
+            },
+          },
           animated: { type: "integer", nullable: true, enum: [0, 1, null] },
           type: { type: "string", nullable: true, enum: ["emoji", "sticker", null] },
         },

@@ -86,7 +86,6 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/message-processing/count-repost` | ✓ | Record or withdraw repost accusation |
 | POST | `/api/message-processing/emoji-import` | ✓ | Sync server emoji list (body: `{ app, emojis }`) |
 | POST | `/api/message-processing/sticker-import` | ✓ | Sync server sticker list (body: `{ app, stickers }`) |
-| POST | `/api/message-processing/emoji-frequency-sync` | bot/admin | Delete guild_emojis rows misattributed to another guild, then copy emoji_frequency into guild_emojis for this guild (body: `{ app, guildId }`) |
 | POST | `/api/message-processing/pin-check` | ✓ | Check if message already pinned (body: `{ messageId }`) |
 | POST | `/api/message-processing/pin-log` | ✓ | Log message as pinned (body: `{ messageId }`) |
 | POST | `/api/message-processing/timeout-vote` | ✓ | Record a vote-to-timeout reaction (body: `{ app, guildId, messageId, targetPlatformId, voterPlatformId, weight? }`); returns `triggered:true` + duration/response message once threshold is reached |
@@ -136,7 +135,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/leaderboards/plusplus/total?string=&type=word or user` | ✓ | Total for word or user |
 | GET | `/api/leaderboards/plusplus/voter/:userId` | ✓ | Vote count by voter |
 | POST | `/api/leaderboards/plusplus/top-voters` | ✓ | Top voters (body: `{ limit? }`) |
-| POST | `/api/leaderboards/emoji` | ✓ | Top emojis (body: `{ limit? }`) |
+| POST | `/api/leaderboards/emoji` | ✓ | Top emojis (body: `{ limit?, guildId?, app? }`); totals are combined across apps unless `app` is given |
 | POST | `/api/leaderboards/repost` | ✓ | Top reposters (body: `{ limit? }`) |
 | GET | `/api/leaderboards/repost/user/:userId` | ✓ | Repost count for user |
 | GET | `/api/leaderboards/emoji/user/:userId?app=discord` | ✓ | Per-user emoji stats |
@@ -165,8 +164,8 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/guild-members/:guildMemberId/link` | admin | Link (or move) a guild_member to a chat_member_mapping identity (body: `{ chatMemberMappingId }`) |
 | DELETE | `/api/guild-members/:guildMemberId/link` | admin | Unlink a guild_member from its identity |
 | POST | `/api/guild-members/sync` | ✓ | Upsert a server's membership list (body: `{ app, guildId, members }`); never removes members, safe for a full roster or a single incremental push |
-| POST | `/api/guild-members/link-request` | bot/admin | User-initiated: flag a user's rows in other servers as pending link to the requester (body: `{ app, guildId, requesterUserId, targetUserId }`) |
-| POST | `/api/guild-members/link-confirm` | bot/admin | Confirm a pending link: requester's row becomes an alias of the confirmer's existing identity (body: `{ app, guildId, userId }`); errors if 0 or multiple identities |
+| POST | `/api/guild-members/link-request` | bot/admin | User-initiated: generate a one-time link token for the requester, snapshotting their existing identity if they have one (body: `{ app, guildId, requesterUserId }`) |
+| POST | `/api/guild-members/link-confirm` | bot/admin | Confirm a pending link by token: confirmer's row becomes an alias of the requester's identity, creating one if the requester didn't have one yet (body: `{ app, guildId, userId, token }`) |
 | GET | `/api/events/plusplus` | ✓ | Raw plusplus events |
 | GET | `/api/events/reposts` | ✓ | Raw repost events |
 | GET | `/api/audit-log` | admin | Audit log |

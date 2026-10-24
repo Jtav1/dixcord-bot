@@ -17,6 +17,32 @@ import { guildConfigExistsFor, seedDefaultConfigForGuild } from "../services/gui
 const isSqlite = isSqliteDb();
 
 /**
+ * Whether a column is currently declared NOT NULL (guards idempotent nullable->NOT NULL migrations).
+ * @param {import('mysql2/promise').Pool | { query: Function }} db
+ * @param {string} table
+ * @param {string} column
+ * @param {boolean} isSqlite
+ * @returns {Promise<boolean>}
+ */
+async function isColumnNotNull(db, table, column, isSqlite) {
+  if (isSqlite) {
+    const [rows] = await db.query(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [table],
+    );
+    const ddl = rows?.[0]?.sql ?? "";
+    const match = new RegExp(`[(,]\\s*${column}\\s+\\w+[^,)]*`, "i").exec(ddl);
+    return !!match && /NOT NULL/i.test(match[0]);
+  }
+  const [rows] = await db.query(
+    `SELECT IS_NULLABLE FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [table, column],
+  );
+  return String(rows?.[0]?.IS_NULLABLE ?? "YES").toUpperCase() === "NO";
+}
+
+/**
  * Get or create a trigger_response_functions row by name, returning its id.
  * Used only to backfill trigger_response.response_function during the FK-id migration below.
  * @param {import('mysql2/promise').Pool | { query: Function }} db
@@ -467,14 +493,12 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: guild_config table already exists");
   }
 
-  // One-time backfill: seed guild_config for every known server from global `configurations`/defaults
+  // One-time backfill: seed guild_config for every known server from CONFIG_METADATA's defaults.
   if (await tableExists(db, "guild_config", isSqlite)) {
     const [existingGuilds] = await db.query("SELECT app, guild_id FROM guild_info");
-    const [globalConfigRows] = await db.query("SELECT config, value FROM configurations");
-    const globalOverrides = Array.isArray(globalConfigRows) ? globalConfigRows : [];
     for (const guild of existingGuilds ?? []) {
       if (await guildConfigExistsFor(guild.app, guild.guild_id)) continue;
-      await seedDefaultConfigForGuild(guild.app, guild.guild_id, globalOverrides);
+      await seedDefaultConfigForGuild(guild.app, guild.guild_id);
       applied.push(`guild_config backfill for ${guild.app}/${guild.guild_id}`);
       console.log(
         `db: migration applied: seeded guild_config for ${guild.app}/${guild.guild_id}`,
@@ -687,30 +711,53 @@ export async function ensureSchemaMigrations() {
     }
   }
 
-  // guild_members.pending_link: id of the guild_members row that requested an account link
-  // (link-accounts); cleared by confirm-link.
-  if (await tableExists(db, "guild_members", isSqlite)) {
-    if (!(await columnExists(db, "guild_members", "pending_link", isSqlite))) {
-      await db.query(
-        isSqlite
-          ? "ALTER TABLE guild_members ADD COLUMN pending_link INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL"
-          : "ALTER TABLE guild_members ADD COLUMN pending_link INT NULL",
-      );
-      applied.push("guild_members.pending_link column");
-      console.log("db: migration applied: added guild_members.pending_link column");
-    } else {
-      console.log("db: schema ok: guild_members.pending_link column already exists");
-    }
+  // Drop guild_members.pending_link: superseded by pending_account_links below.
+  if (await columnExists(db, "guild_members", "pending_link", isSqlite)) {
     if (
       !isSqlite &&
-      !(await constraintExists(db, "guild_members", "fk_guild_members_pending_link", isSqlite))
+      (await constraintExists(db, "guild_members", "fk_guild_members_pending_link", isSqlite))
     ) {
-      await db.query(
-        "ALTER TABLE guild_members ADD CONSTRAINT fk_guild_members_pending_link FOREIGN KEY (pending_link) REFERENCES guild_members(id) ON DELETE SET NULL",
-      );
-      applied.push("guild_members.pending_link foreign key");
-      console.log("db: migration applied: added guild_members.pending_link foreign key");
+      await db.query("ALTER TABLE guild_members DROP FOREIGN KEY fk_guild_members_pending_link");
     }
+    await db.query("ALTER TABLE guild_members DROP COLUMN pending_link");
+    applied.push("guild_members.pending_link column dropped");
+    console.log("db: migration applied: dropped guild_members.pending_link");
+  }
+
+  // pending_account_links: link-accounts/confirm-link self-service handshake token.
+  if (!(await tableExists(db, "pending_account_links", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE pending_account_links (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          app_user_id TEXT NOT NULL,
+          chat_member_mapping_id INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          auth_token TEXT NOT NULL UNIQUE,
+          created_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      await db.query(
+        "CREATE INDEX idx_pending_account_links_app_user ON pending_account_links (app, app_user_id)",
+      );
+    } else {
+      await db.query(`
+        CREATE TABLE pending_account_links (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          app VARCHAR(20) NOT NULL,
+          app_user_id VARCHAR(64) NOT NULL,
+          chat_member_mapping_id INT NULL,
+          auth_token CHAR(32) NOT NULL UNIQUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          KEY idx_pending_account_links_app_user (app, app_user_id),
+          CONSTRAINT fk_pending_account_links_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
+        )
+      `);
+    }
+    applied.push("pending_account_links table");
+    console.log("db: migration applied: created pending_account_links table");
+  } else {
+    console.log("db: schema ok: pending_account_links table already exists");
   }
 
   // Backfill guild_members.handle from chat_member_mapping.discord_handle (the OLD table's own
@@ -1019,94 +1066,6 @@ export async function ensureSchemaMigrations() {
           ? "ALTER TABLE pin_history ADD COLUMN hydrated INTEGER NOT NULL DEFAULT 0"
           : "ALTER TABLE pin_history ADD COLUMN hydrated TINYINT(1) NOT NULL DEFAULT 0",
       );
-    }
-  }
-
-  // Seed pin_message_role_ids if missing
-  const [pinRoleRows] = await db.query(
-    "SELECT config FROM configurations WHERE config = 'pin_message_role_ids'",
-  );
-  if (!pinRoleRows || pinRoleRows.length === 0) {
-    await db.query("INSERT INTO configurations (config, value) VALUES (?, ?)", [
-      "pin_message_role_ids",
-      '["612842488302141441"]',
-    ]);
-    applied.push("pin_message_role_ids configuration seed");
-    console.log(
-      "db: migration applied: seeded pin_message_role_ids configuration",
-    );
-  } else {
-    console.log(
-      "db: schema ok: pin_message_role_ids configuration already exists",
-    );
-  }
-
-  // Seed user_mapping_import_channel_id if missing (migrated off the
-  // discord-bot DISCORD_USER_MAPPING_IMPORT_CHANNEL_ID env var)
-  const [userMappingChannelRows] = await db.query(
-    "SELECT config FROM configurations WHERE config = 'user_mapping_import_channel_id'",
-  );
-  if (!userMappingChannelRows || userMappingChannelRows.length === 0) {
-    await db.query("INSERT INTO configurations (config, value) VALUES (?, ?)", [
-      "user_mapping_import_channel_id",
-      "",
-    ]);
-    applied.push("user_mapping_import_channel_id configuration seed");
-    console.log(
-      "db: migration applied: seeded user_mapping_import_channel_id configuration",
-    );
-  } else {
-    console.log(
-      "db: schema ok: user_mapping_import_channel_id configuration already exists",
-    );
-  }
-
-  // Seed feature-toggle configuration keys (default enabled) if missing
-  const featureToggleKeys = [
-    "trigger_responses_enabled",
-    "reminders_enabled",
-    "eight_ball_enabled",
-    "emoji_tracking_enabled",
-    "sticker_tracking_enabled",
-    "plusplus_enabled",
-    "repost_detection_enabled",
-    "pin_system_enabled",
-    "twitter_fix_enabled",
-  ];
-  for (const key of featureToggleKeys) {
-    const [rows] = await db.query(
-      "SELECT config FROM configurations WHERE config = ?",
-      [key],
-    );
-    if (!rows || rows.length === 0) {
-      await db.query(
-        "INSERT INTO configurations (config, value) VALUES (?, ?)",
-        [key, "true"],
-      );
-      applied.push(`${key} configuration seed`);
-      console.log(`db: migration applied: seeded ${key} configuration`);
-    } else {
-      console.log(`db: schema ok: ${key} configuration already exists`);
-    }
-  }
-
-  // Drop deprecated/unused configuration keys
-  const deprecatedConfigKeys = [
-    "rare_frequency",
-    "take_a_look_delay",
-    "take_a_look_repost_limit",
-    "timeout_emoji",
-    "timeout_vote_threshold",
-  ];
-  for (const key of deprecatedConfigKeys) {
-    const [rows] = await db.query(
-      "SELECT config FROM configurations WHERE config = ?",
-      [key],
-    );
-    if (rows && rows.length > 0) {
-      await db.query("DELETE FROM configurations WHERE config = ?", [key]);
-      applied.push(`${key} configuration removed`);
-      console.log(`db: migration applied: removed deprecated ${key} configuration`);
     }
   }
 
@@ -1861,6 +1820,156 @@ export async function ensureSchemaMigrations() {
     }
   }
 
+  // Drop emoji_frequency (pure legacy — counting lives in guild_emojis.frequency now): merge any
+  // leftover frequency into guild_emojis by emoid first, then drop the table.
+  if (await tableExists(db, "emoji_frequency", isSqlite)) {
+    const [legacyRows] = await db.query("SELECT emoid, frequency FROM emoji_frequency");
+    const legacyTotals = new Map();
+    for (const row of legacyRows ?? []) {
+      const emoid = String(row.emoid ?? "").trim();
+      const frequency = Number(row.frequency) || 0;
+      if (!emoid || frequency === 0) continue;
+      legacyTotals.set(emoid, (legacyTotals.get(emoid) ?? 0) + frequency);
+    }
+
+    let merged = 0;
+    let inserted = 0;
+    for (const [emoid, legacyFrequency] of legacyTotals) {
+      const [existing] = await db.query("SELECT id FROM guild_emojis WHERE id = ?", [emoid]);
+      if (existing && existing.length > 0) {
+        await db.query("UPDATE guild_emojis SET frequency = frequency + ? WHERE id = ?", [
+          legacyFrequency,
+          emoid,
+        ]);
+        merged += 1;
+      } else {
+        await db.query("INSERT INTO guild_emojis (id, name, frequency) VALUES (?, ?, ?)", [
+          emoid,
+          emoid,
+          legacyFrequency,
+        ]);
+        inserted += 1;
+      }
+    }
+
+    await db.query("DROP TABLE emoji_frequency");
+    applied.push(
+      `emoji_frequency table dropped (merged into ${merged}, inserted ${inserted} guild_emojis row(s) first)`,
+    );
+    console.log(
+      `db: migration applied: dropped legacy emoji_frequency table (merged into ${merged}, inserted ${inserted} guild_emojis row(s) from its leftover counts first)`,
+    );
+  } else {
+    console.log("db: schema ok: emoji_frequency table already dropped");
+  }
+
+  // Drop sticker_frequency: pure legacy, never read or written by any code.
+  if (await tableExists(db, "sticker_frequency", isSqlite)) {
+    await db.query("DROP TABLE sticker_frequency");
+    applied.push("sticker_frequency table dropped (unused legacy table)");
+    console.log("db: migration applied: dropped unused legacy sticker_frequency table");
+  } else {
+    console.log("db: schema ok: sticker_frequency table already dropped");
+  }
+
+  // Drop configurations: superseded by guild_config; the backfill above already consumed it.
+  if (await tableExists(db, "configurations", isSqlite)) {
+    await db.query("DROP TABLE configurations");
+    applied.push("configurations table dropped (superseded by guild_config)");
+    console.log("db: migration applied: dropped legacy configurations table (superseded by guild_config)");
+  } else {
+    console.log("db: schema ok: configurations table already dropped");
+  }
+
+  // guild_emojis: re-key PRIMARY KEY (id) to (app, id) — an id alone isn't unique across apps.
+  // Rows left with app NULL (pre-fix) are attributed to 'discord', the only app that's written here.
+  if (
+    (await tableExists(db, "guild_emojis", isSqlite)) &&
+    !(await isColumnNotNull(db, "guild_emojis", "app", isSqlite))
+  ) {
+    await db.query("UPDATE guild_emojis SET app = 'discord' WHERE app IS NULL");
+
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_emojis_new (
+          id TEXT NOT NULL,
+          app TEXT NOT NULL,
+          guild_id TEXT NULL,
+          type TEXT NULL,
+          name TEXT NOT NULL,
+          animated INTEGER DEFAULT 0,
+          available INTEGER NULL,
+          managed INTEGER NULL,
+          requires_colons INTEGER NULL,
+          roles TEXT NULL,
+          frequency INTEGER NOT NULL DEFAULT 0,
+          synced_at TEXT DEFAULT (datetime('now')),
+          PRIMARY KEY (app, id)
+        )
+      `);
+      await db.query(`
+        INSERT INTO guild_emojis_new
+          (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles, frequency, synced_at)
+        SELECT id, app, guild_id, type, name, animated, available, managed, requires_colons, roles, frequency, synced_at
+        FROM guild_emojis
+      `);
+      await db.query("DROP TABLE guild_emojis");
+      await db.query("ALTER TABLE guild_emojis_new RENAME TO guild_emojis");
+      await db.query("CREATE INDEX idx_guild_emojis_guild ON guild_emojis (app, guild_id)");
+      await db.query("CREATE INDEX idx_guild_emojis_name ON guild_emojis (name)");
+    } else {
+      await db.query("ALTER TABLE guild_emojis MODIFY COLUMN app VARCHAR(20) NOT NULL");
+      await db.query("ALTER TABLE guild_emojis DROP PRIMARY KEY, ADD PRIMARY KEY (app, id)");
+      if (!(await indexExists(db, "guild_emojis", "idx_guild_emojis_name", isSqlite))) {
+        await db.query("ALTER TABLE guild_emojis ADD KEY idx_guild_emojis_name (name)");
+      }
+    }
+    applied.push("guild_emojis re-keyed to PRIMARY KEY (app, id)");
+    console.log("db: migration applied: re-keyed guild_emojis to PRIMARY KEY (app, id)");
+  } else {
+    console.log("db: schema ok: guild_emojis already keyed on (app, id)");
+  }
+
+  // member_emoji_tracking: add app, scope unique_user_emoji to (userid, app, emoid) — same
+  // reasoning as guild_emojis above. Existing rows are attributed to 'discord'.
+  if (
+    (await tableExists(db, "member_emoji_tracking", isSqlite)) &&
+    !(await columnExists(db, "member_emoji_tracking", "app", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE member_emoji_tracking_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          app TEXT NOT NULL,
+          emoid TEXT NOT NULL,
+          frequency INTEGER DEFAULT 1,
+          UNIQUE (userid, app, emoid)
+        )
+      `);
+      await db.query(`
+        INSERT INTO member_emoji_tracking_new (id, userid, app, emoid, frequency)
+        SELECT id, userid, 'discord', emoid, frequency FROM member_emoji_tracking
+      `);
+      await db.query("DROP TABLE member_emoji_tracking");
+      await db.query("ALTER TABLE member_emoji_tracking_new RENAME TO member_emoji_tracking");
+    } else {
+      await db.query("ALTER TABLE member_emoji_tracking ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE member_emoji_tracking SET app = 'discord' WHERE app IS NULL");
+      await db.query("ALTER TABLE member_emoji_tracking MODIFY COLUMN app VARCHAR(20) NOT NULL");
+      await db.query("ALTER TABLE member_emoji_tracking DROP INDEX unique_user_emoji");
+      await db.query(
+        "ALTER TABLE member_emoji_tracking ADD UNIQUE KEY unique_user_emoji (userid, app, emoid)",
+      );
+    }
+    applied.push("member_emoji_tracking.app column + unique_user_emoji scoped to (userid, app, emoid)");
+    console.log(
+      "db: migration applied: added member_emoji_tracking.app, scoped unique_user_emoji to (userid, app, emoid)",
+    );
+  } else {
+    console.log("db: schema ok: member_emoji_tracking already scoped to (userid, app, emoid)");
+  }
+
   // scheduled_messages: generalize discord_channel_id/discord_guild_id (resolved via a per-app
   // column-name map) to a plain app/channel_id/guild_id shape, matching every other app-scoped
   // table. Pre-existing rows predate multi-app support, so backfilling app='discord' is safe.
@@ -1925,8 +2034,6 @@ export async function ensureSchemaMigrations() {
 
   // pin_history.guild_id: lets each app's bot hydration loop (and admin filtering) scope to its
   // own pins instead of a mixed-app stream, now that more than one platform can create pins.
-  // No app column (per design: a single guild_id already disambiguates, since every bot
-  // instance is single-guild and Discord/Fluxer id spaces don't collide in practice).
   if (
     (await tableExists(db, "pin_history", isSqlite)) &&
     !(await columnExists(db, "pin_history", "guild_id", isSqlite))
@@ -1966,6 +2073,137 @@ export async function ensureSchemaMigrations() {
     }
   } else {
     console.log("db: schema ok: pin_history.guild_id column already exists");
+  }
+
+  // pin_history: add `app` column + composite (app, msgid) uniqueness — msgid alone isn't
+  // unique across apps. Backfill existing rows to 'discord'.
+  if (
+    (await tableExists(db, "pin_history", isSqlite)) &&
+    !(await columnExists(db, "pin_history", "app", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE pin_history_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          msgid TEXT NOT NULL,
+          timestamp TEXT DEFAULT (datetime('now')),
+          author INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
+          contents TEXT NULL,
+          attachments TEXT NULL,
+          channel_id TEXT NULL,
+          channel_name TEXT NULL,
+          pinners TEXT NULL,
+          hydrated INTEGER NOT NULL DEFAULT 1,
+          guild_id TEXT NULL,
+          UNIQUE (app, msgid)
+        )
+      `);
+      await db.query(`
+        INSERT INTO pin_history_new (
+          id, app, msgid, timestamp, author, contents, attachments, channel_id, channel_name,
+          pinners, hydrated, guild_id
+        )
+        SELECT id, 'discord', msgid, timestamp, author, contents, attachments, channel_id,
+          channel_name, pinners, hydrated, guild_id
+        FROM pin_history
+      `);
+      await db.query("DROP TABLE pin_history");
+      await db.query("ALTER TABLE pin_history_new RENAME TO pin_history");
+    } else {
+      await db.query("ALTER TABLE pin_history ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE pin_history SET app = 'discord' WHERE app IS NULL");
+      await db.query("ALTER TABLE pin_history MODIFY COLUMN app VARCHAR(20) NOT NULL");
+      // Old unique index is named "msgid" (fresh install) or "unique_pin_history_msgid" (upgraded).
+      if (await indexExists(db, "pin_history", "msgid", isSqlite)) {
+        await db.query("ALTER TABLE pin_history DROP INDEX msgid");
+      } else if (await indexExists(db, "pin_history", "unique_pin_history_msgid", isSqlite)) {
+        await db.query("ALTER TABLE pin_history DROP INDEX unique_pin_history_msgid");
+      }
+      await db.query(
+        "ALTER TABLE pin_history ADD UNIQUE KEY unique_pin_history_app_msgid (app, msgid)",
+      );
+    }
+    applied.push("pin_history.app column + composite unique(app, msgid)");
+    console.log(
+      "db: migration applied: added pin_history.app column, backfilled 'discord' for pre-existing rows, and replaced the msgid-only unique key with (app, msgid)",
+    );
+  } else {
+    console.log("db: schema ok: pin_history.app column already exists");
+  }
+
+  // member_repost_tracking: add `app` column + composite (app, userid, msgid, accuser)
+  // uniqueness — msgid alone isn't unique across apps. Totals still never filter on app.
+  if (
+    (await tableExists(db, "member_repost_tracking", isSqlite)) &&
+    !(await columnExists(db, "member_repost_tracking", "app", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE member_repost_tracking_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          msgid TEXT NOT NULL,
+          accuser INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          timestamp TEXT DEFAULT (datetime('now')),
+          msgcontents TEXT,
+          UNIQUE (app, userid, msgid, accuser)
+        )
+      `);
+      await db.query(`
+        INSERT INTO member_repost_tracking_new (
+          id, app, userid, msgid, accuser, timestamp, msgcontents
+        )
+        SELECT id, 'discord', userid, msgid, accuser, timestamp, msgcontents
+        FROM member_repost_tracking
+      `);
+      await db.query("DROP TABLE member_repost_tracking");
+      await db.query("ALTER TABLE member_repost_tracking_new RENAME TO member_repost_tracking");
+    } else {
+      await db.query("ALTER TABLE member_repost_tracking ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE member_repost_tracking SET app = 'discord' WHERE app IS NULL");
+      await db.query(
+        "ALTER TABLE member_repost_tracking MODIFY COLUMN app VARCHAR(20) NOT NULL",
+      );
+      if (await indexExists(db, "member_repost_tracking", "unique_repost_accusation", isSqlite)) {
+        await db.query(
+          "ALTER TABLE member_repost_tracking DROP INDEX unique_repost_accusation",
+        );
+      }
+      await db.query(
+        "ALTER TABLE member_repost_tracking ADD UNIQUE KEY unique_repost_accusation (app, userid, msgid, accuser)",
+      );
+    }
+    applied.push(
+      "member_repost_tracking.app column + composite unique(app, userid, msgid, accuser)",
+    );
+    console.log(
+      "db: migration applied: added member_repost_tracking.app column, backfilled 'discord' for pre-existing rows, and replaced the (userid, msgid, accuser) unique key with (app, userid, msgid, accuser)",
+    );
+  } else {
+    console.log("db: schema ok: member_repost_tracking.app column already exists");
+  }
+
+  // plusplus_tracking.app column: which platform cast the vote. Totals never filter on it.
+  if (
+    (await tableExists(db, "plusplus_tracking", isSqlite)) &&
+    !(await columnExists(db, "plusplus_tracking", "app", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query("ALTER TABLE plusplus_tracking ADD COLUMN app TEXT");
+      await db.query("UPDATE plusplus_tracking SET app = 'discord' WHERE app IS NULL");
+    } else {
+      await db.query("ALTER TABLE plusplus_tracking ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE plusplus_tracking SET app = 'discord' WHERE app IS NULL");
+      await db.query("ALTER TABLE plusplus_tracking MODIFY COLUMN app VARCHAR(20) NOT NULL");
+    }
+    applied.push("plusplus_tracking.app column (backfilled 'discord' for pre-existing rows)");
+    console.log(
+      "db: migration applied: added plusplus_tracking.app column, backfilled 'discord' for pre-existing rows",
+    );
+  } else {
+    console.log("db: schema ok: plusplus_tracking.app column already exists");
   }
 
   if (applied.length === 0) {

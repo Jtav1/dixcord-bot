@@ -30,11 +30,6 @@ CREATE TABLE IF NOT EXISTS chat_member_mapping (
 );
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
-CREATE TABLE IF NOT EXISTS configurations (
-  config TEXT PRIMARY KEY,
-  value TEXT
-);
-
 CREATE TABLE IF NOT EXISTS eight_ball_responses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   response_string TEXT NOT NULL,
@@ -43,8 +38,10 @@ CREATE TABLE IF NOT EXISTS eight_ball_responses (
   UNIQUE (response_string, sentiment)
 );
 
+-- app records which platform cast the vote; totals never filter on it.
 CREATE TABLE IF NOT EXISTS plusplus_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
   type TEXT NOT NULL,
   string TEXT,
   voter INTEGER REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
@@ -57,9 +54,11 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
 -- (cross-platform, no owner). Fully replaced per-guild on each emoji-import sync (mirrors
 -- guild_channels/guild_roles); unicode rows are added lazily on first use, never synced from Discord
 -- (no such API exists — see discord-bot/api/emojis.js).
+-- Keyed on (app, id), not id alone — an id isn't unique across apps (see emojiFrequency.js for
+-- how cross-app totals are computed, grouped by name).
 CREATE TABLE IF NOT EXISTS guild_emojis (
-  id TEXT PRIMARY KEY,
-  app TEXT NULL,
+  id TEXT NOT NULL,
+  app TEXT NOT NULL,
   guild_id TEXT NULL,
   type TEXT NULL,                     -- "emoji" | "sticker" | NULL (unicode); scopes the per-kind full-replace sync
   name TEXT NOT NULL,
@@ -68,56 +67,41 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   managed INTEGER NULL,
   requires_colons INTEGER NULL,
   roles TEXT NULL,
-  frequency INTEGER NOT NULL DEFAULT 0,  -- synced from emoji_frequency by discord-bot/scripts/sync-emoji-frequency.js
-  synced_at TEXT DEFAULT (datetime('now'))
+  frequency INTEGER NOT NULL DEFAULT 0,  -- usage counter, incremented directly (see ensureAndIncrementEmoji)
+  synced_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (app, id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_guild_emojis_guild ON guild_emojis (app, guild_id);
+CREATE INDEX IF NOT EXISTS idx_guild_emojis_name ON guild_emojis (name);
 
--- Per-guild usage counter for any emoji/sticker seen in a message/reaction. `type` classifies the
--- row (emoji/sticker/unicode) for leaderboard filtering; display identity (name, animated) lives
--- in guild_emojis, joined via emoid.
--- emoid is a soft reference to guild_emojis.id, deliberately NOT a real FK: guild_emojis is fully
--- replaced (delete+insert) on every catalog sync, and emoid is part of this table's PRIMARY KEY
--- (so it can't be nulled out) — a real FK with ON DELETE CASCADE would silently destroy usage
--- history the moment an emoji/sticker is removed from Discord. Missing catalog rows resolve to a
--- placeholder object at read time (see attachEmojiObjects), matching guild_channels/guild_roles.
-CREATE TABLE IF NOT EXISTS emoji_frequency (
-  app TEXT NOT NULL,
-  guild_id TEXT NOT NULL,
-  emoid TEXT NOT NULL,
-  frequency INTEGER NOT NULL DEFAULT 0,
-  type TEXT DEFAULT NULL,
-  PRIMARY KEY (app, guild_id, emoid)
-);
-
-CREATE TABLE IF NOT EXISTS sticker_frequency (
-  stickerid TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  frequency INTEGER NOT NULL DEFAULT 0
-);
-
+-- emoid alone isn't unique across apps (see guild_emojis), so app is part of the per-user key too.
 CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  app TEXT NOT NULL,
   emoid TEXT NOT NULL,
   frequency INTEGER DEFAULT 1,
-  UNIQUE (userid, emoid)
+  UNIQUE (userid, app, emoid)
 );
 
+-- app is part of the accusation key too — msgid isn't unique across apps. Totals never filter on it.
 CREATE TABLE IF NOT EXISTS member_repost_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
   userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   msgid TEXT NOT NULL,
   accuser INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   timestamp TEXT DEFAULT (datetime('now')),
   msgcontents TEXT,
-  UNIQUE (userid, msgid, accuser)
+  UNIQUE (app, userid, msgid, accuser)
 );
 
+-- app + msgid is the dedup key (not msgid alone) — msgid isn't unique across apps.
 CREATE TABLE IF NOT EXISTS pin_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  msgid TEXT NOT NULL UNIQUE,
+  app TEXT NOT NULL,
+  msgid TEXT NOT NULL,
   timestamp TEXT DEFAULT (datetime('now')),
   author INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE SET NULL,
   contents TEXT NULL,
@@ -126,7 +110,8 @@ CREATE TABLE IF NOT EXISTS pin_history (
   channel_name TEXT NULL,
   pinners TEXT NULL,
   hydrated INTEGER NOT NULL DEFAULT 1,
-  guild_id TEXT NULL
+  guild_id TEXT NULL,
+  UNIQUE (app, msgid)
 );
 
 CREATE TABLE IF NOT EXISTS link_replacements (
@@ -312,9 +297,6 @@ CREATE TABLE IF NOT EXISTS guild_members (
   roles TEXT NULL,
   joined_at TEXT NULL,
   synced_at TEXT DEFAULT (datetime('now')),
-  -- guild_members.id of a user who asked (link-accounts) to link their account to this one;
-  -- NULL = no pending request. Cleared by confirm-link.
-  pending_link INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL,
   UNIQUE (app, guild_id, platform_user_id)
 );
 
@@ -331,6 +313,18 @@ CREATE TABLE IF NOT EXISTS member_aliases (
 );
 
 CREATE INDEX IF NOT EXISTS idx_member_aliases_chat_member ON member_aliases (chat_member_mapping_id);
+
+-- Self-service account-link handshake (link-accounts / confirm-link); deleted on confirm.
+CREATE TABLE IF NOT EXISTS pending_account_links (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
+  app_user_id TEXT NOT NULL,
+  chat_member_mapping_id INTEGER NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  auth_token TEXT NOT NULL UNIQUE,
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_pending_account_links_app_user ON pending_account_links (app, app_user_id);
 
 -- Admin-defined usage-stat thresholds. `type` is the fine-grained metric key (see
 -- webapi/services/milestoneTypes.js), `item` scopes it to one entity (null = global), `object`

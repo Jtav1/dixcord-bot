@@ -143,29 +143,29 @@ async function postLinkAction(path, body) {
 }
 
 /**
- * Flag another server's account for linking to the requester's. POST /api/guild-members/link-request.
+ * Request a one-time account-link token for the requester. POST /api/guild-members/link-request.
  * @param {string} requesterUserId
- * @param {string} targetUserId
- * @returns {Promise<{ ok: boolean, error?: string }>}
+ * @returns {Promise<{ ok: boolean, error?: string, token?: string }>}
  */
-export function requestAccountLink(requesterUserId, targetUserId) {
+export function requestAccountLink(requesterUserId) {
   return postLinkAction("/api/guild-members/link-request", {
     app: "discord",
     guildId,
     requesterUserId,
-    targetUserId,
   });
 }
 
 /**
- * Confirm a pending account link. POST /api/guild-members/link-confirm.
+ * Confirm a pending account link using the token the requester was given. POST /api/guild-members/link-confirm.
  * @param {string} userId
+ * @param {string} token
  * @returns {Promise<{ ok: boolean, error?: string, requesterHandle?: string|null }>}
  */
-export function confirmAccountLink(userId) {
+export function confirmAccountLink(userId, token) {
   return postLinkAction("/api/guild-members/link-confirm", {
     app: "discord",
     guildId,
     userId,
+    token,
   });
 }

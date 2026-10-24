@@ -24,11 +24,6 @@ CREATE TABLE IF NOT EXISTS chat_member_mapping (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
-CREATE TABLE IF NOT EXISTS configurations (
-  config VARCHAR(255) PRIMARY KEY,
-  value VARCHAR(255)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 CREATE TABLE IF NOT EXISTS eight_ball_responses (
   id INT AUTO_INCREMENT PRIMARY KEY,
   response_string VARCHAR(500) NOT NULL,
@@ -37,8 +32,10 @@ CREATE TABLE IF NOT EXISTS eight_ball_responses (
   UNIQUE KEY unique_response (response_string, sentiment)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- app records which platform cast the vote; totals never filter on it.
 CREATE TABLE IF NOT EXISTS plusplus_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  app VARCHAR(20) NOT NULL,
   type VARCHAR(10) NOT NULL,
   string VARCHAR(500) DEFAULT NULL,
   voter INT DEFAULT NULL,
@@ -52,9 +49,11 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
 -- (cross-platform, no owner). Fully replaced per-guild on each emoji-import sync (mirrors
 -- guild_channels/guild_roles); unicode rows are added lazily on first use, never synced from Discord
 -- (no such API exists — see discord-bot/api/emojis.js).
+-- Keyed on (app, id), not id alone — an id isn't unique across apps (see emojiFrequency.js for
+-- how cross-app totals are computed, grouped by name).
 CREATE TABLE IF NOT EXISTS guild_emojis (
-  id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin PRIMARY KEY, -- exact-match identity (custom snowflake or unicode emoji char); a linguistic _ci collation treats many distinct emoji as equal
-  app VARCHAR(20) NULL,
+  id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL, -- exact-match identity (custom snowflake or unicode emoji char); a linguistic _ci collation treats many distinct emoji as equal
+  app VARCHAR(20) NOT NULL,
   guild_id VARCHAR(64) NULL,
   type VARCHAR(50) NULL,              -- "emoji" | "sticker" | NULL (unicode); scopes the per-kind full-replace sync
   name VARCHAR(255) NOT NULL,
@@ -63,37 +62,18 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   managed TINYINT(1) NULL,
   requires_colons TINYINT(1) NULL,
   roles TEXT NULL,
-  frequency INT NOT NULL DEFAULT 0,   -- synced from emoji_frequency by discord-bot/scripts/sync-emoji-frequency.js
+  frequency INT NOT NULL DEFAULT 0,   -- usage counter, incremented directly (see ensureAndIncrementEmoji)
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_guild_emojis_guild (app, guild_id)
+  PRIMARY KEY (app, id),
+  KEY idx_guild_emojis_guild (app, guild_id),
+  KEY idx_guild_emojis_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Per-guild usage counter for any emoji/sticker seen in a message/reaction. `type` classifies the
--- row (emoji/sticker/unicode) for leaderboard filtering; display identity (name, animated) lives
--- in guild_emojis, joined via emoid.
--- emoid is a soft reference to guild_emojis.id, deliberately NOT a real FK: guild_emojis is fully
--- replaced (delete+insert) on every catalog sync, and emoid is part of this table's PRIMARY KEY
--- (so it can't be nulled out) — a real FK with ON DELETE CASCADE would silently destroy usage
--- history the moment an emoji/sticker is removed from Discord. Missing catalog rows resolve to a
--- placeholder object at read time (see attachEmojiObjects), matching guild_channels/guild_roles.
-CREATE TABLE IF NOT EXISTS emoji_frequency (
-  app VARCHAR(20) NOT NULL,
-  guild_id VARCHAR(64) NOT NULL,
-  emoid VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
-  frequency INT NOT NULL DEFAULT 0,
-  type VARCHAR(50) DEFAULT NULL,
-  PRIMARY KEY (app, guild_id, emoid)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE IF NOT EXISTS sticker_frequency (
-  stickerid VARCHAR(255) PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  frequency INT NOT NULL DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
+-- app + msgid is the dedup key (not msgid alone) — msgid isn't unique across apps.
 CREATE TABLE IF NOT EXISTS pin_history (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  msgid VARCHAR(255) NOT NULL UNIQUE,
+  app VARCHAR(20) NOT NULL,
+  msgid VARCHAR(255) NOT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   author INT NULL,
   contents VARCHAR(5000) NULL,
@@ -103,26 +83,31 @@ CREATE TABLE IF NOT EXISTS pin_history (
   pinners TEXT NULL,
   hydrated TINYINT(1) NOT NULL DEFAULT 1,
   guild_id VARCHAR(64) NULL,
+  UNIQUE KEY unique_pin_history_app_msgid (app, msgid),
   CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- emoid alone isn't unique across apps (see guild_emojis), so app is part of the per-user key too.
 CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
   userid INT NOT NULL,
+  app VARCHAR(20) NOT NULL,
   emoid VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
   frequency INT DEFAULT 1,
-  UNIQUE KEY unique_user_emoji (userid, emoid),
+  UNIQUE KEY unique_user_emoji (userid, app, emoid),
   CONSTRAINT fk_user_emoji_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- app is part of the accusation key too — msgid isn't unique across apps. Totals never filter on it.
 CREATE TABLE IF NOT EXISTS member_repost_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
+  app VARCHAR(20) NOT NULL,
   userid INT NOT NULL,
   msgid VARCHAR(500) NOT NULL,
   accuser INT NOT NULL,
   timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
   msgcontents TEXT DEFAULT NULL,
-  UNIQUE KEY unique_repost_accusation (userid, msgid, accuser),
+  UNIQUE KEY unique_repost_accusation (app, userid, msgid, accuser),
   CONSTRAINT fk_repost_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   CONSTRAINT fk_repost_accuser FOREIGN KEY (accuser) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -315,12 +300,8 @@ CREATE TABLE IF NOT EXISTS guild_members (
   roles TEXT NULL,
   joined_at DATETIME NULL,
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  -- guild_members.id of a user who asked (link-accounts) to link their account to this one;
-  -- NULL = no pending request. Cleared by confirm-link.
-  pending_link INT NULL,
   UNIQUE KEY uniq_guild_members_app_guild_platform (app, guild_id, platform_user_id),
-  KEY idx_guild_members_app_guild (app, guild_id),
-  CONSTRAINT fk_guild_members_pending_link FOREIGN KEY (pending_link) REFERENCES guild_members(id) ON DELETE SET NULL
+  KEY idx_guild_members_app_guild (app, guild_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Links one chat_member_mapping identity to many guild_members rows (one-to-many). A
@@ -335,6 +316,18 @@ CREATE TABLE IF NOT EXISTS member_aliases (
   KEY idx_member_aliases_chat_member (chat_member_mapping_id),
   CONSTRAINT fk_member_aliases_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   CONSTRAINT fk_member_aliases_guild_member FOREIGN KEY (guild_member_id) REFERENCES guild_members(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Self-service account-link handshake (link-accounts / confirm-link); deleted on confirm.
+CREATE TABLE IF NOT EXISTS pending_account_links (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  app VARCHAR(20) NOT NULL,
+  app_user_id VARCHAR(64) NOT NULL,
+  chat_member_mapping_id INT NULL,
+  auth_token CHAR(32) NOT NULL UNIQUE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_pending_account_links_app_user (app, app_user_id),
+  CONSTRAINT fk_pending_account_links_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Added here (not inline above) because chat_member_mapping is declared before guild_members.

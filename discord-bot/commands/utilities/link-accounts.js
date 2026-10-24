@@ -5,22 +5,15 @@ const cmdName = "link-accounts";
 
 const data = new SlashCommandBuilder()
   .setName("link-accounts")
-  .setDescription("Request to link your account with your account on another server")
-  .addStringOption((option) =>
-    option
-      .setName("user-id")
-      .setDescription("Your user ID on the other server (they must then run /confirm-link)")
-      .setRequired(true),
-  );
+  .setDescription("Get a token to link your account with your account on another server");
 
 const execute = async (interaction) => {
-  const targetUserId = interaction.options.getString("user-id").trim();
-  const result = await requestAccountLink(interaction.user.id, targetUserId);
+  const result = await requestAccountLink(interaction.user.id);
 
   await interaction.reply({
     flags: MessageFlags.Ephemeral,
     content: result.ok
-      ? "Link requested. Now run confirm-link from that account on the other server to finish."
+      ? `Your link token is \`${result.token}\`. Run /confirm-link with this token from the account you want to link.`
       : `Couldn't request link: ${result.error}`,
   });
 };

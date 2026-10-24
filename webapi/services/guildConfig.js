@@ -32,7 +32,7 @@ export async function listGuildConfig(app, guildId) {
       config: row.config,
       value:
         CONFIG_METADATA[row.config]?.type === "emoji"
-          ? await resolveConfigEmojiValue(row.value)
+          ? await resolveConfigEmojiValue(row.value, app)
           : (row.value ?? ""),
     })),
   );

@@ -49,8 +49,12 @@ function requireChatAppFromPayload(payload) {
 
 // --- Emoji detector (count emoji usage) ---
 
-/** @param {string} emoid @returns {boolean} true if this looks like a real Discord snowflake (custom emoji/sticker), not a unicode character. */
-function isNumericEmoid(emoid) {
+/**
+ * @param {string} emoid
+ * @param {string} app - e.g. "discord"; reserved for a future per-app numeric-id check.
+ * @returns {boolean} true if this looks like a real Discord snowflake (custom emoji/sticker), not a unicode character.
+ */
+function isNumericEmoid(emoid, app) {
   return /^\d+$/.test(String(emoid));
 }
 
@@ -88,7 +92,7 @@ async function ensureAndIncrementEmoji(
     return { frequency: null, inserted: false };
   }
 
-  const numeric = isNumericEmoid(id);
+  const numeric = isNumericEmoid(id, app);
 
   if (numeric) {
     const [knownGuild] = await db.query(
@@ -101,43 +105,53 @@ async function ensureAndIncrementEmoji(
     }
   }
 
-  const [existing] = await db.query("SELECT frequency FROM guild_emojis WHERE id = ?", [id]);
+  // Scoped to (app, id) — an id alone isn't unique across apps.
+  const [existing] = await db.query(
+    "SELECT frequency FROM guild_emojis WHERE app = ? AND id = ?",
+    [app, id],
+  );
 
   if (existing && existing.length > 0) {
-    await db.query("UPDATE guild_emojis SET frequency = frequency + 1 WHERE id = ?", [id]);
+    await db.query(
+      "UPDATE guild_emojis SET frequency = frequency + 1 WHERE app = ? AND id = ?",
+      [app, id],
+    );
     return { frequency: Number(existing[0].frequency) + 1, inserted: false };
   }
 
   await db.query(
     `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, frequency)
      VALUES (?, ?, ?, ?, ?, ?, 1)`,
-    [id, numeric ? app : null, numeric ? gid : null, type, name, emojiAnimated ? 1 : 0],
+    [id, app, numeric ? gid : null, type, name, emojiAnimated ? 1 : 0],
   );
   return { frequency: 1, inserted: true };
 }
 
 /**
- * Upsert member_emoji_tracking. DB-agnostic: SELECT then INSERT or UPDATE.
+ * Upsert member_emoji_tracking (SELECT then INSERT/UPDATE), scoped to (userid, app, emoid) —
+ * emoid alone isn't unique across apps.
  * @param {number} chatMemberMappingId - chat_member_mapping.id
+ * @param {string} app
+ * @param {string} emojiId
  * @private
  */
-async function upsertUserEmoji(chatMemberMappingId, emojiId) {
+async function upsertUserEmoji(chatMemberMappingId, app, emojiId) {
   if (chatMemberMappingId == null || !emojiId) return;
 
   const [rows] = await db.query(
-    "SELECT frequency FROM member_emoji_tracking WHERE userid = ? AND emoid = ?",
-    [chatMemberMappingId, emojiId],
+    "SELECT frequency FROM member_emoji_tracking WHERE userid = ? AND app = ? AND emoid = ?",
+    [chatMemberMappingId, app, emojiId],
   );
 
   if (rows && rows.length > 0) {
     await db.query(
-      "UPDATE member_emoji_tracking SET frequency = frequency + 1 WHERE userid = ? AND emoid = ?",
-      [chatMemberMappingId, emojiId],
+      "UPDATE member_emoji_tracking SET frequency = frequency + 1 WHERE userid = ? AND app = ? AND emoid = ?",
+      [chatMemberMappingId, app, emojiId],
     );
   } else {
     await db.query(
-      "INSERT INTO member_emoji_tracking (userid, emoid, frequency) VALUES (?, ?, 1)",
-      [chatMemberMappingId, emojiId],
+      "INSERT INTO member_emoji_tracking (userid, app, emoid, frequency) VALUES (?, ?, ?, 1)",
+      [chatMemberMappingId, app, emojiId],
     );
   }
 }
@@ -183,8 +197,8 @@ export async function countEmoji(payload) {
     getGuildConfigValue(chatApp, guildId, "plusplus_emoji"),
     getGuildConfigValue(chatApp, guildId, "minusminus_emoji"),
   ]);
-  const plusEmoji = await resolveConfigEmojiValue(plusValue);
-  const minusEmoji = await resolveConfigEmojiValue(minusValue);
+  const plusEmoji = await resolveConfigEmojiValue(plusValue, chatApp);
+  const minusEmoji = await resolveConfigEmojiValue(minusValue, chatApp);
 
   if (!authorId || !Array.isArray(emojis) || emojis.length === 0) {
     return { ok: false };
@@ -235,7 +249,7 @@ export async function countEmoji(payload) {
       em.type,
     );
     if (id && authorId) {
-      await upsertUserEmoji(authorMap.id, id);
+      await upsertUserEmoji(authorMap.id, chatApp, id);
     }
     if (frequency != null) {
       milestones.push(
@@ -328,7 +342,7 @@ export async function countSticker(payload) {
       "sticker",
     );
     if (id && authorId) {
-      await upsertUserEmoji(authorMap.id, id);
+      await upsertUserEmoji(authorMap.id, chatApp, id);
     }
     if (frequency != null) {
       milestones.push(
@@ -414,8 +428,8 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
   if (typestr === "word") {
     if (!target || String(target).trim() === "") return { ok: false, milestones: [] };
     await db.query(
-      "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
-      ["word", String(target), voterRes.id, value],
+      "INSERT INTO plusplus_tracking (app, type, string, voter, value) VALUES (?, ?, ?, ?, ?)",
+      [chatApp, "word", String(target), voterRes.id, value],
     );
     const milestones = await checkAllPlusPlusMilestones({ typestr, target, value, chatApp });
     return { ok: true, milestones };
@@ -425,8 +439,8 @@ async function recordPlusPlus(target, typestr, voterDiscordId, value, chatApp) {
   if (!targetRes.ok) return { ok: false, milestones: [] };
 
   await db.query(
-    "INSERT INTO plusplus_tracking (type, string, voter, value) VALUES (?, ?, ?, ?)",
-    ["user", String(targetRes.id), voterRes.id, value],
+    "INSERT INTO plusplus_tracking (app, type, string, voter, value) VALUES (?, ?, ?, ?, ?)",
+    [chatApp, "user", String(targetRes.id), voterRes.id, value],
   );
   const milestones = await checkAllPlusPlusMilestones({ typestr, target, value, chatApp });
   return { ok: true, milestones };
@@ -573,19 +587,19 @@ export async function countRepost(payload) {
 
   if (repost === 1) {
     const [existing] = await db.query(
-      "SELECT 1 FROM member_repost_tracking WHERE userid = ? AND msgid = ? AND accuser = ?",
-      [authorId, msgid, accuserId],
+      "SELECT 1 FROM member_repost_tracking WHERE app = ? AND userid = ? AND msgid = ? AND accuser = ?",
+      [chatApp, authorId, msgid, accuserId],
     );
     if (existing && existing.length > 0) {
       const now = new Date().toISOString().slice(0, 19).replace("T", " ");
       await db.query(
-        "UPDATE member_repost_tracking SET msgcontents = ?, timestamp = ? WHERE userid = ? AND msgid = ? AND accuser = ?",
-        [msgcontents || null, now, authorId, msgid, accuserId],
+        "UPDATE member_repost_tracking SET msgcontents = ?, timestamp = ? WHERE app = ? AND userid = ? AND msgid = ? AND accuser = ?",
+        [msgcontents || null, now, chatApp, authorId, msgid, accuserId],
       );
     } else {
       await db.query(
-        "INSERT INTO member_repost_tracking (userid, msgid, accuser, msgcontents) VALUES (?, ?, ?, ?)",
-        [authorId, msgid, accuserId, msgcontents || null],
+        "INSERT INTO member_repost_tracking (app, userid, msgid, accuser, msgcontents) VALUES (?, ?, ?, ?, ?)",
+        [chatApp, authorId, msgid, accuserId, msgcontents || null],
       );
     }
 
@@ -611,8 +625,8 @@ export async function countRepost(payload) {
 
   if (repost === -1) {
     const [result] = await db.query(
-      "DELETE FROM member_repost_tracking WHERE msgid = ? AND accuser = ?",
-      [msgid, accuserId],
+      "DELETE FROM member_repost_tracking WHERE app = ? AND msgid = ? AND accuser = ?",
+      [chatApp, msgid, accuserId],
     );
     const deleted = result?.affectedRows ?? result?.changes ?? 0;
     return { ok: true, action: "withdrawn", deleted, milestones: [] };
@@ -624,15 +638,11 @@ export async function countRepost(payload) {
 // --- Guild emoji / sticker catalog + usage counter (guild_emojis; type = 'emoji' | 'sticker' | NULL) ---
 
 /**
- * Replace this guild's custom emoji/sticker catalog in guild_emojis, keeping any row with usage
- * history: rows of this (app, guild_id, type) are deleted unless frequency IS NOT NULL AND > 0
- * (those survive even if the emoji/sticker is gone from Discord, so historical stats keep their
- * name/type). Every currently-live item is then upserted (keyed on id), so a kept row that's
- * still live gets its metadata refreshed in place rather than duplicated, and its frequency is
- * left untouched (upsert only writes the identity columns, never frequency) since it's
- * incremented separately by ensureAndIncrementEmoji on actual use. Gracefully discards the whole
- * sync if guildId isn't a known guild (guild_info) — see reactionHandler.js's mirror-image guard
- * on the bot side.
+ * Replace this guild's custom emoji/sticker catalog in guild_emojis. Upserts live items first
+ * (keyed on (app, id)) — deleting a still-live row before re-inserting it would lose its name —
+ * then deletes rows no longer live with no usage history (frequency > 0 rows always survive). If
+ * the incoming name equals the id, the existing name is kept instead (Discord has been observed
+ * to briefly report a name as its own id). Discards the sync if guildId is unknown.
  * @param {Array<{id?: string, name?: string, animated?: boolean, available?: boolean|null, managed?: boolean|null, requiresColons?: boolean|null, roles?: string[]}>} items
  * @param {"emoji"|"sticker"} assetKind
  * @param {string} app
@@ -659,19 +669,15 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
     (e) => e != null && (e.id != null || e.name != null),
   );
 
-  // Scoped by (app, guild_id, type) so replacing one kind's catalog never touches the other's.
-  // Rows with usage history (frequency > 0) are kept even if no longer live on Discord.
-  await db.query(
-    "DELETE FROM guild_emojis WHERE app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)",
-    [app, gid, assetKind],
-  );
-
+  // Upsert live items first — deleting a still-live row before re-inserting it would lose its name.
   let imported = 0;
+  const liveIds = [];
   for (const e of list) {
     const id = String(e.id ?? "").trim();
     const name = String((e.name ?? id) || "?").trim();
     if (id.length === 0 && name === "?") continue;
     const emoid = id || name;
+    liveIds.push(emoid);
 
     const params = [
       emoid,
@@ -690,11 +696,10 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
       await db.query(
         `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           app = excluded.app,
+         ON CONFLICT(app, id) DO UPDATE SET
            guild_id = excluded.guild_id,
            type = excluded.type,
-           name = excluded.name,
+           name = CASE WHEN excluded.name = excluded.id THEN guild_emojis.name ELSE excluded.name END,
            animated = excluded.animated,
            available = excluded.available,
            managed = excluded.managed,
@@ -711,7 +716,7 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
            app = VALUES(app),
            guild_id = VALUES(guild_id),
            type = VALUES(type),
-           name = VALUES(name),
+           name = IF(VALUES(name) = VALUES(id), name, VALUES(name)),
            animated = VALUES(animated),
            available = VALUES(available),
            managed = VALUES(managed),
@@ -723,110 +728,47 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
     }
     imported++;
   }
-  return { ok: true, imported };
-}
 
-/**
- * Admin maintenance for the discord-bot sync-emoji-frequency script: a one-time backfill for
- * installs with historical usage counts still sitting in the now-legacy emoji_frequency table
- * (counting has since moved entirely to guild_emojis.frequency — see ensureAndIncrementEmoji).
- * Two steps, in order:
- *
- * 1. Delete guild_emojis rows attributed to another guild (app matches, guild_id set but not
- *    this one) — legacy/misattributed rows, not normal churn from an emoji being removed on
- *    Discord (that leaves guild_id correct and is left alone).
- * 2. For every emoji_frequency row belonging to this (app, guildId) — emoji and sticker alike,
- *    distinguished by emoji_frequency.type (NULL = emoji) — copy its frequency into the matching
- *    guild_emojis row (keyed on id = emoid). If no such catalog row exists yet, insert one using
- *    only what emoji_frequency has: id, app, guild_id, type (NULL treated as "emoji"), frequency,
- *    and name falls back to the id itself (emoji_frequency carries no display name).
- *
- * With dryRun, every count below is still computed (via SELECT, not the actual DELETE/INSERT/
- * UPDATE) so a caller can preview exactly what a real run would do.
- * @param {string} app
- * @param {string} guildId
- * @param {boolean} [dryRun]
- * @returns {Promise<{ok: boolean, dryRun?: boolean, deleted?: number, inserted?: number, updated?: number, synced?: number}>}
- */
-export async function syncGuildEmojiFrequency(app, guildId, dryRun = false) {
-  if (!isChatMemberAppSupported(app)) return { ok: false };
-  const gid = String(guildId ?? "").trim();
-  if (!gid) return { ok: false };
-
-  const [staleRows] = await db.query(
-    "SELECT id FROM guild_emojis WHERE app = ? AND guild_id IS NOT NULL AND guild_id <> ?",
-    [app, gid],
-  );
-  const deleted = (staleRows ?? []).length;
-  if (!dryRun && deleted > 0) {
+  // Remove no-longer-live rows with no usage history; frequency > 0 rows are kept regardless.
+  if (liveIds.length > 0) {
+    const placeholders = liveIds.map(() => "?").join(", ");
     await db.query(
-      "DELETE FROM guild_emojis WHERE app = ? AND guild_id IS NOT NULL AND guild_id <> ?",
-      [app, gid],
+      `DELETE FROM guild_emojis
+       WHERE app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)
+         AND id NOT IN (${placeholders})`,
+      [app, gid, assetKind, ...liveIds],
+    );
+  } else {
+    await db.query(
+      "DELETE FROM guild_emojis WHERE app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)",
+      [app, gid, assetKind],
     );
   }
 
-  const [freqRows] = await db.query(
-    "SELECT emoid, type, frequency FROM emoji_frequency WHERE app = ? AND guild_id = ?",
-    [app, gid],
-  );
-
-  let inserted = 0;
-  let updated = 0;
-  for (const row of freqRows ?? []) {
-    const emoid = String(row.emoid ?? "").trim();
-    if (!emoid) continue;
-    const type = row.type ?? "emoji";
-    const frequency = Number(row.frequency) || 0;
-
-    const [existingRows] = await db.query("SELECT id FROM guild_emojis WHERE id = ?", [emoid]);
-    const exists = (existingRows ?? []).length > 0;
-    if (exists) {
-      updated++;
-    } else {
-      inserted++;
-    }
-
-    if (dryRun) continue;
-
-    const params = [emoid, app, gid, type, emoid, frequency];
-    if (isSqlite) {
-      await db.query(
-        `INSERT INTO guild_emojis (id, app, guild_id, type, name, frequency)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET frequency = excluded.frequency`,
-        params,
-      );
-    } else {
-      await db.query(
-        `INSERT INTO guild_emojis (id, app, guild_id, type, name, frequency)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE frequency = VALUES(frequency)`,
-        params,
-      );
-    }
-  }
-
-  return { ok: true, dryRun, deleted, inserted, updated, synced: inserted + updated };
+  return { ok: true, imported };
 }
 
 // --- Pin history (for pin decision + log) ---
 
 /**
- * Check if a message was already logged as pinned.
- * @param {string} messageId - Discord message ID (snowflake)
+ * Check if a message was already logged as pinned. Scoped to `app` — messageId alone isn't unique across platforms.
+ * @param {string} messageId - platform message id (snowflake)
+ * @param {string} app - e.g. "discord"
  * @returns {Promise<boolean>}
  */
-export async function isMessageAlreadyPinned(messageId) {
+export async function isMessageAlreadyPinned(messageId, app) {
   if (!messageId || String(messageId).trim() === "") return false;
+  if (!isChatMemberAppSupported(app)) return false;
   const id = String(messageId).trim();
-  const [rows] = await db.query("SELECT 1 FROM pin_history WHERE msgid = ?", [
+  const [rows] = await db.query("SELECT 1 FROM pin_history WHERE app = ? AND msgid = ?", [
+    app,
     id,
   ]);
   return Array.isArray(rows) && rows.length > 0;
 }
 
 /**
- * Log a message as pinned (idempotent: no-op if already logged).
+ * Log a message as pinned (idempotent: no-op if already logged for this app+messageId).
  * @param {{ messageId?: string, app?: string, authorId?: string, contents?: string, attachments?: unknown, channelId?: string, channelName?: string, pinnerIds?: string[] }} payload
  * @returns {Promise<{ ok: boolean, error?: string, milestones?: Array }>}
  */
@@ -837,13 +779,14 @@ export async function logPinnedMessage(payload) {
     return { ok: false };
   }
   const id = String(messageId).trim();
-  const already = await isMessageAlreadyPinned(id);
-  if (already) return { ok: true, milestones: [] };
 
   const appCheck = requireChatAppFromPayload(
     typeof payload === "object" && payload != null ? payload : {},
   );
   if (!appCheck.ok) return appCheck;
+
+  const already = await isMessageAlreadyPinned(id, appCheck.app);
+  if (already) return { ok: true, milestones: [] };
 
   const normalized = await normalizePinLogPayload(payload, appCheck.app);
   if (!normalized.ok) return normalized;
@@ -858,9 +801,9 @@ export async function logPinnedMessage(payload) {
 
   await db.query(
     `INSERT INTO pin_history (
-      msgid, author, contents, attachments, channel_id, channel_name, pinners, hydrated, guild_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, author, contents, attachments, channelId, channelName, pinners, 1, guildId],
+      app, msgid, author, contents, attachments, channel_id, channel_name, pinners, hydrated, guild_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [appCheck.app, id, author, contents, attachments, channelId, channelName, pinners, 1, guildId],
   );
 
   const milestones = [];
