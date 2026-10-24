@@ -8,6 +8,11 @@ import { token } from "./configVars.js";
 import { client } from "./fluxerClient.js";
 import { commands } from "./commandRegistry.js";
 
+// Side-effect imports: both load guild_config / triggers / link-hosts into memory via a
+// top-level await, and must finish before any event listener can fire a message handler.
+import "./configStore.js";
+import "./api/cacheRefresh.js";
+
 // EventEmitter throws if an "error" event has no listener; without this, a failed
 // login or dropped gateway connection crashes the process instead of just logging.
 client.on(Events.Error, (error) => {

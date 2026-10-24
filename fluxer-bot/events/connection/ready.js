@@ -3,6 +3,8 @@ import { Events } from "@fluxerjs/core";
 import { guildId } from "../../configVars.js";
 import { client } from "../../fluxerClient.js";
 import { startGuildMembersSync } from "../../api/guildMembers.js";
+import { startCacheVersionPoller } from "../../api/cacheRefresh.js";
+import { startMessageScheduler } from "../../scheduler/messageScheduler.js";
 import { buildInviteUrl } from "../../lib/inviteUrl.js";
 
 const name = Events.Ready;
@@ -29,6 +31,8 @@ const execute = async () => {
       const guild = await client.guilds.resolve(guildId);
       console.log(`bot: connected to community "${guild.name}" (${guild.id})`);
       startGuildMembersSync();
+      startCacheVersionPoller();
+      startMessageScheduler();
     } catch (err) {
       const status = err?.cause?.statusCode;
       if (status !== 403 && status !== 404) throw err;
