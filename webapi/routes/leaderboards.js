@@ -3,10 +3,27 @@ import { authenticate } from "../middleware/auth.js";
 import * as leaderboards from "../services/leaderboards.js";
 import { getEmojiStatsForUser, getStickerStatsForUser } from "../services/events.js";
 import { listTimeoutHistory, listTimeoutVotersForHistory } from "../services/timeoutVotes.js";
+import { isChatMemberAppSupported } from "../services/chatMemberMapping.js";
 import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
 } from "../utils/chatAppHttp.js";
+
+/**
+ * Optional `app` filter shared by the emoji/sticker leaderboard routes below: when given, both
+ * the listed rows and their displayed totals are scoped to that one app (see
+ * services/emojiFrequency.js); omitted, totals are the combined cross-app total for the name.
+ * @param {import('express').Request} req
+ * @returns {{ ok: true, app?: string } | { ok: false, error: string }}
+ */
+function parseOptionalAppFilter(req) {
+  const app = req.body?.app;
+  if (app == null || app === "") return { ok: true, app: undefined };
+  if (!isChatMemberAppSupported(app)) {
+    return { ok: false, error: 'Parameter "app" must be a supported chat app.' };
+  }
+  return { ok: true, app };
+}
 
 const router = express.Router();
 
@@ -388,6 +405,7 @@ router.post("/plusplus/top-voters", authenticate, async (req, res) => {
  *               limit: { type: integer, default: 5, minimum: 1, maximum: 50 }
  *               offset: { type: integer, default: 0, minimum: 0 }
  *               guildId: { type: string, description: "Scope to one guild/community. Omit to mix every guild's emoji into one pool (current/legacy behavior)." }
+ *               app: { type: string, description: "Scope to one app's own usage only (listed rows and displayed totals alike). Omit for the combined cross-app total per emoji." }
  *     responses:
  *       '200':
  *         description: Emoji usage page.
@@ -406,6 +424,8 @@ router.post("/plusplus/top-voters", authenticate, async (req, res) => {
  *                     type: object
  *                     properties:
  *                       emoji: { $ref: '#/components/schemas/EmojiFrequency' }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
@@ -413,6 +433,9 @@ router.post("/plusplus/top-voters", authenticate, async (req, res) => {
  */
 router.post("/emoji", authenticate, async (req, res) => {
   try {
+    const appFilter = parseOptionalAppFilter(req);
+    if (!appFilter.ok) return res.status(400).json({ ok: false, error: appFilter.error });
+
     const limit = leaderboards.parseLimit(req.body?.limit, 5, 50);
     const offset =
       req.body?.offset != null ? Math.max(0, parseInt(req.body.offset, 10) || 0) : 0;
@@ -420,6 +443,7 @@ router.post("/emoji", authenticate, async (req, res) => {
       limit,
       offset,
       req.body?.guildId,
+      appFilter.app,
     );
     res.json({ ok: true, limit, offset, total, top: rows });
   } catch (err) {
@@ -520,6 +544,7 @@ router.post("/emoji/users", authenticate, async (req, res) => {
  *               limit: { type: integer, default: 5, minimum: 1, maximum: 50 }
  *               offset: { type: integer, default: 0, minimum: 0 }
  *               guildId: { type: string, description: "Scope to one guild/community. Omit to mix every guild's stickers into one pool (current/legacy behavior)." }
+ *               app: { type: string, description: "Scope to one app's own usage only (listed rows and displayed totals alike). Omit for the combined cross-app total per sticker." }
  *     responses:
  *       '200':
  *         description: Sticker usage page.
@@ -538,6 +563,8 @@ router.post("/emoji/users", authenticate, async (req, res) => {
  *                     type: object
  *                     properties:
  *                       emoji: { $ref: '#/components/schemas/EmojiFrequency' }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '500':
@@ -545,6 +572,9 @@ router.post("/emoji/users", authenticate, async (req, res) => {
  */
 router.post("/sticker", authenticate, async (req, res) => {
   try {
+    const appFilter = parseOptionalAppFilter(req);
+    if (!appFilter.ok) return res.status(400).json({ ok: false, error: appFilter.error });
+
     const limit = leaderboards.parseLimit(req.body?.limit, 5, 50);
     const offset =
       req.body?.offset != null ? Math.max(0, parseInt(req.body.offset, 10) || 0) : 0;
@@ -552,6 +582,7 @@ router.post("/sticker", authenticate, async (req, res) => {
       limit,
       offset,
       req.body?.guildId,
+      appFilter.app,
     );
     res.json({ ok: true, limit, offset, total, top: rows });
   } catch (err) {

@@ -106,43 +106,54 @@ async function ensureAndIncrementEmoji(
     }
   }
 
-  const [existing] = await db.query("SELECT frequency FROM guild_emojis WHERE id = ?", [id]);
+  // Scoped to (app, id): an id is only unique within its own platform, so two apps could
+  // otherwise collide on the same id and silently merge into one row.
+  const [existing] = await db.query(
+    "SELECT frequency FROM guild_emojis WHERE app = ? AND id = ?",
+    [app, id],
+  );
 
   if (existing && existing.length > 0) {
-    await db.query("UPDATE guild_emojis SET frequency = frequency + 1 WHERE id = ?", [id]);
+    await db.query(
+      "UPDATE guild_emojis SET frequency = frequency + 1 WHERE app = ? AND id = ?",
+      [app, id],
+    );
     return { frequency: Number(existing[0].frequency) + 1, inserted: false };
   }
 
   await db.query(
     `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, frequency)
      VALUES (?, ?, ?, ?, ?, ?, 1)`,
-    [id, numeric ? app : null, numeric ? gid : null, type, name, emojiAnimated ? 1 : 0],
+    [id, app, numeric ? gid : null, type, name, emojiAnimated ? 1 : 0],
   );
   return { frequency: 1, inserted: true };
 }
 
 /**
- * Upsert member_emoji_tracking. DB-agnostic: SELECT then INSERT or UPDATE.
+ * Upsert member_emoji_tracking. DB-agnostic: SELECT then INSERT or UPDATE. Scoped to
+ * (userid, app, emoid): an emoid is only unique within its own platform (see guild_emojis).
  * @param {number} chatMemberMappingId - chat_member_mapping.id
+ * @param {string} app
+ * @param {string} emojiId
  * @private
  */
-async function upsertUserEmoji(chatMemberMappingId, emojiId) {
+async function upsertUserEmoji(chatMemberMappingId, app, emojiId) {
   if (chatMemberMappingId == null || !emojiId) return;
 
   const [rows] = await db.query(
-    "SELECT frequency FROM member_emoji_tracking WHERE userid = ? AND emoid = ?",
-    [chatMemberMappingId, emojiId],
+    "SELECT frequency FROM member_emoji_tracking WHERE userid = ? AND app = ? AND emoid = ?",
+    [chatMemberMappingId, app, emojiId],
   );
 
   if (rows && rows.length > 0) {
     await db.query(
-      "UPDATE member_emoji_tracking SET frequency = frequency + 1 WHERE userid = ? AND emoid = ?",
-      [chatMemberMappingId, emojiId],
+      "UPDATE member_emoji_tracking SET frequency = frequency + 1 WHERE userid = ? AND app = ? AND emoid = ?",
+      [chatMemberMappingId, app, emojiId],
     );
   } else {
     await db.query(
-      "INSERT INTO member_emoji_tracking (userid, emoid, frequency) VALUES (?, ?, 1)",
-      [chatMemberMappingId, emojiId],
+      "INSERT INTO member_emoji_tracking (userid, app, emoid, frequency) VALUES (?, ?, ?, 1)",
+      [chatMemberMappingId, app, emojiId],
     );
   }
 }
@@ -188,8 +199,8 @@ export async function countEmoji(payload) {
     getGuildConfigValue(chatApp, guildId, "plusplus_emoji"),
     getGuildConfigValue(chatApp, guildId, "minusminus_emoji"),
   ]);
-  const plusEmoji = await resolveConfigEmojiValue(plusValue);
-  const minusEmoji = await resolveConfigEmojiValue(minusValue);
+  const plusEmoji = await resolveConfigEmojiValue(plusValue, chatApp);
+  const minusEmoji = await resolveConfigEmojiValue(minusValue, chatApp);
 
   if (!authorId || !Array.isArray(emojis) || emojis.length === 0) {
     return { ok: false };
@@ -240,7 +251,7 @@ export async function countEmoji(payload) {
       em.type,
     );
     if (id && authorId) {
-      await upsertUserEmoji(authorMap.id, id);
+      await upsertUserEmoji(authorMap.id, chatApp, id);
     }
     if (frequency != null) {
       milestones.push(
@@ -333,7 +344,7 @@ export async function countSticker(payload) {
       "sticker",
     );
     if (id && authorId) {
-      await upsertUserEmoji(authorMap.id, id);
+      await upsertUserEmoji(authorMap.id, chatApp, id);
     }
     if (frequency != null) {
       milestones.push(
@@ -695,8 +706,7 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
       await db.query(
         `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           app = excluded.app,
+         ON CONFLICT(app, id) DO UPDATE SET
            guild_id = excluded.guild_id,
            type = excluded.type,
            name = excluded.name,

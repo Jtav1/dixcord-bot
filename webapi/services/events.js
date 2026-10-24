@@ -155,9 +155,9 @@ export async function getEmojiStatsForUser(userId, app, limit) {
   const mid = await getChatMemberMappingIdByPlatformUserId(userId, app);
   if (mid == null) return [];
 
-  const sql = `SELECT uet.emoid, uet.frequency
+  const sql = `SELECT uet.app, uet.emoid, uet.frequency
      FROM member_emoji_tracking uet
-     INNER JOIN guild_emojis ge ON uet.emoid = ge.id
+     INNER JOIN guild_emojis ge ON uet.app = ge.app AND uet.emoid = ge.id
      WHERE uet.userid = ? AND (${EMOJI_FREQUENCY_WHERE})
      ORDER BY uet.frequency DESC`;
 
@@ -172,6 +172,7 @@ export async function getEmojiStatsForUser(userId, app, limit) {
   );
 
   const parsed = (Array.isArray(rows) ? rows : []).map((row) => ({
+    app: String(row.app),
     emoid: String(row.emoid),
     frequency: Number(row.frequency),
   }));
@@ -192,9 +193,9 @@ export async function getStickerStatsForUser(userId, app, limit) {
   const mid = await getChatMemberMappingIdByPlatformUserId(userId, app);
   if (mid == null) return [];
 
-  const sql = `SELECT uet.emoid, uet.frequency
+  const sql = `SELECT uet.app, uet.emoid, uet.frequency
      FROM member_emoji_tracking uet
-     INNER JOIN guild_emojis ge ON uet.emoid = ge.id
+     INNER JOIN guild_emojis ge ON uet.app = ge.app AND uet.emoid = ge.id
      WHERE uet.userid = ? AND (${STICKER_FREQUENCY_WHERE})
      ORDER BY uet.frequency DESC`;
 
@@ -209,6 +210,7 @@ export async function getStickerStatsForUser(userId, app, limit) {
   );
 
   const parsed = (Array.isArray(rows) ? rows : []).map((row) => ({
+    app: String(row.app),
     emoid: String(row.emoid),
     frequency: Number(row.frequency),
   }));
@@ -223,7 +225,7 @@ export async function getStickerStatsForUser(userId, app, limit) {
 export async function listStickerCatalog(limit) {
   const n = parseLimit(limit, 50, 200);
   const [rows] = await db.query(
-    `SELECT id AS emoid FROM guild_emojis
+    `SELECT id AS emoid, app FROM guild_emojis
      WHERE type = 'sticker'
      ORDER BY frequency DESC
      LIMIT ?`,

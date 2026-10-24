@@ -63,12 +63,12 @@ export async function computePinTotal() {
 
 /**
  * @param {string} app - e.g. "discord"
- * Custom emoji rows carry this app directly; unicode emoji rows have app NULL (shared, guild-less
- * identity — see ensureAndIncrementEmoji), so they're included in every app's total.
+ * Every guild_emojis row (unicode included) now belongs to exactly one app — see
+ * ensureAndIncrementEmoji — so this is a plain per-app sum, no cross-app leakage.
  */
 export async function computeEmojiFrequencyPerApp(app) {
   const [rows] = await db.query(
-    "SELECT COALESCE(SUM(frequency), 0) AS total FROM guild_emojis WHERE (app = ? OR app IS NULL) AND (type = 'emoji' OR type IS NULL)",
+    "SELECT COALESCE(SUM(frequency), 0) AS total FROM guild_emojis WHERE app = ? AND (type = 'emoji' OR type IS NULL)",
     [app],
   );
   return Number(rows?.[0]?.total ?? 0);

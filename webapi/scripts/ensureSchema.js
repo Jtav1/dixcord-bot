@@ -17,6 +17,33 @@ import { guildConfigExistsFor, seedDefaultConfigForGuild } from "../services/gui
 const isSqlite = isSqliteDb();
 
 /**
+ * Whether a column is currently declared NOT NULL. Used to guard idempotent nullable->NOT NULL
+ * migrations (there's no ready-made helper for this in schemaUtils.js's introspection set).
+ * @param {import('mysql2/promise').Pool | { query: Function }} db
+ * @param {string} table
+ * @param {string} column
+ * @param {boolean} isSqlite
+ * @returns {Promise<boolean>}
+ */
+async function isColumnNotNull(db, table, column, isSqlite) {
+  if (isSqlite) {
+    const [rows] = await db.query(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?",
+      [table],
+    );
+    const ddl = rows?.[0]?.sql ?? "";
+    const match = new RegExp(`[(,]\\s*${column}\\s+\\w+[^,)]*`, "i").exec(ddl);
+    return !!match && /NOT NULL/i.test(match[0]);
+  }
+  const [rows] = await db.query(
+    `SELECT IS_NULLABLE FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [table, column],
+  );
+  return String(rows?.[0]?.IS_NULLABLE ?? "YES").toUpperCase() === "NO";
+}
+
+/**
  * Get or create a trigger_response_functions row by name, returning its id.
  * Used only to backfill trigger_response.response_function during the FK-id migration below.
  * @param {import('mysql2/promise').Pool | { query: Function }} db
@@ -1871,6 +1898,100 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: dropped legacy configurations table (superseded by guild_config)");
   } else {
     console.log("db: schema ok: configurations table already dropped");
+  }
+
+  // guild_emojis: re-key from PRIMARY KEY (id) to PRIMARY KEY (app, id) — a custom emoji id is
+  // only unique within its own platform, so two apps could otherwise collide on the same id and
+  // silently merge into one row (wrong app/guild_id/name, misattributed frequency). Every row,
+  // unicode included, now belongs to exactly one app; any row left over from before this fix
+  // (including ones the legacy emoji_frequency backfill above inserted with app NULL) is
+  // attributed to 'discord' — the only app that has ever written here.
+  if (
+    (await tableExists(db, "guild_emojis", isSqlite)) &&
+    !(await isColumnNotNull(db, "guild_emojis", "app", isSqlite))
+  ) {
+    await db.query("UPDATE guild_emojis SET app = 'discord' WHERE app IS NULL");
+
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE guild_emojis_new (
+          id TEXT NOT NULL,
+          app TEXT NOT NULL,
+          guild_id TEXT NULL,
+          type TEXT NULL,
+          name TEXT NOT NULL,
+          animated INTEGER DEFAULT 0,
+          available INTEGER NULL,
+          managed INTEGER NULL,
+          requires_colons INTEGER NULL,
+          roles TEXT NULL,
+          frequency INTEGER NOT NULL DEFAULT 0,
+          synced_at TEXT DEFAULT (datetime('now')),
+          PRIMARY KEY (app, id)
+        )
+      `);
+      await db.query(`
+        INSERT INTO guild_emojis_new
+          (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles, frequency, synced_at)
+        SELECT id, app, guild_id, type, name, animated, available, managed, requires_colons, roles, frequency, synced_at
+        FROM guild_emojis
+      `);
+      await db.query("DROP TABLE guild_emojis");
+      await db.query("ALTER TABLE guild_emojis_new RENAME TO guild_emojis");
+      await db.query("CREATE INDEX idx_guild_emojis_guild ON guild_emojis (app, guild_id)");
+      await db.query("CREATE INDEX idx_guild_emojis_name ON guild_emojis (name)");
+    } else {
+      await db.query("ALTER TABLE guild_emojis MODIFY COLUMN app VARCHAR(20) NOT NULL");
+      await db.query("ALTER TABLE guild_emojis DROP PRIMARY KEY, ADD PRIMARY KEY (app, id)");
+      if (!(await indexExists(db, "guild_emojis", "idx_guild_emojis_name", isSqlite))) {
+        await db.query("ALTER TABLE guild_emojis ADD KEY idx_guild_emojis_name (name)");
+      }
+    }
+    applied.push("guild_emojis re-keyed to PRIMARY KEY (app, id)");
+    console.log("db: migration applied: re-keyed guild_emojis to PRIMARY KEY (app, id)");
+  } else {
+    console.log("db: schema ok: guild_emojis already keyed on (app, id)");
+  }
+
+  // member_emoji_tracking: add app, scope unique_user_emoji to (userid, app, emoid) — same
+  // cross-app emoid collision reasoning as guild_emojis above. Existing rows are attributed to
+  // 'discord', the only app that has ever written here.
+  if (
+    (await tableExists(db, "member_emoji_tracking", isSqlite)) &&
+    !(await columnExists(db, "member_emoji_tracking", "app", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE member_emoji_tracking_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+          app TEXT NOT NULL,
+          emoid TEXT NOT NULL,
+          frequency INTEGER DEFAULT 1,
+          UNIQUE (userid, app, emoid)
+        )
+      `);
+      await db.query(`
+        INSERT INTO member_emoji_tracking_new (id, userid, app, emoid, frequency)
+        SELECT id, userid, 'discord', emoid, frequency FROM member_emoji_tracking
+      `);
+      await db.query("DROP TABLE member_emoji_tracking");
+      await db.query("ALTER TABLE member_emoji_tracking_new RENAME TO member_emoji_tracking");
+    } else {
+      await db.query("ALTER TABLE member_emoji_tracking ADD COLUMN app VARCHAR(20) NULL");
+      await db.query("UPDATE member_emoji_tracking SET app = 'discord' WHERE app IS NULL");
+      await db.query("ALTER TABLE member_emoji_tracking MODIFY COLUMN app VARCHAR(20) NOT NULL");
+      await db.query("ALTER TABLE member_emoji_tracking DROP INDEX unique_user_emoji");
+      await db.query(
+        "ALTER TABLE member_emoji_tracking ADD UNIQUE KEY unique_user_emoji (userid, app, emoid)",
+      );
+    }
+    applied.push("member_emoji_tracking.app column + unique_user_emoji scoped to (userid, app, emoid)");
+    console.log(
+      "db: migration applied: added member_emoji_tracking.app, scoped unique_user_emoji to (userid, app, emoid)",
+    );
+  } else {
+    console.log("db: schema ok: member_emoji_tracking already scoped to (userid, app, emoid)");
   }
 
   // scheduled_messages: generalize discord_channel_id/discord_guild_id (resolved via a per-app

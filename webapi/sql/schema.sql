@@ -51,9 +51,13 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
 -- (cross-platform, no owner). Fully replaced per-guild on each emoji-import sync (mirrors
 -- guild_channels/guild_roles); unicode rows are added lazily on first use, never synced from Discord
 -- (no such API exists — see discord-bot/api/emojis.js).
+-- Keyed on (app, id), not id alone: a custom emoji id is only unique within its own platform, so
+-- two apps could otherwise collide on the same id string and silently merge into one row. Every
+-- row (including unicode) now belongs to exactly one app; see services/emojiFrequency.js for how
+-- cross-app totals for the same emoji are computed (grouped by name, not by sharing a row).
 CREATE TABLE IF NOT EXISTS guild_emojis (
-  id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin PRIMARY KEY, -- exact-match identity (custom snowflake or unicode emoji char); a linguistic _ci collation treats many distinct emoji as equal
-  app VARCHAR(20) NULL,
+  id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL, -- exact-match identity (custom snowflake or unicode emoji char); a linguistic _ci collation treats many distinct emoji as equal
+  app VARCHAR(20) NOT NULL,
   guild_id VARCHAR(64) NULL,
   type VARCHAR(50) NULL,              -- "emoji" | "sticker" | NULL (unicode); scopes the per-kind full-replace sync
   name VARCHAR(255) NOT NULL,
@@ -64,7 +68,9 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   roles TEXT NULL,
   frequency INT NOT NULL DEFAULT 0,   -- usage counter, incremented directly (see ensureAndIncrementEmoji)
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  KEY idx_guild_emojis_guild (app, guild_id)
+  PRIMARY KEY (app, id),
+  KEY idx_guild_emojis_guild (app, guild_id),
+  KEY idx_guild_emojis_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- app + msgid is the dedup key (not msgid alone): message ids are only guaranteed unique within
@@ -86,12 +92,14 @@ CREATE TABLE IF NOT EXISTS pin_history (
   CONSTRAINT fk_pin_history_author FOREIGN KEY (author) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- emoid alone isn't unique across apps (see guild_emojis), so app is part of the per-user key too.
 CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   id INT AUTO_INCREMENT PRIMARY KEY,
   userid INT NOT NULL,
+  app VARCHAR(20) NOT NULL,
   emoid VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
   frequency INT DEFAULT 1,
-  UNIQUE KEY unique_user_emoji (userid, emoid),
+  UNIQUE KEY unique_user_emoji (userid, app, emoid),
   CONSTRAINT fk_user_emoji_userid FOREIGN KEY (userid) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

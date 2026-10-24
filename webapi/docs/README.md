@@ -135,7 +135,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/leaderboards/plusplus/total?string=&type=word or user` | ✓ | Total for word or user |
 | GET | `/api/leaderboards/plusplus/voter/:userId` | ✓ | Vote count by voter |
 | POST | `/api/leaderboards/plusplus/top-voters` | ✓ | Top voters (body: `{ limit? }`) |
-| POST | `/api/leaderboards/emoji` | ✓ | Top emojis (body: `{ limit? }`) |
+| POST | `/api/leaderboards/emoji` | ✓ | Top emojis (body: `{ limit?, guildId?, app? }`); totals are combined across apps unless `app` is given |
 | POST | `/api/leaderboards/repost` | ✓ | Top reposters (body: `{ limit? }`) |
 | GET | `/api/leaderboards/repost/user/:userId` | ✓ | Repost count for user |
 | GET | `/api/leaderboards/emoji/user/:userId?app=discord` | ✓ | Per-user emoji stats |

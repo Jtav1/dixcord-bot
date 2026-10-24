@@ -56,9 +56,13 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
 -- (cross-platform, no owner). Fully replaced per-guild on each emoji-import sync (mirrors
 -- guild_channels/guild_roles); unicode rows are added lazily on first use, never synced from Discord
 -- (no such API exists — see discord-bot/api/emojis.js).
+-- Keyed on (app, id), not id alone: a custom emoji id is only unique within its own platform, so
+-- two apps could otherwise collide on the same id string and silently merge into one row. Every
+-- row (including unicode) now belongs to exactly one app; see services/emojiFrequency.js for how
+-- cross-app totals for the same emoji are computed (grouped by name, not by sharing a row).
 CREATE TABLE IF NOT EXISTS guild_emojis (
-  id TEXT PRIMARY KEY,
-  app TEXT NULL,
+  id TEXT NOT NULL,
+  app TEXT NOT NULL,
   guild_id TEXT NULL,
   type TEXT NULL,                     -- "emoji" | "sticker" | NULL (unicode); scopes the per-kind full-replace sync
   name TEXT NOT NULL,
@@ -68,17 +72,21 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   requires_colons INTEGER NULL,
   roles TEXT NULL,
   frequency INTEGER NOT NULL DEFAULT 0,  -- usage counter, incremented directly (see ensureAndIncrementEmoji)
-  synced_at TEXT DEFAULT (datetime('now'))
+  synced_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (app, id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_guild_emojis_guild ON guild_emojis (app, guild_id);
+CREATE INDEX IF NOT EXISTS idx_guild_emojis_name ON guild_emojis (name);
 
+-- emoid alone isn't unique across apps (see guild_emojis), so app is part of the per-user key too.
 CREATE TABLE IF NOT EXISTS member_emoji_tracking (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   userid INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
+  app TEXT NOT NULL,
   emoid TEXT NOT NULL,
   frequency INTEGER DEFAULT 1,
-  UNIQUE (userid, emoid)
+  UNIQUE (userid, app, emoid)
 );
 
 -- app is part of the accusation key (not just userid/msgid/accuser) for the same reason as
