@@ -157,3 +157,17 @@ export async function markScheduledMessageSent(payload) {
   if (!data?.ok || !data?.scheduledMessage) return null;
   return data.scheduledMessage;
 }
+
+/**
+ * Record that this app delivered a scheduled message as a DM to the requester's linked
+ * Discord account — used for rows another app owns (`deliveryKind: "foreign"` from
+ * getDueScheduledMessagesForBot), not for rows this bot itself created.
+ * @param {{ id: number|string }} payload
+ * @returns {Promise<boolean>} True on success.
+ */
+export async function markScheduledMessageDelivered(payload) {
+  const { data } = await api.post(`/api/scheduled-messages/${payload.id}/delivered`, {
+    app: "discord",
+  });
+  return data?.ok === true;
+}

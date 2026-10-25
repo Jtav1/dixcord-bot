@@ -2032,6 +2032,38 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: scheduled_messages already generalized");
   }
 
+  // scheduled_message_deliveries: tracks cross-app delivery of a reminder to the requester's
+  // OTHER linked accounts (member_aliases) — the row's own app/channel is already covered by
+  // status/sent_at, so this is only needed for every additional app the identity has an alias on.
+  if (!(await tableExists(db, "scheduled_message_deliveries", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE scheduled_message_deliveries (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          scheduled_message_id INTEGER NOT NULL REFERENCES scheduled_messages(id) ON DELETE CASCADE,
+          app TEXT NOT NULL,
+          delivered_at TEXT DEFAULT (datetime('now')),
+          UNIQUE (scheduled_message_id, app)
+        )
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE scheduled_message_deliveries (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          scheduled_message_id INT NOT NULL,
+          app VARCHAR(20) NOT NULL,
+          delivered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uniq_scheduled_message_deliveries (scheduled_message_id, app),
+          CONSTRAINT fk_scheduled_message_deliveries_message FOREIGN KEY (scheduled_message_id) REFERENCES scheduled_messages(id) ON DELETE CASCADE
+        )
+      `);
+    }
+    applied.push("scheduled_message_deliveries table");
+    console.log("db: migration applied: created scheduled_message_deliveries table");
+  } else {
+    console.log("db: schema ok: scheduled_message_deliveries table already exists");
+  }
+
   // pin_history.guild_id: lets each app's bot hydration loop (and admin filtering) scope to its
   // own pins instead of a mixed-app stream, now that more than one platform can create pins.
   if (

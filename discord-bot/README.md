@@ -18,7 +18,7 @@ The bot **depends on the web API** for almost all behavior. It loads configurati
 - **Fortune (8-ball)** – @mention the bot with a message ending in `?` for a random fortune from the API.
 - **Emoji tracking** – Records emoji usage; a reply with exactly one configured +/- emoji applies plus/minus to the replied-to user.
 - **Plus/minus from text** – Parses `word++` / `user++` / `--` via the API.
-- **Scheduled reminders** – Natural-language reminder messages are stored via the API and delivered later by the in-process scheduler.
+- **Scheduled reminders** – Natural-language reminder messages are stored via the API and delivered later by the in-process scheduler. If the requester also has a linked account on another app (`link-accounts`/`confirm-link`, or admin-linked), that app's bot delivers the same reminder there too, as a DM — there's no equivalent channel to post into cross-platform. See `webapi/docs/README.md`'s scheduled-messages section (`deliveryKind`/`POST /:id/delivered`).
 
 ### Reaction handling
 

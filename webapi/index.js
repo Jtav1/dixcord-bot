@@ -459,6 +459,7 @@ app.get("/", publicLimiter, (req, res) => {
         routes: [
           "GET /api/scheduled-messages?app=discord&scope=bot|admin&status=",
           "GET/POST/PUT/DELETE /api/scheduled-messages/:id",
+          "POST /api/scheduled-messages/:id/delivered (bot only); records cross-app delivery",
           "POST /api/scheduled-messages/parse-reminder",
         ],
       },

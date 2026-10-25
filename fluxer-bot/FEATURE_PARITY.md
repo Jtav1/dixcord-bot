@@ -13,7 +13,7 @@ fluxer.js API gap forces a different implementation).
 - [x] Emoji tracking (message content) — records emoji usage (`emoji_tracking_enabled`)
 - [x] Sticker tracking — records sticker usage (`sticker_tracking_enabled`)
 - [x] Plus/minus from text — `word++` / `user++` / `--` parsing, plus milestone announcements (`plusplus_enabled`)
-- [x] Scheduled reminders (create) — `@bot remind me ...` natural-language parse → stored for later delivery (`reminders_enabled`). Note: the reply-with-no-explicit-time deep-link body guesses at a Discord-style `{instanceUrl}/channels/.../.../...` URL — unverified against a real Fluxer instance, since no message-permalink getter exists on fluxer.js's `Message`.
+- [x] Scheduled reminders (create) — `@bot remind me ...` natural-language parse → stored for later delivery (`reminders_enabled`). Note: the reply-with-no-explicit-time deep-link body guesses at a Discord-style `{instanceUrl}/channels/.../.../...` URL — unverified against a real Fluxer instance, since no message-permalink getter exists on fluxer.js's `Message`. Delivery also fans out cross-platform: if the requester has a linked Discord account too, discord-bot DMs them the same reminder — see `webapi/docs/README.md`'s scheduled-messages section (`deliveryKind`/`POST /:id/delivered`).
 
 ## Reaction handling
 

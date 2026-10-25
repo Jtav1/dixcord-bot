@@ -6,6 +6,7 @@
 import { client } from "../fluxerClient.js";
 import {
   getDueScheduledMessagesForBot,
+  markScheduledMessageDelivered,
   markScheduledMessageSent,
 } from "../api/scheduledMessages.js";
 
@@ -15,13 +16,24 @@ let runInProgress = false;
 let schedulerHandle = null;
 
 /**
- * Send every currently-due scheduled message and mark it sent. Best-effort per row.
+ * Send every currently-due scheduled message and mark it. Best-effort per row. Each due row is
+ * one of two kinds (see getDueScheduledMessagesForBot): `"home"` rows this app owns are posted
+ * in their own channel and marked sent; `"foreign"` rows another app owns are delivered as a DM
+ * to the requester's linked Fluxer account (no equivalent channel exists cross-platform) and
+ * recorded via the separate /delivered endpoint, which never touches the row's own status.
  * @returns {Promise<void>}
  */
 export async function processDueScheduledMessages() {
   const due = await getDueScheduledMessagesForBot();
   for (const row of due) {
     try {
+      if (row.deliveryKind === "foreign") {
+        const user = await client.users.fetch(row.targetPlatformUserId);
+        await user.send(String(row.message_body ?? ""));
+        await markScheduledMessageDelivered({ id: row.id });
+        continue;
+      }
+
       const channel = await client.channels.fetch(row.chat_channel_id);
       await channel.send(String(row.message_body ?? ""));
       await markScheduledMessageSent({ id: row.id, sentAtUtcIso: new Date().toISOString() });
