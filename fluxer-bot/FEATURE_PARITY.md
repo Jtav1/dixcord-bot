@@ -58,7 +58,7 @@ Needs `@fluxerjs/builders` (command builder) + `@fluxerjs/rest` (deploy) adopted
 
 ## Maintenance scripts
 
-- [ ] `deploy-commands.js` / `delete-all-commands.js` equivalents
+Nothing: Fluxer doesn't have discord-style commands, so no need for `deploy-commands.js` / `delete-all-commands.js` equivalents
 
 ## Feature toggles (webapi `guild_config`, hot-reloaded ≤30s)
 
