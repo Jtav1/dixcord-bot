@@ -7,6 +7,7 @@ import { loadConfig } from "../configStore.js";
 import { getTriggersList, getTriggerResponseFunctionsList } from "./triggerResponses.js";
 import { getLinkReplacementSourceHosts } from "./linkReplacements.js";
 import { rebuildResponseFunctionHandlers } from "../utilities/triggerResponseFunctions.js";
+import { incrementCounter } from "../utilities/metrics.js";
 
 /** @type {Array<{ trigger_string: string, selection_mode?: string }>|null} */
 let cachedTriggers = null;
@@ -69,6 +70,7 @@ export function startCacheVersionPoller() {
       }
       lastCacheVersion = version;
     } catch (err) {
+      incrementCounter("cachePollErrorsTotal");
       console.error("cache: version poll error:", err);
     }
   }, POLL_INTERVAL_MS);

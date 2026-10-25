@@ -9,6 +9,7 @@ import {
   markScheduledMessageDelivered,
   markScheduledMessageSent,
 } from "../api/scheduledMessages.js";
+import { incrementCounter } from "../utilities/metrics.js";
 
 const POLL_INTERVAL_MS = 15_000;
 
@@ -31,12 +32,14 @@ export async function processDueScheduledMessages() {
         const user = await client.users.fetch(row.targetPlatformUserId);
         await user.send(String(row.message_body ?? ""));
         await markScheduledMessageDelivered({ id: row.id });
+        incrementCounter("scheduledMessagesSentTotal");
         continue;
       }
 
       const channel = await client.channels.fetch(row.chat_channel_id);
       await channel.send(String(row.message_body ?? ""));
       await markScheduledMessageSent({ id: row.id, sentAtUtcIso: new Date().toISOString() });
+      incrementCounter("scheduledMessagesSentTotal");
     } catch (err) {
       console.error(`bot: failed to deliver scheduled message ${row.id}:`, err);
     }

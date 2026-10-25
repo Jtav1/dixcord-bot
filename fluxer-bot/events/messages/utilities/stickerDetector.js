@@ -1,6 +1,7 @@
 import { describeApiError } from "../../../api/client.js";
 import { countSticker } from "../../../api/stickers.js";
 import { announceMilestones } from "../../../utilities/milestoneNotifier.js";
+import { incrementCounter } from "../../../utilities/metrics.js";
 
 /**
  * Detect and record sticker usage in a message.
@@ -15,8 +16,10 @@ export const stickerDetector = async (rawMessage) => {
   for (const sticker of rawMessage.stickers) {
     try {
       const milestones = await countSticker(sticker.name, sticker.id, rawMessage.author.id);
+      incrementCounter("stickerCountedTotal");
       await announceMilestones(rawMessage, milestones);
     } catch (err) {
+      incrementCounter("apiCallErrorsTotal", "stickers");
       console.error(
         `bot: countSticker failed for sticker "${sticker.id ?? sticker.name}" in message ${rawMessage.id} from user ${rawMessage.author.id}: ${describeApiError(err)}`,
       );

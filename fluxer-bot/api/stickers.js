@@ -2,6 +2,20 @@ import * as api from "./client.js";
 import { guildId } from "../configVars.js";
 
 /**
+ * Sync server sticker list with the web API. Fully replaces this guild's sticker catalog.
+ * POST /api/message-processing/sticker-import
+ * @param {Array<import('@fluxerjs/core').GuildSticker>} stickerList - e.g. from guild.fetchStickers()
+ */
+export const importStickerList = async (stickerList) => {
+  const stickers = stickerList.map((s) => ({
+    id: String(s.id),
+    name: String(s.name),
+  }));
+  await api.post("/api/message-processing/sticker-import", { app: "fluxer", guildId, stickers });
+  console.log("bot: sticker import via webapi complete");
+};
+
+/**
  * Record sticker usage. POST /api/message-processing/sticker-count
  * @param {string} stickerName - Sticker name
  * @param {string} stickerId - Sticker ID

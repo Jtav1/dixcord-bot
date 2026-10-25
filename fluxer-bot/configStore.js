@@ -67,6 +67,27 @@ export function getMinusEmoji() {
 }
 
 /**
+ * @returns {string}
+ */
+export function getAnnounceChannelId() {
+  return getConfigValue("announce_channel_id", "");
+}
+
+/**
+ * @returns {string|null}
+ */
+export function getPinChannelId() {
+  return getConfigValue("pin_channel_id");
+}
+
+/**
+ * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object; null if unset. See getPlusEmoji for shape notes.
+ */
+export function getPinEmoji() {
+  return getConfigValue("pin_emoji");
+}
+
+/**
  * Generic feature-toggle check. Missing/unseeded keys default to enabled.
  * @param {string} key
  * @returns {boolean}
