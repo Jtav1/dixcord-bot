@@ -7,6 +7,7 @@ import {
 } from "../middleware/auth.js";
 import {
   getScheduledMessageById,
+  getScheduledMessageByIdAnyApp,
   createScheduledMessage,
   deletePendingScheduledMessageByIdForUser,
   deleteScheduledMessageByIdAdmin,
@@ -14,7 +15,9 @@ import {
   getPendingScheduledMessagesForBot,
   getScheduledMessagesForAdmin,
   getUpcomingScheduledMessagesByUserId,
+  hasAliasForApp,
   normalizeUtcIsoString,
+  recordCrossAppDelivery,
   updateScheduledMessageById,
 } from "../services/scheduledMessages.js";
 import { requireChatMemberMappingId } from "../services/chatMemberMapping.js";
@@ -241,6 +244,8 @@ router.post("/parse-reminder", authenticate, async (req, res) => {
  *                       status: { type: string, enum: [pending, sent] }
  *                       sent_at: { type: string, format: date-time, nullable: true }
  *                       created_at: { type: string, format: date-time, nullable: true }
+ *                       deliveryKind: { type: string, enum: [home, foreign], description: "scope=bot, due=true only. \"home\": this app owns the row, deliver to chat_channel_id and PUT status=sent. \"foreign\": another app owns it, but the requester has a linked account on this app too — deliver as a DM to targetPlatformUserId, then POST /:id/delivered." }
+ *                       targetPlatformUserId: { type: string, nullable: true, description: "scope=bot, due=true only. Set when deliveryKind=\"foreign\" — the platform user id to DM on this app." }
  *                 total: { type: integer, description: "scope=admin only." }
  *                 limit: { type: integer, description: "scope=admin only." }
  *                 offset: { type: integer, description: "scope=admin only." }
@@ -1025,6 +1030,104 @@ router.delete("/:id", authenticate, async (req, res) => {
     return res
       .status(500)
       .json({ ok: false, error: "Failed to delete scheduled message" });
+  }
+});
+
+/**
+ * POST /api/scheduled-messages/:id/delivered
+ * Bot scope only: record that `app` (deliberately NOT the row's own app) delivered this
+ * scheduled message as a DM to the requester's linked account there. Used for cross-app
+ * fan-out — a reminder created on one platform is also delivered on every other platform
+ * where the requester has a linked account (member_aliases) — see getDueScheduledMessagesForBot.
+ * Body: { app }
+ * Auth: bot.
+ * @openapi
+ * /api/scheduled-messages/{id}/delivered:
+ *   post:
+ *     operationId: markScheduledMessageDeliveredCrossApp
+ *     tags: [Scheduled Messages]
+ *     summary: Record a cross-app delivery of a scheduled message (bot only)
+ *     description: >
+ *       `app` must be a different app than the one that owns the row, and the requester
+ *       (the row's user_id) must have a member_aliases link on `app` — otherwise this 403s.
+ *       Idempotent: calling twice for the same (id, app) is a no-op. Does not touch the row's
+ *       own `status`/`sent_at`, which only the owning app's own mark-sent call affects.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app]
+ *             properties:
+ *               app: { type: string, example: fluxer }
+ *     responses:
+ *       '200':
+ *         description: Delivery recorded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         description: Bot role required, or the requester has no linked account on `app`.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '404':
+ *         description: Scheduled message not found.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/:id/delivered", authenticate, async (req, res) => {
+  try {
+    if (!isBotRole(req.user?.role)) {
+      return res.status(403).json({ ok: false, error: "Bot access required" });
+    }
+
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ ok: false, error: "Invalid id" });
+    }
+
+    const app = resolveChatAppFromRequest(req);
+    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
+
+    const existing = await getScheduledMessageByIdAnyApp(id);
+    if (!existing) {
+      return res.status(404).json({ ok: false, error: "Scheduled message not found" });
+    }
+
+    const linked = await hasAliasForApp(existing.user_id, app);
+    if (!linked) {
+      return res.status(403).json({
+        ok: false,
+        error: "Requester has no linked account on this app",
+      });
+    }
+
+    await recordCrossAppDelivery(id, app);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("POST /api/scheduled-messages/:id/delivered error:", err);
+    return res
+      .status(500)
+      .json({ ok: false, error: "Failed to record cross-app delivery" });
   }
 });
 

@@ -201,6 +201,18 @@ CREATE TABLE IF NOT EXISTS scheduled_messages (
   CONSTRAINT fk_scheduled_messages_user FOREIGN KEY (user_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Tracks cross-app delivery of a scheduled message to the requester's OTHER linked accounts
+-- (member_aliases), since one row's own app/channel is already covered by its status/sent_at.
+-- One row per (scheduled_message_id, app) a cross-app delivery has gone out to.
+CREATE TABLE IF NOT EXISTS scheduled_message_deliveries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  scheduled_message_id INT NOT NULL,
+  app VARCHAR(20) NOT NULL,
+  delivered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_scheduled_message_deliveries (scheduled_message_id, app),
+  CONSTRAINT fk_scheduled_message_deliveries_message FOREIGN KEY (scheduled_message_id) REFERENCES scheduled_messages(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS audit_log (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,

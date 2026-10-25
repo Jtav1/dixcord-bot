@@ -197,6 +197,17 @@ CREATE TABLE IF NOT EXISTS scheduled_messages (
 CREATE INDEX IF NOT EXISTS idx_scheduled_messages_due ON scheduled_messages (status, scheduled_at);
 CREATE INDEX IF NOT EXISTS idx_scheduled_messages_app_user ON scheduled_messages (app, user_id, status);
 
+-- Tracks cross-app delivery of a scheduled message to the requester's OTHER linked accounts
+-- (member_aliases), since one row's own app/channel is already covered by its status/sent_at.
+-- One row per (scheduled_message_id, app) a cross-app delivery has gone out to.
+CREATE TABLE IF NOT EXISTS scheduled_message_deliveries (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scheduled_message_id INTEGER NOT NULL REFERENCES scheduled_messages(id) ON DELETE CASCADE,
+  app TEXT NOT NULL,
+  delivered_at TEXT DEFAULT (datetime('now')),
+  UNIQUE (scheduled_message_id, app)
+);
+
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

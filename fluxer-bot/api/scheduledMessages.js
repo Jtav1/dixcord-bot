@@ -1,0 +1,86 @@
+import * as api from "./client.js";
+
+/**
+ * Parse "remind me" style reminder text into a scheduled time + message body.
+ * POST /api/scheduled-messages/parse-reminder
+ * @param {{ text: string, isReply?: boolean }} payload - Mention-stripped text and reply context.
+ * @returns {Promise<{ ok: true, scheduledAt: string, messageContent: string|null, usesReplyContext: boolean } | { ok: false, error: string }>}
+ */
+export async function parseReminderText(payload) {
+  try {
+    const { data } = await api.post("/api/scheduled-messages/parse-reminder", {
+      text: payload.text,
+      isReply: Boolean(payload.isReply),
+    });
+    if (!data?.ok) return { ok: false, error: data?.error || "Could not parse reminder" };
+    return {
+      ok: true,
+      scheduledAt: data.scheduledAt,
+      messageContent: data.messageContent,
+      usesReplyContext: Boolean(data.usesReplyContext),
+    };
+  } catch (err) {
+    return { ok: false, error: api.describeApiError(err) };
+  }
+}
+
+/**
+ * Create a scheduled message for a requester.
+ * @param {{ requesterUserId: string, chatChannelId: string, chatGuildId?: string|null, messageBody: string, scheduledAtUtcIso: string }} payload - Creation fields.
+ * @returns {Promise<{ id: number, user_id: number, app: string, chat_channel_id: string, chat_guild_id: string|null, message_body: string, scheduled_at: string, status: string, sent_at: string|null, created_at: string|null }|null>} Created row or null.
+ */
+export async function createScheduledMessage(payload) {
+  const { data } = await api.post("/api/scheduled-messages", {
+    app: "fluxer",
+    requesterUserId: payload.requesterUserId,
+    chat_channel_id: payload.chatChannelId,
+    chat_guild_id: payload.chatGuildId ?? null,
+    message_body: payload.messageBody,
+    scheduled_at: payload.scheduledAtUtcIso,
+  });
+  if (!data?.ok || !data?.scheduledMessage) return null;
+  return data.scheduledMessage;
+}
+
+/**
+ * Bot scope: fetch scheduled messages that are currently due (scheduled_at <= now). The "is it
+ * due yet" comparison happens server-side; the bot just sends whatever comes back.
+ * @returns {Promise<Array<object>>} Due rows.
+ */
+export async function getDueScheduledMessagesForBot() {
+  const { data } = await api.get("/api/scheduled-messages", {
+    params: { app: "fluxer", scope: "bot", due: "true" },
+  });
+  if (!data?.ok || !Array.isArray(data.scheduledMessages)) return [];
+  return data.scheduledMessages;
+}
+
+/**
+ * Bot scope: mark one scheduled row as sent.
+ * @param {{ id: number|string, sentAtUtcIso?: string }} payload - Mark-sent fields.
+ * @returns {Promise<object|null>} Updated scheduled row or null.
+ */
+export async function markScheduledMessageSent(payload) {
+  const { data } = await api.put(`/api/scheduled-messages/${payload.id}`, {
+    app: "fluxer",
+    scope: "bot",
+    status: "sent",
+    sent_at: payload.sentAtUtcIso ?? new Date().toISOString(),
+  });
+  if (!data?.ok || !data?.scheduledMessage) return null;
+  return data.scheduledMessage;
+}
+
+/**
+ * Record that this app delivered a scheduled message as a DM to the requester's linked
+ * Fluxer account — used for rows another app owns (`deliveryKind: "foreign"` from
+ * getDueScheduledMessagesForBot), not for rows this bot itself created.
+ * @param {{ id: number|string }} payload
+ * @returns {Promise<boolean>} True on success.
+ */
+export async function markScheduledMessageDelivered(payload) {
+  const { data } = await api.post(`/api/scheduled-messages/${payload.id}/delivered`, {
+    app: "fluxer",
+  });
+  return data?.ok === true;
+}

@@ -1,6 +1,7 @@
 import { AsyncTask, SimpleIntervalJob, ToadScheduler } from "toad-scheduler";
 import {
   getDueScheduledMessagesForBot,
+  markScheduledMessageDelivered,
   markScheduledMessageSent,
 } from "../api/scheduledMessages.js";
 import { incrementCounter } from "../utilities/metrics.js";
@@ -11,8 +12,12 @@ let discordClient = null;
 let runInProgress = false;
 
 /**
- * Send and mark-sent every scheduled message webapi currently considers due
- * (scheduled_at <= now); webapi does the due-time comparison.
+ * Send and mark every scheduled message webapi currently considers due (scheduled_at <= now);
+ * webapi does the due-time comparison. Each due row is one of two kinds (see
+ * getDueScheduledMessagesForBot): `"home"` rows this app owns are posted in their own channel
+ * and marked sent; `"foreign"` rows another app owns are delivered as a DM to the requester's
+ * linked Discord account (no equivalent channel exists cross-platform) and recorded via the
+ * separate /delivered endpoint, which never touches the row's own status/sent_at.
  * @returns {Promise<number>} Number of messages successfully sent+marked.
  */
 export async function processDueScheduledMessages() {
@@ -24,6 +29,17 @@ export async function processDueScheduledMessages() {
     let sentCount = 0;
     for (const row of dueRows) {
       try {
+        if (row.deliveryKind === "foreign") {
+          const user = await discordClient.users.fetch(row.targetPlatformUserId);
+          await user.send(String(row.message_body ?? ""));
+          const marked = await markScheduledMessageDelivered({ id: row.id });
+          if (marked) {
+            sentCount++;
+            incrementCounter("scheduledMessagesSentTotal");
+          }
+          continue;
+        }
+
         const channel = await discordClient.channels.fetch(row.chat_channel_id);
         if (!channel || !channel.isTextBased()) continue;
         await channel.send(String(row.message_body ?? ""));

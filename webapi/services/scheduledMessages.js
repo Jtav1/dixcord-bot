@@ -5,6 +5,8 @@
 
 import db from "../config/db.js";
 
+const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
+
 /**
  * Convert unknown input into an ISO 8601 UTC timestamp string ending with Z.
  * @param {unknown} value - Input datetime value.
@@ -105,6 +107,53 @@ export async function getScheduledMessageById(app, id) {
 }
 
 /**
+ * Get one scheduled message by id, regardless of which app owns it — used by the cross-app
+ * delivery endpoint, where the calling app is deliberately NOT the row's own `app`.
+ * @param {number} id - scheduled_messages.id
+ * @returns {Promise<ReturnType<typeof serializeScheduledMessageRow>|null>} Serialized row or null.
+ */
+export async function getScheduledMessageByIdAnyApp(id) {
+  const [rows] = await db.query("SELECT * FROM scheduled_messages WHERE id = ?", [id]);
+  if (!rows || rows.length === 0) return null;
+  return serializeScheduledMessageRow(rows[0]);
+}
+
+/**
+ * Whether the given chat_member_mapping identity has a guild_members alias on `app` — the
+ * authorization check for cross-app delivery (an app may only mark a row delivered for an
+ * identity it actually has a linked account for).
+ * @param {number} chatMemberMappingId
+ * @param {string} app
+ * @returns {Promise<boolean>}
+ */
+export async function hasAliasForApp(chatMemberMappingId, app) {
+  const [rows] = await db.query(
+    `SELECT 1 FROM member_aliases ma
+     JOIN guild_members gm ON gm.id = ma.guild_member_id
+     WHERE ma.chat_member_mapping_id = ? AND gm.app = ?
+     LIMIT 1`,
+    [chatMemberMappingId, app],
+  );
+  return Array.isArray(rows) && rows.length > 0;
+}
+
+/**
+ * Record that a scheduled message was delivered (as a DM) to the requester's account on an app
+ * other than the row's own `app`. Idempotent: a second call for the same (id, app) is a no-op.
+ * @param {number} scheduledMessageId
+ * @param {string} app
+ * @returns {Promise<void>}
+ */
+export async function recordCrossAppDelivery(scheduledMessageId, app) {
+  await db.query(
+    isSqlite
+      ? "INSERT OR IGNORE INTO scheduled_message_deliveries (scheduled_message_id, app) VALUES (?, ?)"
+      : "INSERT IGNORE INTO scheduled_message_deliveries (scheduled_message_id, app) VALUES (?, ?)",
+    [scheduledMessageId, app],
+  );
+}
+
+/**
  * Get unsent upcoming scheduled messages for a specific user.
  * @param {string} app - Chat app key.
  * @param {number} userId - chat_member_mapping.id
@@ -140,18 +189,69 @@ export async function getPendingScheduledMessagesForBot(app) {
  * Get pending scheduled messages that are currently due (scheduled_at <= now) for the bot's
  * send loop. Filtering by time here (rather than in the bot) keeps the "what's due right now"
  * decision server-side.
+ *
+ * Returns two kinds of rows, distinguished by `deliveryKind`:
+ * - `"home"`: this app owns the row (its own channel/guild) — deliver exactly as before
+ *   (post/reply in `chat_channel_id`), then PUT .../:id {scope:"bot", status:"sent"}.
+ * - `"foreign"`: a DIFFERENT app owns the row, but the requester (`user_id`, a
+ *   chat_member_mapping identity) also has a linked account on THIS app (member_aliases) and
+ *   this app hasn't delivered it yet (no scheduled_message_deliveries row for (id, app)) — there's
+ *   no equivalent channel on this app, so deliver as a DM to `targetPlatformUserId`, then
+ *   POST /:id/delivered {app} to record it (idempotent, since nothing here flips `status`).
+ * `status`/`scheduled_at <= now` gate home rows; foreign rows are gated purely by "not yet
+ * delivered to this app", since `status` flips to `sent` once the HOME app delivers, which must
+ * not hide the row from other apps still owed their own delivery.
  * @param {string} app - Chat app key.
- * @returns {Promise<Array<ReturnType<typeof serializeScheduledMessageRow>>>} Due rows sorted by schedule time.
+ * @returns {Promise<Array<ReturnType<typeof serializeScheduledMessageRow> & { deliveryKind: "home"|"foreign", targetPlatformUserId: string|null }>>} Due rows sorted by schedule time.
  */
 export async function getDueScheduledMessagesForBot(app) {
   const nowSql = utcIsoToSqlDatetime(new Date().toISOString());
-  const [rows] = await db.query(
+
+  const [homeRows] = await db.query(
     `SELECT * FROM scheduled_messages
      WHERE app = ? AND status = 'pending' AND scheduled_at <= ?
      ORDER BY scheduled_at ASC, id ASC`,
     [app, nowSql],
   );
-  return Array.isArray(rows) ? rows.map(serializeScheduledMessageRow) : [];
+
+  const [foreignRows] = await db.query(
+    `SELECT sm.*,
+       (SELECT gm.platform_user_id FROM guild_members gm
+        JOIN member_aliases ma ON ma.guild_member_id = gm.id
+        WHERE ma.chat_member_mapping_id = sm.user_id AND gm.app = ?
+        ORDER BY gm.synced_at DESC LIMIT 1) AS target_platform_user_id
+     FROM scheduled_messages sm
+     WHERE sm.app <> ?
+       AND sm.scheduled_at <= ?
+       AND EXISTS (
+         SELECT 1 FROM member_aliases ma2
+         JOIN guild_members gm2 ON gm2.id = ma2.guild_member_id
+         WHERE ma2.chat_member_mapping_id = sm.user_id AND gm2.app = ?
+       )
+       AND NOT EXISTS (
+         SELECT 1 FROM scheduled_message_deliveries smd
+         WHERE smd.scheduled_message_id = sm.id AND smd.app = ?
+       )
+     ORDER BY sm.scheduled_at ASC, sm.id ASC`,
+    [app, app, nowSql, app, app],
+  );
+
+  const home = (Array.isArray(homeRows) ? homeRows : []).map((row) => ({
+    ...serializeScheduledMessageRow(row),
+    deliveryKind: "home",
+    targetPlatformUserId: null,
+  }));
+  const foreign = (Array.isArray(foreignRows) ? foreignRows : [])
+    .filter((row) => row.target_platform_user_id != null)
+    .map((row) => ({
+      ...serializeScheduledMessageRow(row),
+      deliveryKind: "foreign",
+      targetPlatformUserId: String(row.target_platform_user_id),
+    }));
+
+  return [...home, ...foreign].sort((a, b) =>
+    a.scheduled_at < b.scheduled_at ? -1 : a.scheduled_at > b.scheduled_at ? 1 : a.id - b.id,
+  );
 }
 
 /**
