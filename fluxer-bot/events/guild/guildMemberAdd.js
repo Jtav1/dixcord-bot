@@ -2,6 +2,7 @@ import { Events } from "@fluxerjs/core";
 
 import { guildId } from "../../configVars.js";
 import { syncSingleGuildMember } from "../../api/guildMembers.js";
+import { incrementCounter } from "../../utilities/metrics.js";
 
 const name = Events.GuildMemberAdd;
 
@@ -13,6 +14,7 @@ const name = Events.GuildMemberAdd;
 const execute = async (member) => {
   if (member.guild.id !== guildId || member.user.bot) return;
 
+  incrementCounter("guildMemberJoinsTotal");
   await syncSingleGuildMember(member);
 };
 

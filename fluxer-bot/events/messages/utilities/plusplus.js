@@ -3,6 +3,7 @@ import {
   minusminus,
   recordPlusMinusFromMessage,
 } from "../../../api/plusplus.js";
+import { incrementCounter } from "../../../utilities/metrics.js";
 
 /**
  * Used by reaction handler only (user votes).
@@ -11,8 +12,11 @@ import {
 export const doplus = async (string, typestr, voterid) => {
   if (typestr !== "user" || string === voterid) return [];
   try {
-    return await plusplus(string, typestr, voterid);
+    const milestones = await plusplus(string, typestr, voterid);
+    incrementCounter("plusplusVotesTotal");
+    return milestones;
   } catch (err) {
+    incrementCounter("apiCallErrorsTotal", "plusplus");
     console.log("bot: plusplus error", err);
     return [];
   }
@@ -25,8 +29,11 @@ export const doplus = async (string, typestr, voterid) => {
 export const dominus = async (string, typestr, voterid) => {
   if (typestr !== "user" || string === voterid) return [];
   try {
-    return await minusminus(string, typestr, voterid);
+    const milestones = await minusminus(string, typestr, voterid);
+    incrementCounter("plusplusVotesTotal");
+    return milestones;
   } catch (err) {
+    incrementCounter("apiCallErrorsTotal", "plusplus");
     console.log("bot: minusminus error", err);
     return [];
   }

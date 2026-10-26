@@ -45,16 +45,15 @@ Needs `@fluxerjs/builders` (command builder) + `@fluxerjs/rest` (deploy) adopted
 
 - [x] webapi JWT auth with auto-relogin on 401 — `api/client.js` plumbing already exists in the base template; now actually used by the message-handling port's API modules
 - [x] Cache-version polling → refresh in-memory triggers/link-hosts/config (ported as a prerequisite for message handling: `api/cacheRefresh.js`, `configStore.js`)
-- [ ] Heartbeat to webapi; `wait-for-webapi` health gate on container start — already in the base template
-- [ ] Guild snapshot sync (metadata/channels/roles) on startup + every 5 min
-- [ ] Guild member sync (nickname/roles/joined-at) on startup + every 5 min — unlinked members synced, not skipped
-- [ ] `guildMemberAdd`-equivalent → immediate single-member sync
-- [ ] Emoji/sticker catalog import from guild on ready
-- [ ] Pin-history hydration on startup
+- [x] Heartbeat to webapi; `wait-for-webapi` health gate on container start — `api/system.js` `startHeartbeat`
+- [x] Guild snapshot sync (metadata/channels/roles) on startup + every 5 min — `api/guildInfo.js`; no description/preferredLocale/boost-tier concept on fluxer.js, sent as `null`
+- [x] Guild member sync (nickname/roles/joined-at) on startup + every 5 min — unlinked members synced, not skipped (already done pre-this-pass)
+- [x] `guildMemberAdd`-equivalent → immediate single-member sync (already done pre-this-pass)
+- [x] Emoji/sticker catalog import from guild on ready — `api/emojis.js`/`api/stickers.js` `importEmojiList`/`importStickerList`
+- [x] Pin-history hydration on startup — `events/connection/utilities/pinHistoryHydration.js`; simplified vs. discord-bot's: no thread paging, no embed-hint scraping, attachments passed through as remote URLs (no local download/archival)
 - [x] In-process scheduler delivering reminders at their scheduled time (`scheduler/messageScheduler.js`, `setInterval`-based — see commit for why this skips `toad-scheduler`)
-- [ ] Optional slash-command clear+redeploy on container start (`DEPLOY_SLASH_COMMANDS`)
-- [ ] Online-announce message on ready (prod posts to announce channel; dev just logs)
-- [ ] Metrics counters (messages/commands/errors/joins/leaves/rate-limits/etc.) — deliberately not ported with this pass; no heartbeat/metrics-shipping infra exists yet in fluxer-bot to receive them
+- [x] Online-announce message on ready (prod posts to announce channel; dev just logs) — tied to `ready.js`'s own handler rather than discord-bot's racy post-login block, a deliberate improvement
+- [x] Metrics counters (messages/commands/errors/joins/leaves/shard-errors/etc.) — `utilities/metrics.js`; no fluxer.js rate-limit client event exists, so `discordRateLimitHitsTotal`'s equivalent is omitted entirely
 
 ## Maintenance scripts
 

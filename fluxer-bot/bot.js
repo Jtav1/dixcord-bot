@@ -7,6 +7,7 @@ import { pathToFileURL } from "node:url";
 import { token } from "./configVars.js";
 import { client } from "./fluxerClient.js";
 import { commands } from "./commandRegistry.js";
+import { incrementCounter } from "./utilities/metrics.js";
 
 // Side-effect imports: both load guild_config / triggers / link-hosts into memory via a
 // top-level await, and must finish before any event listener can fire a message handler.
@@ -16,8 +17,13 @@ import "./api/cacheRefresh.js";
 // EventEmitter throws if an "error" event has no listener; without this, a failed
 // login or dropped gateway connection crashes the process instead of just logging.
 client.on(Events.Error, (error) => {
+  incrementCounter("fluxerClientErrorsTotal");
   console.error("bot: Fluxer client error:", error);
 });
+
+client.on(Events.GuildCreate, () => incrementCounter("fluxerGuildJoinsTotal"));
+client.on(Events.GuildDelete, () => incrementCounter("fluxerGuildLeavesTotal"));
+client.on(Events.ShardError, () => incrementCounter("fluxerShardErrorsTotal"));
 
 /**
  * Wrap an event handler so a thrown/rejected execute() is logged instead of crashing the

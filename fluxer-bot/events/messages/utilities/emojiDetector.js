@@ -9,6 +9,7 @@ import {
 import { doplus, dominus } from "./plusplus.js";
 import { emojisMatch, toEmojiObject } from "../../../utilities/emojiCompare.js";
 import { announceMilestones } from "../../../utilities/milestoneNotifier.js";
+import { incrementCounter } from "../../../utilities/metrics.js";
 
 const EMOJIREGEX =
   /((<|<a):?:\w+:?\d+>)|\p{Emoji_Presentation}|\p{Extended_Pictographic}/gmu;
@@ -79,8 +80,10 @@ export const emojiDetector = async (rawMessage) => {
       }
       try {
         const milestones = await countEmoji(emo.name, emo.id, rawMessage.author.id);
+        incrementCounter("emojiCountedTotal");
         await announceMilestones(rawMessage, milestones);
       } catch (err) {
+        incrementCounter("apiCallErrorsTotal", "emojis");
         console.error(
           `bot: countEmoji failed for emoji "${emo.id ?? emo.name}" in message ${rawMessage.id} from user ${rawMessage.author.id}: ${describeApiError(err)}`,
         );

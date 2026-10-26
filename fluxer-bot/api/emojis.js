@@ -2,6 +2,26 @@ import * as api from "./client.js";
 import { guildId } from "../configVars.js";
 
 /**
+ * Sync server emoji list with the web API. Fully replaces this guild's guild_emojis catalog.
+ * POST /api/message-processing/emoji-import
+ * @param {Array<import('@fluxerjs/core').GuildEmoji>} emojiList - e.g. from guild.fetchEmojis()
+ */
+export const importEmojiList = async (emojiList) => {
+  const emojis = emojiList.map((e) => ({
+    id: String(e.id),
+    name: String(e.name),
+    animated: Boolean(e.animated),
+    available: null,
+    managed: null,
+    requiresColons: null,
+    roles: [],
+    type: "emoji",
+  }));
+  await api.post("/api/message-processing/emoji-import", { app: "fluxer", guildId, emojis });
+  console.log("bot: emoji import via webapi complete");
+};
+
+/**
  * Record emoji usage. POST /api/message-processing/emoji-count
  * guildId (this bot's own, from configVars) is required so webapi can resolve this server's
  * plusplus_emoji/minusminus_emoji from guild_config for the reply-vote comparison.
