@@ -19,6 +19,17 @@ export function toEmojiObject(discordEmoji) {
 }
 
 /**
+ * Strip variation selectors (U+FE0E/FE0F) and apply NFC normalization, so visually-identical
+ * unicode emoji typed/stored differently (e.g. "❤" vs "❤️") still compare equal.
+ * @param {string|null|undefined} value
+ * @returns {string|null|undefined}
+ */
+function normalizeEmojiString(value) {
+  if (typeof value !== "string") return value;
+  return value.normalize("NFC").replace(/[︎️]/g, "");
+}
+
+/**
  * Compare two resolved emoji objects for equality. Same app: compare by emoid; else by emoji string.
  * @param {{app:string|null,emoid:string|null,emoji:string|null}|null|undefined} a
  * @param {{app:string|null,emoid:string|null,emoji:string|null}|null|undefined} b
@@ -27,5 +38,6 @@ export function toEmojiObject(discordEmoji) {
 export function emojisMatch(a, b) {
   if (!a || !b) return false;
   if (a.app != null && a.app === b.app) return a.emoid === b.emoid;
-  return a.emoji != null && a.emoji === b.emoji;
+  if (a.emoji == null || b.emoji == null) return false;
+  return normalizeEmojiString(a.emoji) === normalizeEmojiString(b.emoji);
 }

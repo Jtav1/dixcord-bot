@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@fluxerjs/builders": "^3.0.0",
     "@fluxerjs/core": "^3.3.0",
     "axios": "^1.20.0",
     "dotenv": "^18.0.1"

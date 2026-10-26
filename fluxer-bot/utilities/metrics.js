@@ -19,6 +19,7 @@ const counters = {
   reactionsProcessedTotal: 0,
   pinsLoggedTotal: 0,
   repostsDetectedTotal: 0,
+  timeoutVotesTriggeredTotal: 0,
   guildMemberJoinsTotal: 0,
   scheduledMessagesSentTotal: 0,
   cachePollErrorsTotal: 0,
