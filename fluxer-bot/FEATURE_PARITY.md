@@ -52,7 +52,6 @@ Needs `@fluxerjs/builders` (command builder) + `@fluxerjs/rest` (deploy) adopted
 - [x] Emoji/sticker catalog import from guild on ready — `api/emojis.js`/`api/stickers.js` `importEmojiList`/`importStickerList`
 - [x] Pin-history hydration on startup — `events/connection/utilities/pinHistoryHydration.js`; simplified vs. discord-bot's: no thread paging, no embed-hint scraping, attachments passed through as remote URLs (no local download/archival)
 - [x] In-process scheduler delivering reminders at their scheduled time (`scheduler/messageScheduler.js`, `setInterval`-based — see commit for why this skips `toad-scheduler`)
-- [ ] Optional slash-command clear+redeploy on container start (`DEPLOY_SLASH_COMMANDS`)
 - [x] Online-announce message on ready (prod posts to announce channel; dev just logs) — tied to `ready.js`'s own handler rather than discord-bot's racy post-login block, a deliberate improvement
 - [x] Metrics counters (messages/commands/errors/joins/leaves/shard-errors/etc.) — `utilities/metrics.js`; no fluxer.js rate-limit client event exists, so `discordRateLimitHitsTotal`'s equivalent is omitted entirely
 
