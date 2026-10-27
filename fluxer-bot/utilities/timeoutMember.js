@@ -19,6 +19,10 @@ export const timeoutMember = async (member, durationSeconds, reason) => {
     );
   }
 
+  // `moderatable` is cache-only (needs guild.members.me); fetch it if nothing has yet.
+  if (!member.guild.members.me) {
+    await member.guild.members.fetchMe().catch(() => null);
+  }
   if (!member.moderatable) {
     throw new Error(
       `Cannot timeout member ${member.id}: missing permissions or role hierarchy`,

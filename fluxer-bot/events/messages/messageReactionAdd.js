@@ -33,6 +33,8 @@ const execute = async (payload) => {
       emoji: payload.emoji,
       userId: payload.userId,
       member: payload.member,
+      // message.guildId is unreliable from reaction.fetchMessage(); reaction.guildId is always set.
+      guildId: payload.reaction.guildId,
       client,
     },
     buildReactionOptions(),

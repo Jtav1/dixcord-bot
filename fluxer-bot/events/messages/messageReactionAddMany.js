@@ -23,6 +23,7 @@ const execute = async (payload) => {
         emoji: entry.emoji,
         userId: entry.userId,
         member: entry.member,
+        guildId: payload.guildId,
         client,
       },
       buildReactionOptions(),
