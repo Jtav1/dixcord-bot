@@ -44,3 +44,40 @@ export const countEmoji = async (emojiName, emojiId, userid = null) => {
   });
   return Array.isArray(data?.milestones) ? data.milestones : [];
 };
+
+/**
+ * Record a repost accusation. POST /api/message-processing/count-repost
+ * @param {string} userid - Author of the accused message
+ * @param {string} msgid - Accused message id
+ * @param {string} accuserid - User who added the repost emoji
+ * @returns {Promise<Array>} milestones newly achieved by this count, if any
+ */
+export const countRepost = async (userid, msgid, accuserid) => {
+  if (!msgid || !userid || !accuserid) return [];
+  const { data } = await api.post("/api/message-processing/count-repost", {
+    app: "fluxer",
+    userid,
+    msgid,
+    accuser: accuserid,
+    repost: 1,
+  });
+  return Array.isArray(data?.milestones) ? data.milestones : [];
+};
+
+/**
+ * Withdraw a repost accusation. POST /api/message-processing/count-repost
+ * @param {string} userid - Author of the accused message
+ * @param {string} msgid - Accused message id
+ * @param {string} accuserid - User who removed the repost emoji
+ * @returns {Promise<void>}
+ */
+export const uncountRepost = async (userid, msgid, accuserid) => {
+  if (!msgid || !userid || !accuserid) return;
+  await api.post("/api/message-processing/count-repost", {
+    app: "fluxer",
+    userid,
+    msgid,
+    accuser: accuserid,
+    repost: -1,
+  });
+};

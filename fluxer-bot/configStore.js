@@ -131,4 +131,48 @@ export function isPlusPlusEnabled() {
   return isFeatureEnabled("plusplus_enabled");
 }
 
+/** @returns {number} */
+export function getPinThreshold() {
+  return parseInt(getConfigValue("pin_threshold", "0"), 10) || 0;
+}
+
+/**
+ * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object; null if unset. See getPlusEmoji for shape notes.
+ */
+export function getRepostEmoji() {
+  return getConfigValue("repost_emoji");
+}
+
+/** @returns {boolean} */
+export function isPinSystemEnabled() {
+  return isFeatureEnabled("pin_system_enabled");
+}
+
+/** @returns {boolean} */
+export function isRepostDetectionEnabled() {
+  return isFeatureEnabled("repost_detection_enabled");
+}
+
+/** @returns {boolean} Defaults to disabled, unlike isFeatureEnabled's default-on convention. */
+export function isTimeoutVoteEnabled() {
+  return getConfigValue("timeout_vote_enabled", "false") === "true";
+}
+
+/**
+ * @returns {{app:string|null,emoid:string|null,emoji:string|null}|null} Resolved emoji object; null if unset. See getPlusEmoji for shape notes.
+ */
+export function getTimeoutVoteEmoji() {
+  return getConfigValue("timeout_vote_emoji");
+}
+
+/** @returns {string} */
+export function getTimeoutVoteDoubleRoleId() {
+  return getConfigValue("timeout_vote_double_role_id", "");
+}
+
+/** @returns {string} */
+export function getTimeoutVoteTripleRoleId() {
+  return getConfigValue("timeout_vote_triple_role_id", "");
+}
+
 await loadConfig();

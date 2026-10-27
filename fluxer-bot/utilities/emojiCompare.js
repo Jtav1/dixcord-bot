@@ -26,6 +26,8 @@ export function toEmojiObject(fluxerEmoji) {
  */
 export function emojisMatch(a, b) {
   if (!a || !b) return false;
-  if (a.app != null && a.app === b.app) return a.emoid === b.emoid;
-  return a.emoji != null && a.emoji === b.emoji;
+  if (a == b) return true;
+  if (a.emoid == b.emoid) return true;
+  if (a.emoji == b.emoji) return true;
+  return false;
 }
