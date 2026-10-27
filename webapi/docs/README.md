@@ -164,6 +164,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/guild-members/:guildMemberId/link` | admin | Link (or move) a guild_member to a chat_member_mapping identity (body: `{ chatMemberMappingId }`) |
 | DELETE | `/api/guild-members/:guildMemberId/link` | admin | Unlink a guild_member from its identity |
 | POST | `/api/guild-members/sync` | ✓ | Upsert a server's membership list (body: `{ app, guildId, members }`); never removes members, safe for a full roster or a single incremental push |
+| POST | `/api/guild-members/register-self` | ✓ | Register the calling bot client's own platform account into guild_members, aliased to the shared bot identity (body: `{ app, guildId, platformUserId, handle? }`); normal sync excludes bot accounts, this is the only path that creates one |
 | POST | `/api/guild-members/link-request` | bot/admin | User-initiated: generate a one-time link token for the requester, snapshotting their existing identity if they have one (body: `{ app, guildId, requesterUserId }`) |
 | POST | `/api/guild-members/link-confirm` | bot/admin | Confirm a pending link by token: confirmer's row becomes an alias of the requester's identity, creating one if the requester didn't have one yet (body: `{ app, guildId, userId, token }`) |
 | GET | `/api/events/plusplus` | ✓ | Raw plusplus events |

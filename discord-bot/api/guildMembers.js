@@ -64,6 +64,23 @@ export async function syncGuildMembers(client) {
 }
 
 /**
+ * Register this bot's own account into guild_members/member_aliases on startup. Normal roster
+ * sync excludes bots entirely (see buildMemberList above), so this is the only path that gives
+ * the bot's own account a guild_members row, aliased webapi-side to the shared bot identity.
+ * POST /api/guild-members/register-self. Idempotent — safe to call on every restart.
+ * @param {import("discord.js").Client} client
+ * @returns {Promise<void>}
+ */
+export async function registerBotSelf(client) {
+  await api.post("/api/guild-members/register-self", {
+    app: "discord",
+    guildId,
+    platformUserId: String(client.user.id),
+    handle: client.user.username ?? null,
+  });
+}
+
+/**
  * Upsert a single member's row without touching the rest of the roster. Used for join events.
  * @param {import("discord.js").GuildMember} member
  * @returns {Promise<void>}
