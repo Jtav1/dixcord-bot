@@ -3,7 +3,7 @@ import { Events } from "@fluxerjs/core";
 import { guildId, isDev, version } from "../../configVars.js";
 import { client } from "../../fluxerClient.js";
 import { getAnnounceChannelId } from "../../configStore.js";
-import { startGuildMembersSync } from "../../api/guildMembers.js";
+import { registerBotSelf, startGuildMembersSync } from "../../api/guildMembers.js";
 import { startCacheVersionPoller } from "../../api/cacheRefresh.js";
 import { startMessageScheduler } from "../../scheduler/messageScheduler.js";
 import { startHeartbeat } from "../../api/system.js";
@@ -80,6 +80,9 @@ const execute = async () => {
       startMessageScheduler();
       startHeartbeat(client.readyAt);
       startGuildInfoSync();
+      await registerBotSelf().catch((err) => {
+        console.error("bot: failed to register bot's own account:", err);
+      });
     } catch (err) {
       const status = err?.cause?.statusCode;
       if (status !== 403 && status !== 404) throw err;

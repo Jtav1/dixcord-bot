@@ -56,6 +56,41 @@ Per-`(app, guild_id, platform_user_id)` server membership (Discord handle, nickn
 
 ---
 
+## POST /api/guild-members/register-self
+
+**Request**
+
+```json
+{
+  "app": "discord",
+  "guildId": "100000000000000001",
+  "platformUserId": "100000000000000099",
+  "handle": "Dixbot"
+}
+```
+
+**200 OK**
+
+```json
+{
+  "ok": true,
+  "chatMemberMappingId": 42
+}
+```
+
+Unlike `POST /api/guild-members/sync`, this is the one path that creates a `guild_members` row for a bot account and links it (`member_aliases`) — to the single shared `chat_member_mapping` identity named after `BOT_USERNAME`, created on first use. Every client (`discord-bot`, `fluxer-bot`, ...) calls this once at its own startup with its own platform user id; idempotent across restarts.
+
+**400 Bad Request** (missing `guildId`/`platformUserId`, or unsupported `app`)
+
+```json
+{
+  "ok": false,
+  "error": "guildId and platformUserId are required"
+}
+```
+
+---
+
 ## GET /api/guild-members?app=discord&guildId=100000000000000001
 
 **200 OK**

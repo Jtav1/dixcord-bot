@@ -11,6 +11,7 @@ import {
   listServersForUser,
   listUnlinkedGuildMembers,
   unlinkGuildMemberAlias,
+  registerBotSelf,
   requestAccountLink,
   upsertGuildMembers,
 } from "../services/guildMembers.js";
@@ -96,6 +97,68 @@ router.post("/sync", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
   } catch (err) {
     console.error("POST /api/guild-members/sync error:", err);
     res.status(500).json({ ok: false, error: "Failed to sync guild members" });
+  }
+});
+
+/**
+ * POST /api/guild-members/register-self
+ * Register the calling bot client's own platform account as a guild_members row, aliased to
+ * the shared bot chat_member_mapping identity (named after BOT_USERNAME).
+ * Body: { app, guildId, platformUserId, handle? }
+ * Auth: required. A guild-scoped bot account may only register its own guildId.
+ * @openapi
+ * /api/guild-members/register-self:
+ *   post:
+ *     operationId: registerBotSelf
+ *     tags: [Guild Members]
+ *     summary: Register the calling bot's own account into guild_members/member_aliases
+ *     description: >
+ *       Normal roster sync (POST /api/guild-members/sync) excludes bot accounts entirely —
+ *       this is the only path that creates a guild_members row for a bot's own platform
+ *       account. Every client (discord-bot, fluxer-bot, ...) calls this once at its own
+ *       startup with its own platform user id; all of them alias to the single shared
+ *       chat_member_mapping identity named after BOT_USERNAME, created on first use.
+ *       Idempotent — safe to call on every restart.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, guildId, platformUserId]
+ *             properties:
+ *               app: { type: string, example: discord }
+ *               guildId: { type: string }
+ *               platformUserId: { type: string }
+ *               handle: { type: string, nullable: true }
+ *     responses:
+ *       '200':
+ *         description: Registered.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 chatMemberMappingId: { type: integer, description: The shared bot identity's chat_member_mapping.id. }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/register-self", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
+  try {
+    const { app, guildId, platformUserId, handle } = req.body ?? {};
+    const result = await registerBotSelf({ app, guildId, platformUserId, handle });
+    if (!result.ok) return res.status(400).json({ ok: false, error: result.error });
+    res.json({ ok: true, chatMemberMappingId: result.chatMemberMappingId });
+  } catch (err) {
+    console.error("POST /api/guild-members/register-self error:", err);
+    res.status(500).json({ ok: false, error: "Failed to register bot account" });
   }
 });
 

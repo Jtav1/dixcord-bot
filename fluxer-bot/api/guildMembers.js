@@ -70,6 +70,22 @@ export async function syncGuildMembers() {
 }
 
 /**
+ * Register this bot's own account into guild_members/member_aliases on startup. Normal roster
+ * sync excludes bots entirely (see fetchAllMembers above), so this is the only path that gives
+ * the bot's own account a guild_members row, aliased webapi-side to the shared bot identity.
+ * POST /api/guild-members/register-self. Idempotent — safe to call on every restart.
+ * @returns {Promise<void>}
+ */
+export async function registerBotSelf() {
+  await api.post("/api/guild-members/register-self", {
+    app: "fluxer",
+    guildId,
+    platformUserId: String(client.user.id),
+    handle: client.user.username ?? null,
+  });
+}
+
+/**
  * Upsert a single member's row without touching the rest of the roster. Used for join events.
  * @param {import("@fluxerjs/core").GuildMember} member
  * @returns {Promise<void>}

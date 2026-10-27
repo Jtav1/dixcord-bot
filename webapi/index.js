@@ -392,6 +392,7 @@ app.get("/", publicLimiter, (req, res) => {
           "GET /api/guild-members/user/:chatMemberMappingId",
           "GET /api/guild-members/public-aliases/:chatMemberMappingId (handle/nickname per guild, public-safe)",
           "POST /api/guild-members/sync (body: { app, guildId, members }); upserts, never removes members",
+          "POST /api/guild-members/register-self (body: { app, guildId, platformUserId, handle? }); registers the calling bot's own account, aliased to the shared bot identity",
           "POST /api/guild-members/link-request (body: { app, guildId, requesterUserId }); returns a one-time link token",
           "POST /api/guild-members/link-confirm (body: { app, guildId, userId, token }); confirms a pending account link by token",
         ],

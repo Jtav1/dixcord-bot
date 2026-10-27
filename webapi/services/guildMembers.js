@@ -105,6 +105,50 @@ export async function upsertGuildMembers(app, guildId, members) {
 }
 
 /**
+ * Resolve (creating if needed) the one chat_member_mapping identity representing the shared
+ * bot service account, named after BOT_USERNAME. Every bot client's own platform account aliases
+ * to this single identity, regardless of app.
+ * @returns {Promise<number>}
+ * @private
+ */
+async function ensureBotChatMemberMappingId() {
+  const name = String(process.env.BOT_USERNAME ?? "").trim() || "bot";
+  const [rows] = await db.query("SELECT id FROM chat_member_mapping WHERE name = ?", [name]);
+  if (rows?.length) return Number(rows[0].id);
+  const [result] = await db.query("INSERT INTO chat_member_mapping (name) VALUES (?)", [name]);
+  return Number(result?.insertId ?? result?.lastInsertRowid);
+}
+
+/**
+ * Register one bot client's own platform account as a guild_members row for (app, guildId),
+ * aliased to the shared bot identity (see ensureBotChatMemberMappingId). Normal roster sync
+ * (upsertGuildMembers) excludes bot accounts entirely — this is the only path that creates a
+ * guild_members row for one. Called by each client at its own startup, idempotent.
+ * @param {{ app: string, guildId: string, platformUserId: string, handle?: string|null }} params
+ * @returns {Promise<{ ok: true, chatMemberMappingId: number } | { ok: false, error: string }>}
+ */
+export async function registerBotSelf({ app, guildId, platformUserId, handle }) {
+  if (!getChatMemberAppConfig(app)) return { ok: false, error: "Unsupported app" };
+  const gid = String(guildId ?? "").trim();
+  const pid = String(platformUserId ?? "").trim();
+  if (!gid || !pid) {
+    return { ok: false, error: "guildId and platformUserId are required" };
+  }
+
+  await upsertOneGuildMember(app, gid, { platformUserId: pid, handle: handle ?? null });
+  const [rows] = await db.query(
+    "SELECT id FROM guild_members WHERE app = ? AND guild_id = ? AND platform_user_id = ?",
+    [app, gid, pid],
+  );
+  const guildMemberId = Number(rows?.[0]?.id);
+
+  const chatMemberMappingId = await ensureBotChatMemberMappingId();
+  await linkGuildMemberAlias(guildMemberId, chatMemberMappingId);
+
+  return { ok: true, chatMemberMappingId };
+}
+
+/**
  * List one server's members, left-joined through member_aliases for display name.
  * Unlinked members (no member_aliases row yet) appear with id/name null.
  * @param {string} app
