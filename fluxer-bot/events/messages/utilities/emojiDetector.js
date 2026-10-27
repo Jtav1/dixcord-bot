@@ -71,8 +71,8 @@ export const emojiDetector = async (rawMessage) => {
       const milestones = await dominus(repliedUser.id, "user", rawMessage.author.id);
       await announceMilestones(rawMessage, milestones);
     } else if (emojiTrackingEnabled) {
-      // A custom-emoji id missing from the guild's own emoji cache belongs to an unknown guild.
-      // message.guild is a cache-only getter (null if uncached) — resolveGuild() fetches when needed.
+      // A custom-emoji id missing from the guild's emoji cache belongs to an unknown guild.
+      // message.guild is cache-only (null if uncached); resolveGuild() fetches it.
       if (emo.id != null) {
         const guild = await rawMessage.resolveGuild().catch(() => null);
         if (!guild?.emojis.has(emo.id)) {

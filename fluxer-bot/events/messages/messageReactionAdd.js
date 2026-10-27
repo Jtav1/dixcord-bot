@@ -33,8 +33,7 @@ const execute = async (payload) => {
       emoji: payload.emoji,
       userId: payload.userId,
       member: payload.member,
-      // message.guildId is unreliable when `message` came from reaction.fetchMessage() (the
-      // fetched payload has no guild_id); reaction.guildId is the raw gateway field, always set.
+      // message.guildId is unreliable from reaction.fetchMessage(); reaction.guildId is always set.
       guildId: payload.reaction.guildId,
       client,
     },

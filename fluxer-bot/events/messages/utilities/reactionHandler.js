@@ -106,9 +106,7 @@ async function handlePinCheck(ctx, options) {
 }
 
 async function handleTimeoutVoteAdd(ctx, options) {
-  // message.guildId is unreliable (null) when the message came from reaction.fetchMessage() —
-  // that REST payload carries no guild_id. ctx.guildId comes from the gateway reaction payload
-  // itself, which always has it, so resolve the guild from there instead of via the message.
+  // message.guildId is unreliable from reaction.fetchMessage(); ctx.guildId (gateway) is always set.
   const guild = ctx.guildId
     ? await ctx.client.guilds.resolve(ctx.guildId).catch(() => null)
     : null;
@@ -212,8 +210,7 @@ export async function handleReactionAdd(ctx, options) {
   } else if (kind === "generic") {
     if (!options.emojiTrackingEnabled) return;
     if (ctx.emoji.id != null) {
-      // message.guildId is unreliable (null) when the message came from reaction.fetchMessage();
-      // ctx.guildId comes from the gateway reaction payload itself, which always has it.
+      // message.guildId is unreliable from reaction.fetchMessage(); ctx.guildId (gateway) is always set.
       const guild = ctx.guildId
         ? await ctx.client.guilds.resolve(ctx.guildId).catch(() => null)
         : null;
