@@ -29,7 +29,7 @@ import { getRandomPinQuip, messagePinner } from "./messagePinner.js";
 
 /**
  * Core reaction-handling logic, shared by the single-reaction and batched-add event wiring.
- * @typedef {{ message: import('@fluxerjs/core').Message, emoji: {id?:string,name:string,animated?:boolean}, userId: string, member: import('@fluxerjs/core').GuildMember|null, client: import('@fluxerjs/core').Client }} ReactionCtx
+ * @typedef {{ message: import('@fluxerjs/core').Message, emoji: {id?:string,name:string,animated?:boolean}, userId: string, member: import('@fluxerjs/core').GuildMember|null, guildId: string|null, client: import('@fluxerjs/core').Client }} ReactionCtx
  */
 
 /** Reads all reaction-feature config fresh, matching discord-bot's read-fresh-every-event convention. */
@@ -106,9 +106,14 @@ async function handlePinCheck(ctx, options) {
 }
 
 async function handleTimeoutVoteAdd(ctx, options) {
+  // message.guildId is unreliable (null) when the message came from reaction.fetchMessage() —
+  // that REST payload carries no guild_id. ctx.guildId comes from the gateway reaction payload
+  // itself, which always has it, so resolve the guild from there instead of via the message.
+  const guild = ctx.guildId
+    ? await ctx.client.guilds.resolve(ctx.guildId).catch(() => null)
+    : null;
   const voterMember =
-    ctx.member ??
-    (await ctx.message.guild?.members.resolve(ctx.userId).catch(() => null));
+    ctx.member ?? (await guild?.members.resolve(ctx.userId).catch(() => null));
   const weight = resolveTimeoutVoteWeight(
     voterMember,
     options.timeoutVoteDoubleRoleId,
@@ -135,10 +140,13 @@ async function handleTimeoutVoteAdd(ctx, options) {
 
   const targetMember =
     ctx.message.member ??
-    (await ctx.message.guild?.members
-      .resolve(ctx.message.author.id)
-      .catch(() => null));
-  if (!targetMember) return;
+    (await guild?.members.resolve(ctx.message.author.id).catch(() => null));
+  if (!targetMember) {
+    console.error(
+      `bot: timeout vote triggered for message ${ctx.message.id} but could not resolve target member ${ctx.message.author.id}; skipping timeout`,
+    );
+    return;
+  }
 
   try {
     await timeoutMember(
@@ -146,7 +154,8 @@ async function handleTimeoutVoteAdd(ctx, options) {
       result.durationSeconds,
       "Timed out by community vote",
     );
-    await ctx.message.channel.send(
+    const channel = ctx.message.channel ?? (await ctx.message.resolveChannel());
+    await channel.send(
       String(result.responseMessage).replace(
         "{user}",
         `<@${ctx.message.author.id}>`,
@@ -202,11 +211,18 @@ export async function handleReactionAdd(ctx, options) {
       });
   } else if (kind === "generic") {
     if (!options.emojiTrackingEnabled) return;
-    if (ctx.emoji.id != null && !ctx.message.guild?.emojis.has(ctx.emoji.id)) {
-      console.log(
-        `bot: skipping reaction emoji count for external/unknown-guild custom emoji ${ctx.emoji.id} on message ${ctx.message.id}`,
-      );
-      return;
+    if (ctx.emoji.id != null) {
+      // message.guildId is unreliable (null) when the message came from reaction.fetchMessage();
+      // ctx.guildId comes from the gateway reaction payload itself, which always has it.
+      const guild = ctx.guildId
+        ? await ctx.client.guilds.resolve(ctx.guildId).catch(() => null)
+        : null;
+      if (!guild?.emojis.has(ctx.emoji.id)) {
+        console.log(
+          `bot: skipping reaction emoji count for external/unknown-guild custom emoji ${ctx.emoji.id} on message ${ctx.message.id}`,
+        );
+        return;
+      }
     }
     try {
       const milestones = await countEmoji(

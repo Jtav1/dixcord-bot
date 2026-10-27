@@ -66,7 +66,9 @@ async function getChannelNameForPin(channel) {
  * @returns {Promise<{sent: true, milestones: Array}>}
  */
 async function logAndSendPinEmbed(message, client, pinnerUserIds) {
-  const channelName = await getChannelNameForPin(message.channel);
+  // message.channel is a cache-only getter (null if uncached) — resolveChannel() fetches when needed.
+  const channel = message.channel ?? (await message.resolveChannel().catch(() => null));
+  const channelName = await getChannelNameForPin(channel);
   const attachmentUrls = [...message.attachments.values()].map((a) =>
     String(a.url),
   );
