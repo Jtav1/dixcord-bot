@@ -8,6 +8,7 @@ import { getLinkFixerResponse, getFortuneResponse } from "../../api/responses.js
 import { getRandomResponseForTrigger } from "../../api/triggerResponses.js";
 import { executeResponseFunction } from "../../utilities/triggerResponseFunctions.js";
 import { handleReminderRequest } from "../../utilities/reminderRequest.js";
+import { buildCommandListEmbed } from "../../commands/utilities/dixbot.js";
 import {
   getCachedLinkHosts,
   getCachedTriggers,
@@ -88,6 +89,13 @@ const execute = async (message) => {
   if (message.guildId !== guildId) return;
 
   if (await dispatchCommand(message)) return;
+
+  // Exact "@bot help" only — no other phrasing/punctuation. Checked ahead of the rest of the
+  // pipeline so nothing else (triggers, link-fixer) can shadow it.
+  if (message.content.trim() === `<@${client.user?.id}> help`) {
+    await message.author.send({ embeds: [buildCommandListEmbed()] }).catch(() => null);
+    return;
+  }
 
   let response = "";
 
