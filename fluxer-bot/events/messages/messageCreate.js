@@ -1,13 +1,13 @@
-import { Events, MessageType } from "@fluxerjs/core";
+import { Events } from "@fluxerjs/core";
 
 import { commands } from "../../commandRegistry.js";
-import { commandPrefix, guildId, instanceUrl } from "../../configVars.js";
+import { commandPrefix, guildId } from "../../configVars.js";
 import { client } from "../../fluxerClient.js";
 
 import { getLinkFixerResponse, getFortuneResponse } from "../../api/responses.js";
 import { getRandomResponseForTrigger } from "../../api/triggerResponses.js";
 import { executeResponseFunction } from "../../utilities/triggerResponseFunctions.js";
-import { createScheduledMessage, parseReminderText } from "../../api/scheduledMessages.js";
+import { handleReminderRequest } from "../../utilities/reminderRequest.js";
 import {
   getCachedLinkHosts,
   getCachedTriggers,
@@ -25,10 +25,44 @@ import {
   isEightBallEnabled,
   isStickerTrackingEnabled,
   isPlusPlusEnabled,
+  isFeatureEnabled,
 } from "../../configStore.js";
 import { incrementCounter } from "../../utilities/metrics.js";
+import {
+  hasActiveSession,
+  handleWizardReply,
+} from "../../utilities/scheduledUpdateWizard.js";
 
 const name = Events.MessageCreate;
+
+/**
+ * Parse and run a prefix command. Returns false if the message isn't a recognized command
+ * invocation (caller falls through to its own handling); true if it was handled here.
+ * @param {import('@fluxerjs/core').Message} message
+ * @returns {Promise<boolean>}
+ */
+async function dispatchCommand(message) {
+  if (!message.content.startsWith(commandPrefix)) return false;
+
+  const [cmdName, ...args] = message.content
+    .slice(commandPrefix.length)
+    .trim()
+    .split(/\s+/);
+  const command = commands.find((cmd) => cmd.cmdName === cmdName);
+  if (!command) return false;
+
+  if (command.featureKey && !isFeatureEnabled(command.featureKey)) {
+    await message.author.send("This feature is currently disabled.").catch(() => null);
+    return true;
+  }
+
+  try {
+    await command.execute(message, args);
+  } catch (err) {
+    console.error(`bot: command "${cmdName}" error:`, err);
+  }
+  return true;
+}
 
 /**
  * Dispatch prefix commands (fluxer.js has no slash commands), then run the message-handling
@@ -37,23 +71,23 @@ const name = Events.MessageCreate;
  * @param {import('@fluxerjs/core').Message} message
  */
 const execute = async (message) => {
-  if (message.author.bot || message.guildId !== guildId) return;
+  if (message.author.bot) return;
 
-  if (message.content.startsWith(commandPrefix)) {
-    const [cmdName, ...args] = message.content
-      .slice(commandPrefix.length)
-      .trim()
-      .split(/\s+/);
-    const command = commands.find((cmd) => cmd.cmdName === cmdName);
-    if (!command) return;
-
-    try {
-      await command.execute(message, args);
-    } catch (err) {
-      console.error(`bot: command "${cmdName}" error:`, err);
+  // DMs carry no guildId. Commands work here too, except while the user is already mid a
+  // prompt-response chain (e.g. the !scheduled-update wizard) — then every DM reply routes
+  // there instead, until it ends or the user sends "exit".
+  if (message.guildId == null) {
+    if (hasActiveSession(message.author.id)) {
+      await handleWizardReply(message);
+    } else {
+      await dispatchCommand(message);
     }
     return;
   }
+
+  if (message.guildId !== guildId) return;
+
+  if (await dispatchCommand(message)) return;
 
   let response = "";
 
@@ -132,51 +166,7 @@ const execute = async (message) => {
     if (isRemindersEnabled() && message.content.toLowerCase().includes("remind me")) {
       const mentionRegex = new RegExp(`^<@${client.user?.id}>\\s+`, "i");
       const reminderText = message.content.replace(mentionRegex, "").trim();
-      const isReply = message.type === MessageType.Reply;
-
-      const parsedReminder = await parseReminderText({
-        text: reminderText,
-        isReply,
-      });
-
-      if (!parsedReminder.ok) {
-        incrementCounter("reminderParseFailuresTotal");
-        console.log("bot: scheduler parse failure:", parsedReminder.error);
-        await message.react("❌").catch(() => null);
-        await message.reply(
-          "i can only understand the format '[at/in] [time/length of time] remind me [message]' OR NOW ALSO 'remind me [at/in] [time/length of time] [message]'",
-        );
-        return;
-      }
-
-      // Reply-with-no-explicit-time reminders don't carry their own body text (see webapi's
-      // parse-reminder route) - build a mention + link to the replied message instead. No
-      // confirmed Fluxer message-permalink format exists yet; this guesses at a Discord-style
-      // URL against the configured instance - verify against a real Fluxer instance.
-      const messageBody = parsedReminder.usesReplyContext
-        ? `<@${message.author.id}> reminder: ${instanceUrl ?? ""}/channels/${message.messageReference?.guildId}/${message.messageReference?.channelId}/${message.messageReference?.messageId}`
-        : parsedReminder.messageContent;
-
-      try {
-        const created = await createScheduledMessage({
-          requesterUserId: message.author.id,
-          chatChannelId: message.channelId,
-          chatGuildId: message.guildId,
-          messageBody,
-          scheduledAtUtcIso: parsedReminder.scheduledAt,
-        });
-        if (!created) {
-          console.log("bot: scheduler create failure: no created row returned");
-          await message.react("❌").catch(() => null);
-          return;
-        }
-        await message.react("✅").catch(() => null);
-        incrementCounter("remindersCreatedTotal");
-      } catch (err) {
-        console.log("bot: scheduler create failure:", err);
-        await message.react("❌").catch(() => null);
-        return;
-      }
+      await handleReminderRequest(message, reminderText);
     } else if (
       isEightBallEnabled() &&
       !response &&
