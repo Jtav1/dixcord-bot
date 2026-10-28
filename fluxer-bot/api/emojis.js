@@ -81,3 +81,43 @@ export const uncountRepost = async (userid, msgid, accuserid) => {
     repost: -1,
   });
 };
+
+/**
+ * Top used emojis. POST /api/leaderboards/emoji
+ * @returns {Promise<Array>}
+ */
+export const getTopEmoji = async (number = 5) => {
+  const { data } = await api.post("/api/leaderboards/emoji", {
+    limit: number,
+  });
+  if (!data?.ok || !Array.isArray(data.top)) return [];
+  return data.top;
+};
+
+/**
+ * Top reposters by accusation count. POST /api/leaderboards/repost
+ * @param {number} number - Limit (default 5, max 50)
+ * @returns {Promise<Array<{ userid: string, count: number }>>}
+ */
+export const getTopReposters = async (number = 5) => {
+  const { data } = await api.post("/api/leaderboards/repost", {
+    app: "fluxer",
+    limit: number,
+  });
+  if (!data?.ok || !Array.isArray(data.top)) return [];
+  return data.top;
+};
+
+/**
+ * Repost count for a user. GET /api/leaderboards/repost/user/:userId
+ * @param {string} userid - User ID
+ * @returns {Promise<number>}
+ */
+export const getRepostsForUser = async (userid) => {
+  if (!userid) return 0;
+  const { data } = await api.get(`/api/leaderboards/repost/user/${userid}`, {
+    params: { app: "fluxer" },
+  });
+  if (!data?.ok) return 0;
+  return Number(data.count) ?? 0;
+};

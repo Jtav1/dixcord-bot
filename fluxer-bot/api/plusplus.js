@@ -58,3 +58,69 @@ export const recordPlusMinusFromMessage = async (
   });
   return Array.isArray(data?.milestones) ? data.milestones : [];
 };
+
+/**
+ * Total score for a string (word or user). GET /api/leaderboards/plusplus/total
+ * @returns {Promise<Array<{ total: number }>>} For backward compat with callers that use result[0].total
+ */
+export const getTotalScoreByString = async (string, typestr) => {
+  if (!string) return [{ total: 0 }];
+  const type = typestr === "user" ? "user" : "word";
+  const { data } = await api.get("/api/leaderboards/plusplus/total", {
+    params: { app: "fluxer", string, type },
+  });
+  if (!data?.ok) return [{ total: 0 }];
+  return [{ total: Number(data.total) ?? 0 }];
+};
+
+/**
+ * Top plusplus scores. POST /api/leaderboards/plusplus
+ * @returns {Promise<Array<{ string: string, typestr: string, total: number }>>}
+ */
+export const getTopScores = async (number = 5) => {
+  const { data } = await api.post("/api/leaderboards/plusplus", {
+    app: "fluxer",
+    limit: number,
+  });
+  if (!data?.ok || !Array.isArray(data.top)) return [];
+  return data.top;
+};
+
+/**
+ * Bottom plusplus scores. POST /api/leaderboards/plusplus
+ * @returns {Promise<Array<{ string: string, typestr: string, total: number }>>}
+ */
+export const getBottomScores = async (number = 5) => {
+  const { data } = await api.post("/api/leaderboards/plusplus", {
+    app: "fluxer",
+    limit: number,
+  });
+  if (!data?.ok || !Array.isArray(data.bottom)) return [];
+  return data.bottom;
+};
+
+/**
+ * Number of votes cast by a voter. GET /api/leaderboards/plusplus/voter/:userId
+ * @returns {Promise<Array<{ total: number }>>} For backward compat with callers that use result[0].total
+ */
+export const getVotesById = async (voterid) => {
+  if (!voterid) return [{ total: 0 }];
+  const { data } = await api.get(`/api/leaderboards/plusplus/voter/${voterid}`, {
+    params: { app: "fluxer" },
+  });
+  if (!data?.ok) return [{ total: 0 }];
+  return [{ total: Number(data.total) ?? 0 }];
+};
+
+/**
+ * Top voters by vote count. POST /api/leaderboards/plusplus/top-voters
+ * @returns {Promise<Array<{ voter: string, total: number }>>}
+ */
+export const getTopVoters = async (number = 3) => {
+  const { data } = await api.post("/api/leaderboards/plusplus/top-voters", {
+    app: "fluxer",
+    limit: number,
+  });
+  if (!data?.ok || !Array.isArray(data.topVoters)) return [];
+  return data.topVoters;
+};

@@ -60,12 +60,16 @@ async function getChannelNameForPin(channel) {
 }
 
 /**
+ * Re-checks not-already-pinned, then logs and sends the pin alert embed.
  * @param {import('@fluxerjs/core').Message} message
  * @param {import('@fluxerjs/core').Client} client
  * @param {string[]} pinnerUserIds
- * @returns {Promise<{sent: true, milestones: Array}>}
+ * @returns {Promise<{sent: boolean, milestones: Array}>}
  */
-async function logAndSendPinEmbed(message, client, pinnerUserIds) {
+export async function sendPinAlert(message, client, pinnerUserIds) {
+  if (await isMessageAlreadyPinned(message.id)) {
+    return { sent: false, milestones: [] };
+  }
   // message.channel is cache-only (null if uncached); resolveChannel() fetches it.
   const channel = message.channel ?? (await message.resolveChannel().catch(() => null));
   const channelName = await getChannelNameForPin(channel);
@@ -121,13 +125,10 @@ async function logAndSendPinEmbed(message, client, pinnerUserIds) {
  * @returns {Promise<{sent: boolean, milestones: Array}>}
  */
 export const messagePinner = async (message, pinReaction, client) => {
-  if (await isMessageAlreadyPinned(message.id)) {
-    return { sent: false, milestones: [] };
-  }
   const pinnerUserIds = await getPinReactionUserIds(message, {
     app: "fluxer",
     emoid: pinReaction.emoji.id ?? pinReaction.emoji.name,
     emoji: pinReaction.emoji.name,
   });
-  return logAndSendPinEmbed(message, client, pinnerUserIds);
+  return sendPinAlert(message, client, pinnerUserIds);
 };

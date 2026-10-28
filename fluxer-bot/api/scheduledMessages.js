@@ -25,6 +25,24 @@ export async function parseReminderText(payload) {
 }
 
 /**
+ * Parse a bare time expression (no "remind me" grammar) into a scheduled time.
+ * POST /api/scheduled-messages/parse-time
+ * @param {string} text - Free-text time expression.
+ * @returns {Promise<{ ok: true, scheduledAt: string } | { ok: false, error: string }>}
+ */
+export async function parseTimeExpression(text) {
+  try {
+    const { data } = await api.post("/api/scheduled-messages/parse-time", {
+      text,
+    });
+    if (!data?.ok) return { ok: false, error: data?.error || "Could not parse time" };
+    return { ok: true, scheduledAt: data.scheduledAt };
+  } catch (err) {
+    return { ok: false, error: api.describeApiError(err) };
+  }
+}
+
+/**
  * Create a scheduled message for a requester.
  * @param {{ requesterUserId: string, chatChannelId: string, chatGuildId?: string|null, messageBody: string, scheduledAtUtcIso: string }} payload - Creation fields.
  * @returns {Promise<{ id: number, user_id: number, app: string, chat_channel_id: string, chat_guild_id: string|null, message_body: string, scheduled_at: string, status: string, sent_at: string|null, created_at: string|null }|null>} Created row or null.
@@ -40,6 +58,59 @@ export async function createScheduledMessage(payload) {
   });
   if (!data?.ok || !data?.scheduledMessage) return null;
   return data.scheduledMessage;
+}
+
+/**
+ * Get upcoming unsent/future scheduled messages for one user.
+ * @param {string} requesterUserId - Platform user id.
+ * @returns {Promise<Array<object>>} Scheduled message rows.
+ */
+export async function getUpcomingScheduledMessagesForUser(requesterUserId) {
+  const { data } = await api.get("/api/scheduled-messages", {
+    params: { app: "fluxer", requesterUserId },
+  });
+  if (!data?.ok || !Array.isArray(data.scheduledMessages)) return [];
+  return data.scheduledMessages;
+}
+
+/**
+ * Update a user-owned scheduled message.
+ * @param {{ id: number|string, requesterUserId: string, messageContent?: string, scheduledAt?: string }} payload - Update fields.
+ * @returns {Promise<object|null>} Updated scheduled row or null.
+ */
+export async function updateScheduledMessageForUser(payload) {
+  const body = {
+    app: "fluxer",
+    requesterUserId: payload.requesterUserId,
+  };
+
+  if (payload.messageContent !== undefined && payload.messageContent.length > 0)
+    body.message_body = payload.messageContent;
+  if (
+    payload.scheduledAt !== undefined &&
+    String(payload.scheduledAt).length > 0
+  ) {
+    body.scheduled_at = payload.scheduledAt;
+  }
+
+  const { data } = await api.put(`/api/scheduled-messages/${payload.id}`, body);
+  if (!data?.ok || !data?.scheduledMessage) return null;
+  return data.scheduledMessage;
+}
+
+/**
+ * Delete a user-owned pending scheduled message.
+ * @param {{ id: number|string, requesterUserId: string }} payload - Delete fields.
+ * @returns {Promise<boolean>} True when delete succeeds.
+ */
+export async function deleteScheduledMessageForUser(payload) {
+  const { data } = await api.del(`/api/scheduled-messages/${payload.id}`, {
+    params: {
+      app: "fluxer",
+      requesterUserId: payload.requesterUserId,
+    },
+  });
+  return data?.ok === true;
 }
 
 /**
