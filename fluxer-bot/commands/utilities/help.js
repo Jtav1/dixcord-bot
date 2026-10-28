@@ -8,7 +8,7 @@ const data = {
 };
 
 const execute = async (message) => {
-  await message.reply({ embeds: [buildCommandListEmbed()] });
+  await message.author.send({ embeds: [buildCommandListEmbed()] }).catch(() => null);
 };
 
 export { cmdName, data, execute };

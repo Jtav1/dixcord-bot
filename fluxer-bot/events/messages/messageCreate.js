@@ -93,7 +93,7 @@ const execute = async (message) => {
   // Exact "@bot help" only — no other phrasing/punctuation. Checked ahead of the rest of the
   // pipeline so nothing else (triggers, link-fixer) can shadow it.
   if (message.content.trim() === `<@${client.user?.id}> help`) {
-    await message.reply({ embeds: [buildCommandListEmbed()] });
+    await message.author.send({ embeds: [buildCommandListEmbed()] }).catch(() => null);
     return;
   }
 

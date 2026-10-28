@@ -16,18 +16,21 @@ const data = {
  * @returns {EmbedBuilder}
  */
 export function buildCommandListEmbed() {
-  const lines = commands
-    .map((cmd) => `**${commandPrefix}${cmd.data.usage}** — ${cmd.data.description}`)
-    .sort();
+  // Field names render bolder/larger than the description text, making the command itself
+  // stand out from its one-line explanation (set as the field's value).
+  const fields = commands
+    .map((cmd) => ({ name: `${commandPrefix}${cmd.data.usage}`, value: cmd.data.description }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   return new EmbedBuilder()
     .setColor(0x0099ff)
     .setTitle("📖 Dixbot Commands")
-    .setDescription(lines.join("\n"))
+    .addFields(...fields)
     .setFooter({ text: `Prefix: ${commandPrefix}` });
 }
 
 const execute = async (message) => {
-  await message.reply({ embeds: [buildCommandListEmbed()] });
+  await message.author.send({ embeds: [buildCommandListEmbed()] }).catch(() => null);
 };
 
 export { cmdName, data, execute };
