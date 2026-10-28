@@ -2,6 +2,7 @@ import { EmbedBuilder } from "@fluxerjs/builders";
 
 import * as api from "../../../api/client.js";
 import { getPinChannelId } from "../../../configStore.js";
+import { instanceUrl } from "../../../configVars.js";
 import { getPinReactionUserIds } from "../../connection/utilities/pinHistoryHydration.js";
 
 /**
@@ -89,12 +90,18 @@ export async function sendPinAlert(message, client, pinnerUserIds) {
     guildId: message.guildId ?? null,
   });
 
+  // No confirmed Fluxer message-permalink format exists yet (Message has no .url getter like
+  // discord.js) — this guesses at a Discord-style URL against the configured instance, same
+  // deviation noted in utilities/reminderRequest.js; verify against a real Fluxer instance.
+  const messageUrl = `${instanceUrl ?? ""}/channels/${message.guildId}/${message.channelId}/${message.id}`;
+
   const embed = new EmbedBuilder()
     .setColor(0xbc0302)
     .setAuthor({
       name: `${message.author.displayName ?? message.author.username} (${message.author.username})`,
     })
     .setTitle("📌 Major Pin Alert")
+    .setURL(messageUrl)
     .addFields(
       { name: "Channel", value: `<#${message.channelId}>`, inline: true },
       {
