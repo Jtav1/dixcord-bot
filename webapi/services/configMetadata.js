@@ -83,6 +83,12 @@ export const CONFIG_METADATA = Object.freeze({
     requiresBotRestart: false,
     defaultValue: envDefault("reminders_enabled", "true"),
   },
+  color_me_enabled: {
+    description: "Enable the !color-me command (members set their own name color via a bot-managed role; fluxer only)",
+    type: "boolean",
+    requiresBotRestart: false,
+    defaultValue: envDefault("color_me_enabled", "true"),
+  },
   eight_ball_enabled: {
     description: "Enable 8-ball/fortune replies when mentioning the bot with a message ending in '?'",
     type: "boolean",

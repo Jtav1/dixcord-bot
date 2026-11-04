@@ -533,6 +533,8 @@ export async function ensureSchemaMigrations() {
           roles TEXT NULL,
           joined_at TEXT NULL,
           synced_at TEXT DEFAULT (datetime('now')),
+          color_role_name TEXT NULL,
+          color_hex TEXT NULL,
           UNIQUE (app, guild_id, platform_user_id)
         )
       `);
@@ -551,6 +553,8 @@ export async function ensureSchemaMigrations() {
           roles TEXT NULL,
           joined_at DATETIME NULL,
           synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          color_role_name VARCHAR(32) NULL,
+          color_hex CHAR(6) NULL,
           UNIQUE KEY uniq_guild_members_app_guild_platform (app, guild_id, platform_user_id),
           KEY idx_guild_members_app_guild (app, guild_id)
         )
@@ -708,6 +712,23 @@ export async function ensureSchemaMigrations() {
       );
       applied.push("guild_members.handle column");
       console.log("db: migration applied: added guild_members.handle column");
+    }
+  }
+
+  // guild_members.color_role_name/color_hex: the member's bot-created color role (!color-me) and
+  // its hex. Never part of the roster sync's SET list, so syncs leave them alone.
+  if (await tableExists(db, "guild_members", isSqlite)) {
+    for (const col of [
+      { name: "color_role_name", sqlite: "TEXT NULL", mysql: "VARCHAR(32) NULL" },
+      { name: "color_hex", sqlite: "TEXT NULL", mysql: "CHAR(6) NULL" },
+    ]) {
+      if (!(await columnExists(db, "guild_members", col.name, isSqlite))) {
+        await db.query(
+          `ALTER TABLE guild_members ADD COLUMN ${col.name} ${isSqlite ? col.sqlite : col.mysql}`,
+        );
+        applied.push(`guild_members.${col.name} column`);
+        console.log(`db: migration applied: added guild_members.${col.name} column`);
+      }
     }
   }
 

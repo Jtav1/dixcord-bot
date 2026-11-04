@@ -36,6 +36,7 @@ instead until it ends or the user replies `exit`.
 - [x] `scheduled-update` — update a pending reminder's time and/or message. Deviation: collected as a multi-turn DM wizard (id → time → message, `skip`/`cancel` supported) instead of named slash options, since prefix text can't cleanly carry two optional freeform values in one line
 - [x] `scheduled-delete` — delete a pending reminder by id, replies via DM
 - [x] `link-accounts` / `confirm-link` — user-initiated account linking (new in both bots)
+- [x] `color-me` — set your name color via a personal bot-managed `dixbot-#####` role (`#RRGGBB` or `none`; new, fluxer-only). Role name + hex stored on the `guild_members` row; the role is deleted when the member leaves. Feature key `color_me_enabled`
 
 Ephemeral discord-bot replies → DM here; public discord-bot replies → chat reply here. A command's
 `featureKey` (soft kill-switch) and missing/invalid-argument validation both DM the invoker instead

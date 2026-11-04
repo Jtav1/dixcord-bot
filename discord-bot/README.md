@@ -67,6 +67,7 @@ available regardless.
 | `twitter_fix_enabled` | Link fixer |
 | `trigger_responses_enabled` | Trigger-string auto-replies |
 | `reminders_enabled` | Creating new reminders via "@bot remind me ..." |
+| `color_me_enabled` | The fluxer-bot `!color-me` command (per-member name color via a bot-managed role) |
 | `eight_ball_enabled` | 8-ball/fortune replies |
 | `emoji_tracking_enabled` | Emoji usage tracking (message content + reactions) |
 | `sticker_tracking_enabled` | Sticker usage tracking |

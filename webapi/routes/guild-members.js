@@ -1,6 +1,9 @@
 import express from "express";
 import { authenticate, requireAdmin, requireBotOrAdmin, requireOwnGuildOrAdmin } from "../middleware/auth.js";
 import {
+  clearColorRole,
+  getColorRole,
+  setColorRole,
   guildMemberExists,
   confirmAccountLink,
   linkGuildMemberAlias,
@@ -17,6 +20,7 @@ import {
 } from "../services/guildMembers.js";
 import { getUserMappingById } from "../services/userMappings.js";
 import { recordAudit } from "../services/auditLog.js";
+import { getChatMemberAppConfig } from "../services/chatMemberMapping.js";
 
 const router = express.Router();
 
@@ -708,6 +712,203 @@ router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
   } catch (err) {
     console.error("GET /api/guild-members error:", err);
     res.status(500).json({ ok: false, error: "Failed to list guild members" });
+  }
+});
+
+const COLOR_ROLE_NAME_RE = /^dixbot-[a-z0-9]{5}$/;
+const COLOR_HEX_RE = /^[0-9A-F]{6}$/;
+
+/**
+ * Pull and validate the (app, guildId, platformUserId) triple shared by the color-role routes.
+ * @param {Record<string, unknown>} source req.query or req.body
+ * @returns {{ ok: true, app: string, guildId: string, platformUserId: string } | { ok: false, error: string }}
+ */
+function parseColorRoleKey(source) {
+  const app = String(source?.app ?? "").trim();
+  const guildId = String(source?.guildId ?? "").trim();
+  const platformUserId = String(source?.platformUserId ?? "").trim();
+  if (!getChatMemberAppConfig(app)) return { ok: false, error: "Unsupported or missing app" };
+  if (!guildId || !platformUserId) {
+    return { ok: false, error: "guildId and platformUserId are required" };
+  }
+  return { ok: true, app, guildId, platformUserId };
+}
+
+/**
+ * GET /api/guild-members/color-role
+ * The member's bot-created color role (!color-me), or null.
+ * Query: { app, guildId, platformUserId }
+ * Auth: bot or admin.
+ * @openapi
+ * /api/guild-members/color-role:
+ *   get:
+ *     operationId: getColorRole
+ *     tags: [Guild Members]
+ *     summary: Get a member's color role record
+ *     parameters:
+ *       - { name: app, in: query, required: true, schema: { type: string, example: fluxer } }
+ *       - { name: guildId, in: query, required: true, schema: { type: string } }
+ *       - { name: platformUserId, in: query, required: true, schema: { type: string } }
+ *     responses:
+ *       '200':
+ *         description: The record, or null if the member has no color role.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 colorRole:
+ *                   nullable: true
+ *                   type: object
+ *                   properties:
+ *                     name: { type: string, example: dixbot-a1b2c }
+ *                     hex: { type: string, example: FF8800 }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/color-role", authenticate, requireBotOrAdmin, requireOwnGuildOrAdmin, async (req, res) => {
+  try {
+    const key = parseColorRoleKey(req.query);
+    if (!key.ok) return res.status(400).json({ ok: false, error: key.error });
+    const colorRole = await getColorRole(key.app, key.guildId, key.platformUserId);
+    res.json({ ok: true, colorRole });
+  } catch (err) {
+    console.error("GET /api/guild-members/color-role error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get color role" });
+  }
+});
+
+/**
+ * PUT /api/guild-members/color-role
+ * Record the member's color role name + hex (creates a minimal guild_members row if needed).
+ * Body: { app, guildId, platformUserId, name, hex }
+ * Auth: bot or admin.
+ * @openapi
+ * /api/guild-members/color-role:
+ *   put:
+ *     operationId: setColorRole
+ *     tags: [Guild Members]
+ *     summary: Record a member's color role (color-me command)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, guildId, platformUserId, name, hex]
+ *             properties:
+ *               app: { type: string, example: fluxer }
+ *               guildId: { type: string }
+ *               platformUserId: { type: string }
+ *               name: { type: string, description: "Role name, dixbot- plus 5 lowercase alphanumerics.", example: dixbot-a1b2c }
+ *               hex: { type: string, description: "6 uppercase hex digits, no leading #.", example: FF8800 }
+ *     responses:
+ *       '200':
+ *         description: Recorded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.put("/color-role", authenticate, requireBotOrAdmin, requireOwnGuildOrAdmin, async (req, res) => {
+  try {
+    const key = parseColorRoleKey(req.body);
+    if (!key.ok) return res.status(400).json({ ok: false, error: key.error });
+    const name = String(req.body?.name ?? "").trim();
+    const hex = String(req.body?.hex ?? "").trim();
+    if (!COLOR_ROLE_NAME_RE.test(name)) {
+      return res.status(400).json({ ok: false, error: "name must be dixbot- followed by 5 lowercase alphanumerics" });
+    }
+    if (!COLOR_HEX_RE.test(hex)) {
+      return res.status(400).json({ ok: false, error: "hex must be 6 uppercase hex digits without #" });
+    }
+
+    await setColorRole(key.app, key.guildId, key.platformUserId, { name, hex });
+    await recordAudit(req.user.id, "set_color_role", "guild_members", null, {
+      app: key.app,
+      guildId: key.guildId,
+      platformUserId: key.platformUserId,
+      name,
+      hex,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("PUT /api/guild-members/color-role error:", err);
+    res.status(500).json({ ok: false, error: "Failed to set color role" });
+  }
+});
+
+/**
+ * DELETE /api/guild-members/color-role
+ * Clear the member's color role record. Idempotent.
+ * Body: { app, guildId, platformUserId }
+ * Auth: bot or admin.
+ * @openapi
+ * /api/guild-members/color-role:
+ *   delete:
+ *     operationId: clearColorRole
+ *     tags: [Guild Members]
+ *     summary: Clear a member's color role record
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, guildId, platformUserId]
+ *             properties:
+ *               app: { type: string, example: fluxer }
+ *               guildId: { type: string }
+ *               platformUserId: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Cleared (or nothing to clear).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.delete("/color-role", authenticate, requireBotOrAdmin, requireOwnGuildOrAdmin, async (req, res) => {
+  try {
+    const key = parseColorRoleKey(req.body);
+    if (!key.ok) return res.status(400).json({ ok: false, error: key.error });
+    await clearColorRole(key.app, key.guildId, key.platformUserId);
+    await recordAudit(req.user.id, "clear_color_role", "guild_members", null, {
+      app: key.app,
+      guildId: key.guildId,
+      platformUserId: key.platformUserId,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /api/guild-members/color-role error:", err);
+    res.status(500).json({ ok: false, error: "Failed to clear color role" });
   }
 });
 

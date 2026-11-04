@@ -105,6 +105,68 @@ export async function upsertGuildMembers(app, guildId, members) {
 }
 
 /**
+ * The member's bot-created color role (!color-me), if any.
+ * @param {string} app
+ * @param {string} guildId
+ * @param {string} platformUserId
+ * @returns {Promise<{ name: string, hex: string }|null>}
+ */
+export async function getColorRole(app, guildId, platformUserId) {
+  const [rows] = await db.query(
+    "SELECT color_role_name, color_hex FROM guild_members WHERE app = ? AND guild_id = ? AND platform_user_id = ?",
+    [app, guildId, platformUserId],
+  );
+  const row = rows?.[0];
+  if (!row?.color_role_name) return null;
+  return { name: row.color_role_name, hex: row.color_hex };
+}
+
+/**
+ * Record the member's color role. Creates a minimal row if the member isn't synced yet; only
+ * the color columns are written on conflict, so roster sync data is never touched.
+ * @param {string} app
+ * @param {string} guildId
+ * @param {string} platformUserId
+ * @param {{ name: string, hex: string }} colorRole
+ * @returns {Promise<void>}
+ */
+export async function setColorRole(app, guildId, platformUserId, { name, hex }) {
+  if (isSqlite) {
+    await db.query(
+      `INSERT INTO guild_members (app, guild_id, platform_user_id, color_role_name, color_hex)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(app, guild_id, platform_user_id) DO UPDATE SET
+         color_role_name = excluded.color_role_name,
+         color_hex = excluded.color_hex`,
+      [app, guildId, platformUserId, name, hex],
+    );
+  } else {
+    await db.query(
+      `INSERT INTO guild_members (app, guild_id, platform_user_id, color_role_name, color_hex)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         color_role_name = VALUES(color_role_name),
+         color_hex = VALUES(color_hex)`,
+      [app, guildId, platformUserId, name, hex],
+    );
+  }
+}
+
+/**
+ * Clear the member's color role record.
+ * @param {string} app
+ * @param {string} guildId
+ * @param {string} platformUserId
+ * @returns {Promise<void>}
+ */
+export async function clearColorRole(app, guildId, platformUserId) {
+  await db.query(
+    "UPDATE guild_members SET color_role_name = NULL, color_hex = NULL WHERE app = ? AND guild_id = ? AND platform_user_id = ?",
+    [app, guildId, platformUserId],
+  );
+}
+
+/**
  * Resolve (creating if needed) the one chat_member_mapping identity representing the shared
  * bot service account, named after BOT_USERNAME. Every bot client's own platform account aliases
  * to this single identity, regardless of app — so every client calls this with the same `name`
