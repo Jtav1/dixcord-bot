@@ -10,34 +10,16 @@
       </v-app-bar-title>
 
       <v-select
-        v-if="CLIENTS.length > 1"
-        :model-value="activeClientKey"
-        :items="clientItems"
+        :model-value="selectedScope"
+        :items="scopeItems"
         item-title="label"
-        item-value="key"
+        item-value="value"
         density="compact"
         variant="outlined"
         hide-details
-        class="app-client-select"
-        @update:model-value="onClientChange"
+        class="app-scope-select"
+        @update:model-value="onScopeChange"
       />
-
-      <v-tabs
-        :model-value="activeGuildScope"
-        class="app-tabs"
-        color="primary"
-        show-arrows
-      >
-        <v-tab
-          v-for="tab in guildTabs"
-          :key="tab.key"
-          :value="tab.key"
-          :to="guildTabPath(tab.key)"
-          class="text-none"
-        >
-          {{ tab.label }}
-        </v-tab>
-      </v-tabs>
 
       <v-spacer />
 
@@ -49,7 +31,7 @@
         <v-list-item
           v-for="feature in activeFeatures"
           :key="feature.key"
-          :to="`/${activeClientKey}/${activeGuildScope}/${feature.key}`"
+          :to="featurePath(feature.key)"
           :prepend-icon="feature.icon"
           :title="feature.label"
         />
@@ -71,7 +53,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import ThemeToggle from "./ThemeToggle.vue";
 import GlobalSnackbar from "./GlobalSnackbar.vue";
-import { CLIENTS, appForClientKey } from "../nav/clients.js";
+import { GLOBAL_FEATURES, BOT_FEATURES, appLabel } from "../nav/clients.js";
 import { fetchAllGuilds } from "../lib/guild.js";
 
 const route = useRoute();
@@ -88,68 +70,46 @@ onMounted(async () => {
   }
 });
 
-const activeClientKey = computed(
-  () =>
-    CLIENTS.find((client) => route.path.startsWith(`/${client.key}`))?.key ?? CLIENTS[0].key,
+/** `"global"`, or `"<app>:<guildId>"` for a specific configured bot (guild_info is keyed on (app, guild_id)). */
+const selectedScope = computed(() =>
+  route.path.startsWith("/bot/") ? `${route.params.app}:${route.params.guildId}` : "global",
 );
 
-/** The chat-app value (`"discord"`/`"fluxer"`) the active client's features should query webapi with. */
-const activeApp = computed(() => appForClientKey(activeClientKey.value));
-
-const clientItems = computed(() => CLIENTS.map((client) => ({ key: client.key, label: client.label })));
-
-/**
- * Switch clients: land on the new client's first feature under "Global" — a guild tab selected
- * under the old client's app has no meaning for the new one, so never carry it across.
- * @param {string} clientKey
- * @returns {void}
- */
-function onClientChange(clientKey) {
-  const client = CLIENTS.find((c) => c.key === clientKey);
-  if (!client) return;
-  router.push(`/${clientKey}/global/${client.features[0].key}`);
-}
-
-const activeGuildScope = computed(() => route.params.guildScope ?? "global");
-
-/** Current feature key, read from the URL's last path segment. */
-const activeFeatureKey = computed(() => route.path.split("/").filter(Boolean).pop());
-
-const allFeatures = computed(
-  () => CLIENTS.find((client) => client.key === activeClientKey.value)?.features ?? [],
-);
-
-/** Left-nav features, dropping guild-scoped ones (e.g. Config) while "Global" is active. */
-const activeFeatures = computed(() =>
-  activeGuildScope.value === "global"
-    ? allFeatures.value.filter((feature) => !feature.guildScoped)
-    : allFeatures.value,
-);
-
-/**
- * Guild-tab list: a hardcoded "Global" entry first, then one tab per synced guild belonging to
- * the active client's app — never another app's guild, so a tab always loads its own bot's data.
- */
-const guildTabs = computed(() => [
-  { key: "global", label: "Global" },
-  ...guilds.value
-    .filter((guild) => guild.app === activeApp.value)
-    .map((guild) => ({ key: guild.guildId, label: guild.name })),
+const scopeItems = computed(() => [
+  { value: "global", label: "Global" },
+  ...guilds.value.map((guild) => ({
+    value: `${guild.app}:${guild.guildId}`,
+    label: `${guild.name} (${appLabel(guild.app)})`,
+  })),
 ]);
 
+/** Left-nav features for the active scope: cross-app ones under Global, per-bot ones otherwise. */
+const activeFeatures = computed(() => (selectedScope.value === "global" ? GLOBAL_FEATURES : BOT_FEATURES));
+
 /**
- * Target path for a guild tab: stay on the current feature, unless it's guild-scoped and the
- * target is "Global" (that feature is hidden there), in which case fall back to dashboard.
- * @param {string} guildScope
+ * @param {string} featureKey
  * @returns {string}
  */
-function guildTabPath(guildScope) {
-  const currentFeature = allFeatures.value.find((f) => f.key === activeFeatureKey.value);
-  const feature =
-    guildScope === "global" && currentFeature?.guildScoped
-      ? "dashboard"
-      : (activeFeatureKey.value ?? "dashboard");
-  return `/${activeClientKey.value}/${guildScope}/${feature}`;
+function featurePath(featureKey) {
+  if (selectedScope.value === "global") return `/global/${featureKey}`;
+  const [app, guildId] = selectedScope.value.split(":");
+  return `/bot/${app}/${guildId}/${featureKey}`;
+}
+
+/**
+ * Switch scope: land on the new scope's first feature. Global and per-bot feature sets are
+ * disjoint (Config/React For Role only exist per-bot; everything else only exists under
+ * Global), so there's no "current feature" to carry across the switch.
+ * @param {string} value
+ * @returns {void}
+ */
+function onScopeChange(value) {
+  if (value === "global") {
+    router.push(`/global/${GLOBAL_FEATURES[0].key}`);
+    return;
+  }
+  const [app, guildId] = value.split(":");
+  router.push(`/bot/${app}/${guildId}/${BOT_FEATURES[0].key}`);
 }
 </script>
 
@@ -167,15 +127,9 @@ function guildTabPath(guildScope) {
   margin-right: 1rem;
 }
 
-.app-tabs {
-  flex: 1 1 auto;
+.app-scope-select {
+  flex: 0 1 320px;
   min-width: 0;
-}
-
-.app-client-select {
-  flex: 0 0 auto;
-  width: 180px;
-  margin-right: 1rem;
 }
 
 .app-drawer {

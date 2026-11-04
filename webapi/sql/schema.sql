@@ -408,6 +408,8 @@ CREATE TABLE IF NOT EXISTS react_role_messages (
   content_version INT NOT NULL DEFAULT 1,
   synced_version INT NOT NULL DEFAULT 0,
   pending_delete TINYINT(1) NOT NULL DEFAULT 0,
+  last_sync_error TEXT NULL,
+  last_sync_error_version INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_react_role_messages_app_guild (app, guild_id)

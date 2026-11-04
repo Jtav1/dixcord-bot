@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { CLIENTS } from "../nav/clients.js";
+import { GLOBAL_FEATURES, BOT_FEATURES } from "../nav/clients.js";
 import ComingSoonView from "../views/ComingSoonView.vue";
 import DashboardView from "../views/DashboardView.vue";
 import ConfigView from "../views/ConfigView.vue";
@@ -34,28 +34,29 @@ const FEATURE_COMPONENTS = {
   "react-for-role": ReactForRoleView,
 };
 
-const firstClient = CLIENTS[0];
-
 /**
- * Application route table, generated from CLIENTS so a feature only needs an entry in
- * nav/clients.js (+ optionally FEATURE_COMPONENTS) to appear. Every route carries a `guildScope`
- * param ("global" or a guild_id) set by AppShell.vue's tab switcher.
+ * Application route table, generated from nav/clients.js so a feature only needs an entry
+ * there (+ optionally FEATURE_COMPONENTS) to appear. Global features live at `/global/:feature`;
+ * per-bot features live at `/bot/:app/:guildId/:feature`, with `app`/`guildId` real route params
+ * (not guessed from the path) read directly by each bot-scoped view.
  * @type {import("vue-router").RouteRecordRaw[]}
  */
 const routes = [
-  {
-    path: "/",
-    redirect: `/${firstClient.key}/global/${firstClient.features[0].key}`,
-  },
-  ...CLIENTS.flatMap((client) =>
-    client.features.map((feature) => ({
-      path: `/${client.key}/:guildScope/${feature.key}`,
-      name: `${client.key}/${feature.key}`,
-      component: FEATURE_COMPONENTS[feature.key] ?? ComingSoonView,
-      props: FEATURE_COMPONENTS[feature.key] ? false : { title: feature.label },
-      meta: { title: feature.label },
-    })),
-  ),
+  { path: "/", redirect: `/global/${GLOBAL_FEATURES[0].key}` },
+  ...GLOBAL_FEATURES.map((feature) => ({
+    path: `/global/${feature.key}`,
+    name: `global/${feature.key}`,
+    component: FEATURE_COMPONENTS[feature.key] ?? ComingSoonView,
+    props: FEATURE_COMPONENTS[feature.key] ? false : { title: feature.label },
+    meta: { title: feature.label },
+  })),
+  ...BOT_FEATURES.map((feature) => ({
+    path: `/bot/:app/:guildId/${feature.key}`,
+    name: `bot/${feature.key}`,
+    component: FEATURE_COMPONENTS[feature.key] ?? ComingSoonView,
+    props: FEATURE_COMPONENTS[feature.key] ? false : { title: feature.label },
+    meta: { title: feature.label },
+  })),
 ];
 
 /**

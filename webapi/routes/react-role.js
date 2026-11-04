@@ -107,6 +107,8 @@ function validateBindings(bindings) {
  *                     contentVersion: { type: integer }
  *                     syncedVersion: { type: integer }
  *                     pendingDelete: { type: boolean }
+ *                     lastSyncError: { type: string, nullable: true, description: "The bot's last post/edit failure message, if any." }
+ *                     lastSyncErrorVersion: { type: integer, nullable: true, description: "The contentVersion lastSyncError applies to; stale once contentVersion has moved past it." }
  *                     bindings:
  *                       type: array
  *                       items:
@@ -369,6 +371,84 @@ router.post(
     } catch (err) {
       console.error("POST /api/react-role/synced error:", err);
       res.status(500).json({ ok: false, error: "Failed to record react-for-role sync" });
+    }
+  },
+);
+
+/**
+ * POST /api/react-role/sync-failed
+ * Bot-only: record that the bot failed to post/edit the live message for a content version, so
+ * the admin panel (polling GET right after a save) can surface why it didn't take effect.
+ * Body: { app, guildId, contentVersion, error }
+ * Auth: bot or admin required (guild-scoped bot accounts restricted to their own guildId).
+ * @openapi
+ * /api/react-role/sync-failed:
+ *   post:
+ *     operationId: markReactRoleSyncFailed
+ *     tags: [React Role]
+ *     summary: Record that the bot failed to post/edit the live message for a content version
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, guildId, contentVersion, error]
+ *             properties:
+ *               app: { type: string, enum: [discord, fluxer] }
+ *               guildId: { type: string }
+ *               contentVersion: { type: integer }
+ *               error: { type: string }
+ *     responses:
+ *       '200':
+ *         description: Recorded.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post(
+  "/sync-failed",
+  authenticate,
+  requireBotOrAdmin,
+  requireOwnGuildOrAdmin,
+  async (req, res) => {
+    try {
+      const scope = resolveGuildScope(req);
+      if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
+
+      const contentVersion = Number(req.body?.contentVersion);
+      const error = String(req.body?.error ?? "").trim().slice(0, 1000);
+      if (!Number.isInteger(contentVersion) || contentVersion < 0 || !error) {
+        return res.status(400).json({
+          ok: false,
+          error: "contentVersion (non-negative integer) and a non-empty error are required",
+        });
+      }
+
+      const updated = await reactRole.recordSyncFailure(scope.app, scope.guildId, {
+        contentVersion,
+        error,
+      });
+      if (!updated) {
+        return res.status(404).json({ ok: false, error: "React-for-role message not found" });
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("POST /api/react-role/sync-failed error:", err);
+      res.status(500).json({ ok: false, error: "Failed to record react-for-role sync failure" });
     }
   },
 );
