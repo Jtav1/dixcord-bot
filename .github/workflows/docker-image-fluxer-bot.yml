@@ -11,6 +11,11 @@ permissions:
 
 on:
   push:
+<<<<<<< HEAD
+=======
+    # Only a pushed release tag triggers this workflow at all; the `changes` job
+    # below decides whether fluxer-bot's image actually needs rebuilding for it.
+>>>>>>> origin/4.0.0-metrics
     tags: ["v[0-9]+.[0-9]+.[0-9]+", "v[0-9]+.[0-9]+.[0-9]+rc[0-9]+"]
 
 env:
