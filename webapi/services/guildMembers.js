@@ -107,16 +107,29 @@ export async function upsertGuildMembers(app, guildId, members) {
 /**
  * Resolve (creating if needed) the one chat_member_mapping identity representing the shared
  * bot service account, named after BOT_USERNAME. Every bot client's own platform account aliases
- * to this single identity, regardless of app.
+ * to this single identity, regardless of app — so every client calls this with the same `name`
+ * at its own startup. The insert is a no-op-on-conflict upsert (not check-then-insert) because
+ * those startups race: two clients booting together (e.g. docker-compose bringing discord-bot
+ * and fluxer-bot up at once) can both see "no row yet" and both attempt the INSERT, and the
+ * loser would hit chat_member_mapping's UNIQUE(name) constraint and throw.
  * @returns {Promise<number>}
  * @private
  */
 async function ensureBotChatMemberMappingId() {
   const name = String(process.env.BOT_USERNAME ?? "").trim() || "bot";
+  if (isSqlite) {
+    await db.query(
+      "INSERT INTO chat_member_mapping (name) VALUES (?) ON CONFLICT(name) DO NOTHING",
+      [name],
+    );
+  } else {
+    await db.query(
+      "INSERT INTO chat_member_mapping (name) VALUES (?) ON DUPLICATE KEY UPDATE name = name",
+      [name],
+    );
+  }
   const [rows] = await db.query("SELECT id FROM chat_member_mapping WHERE name = ?", [name]);
-  if (rows?.length) return Number(rows[0].id);
-  const [result] = await db.query("INSERT INTO chat_member_mapping (name) VALUES (?)", [name]);
-  return Number(result?.insertId ?? result?.lastInsertRowid);
+  return Number(rows[0].id);
 }
 
 /**
