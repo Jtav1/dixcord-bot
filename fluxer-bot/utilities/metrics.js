@@ -24,10 +24,10 @@ const counters = {
   scheduledMessagesSentTotal: 0,
   cachePollErrorsTotal: 0,
   heartbeatSendErrorsTotal: 0,
-  fluxerGuildJoinsTotal: 0,
-  fluxerGuildLeavesTotal: 0,
-  fluxerShardErrorsTotal: 0,
-  fluxerClientErrorsTotal: 0,
+  guildJoinsTotal: 0,
+  guildLeavesTotal: 0,
+  shardErrorsTotal: 0,
+  clientErrorsTotal: 0,
   apiCallErrorsTotal: {},
 };
 

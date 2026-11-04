@@ -184,6 +184,7 @@ export async function handleReactionAdd(reaction, user, options) {
                   `<@${message.author.id}>`,
                 ),
               );
+              incrementCounter("timeoutVotesTriggeredTotal");
             } catch (err) {
               console.error(
                 `bot: failed to apply vote-timeout on message ${message.id} (target ${message.author.id}): ${err.message}`,

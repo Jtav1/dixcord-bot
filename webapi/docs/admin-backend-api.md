@@ -74,7 +74,7 @@ Per-`(app, guildId)`: each server a community operates gets its own fully indepe
 | GET | `/api/system/status?app=&guildId=` | admin, bot, or webview | Webapi, DB, cache version, bot heartbeat; `status.bot` scoped to one server when both params given, `status.bots` always lists every known server |
 | GET | `/api/system/cache-version` | admin or bot | Current cache version for polling |
 | POST | `/api/system/invalidate-cache` | admin | Bump cache version |
-| POST | `/api/system/heartbeat` | admin or bot | `{ app, guildId, version, lastReadyAt? }` |
+| POST | `/api/system/heartbeat` | admin or bot | `{ app, guildId, version, readyAt?, memberCount?, channelCount?, wsPingMs?, metrics? }` |
 
 ## Statistics
 

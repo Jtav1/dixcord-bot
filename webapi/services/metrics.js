@@ -1,6 +1,6 @@
 /**
- * Prometheus exposition text for /metrics: DB-derived gauges, feature-flag state, and the
- * discord-bot's latest reported counter snapshot (piggybacked on its heartbeat).
+ * Prometheus exposition text for /metrics: DB-derived gauges, feature-flag state, and every
+ * currently-known bot's (app, guild) health + self-reported counter snapshot from its heartbeat.
  */
 
 import client from "@prometheus-io/client";
@@ -23,12 +23,18 @@ function parseBotMetrics(stored) {
   }
 }
 
-/** @returns {Promise<Record<string, unknown>|null>} */
-async function getLatestBotMetrics() {
-  const [rows] = await db.query(
-    "SELECT metrics_json FROM bot_status ORDER BY last_seen_at DESC LIMIT 1",
-  );
-  return parseBotMetrics(rows?.[0]?.metrics_json);
+/**
+ * Parsed metrics_json for every currently-known (app, guild) bot, keyed by "app:guildId".
+ * @returns {Promise<Map<string, Record<string, unknown>>>}
+ */
+async function getAllBotMetrics() {
+  const [rows] = await db.query("SELECT app, guild_id, metrics_json FROM bot_status");
+  const result = new Map();
+  for (const row of rows ?? []) {
+    const metrics = parseBotMetrics(row.metrics_json);
+    if (metrics) result.set(`${row.app}:${row.guild_id}`, metrics);
+  }
+  return result;
 }
 
 /** Feature flags are per-guild (guild_config); each guild reports its own gauge series. @returns {Promise<Array<{ config: string, guildId: string, enabled: boolean }>>} */
@@ -85,14 +91,14 @@ export async function buildMetricsText() {
   const register = new client.Registry();
   client.collectDefaultMetrics({ register });
 
-  const [stats, status, flags, auditCounts, guildCounts, botMetrics] =
+  const [stats, status, flags, auditCounts, guildCounts, botMetricsByKey] =
     await Promise.all([
       getDatabaseStatistics(),
       getSystemStatus(),
       getFeatureFlagStates(),
       getAuditLogEventCounts(),
       getGuildSnapshotCounts(),
-      getLatestBotMetrics(),
+      getAllBotMetrics(),
     ]);
 
   const gauge = (name, help, labelNames = []) =>
@@ -156,37 +162,39 @@ export async function buildMetricsText() {
     "Resident set size of this webapi process, in bytes.",
   ).set(status.webapiMemoryRssBytes);
 
-  if (status.bot) {
-    const guildIdLabel = { guild_id: status.bot.guildId };
-    gauge("discordbot_up", "1 if the bot's last heartbeat was recent, else 0.", [
-      "guild_id",
-    ]).set(guildIdLabel, status.bot.online ? 1 : 0);
-    if (status.bot.uptimeSeconds != null) {
-      gauge(
-        "discordbot_uptime_seconds",
-        "Seconds since the bot's current gateway session became ready.",
-        ["guild_id"],
-      ).set(guildIdLabel, status.bot.uptimeSeconds);
-    }
-    if (status.bot.memberCount != null) {
-      gauge("discordbot_member_count", "Guild member count as of the last heartbeat.", [
-        "guild_id",
-      ]).set(guildIdLabel, status.bot.memberCount);
-    }
-    if (status.bot.channelCount != null) {
-      gauge(
-        "discordbot_channel_count",
-        "Cached guild channel count as of the last heartbeat.",
-        ["guild_id"],
-      ).set(guildIdLabel, status.bot.channelCount);
-    }
-    if (status.bot.wsPingMs != null) {
-      gauge(
-        "discordbot_ws_ping_ms",
-        "Discord gateway heartbeat latency in ms as of the last heartbeat.",
-        ["guild_id"],
-      ).set(guildIdLabel, status.bot.wsPingMs);
-    }
+  const botLabelNames = ["app", "guild_id"];
+  const botUp = gauge(
+    "bot_up",
+    "1 if this (app, guild) bot's last heartbeat was recent, else 0.",
+    botLabelNames,
+  );
+  const botUptime = gauge(
+    "bot_uptime_seconds",
+    "Seconds since this bot's current gateway session became ready.",
+    botLabelNames,
+  );
+  const botMemberCount = gauge(
+    "bot_member_count",
+    "Guild member count as of this bot's last heartbeat.",
+    botLabelNames,
+  );
+  const botChannelCount = gauge(
+    "bot_channel_count",
+    "Cached guild channel count as of this bot's last heartbeat.",
+    botLabelNames,
+  );
+  const botWsPingMs = gauge(
+    "bot_ws_ping_ms",
+    "Gateway heartbeat latency in ms as of this bot's last heartbeat.",
+    botLabelNames,
+  );
+  for (const botRow of status.bots) {
+    const labels = { app: botRow.app, guild_id: botRow.guildId };
+    botUp.set(labels, botRow.online ? 1 : 0);
+    if (botRow.uptimeSeconds != null) botUptime.set(labels, botRow.uptimeSeconds);
+    if (botRow.memberCount != null) botMemberCount.set(labels, botRow.memberCount);
+    if (botRow.channelCount != null) botChannelCount.set(labels, botRow.channelCount);
+    if (botRow.wsPingMs != null) botWsPingMs.set(labels, botRow.wsPingMs);
   }
 
   // --- Feature flags (per guild) ---
@@ -231,37 +239,53 @@ export async function buildMetricsText() {
     guildCounts.roles,
   );
 
-  // --- discord-bot's self-reported cumulative counters (from its heartbeat) ---
-  if (botMetrics && typeof botMetrics === "object") {
-    const breakdownKeys = new Set([
-      "commandsTotal",
-      "commandErrorsTotal",
-      "apiCallErrorsTotal",
-    ]);
-    const breakdownGaugeNames = {
-      commandsTotal: ["discordbot_commands_total", "command"],
-      commandErrorsTotal: ["discordbot_command_errors_total", "command"],
-      apiCallErrorsTotal: ["discordbot_api_call_errors_total", "module"],
-    };
+  // --- Each bot's self-reported cumulative counters (from its heartbeat) ---
+  const breakdownKeys = new Set([
+    "commandsTotal",
+    "commandErrorsTotal",
+    "apiCallErrorsTotal",
+  ]);
+  const breakdownGaugeNames = {
+    commandsTotal: ["bot_commands_total", "command"],
+    commandErrorsTotal: ["bot_command_errors_total", "command"],
+    apiCallErrorsTotal: ["bot_api_call_errors_total", "module"],
+  };
+  const scalarGauges = new Map();
+  const breakdownGauges = new Map();
+
+  for (const botRow of status.bots) {
+    const botMetrics = botMetricsByKey.get(`${botRow.app}:${botRow.guildId}`);
+    if (!botMetrics || typeof botMetrics !== "object") continue;
+    const labels = { app: botRow.app, guild_id: botRow.guildId };
 
     for (const [key, value] of Object.entries(botMetrics)) {
       if (breakdownKeys.has(key)) {
         if (!value || typeof value !== "object") continue;
         const [gaugeName, labelName] = breakdownGaugeNames[key];
-        const g = gauge(gaugeName, `discord-bot reported counter: ${key}.`, [
-          labelName,
-        ]);
+        let g = breakdownGauges.get(gaugeName);
+        if (!g) {
+          g = gauge(gaugeName, `Bot-reported counter: ${key}.`, [
+            "app",
+            "guild_id",
+            labelName,
+          ]);
+          breakdownGauges.set(gaugeName, g);
+        }
         for (const [label, count] of Object.entries(value)) {
           const n = Number(count);
-          if (Number.isFinite(n)) g.set({ [labelName]: label }, n);
+          if (Number.isFinite(n)) g.set({ ...labels, [labelName]: label }, n);
         }
       } else {
         const n = Number(value);
         if (!Number.isFinite(n)) continue;
         const snakeName = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-        gauge(`discordbot_${snakeName}`, `discord-bot reported counter: ${key}.`).set(
-          n,
-        );
+        const gaugeName = `bot_${snakeName}`;
+        let g = scalarGauges.get(gaugeName);
+        if (!g) {
+          g = gauge(gaugeName, `Bot-reported counter: ${key}.`, ["app", "guild_id"]);
+          scalarGauges.set(gaugeName, g);
+        }
+        g.set(labels, n);
       }
     }
   }
