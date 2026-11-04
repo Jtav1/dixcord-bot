@@ -66,17 +66,15 @@
 
 <script setup>
 import { onMounted, ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute } from "vue-router";
 import ConfigSettingsForm from "../components/ConfigSettingsForm.vue";
 import { fetchConfigEntries } from "../lib/config.js";
 import { fetchGuildSnapshot } from "../lib/guild.js";
-import { appForClientKey } from "../nav/clients.js";
 import { invalidateConfigCache } from "../lib/systemStatus.js";
 import { testFortune, testLinkFixer } from "../lib/botResponses.js";
 import { useSnackbar } from "../composables/useSnackbar.js";
 
 const route = useRoute();
-const router = useRouter();
 const { notify } = useSnackbar();
 
 const loading = ref(true);
@@ -104,26 +102,16 @@ const linkFixerChecked = ref(false);
 const linkFixerResult = ref("");
 
 /**
- * Config is per-(app, guildId) — the guildId comes from the active guild tab (route param), never
- * guessed, since guessing ("most recently synced guild") silently shows the wrong server's config
- * as soon as more than one guild has ever synced.
+ * Config is per-(app, guildId) — both come straight from the route params (set by AppShell's
+ * bot picker), never guessed, since guessing ("most recently synced guild") silently shows the
+ * wrong server's config as soon as more than one guild has ever synced.
  * @returns {Promise<void>}
  */
 async function loadConfig() {
-  const guildScope = route.params.guildScope;
-  if (guildScope === "global") {
-    // Config has no cross-guild concept today; this route shouldn't be reachable via nav, but
-    // guard direct URL entry by bouncing to a feature "Global" actually supports.
-    const [, clientKey] = route.path.split("/");
-    router.replace(`/${clientKey}/global/dashboard`);
-    return;
-  }
-
   loading.value = true;
   error.value = "";
   try {
-    const [, clientKey] = route.path.split("/");
-    const snapshot = await fetchGuildSnapshot(appForClientKey(clientKey), guildScope);
+    const snapshot = await fetchGuildSnapshot(route.params.app, route.params.guildId);
     currentApp.value = snapshot.guild.app;
     currentGuildId.value = snapshot.guild.guildId;
     channels.value = snapshot.channels;

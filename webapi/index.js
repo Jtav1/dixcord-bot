@@ -483,6 +483,7 @@ app.get("/", publicLimiter, (req, res) => {
           "PUT /api/react-role (admin)",
           "DELETE /api/react-role (admin)",
           "POST /api/react-role/synced (bot)",
+          "POST /api/react-role/sync-failed (bot)",
           "POST /api/react-role/confirm-delete (bot)",
         ],
       },

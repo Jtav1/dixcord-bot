@@ -39,6 +39,24 @@ export async function markReactRoleSynced({ messageId, channelId, syncedVersion 
 }
 
 /**
+ * POST /api/react-role/sync-failed — call after a post/edit attempt fails, so the admin panel
+ * can surface why a save didn't take effect.
+ * @param {{contentVersion:number, error:string}} fields
+ * @returns {Promise<void>}
+ */
+export async function reportReactRoleSyncFailed({ contentVersion, error }) {
+  const { data } = await api.post("/api/react-role/sync-failed", {
+    app: "fluxer",
+    guildId,
+    contentVersion,
+    error,
+  });
+  if (!data?.ok) {
+    throw new Error(data?.error || "Failed to report react-for-role sync failure");
+  }
+}
+
+/**
  * POST /api/react-role/confirm-delete — call after confirming the live message is gone.
  * @returns {Promise<void>}
  */

@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "dixcord-bot webapi",
-    "version": "4.0.2",
+    "version": "4.0.4",
     "description": "Internal REST API backing the dixcord-bot Discord bot, webview, and webadmin services. Every route requires a service-account JWT (admin, bot, or webview) except login and health."
   },
   "servers": [
@@ -5027,6 +5027,16 @@
                         "pendingDelete": {
                           "type": "boolean"
                         },
+                        "lastSyncError": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "The bot's last post/edit failure message, if any."
+                        },
+                        "lastSyncErrorVersion": {
+                          "type": "integer",
+                          "nullable": true,
+                          "description": "The contentVersion lastSyncError applies to; stale once contentVersion has moved past it."
+                        },
                         "bindings": {
                           "type": "array",
                           "items": {
@@ -5282,6 +5292,84 @@
                   },
                   "syncedVersion": {
                     "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/react-role/sync-failed": {
+      "post": {
+        "operationId": "markReactRoleSyncFailed",
+        "tags": [
+          "React Role"
+        ],
+        "summary": "Record that the bot failed to post/edit the live message for a content version",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "contentVersion",
+                  "error"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord",
+                      "fluxer"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "contentVersion": {
+                    "type": "integer"
+                  },
+                  "error": {
+                    "type": "string"
                   }
                 }
               }

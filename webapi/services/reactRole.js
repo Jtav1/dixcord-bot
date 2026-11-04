@@ -54,6 +54,8 @@ function toApiShape(row, bindings) {
     contentVersion: row.content_version,
     syncedVersion: row.synced_version,
     pendingDelete: Boolean(row.pending_delete),
+    lastSyncError: row.last_sync_error ?? null,
+    lastSyncErrorVersion: row.last_sync_error_version ?? null,
     bindings,
   };
 }
@@ -111,8 +113,9 @@ export async function upsertMessage(app, guildId, { channelId, title, descriptio
 
   let messageRowId;
   if (existing) {
+    // Clear any stale failure from a previous version — this write starts a fresh attempt.
     await db.query(
-      "UPDATE react_role_messages SET channel_id = ?, title = ?, description = ?, content_version = content_version + 1 WHERE id = ?",
+      "UPDATE react_role_messages SET channel_id = ?, title = ?, description = ?, content_version = content_version + 1, last_sync_error = NULL, last_sync_error_version = NULL WHERE id = ?",
       [channelId, title, description ?? null, existing.id],
     );
     await db.query("DELETE FROM react_role_bindings WHERE message_id = ?", [existing.id]);
@@ -168,7 +171,8 @@ export async function hardDeleteMessage(app, guildId) {
 }
 
 /**
- * Called by the bot after it successfully posts or edits the live message.
+ * Called by the bot after it successfully posts or edits the live message. Clears any
+ * previously recorded failure, since a success supersedes it.
  * @param {string} app
  * @param {string} guildId
  * @param {{messageId:string, channelId:string, syncedVersion:number}} fields
@@ -176,8 +180,26 @@ export async function hardDeleteMessage(app, guildId) {
  */
 export async function markSynced(app, guildId, { messageId, channelId, syncedVersion }) {
   const [result] = await db.query(
-    "UPDATE react_role_messages SET message_id = ?, channel_id = ?, synced_version = ? WHERE app = ? AND guild_id = ?",
+    "UPDATE react_role_messages SET message_id = ?, channel_id = ?, synced_version = ?, last_sync_error = NULL, last_sync_error_version = NULL WHERE app = ? AND guild_id = ?",
     [messageId, channelId, syncedVersion, app, guildId],
+  );
+  return (result?.affectedRows ?? result?.changes ?? 0) > 0;
+}
+
+/**
+ * Called by the bot when it fails to post/edit the live message for a given content version, so
+ * the admin panel can surface why a save didn't take effect. `contentVersion` is the version the
+ * bot was attempting to sync to when it failed — the caller (the admin panel, polling GET) only
+ * treats this as relevant if it still matches the row's current content_version.
+ * @param {string} app
+ * @param {string} guildId
+ * @param {{contentVersion:number, error:string}} fields
+ * @returns {Promise<boolean>}
+ */
+export async function recordSyncFailure(app, guildId, { contentVersion, error }) {
+  const [result] = await db.query(
+    "UPDATE react_role_messages SET last_sync_error = ?, last_sync_error_version = ? WHERE app = ? AND guild_id = ?",
+    [error, contentVersion, app, guildId],
   );
   return (result?.affectedRows ?? result?.changes ?? 0) > 0;
 }

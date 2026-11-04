@@ -2253,6 +2253,8 @@ export async function ensureSchemaMigrations() {
           content_version INTEGER NOT NULL DEFAULT 1,
           synced_version INTEGER NOT NULL DEFAULT 0,
           pending_delete INTEGER NOT NULL DEFAULT 0,
+          last_sync_error TEXT NULL,
+          last_sync_error_version INTEGER NULL,
           created_at TEXT DEFAULT (datetime('now')),
           updated_at TEXT DEFAULT (datetime('now')),
           UNIQUE (app, guild_id)
@@ -2278,6 +2280,8 @@ export async function ensureSchemaMigrations() {
           content_version INT NOT NULL DEFAULT 1,
           synced_version INT NOT NULL DEFAULT 0,
           pending_delete TINYINT(1) NOT NULL DEFAULT 0,
+          last_sync_error TEXT NULL,
+          last_sync_error_version INT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           UNIQUE KEY uniq_react_role_messages_app_guild (app, guild_id)
@@ -2288,6 +2292,29 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: created react_role_messages table");
   } else {
     console.log("db: schema ok: react_role_messages table already exists");
+  }
+
+  // react_role_messages.last_sync_error(_version): added after the table's initial release, to
+  // surface the bot's last post/edit failure back to the admin panel.
+  if (
+    (await tableExists(db, "react_role_messages", isSqlite)) &&
+    !(await columnExists(db, "react_role_messages", "last_sync_error", isSqlite))
+  ) {
+    if (isSqlite) {
+      await db.query("ALTER TABLE react_role_messages ADD COLUMN last_sync_error TEXT NULL");
+      await db.query(
+        "ALTER TABLE react_role_messages ADD COLUMN last_sync_error_version INTEGER NULL",
+      );
+    } else {
+      await db.query("ALTER TABLE react_role_messages ADD COLUMN last_sync_error TEXT NULL");
+      await db.query(
+        "ALTER TABLE react_role_messages ADD COLUMN last_sync_error_version INT NULL",
+      );
+    }
+    applied.push("react_role_messages.last_sync_error(_version) columns");
+    console.log("db: migration applied: added react_role_messages.last_sync_error(_version) columns");
+  } else {
+    console.log("db: schema ok: react_role_messages.last_sync_error column already exists");
   }
 
   // react_role_bindings: emoji->role rows for a react_role_messages message. Unique constraints

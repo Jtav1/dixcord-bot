@@ -17,6 +17,13 @@
       class="mb-6"
       text="Deletion requested — the bot will remove the live message shortly."
     />
+    <v-alert
+      v-if="message?.lastSyncError && message.lastSyncErrorVersion === message.contentVersion"
+      type="error"
+      variant="tonal"
+      class="mb-6"
+      :text="`The bot could not update the live message: ${message.lastSyncError}`"
+    />
 
     <v-skeleton-loader v-if="loading" type="card@2" class="mb-6" />
 
@@ -144,6 +151,7 @@
           Delete
         </v-btn>
         <v-spacer />
+        <span v-if="savingStatus" class="text-caption text-medium-emphasis mr-2">{{ savingStatus }}</span>
         <v-btn
           color="primary"
           variant="flat"
@@ -177,16 +185,19 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { computed, onMounted, reactive, ref } from "vue";
+import { useRoute } from "vue-router";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
 import { fetchGuildSnapshot } from "../lib/guild.js";
-import { fetchReactRoleMessage, saveReactRoleMessage, deleteReactRoleMessage } from "../lib/reactRole.js";
-import { appForClientKey } from "../nav/clients.js";
+import {
+  fetchReactRoleMessage,
+  saveReactRoleMessage,
+  deleteReactRoleMessage,
+  waitForReactRoleSync,
+} from "../lib/reactRole.js";
 import { useSnackbar } from "../composables/useSnackbar.js";
 
 const route = useRoute();
-const router = useRouter();
 const { notify } = useSnackbar();
 
 const maxBindings = 20;
@@ -195,6 +206,7 @@ let nextRowKey = 0;
 const loading = ref(true);
 const error = ref("");
 const saving = ref(false);
+const savingStatus = ref("");
 const deleting = ref(false);
 const deleteStep1Open = ref(false);
 const deleteStep2Open = ref(false);
@@ -327,24 +339,15 @@ function applyMessage(loaded) {
 }
 
 /**
- * React-for-role is guild-scoped — resolve app from the active client (discord-bot/fluxer-bot)
- * and guildId from the active guild tab, never guessed.
+ * React-for-role is per-(app, guildId) — both come straight from the route params (set by
+ * AppShell's bot picker), never guessed.
  * @returns {Promise<void>}
  */
 async function load() {
-  const guildScope = route.params.guildScope;
-  if (guildScope === "global") {
-    const [, clientKey] = route.path.split("/");
-    router.replace(`/${clientKey}/global/dashboard`);
-    return;
-  }
-  const [, clientKey] = route.path.split("/");
-  const app = appForClientKey(clientKey);
-
   loading.value = true;
   error.value = "";
   try {
-    const snapshot = await fetchGuildSnapshot(app, guildScope);
+    const snapshot = await fetchGuildSnapshot(route.params.app, route.params.guildId);
     currentApp.value = snapshot.guild.app;
     currentGuildId.value = snapshot.guild.guildId;
     channels.value = snapshot.channels;
@@ -363,6 +366,7 @@ async function load() {
  */
 async function onSave() {
   saving.value = true;
+  savingStatus.value = "Saving...";
   try {
     const saved = await saveReactRoleMessage(currentApp.value, currentGuildId.value, {
       channelId: String(form.channelId).trim(),
@@ -376,13 +380,32 @@ async function onSave() {
       })),
     });
     applyMessage(saved);
-    notify("Saved — the bot will update the live message shortly");
+
+    // The config write above is only half the job — wait for the bot's near-immediate
+    // reconciliation to actually post/edit the live message, so a failure (bad permissions,
+    // deleted channel, etc.) is surfaced here rather than silently retried forever.
+    savingStatus.value = "Posting to the live channel...";
+    const result = await waitForReactRoleSync(currentApp.value, currentGuildId.value, saved.contentVersion);
+    applyMessage(await fetchReactRoleMessage(currentApp.value, currentGuildId.value));
+
+    if (result.status === "synced") {
+      notify("Saved — the live message has been updated");
+    } else if (result.status === "failed") {
+      notify(`Save failed: the bot could not update the live message — ${result.error}`, {
+        color: "error",
+      });
+    } else {
+      notify("Saved, but still waiting on the bot to update the live message — check back shortly", {
+        color: "warning",
+      });
+    }
   } catch (err) {
     notify(err instanceof Error ? err.message : "Failed to save react-for-role message", {
       color: "error",
     });
   } finally {
     saving.value = false;
+    savingStatus.value = "";
   }
 }
 
@@ -415,10 +438,6 @@ async function onDelete() {
     deleting.value = false;
   }
 }
-
-watch(() => route.params.guildScope, () => {
-  void load();
-});
 
 onMounted(() => {
   void load();

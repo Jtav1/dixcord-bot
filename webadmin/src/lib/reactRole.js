@@ -40,3 +40,30 @@ export async function saveReactRoleMessage(app, guildId, fields) {
 export async function deleteReactRoleMessage(app, guildId) {
   await apiFetchJson("DELETE", "/react-role", { app, guildId }, "React-for-role delete");
 }
+
+/**
+ * Poll until the bot has synced the live message to `contentVersion` (a save just made), it
+ * reports a failure for that same version, or the timeout elapses. The bot reconciles every few
+ * seconds (see discord-bot/fluxer-bot's reactRoleSync.js), so this gives the admin a near-immediate
+ * success/failure signal instead of the old fire-and-forget "saved, will update shortly" toast.
+ * @param {string} app
+ * @param {string} guildId
+ * @param {number} contentVersion
+ * @param {{intervalMs?:number, timeoutMs?:number}} [opts]
+ * @returns {Promise<{status:"synced"} | {status:"failed", error:string} | {status:"pending"}>} "pending" means the timeout elapsed with no result yet — not itself a failure.
+ */
+export async function waitForReactRoleSync(app, guildId, contentVersion, opts = {}) {
+  const intervalMs = opts.intervalMs ?? 1500;
+  const timeoutMs = opts.timeoutMs ?? 15000;
+  const deadline = Date.now() + timeoutMs;
+
+  for (;;) {
+    const message = await fetchReactRoleMessage(app, guildId);
+    if (message?.syncedVersion === contentVersion) return { status: "synced" };
+    if (message?.lastSyncErrorVersion === contentVersion && message.lastSyncError) {
+      return { status: "failed", error: message.lastSyncError };
+    }
+    if (Date.now() >= deadline) return { status: "pending" };
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}

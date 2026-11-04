@@ -8,11 +8,19 @@
 
 import { EmbedBuilder } from "@fluxerjs/builders";
 import { client } from "../fluxerClient.js";
-import { getReactRoleMessage, markReactRoleSynced, confirmReactRoleDelete } from "./reactRole.js";
+import {
+  getReactRoleMessage,
+  markReactRoleSynced,
+  reportReactRoleSyncFailed,
+  confirmReactRoleDelete,
+} from "./reactRole.js";
 import { isReactForRoleEnabled } from "../configStore.js";
 import { guildId } from "../configVars.js";
 
-const SYNC_INTERVAL_MS = 30_000;
+// Short on purpose: an admin save should reach the live message within a couple of seconds, not
+// wait out a long cache-refresh-style interval (see api/cacheRefresh.js's 30s, a different
+// concern). The request itself is cheap (one webapi GET most ticks), so polling this often is fine.
+const SYNC_INTERVAL_MS = 3_000;
 
 /** @type {object|null} Last-fetched message+bindings (API shape), for reactionHandler.js. */
 let cachedMessage = null;
@@ -113,17 +121,19 @@ async function handleDelete(message) {
 
 /**
  * Post a new message or edit the existing one in place to match `message`'s current content,
- * then report the result back to webapi.
+ * then report the result back to webapi. Throws on any real failure (guild/channel not found,
+ * missing permissions, etc.) — the caller (tick) reports those to webapi so the admin panel can
+ * surface them. The one non-failure case — the live message was manually deleted — is handled
+ * here by falling through to a fresh post, not thrown.
  * @param {object} message
  * @returns {Promise<void>}
  */
 async function handlePostOrEdit(message) {
   const guild = client.guilds.get(guildId);
-  if (!guild) return;
+  if (!guild) throw new Error(`Guild ${guildId} not found in client cache`);
   const channel = await client.channels.fetch(message.channelId).catch(() => null);
   if (!channel) {
-    console.error(`bot: react-role channel ${message.channelId} not found; will retry next sync`);
-    return;
+    throw new Error(`Channel ${message.channelId} not found or not accessible`);
   }
   const embed = buildEmbed(message, guild);
 
@@ -138,10 +148,7 @@ async function handlePostOrEdit(message) {
       });
       return;
     } catch (err) {
-      if (!isUnknownMessageError(err)) {
-        console.error("bot: react-role edit failed, will retry next sync:", err);
-        return;
-      }
+      if (!isUnknownMessageError(err)) throw err;
       // Live message was manually deleted — fall through to repost fresh.
     }
   }
@@ -157,7 +164,8 @@ async function handlePostOrEdit(message) {
 /**
  * One reconciliation pass: refresh the cache, then act on pending delete or an out-of-sync edit.
  * pending_delete is checked before the enabled flag, so a delete already in flight completes
- * even if the feature gets disabled mid-flight.
+ * even if the feature gets disabled mid-flight. A post/edit failure is reported to webapi (so
+ * the admin panel can surface it) rather than left to fail silently until the next tick retries.
  * @returns {Promise<void>}
  */
 async function tick() {
@@ -171,7 +179,18 @@ async function tick() {
   }
   if (!isReactForRoleEnabled()) return;
   if (message.contentVersion === message.syncedVersion) return;
-  await handlePostOrEdit(message);
+
+  try {
+    await handlePostOrEdit(message);
+  } catch (err) {
+    console.error("bot: react-role post/edit failed:", err);
+    await reportReactRoleSyncFailed({
+      contentVersion: message.contentVersion,
+      error: err?.message || String(err),
+    }).catch((reportErr) => {
+      console.error("bot: failed to report react-role sync failure:", reportErr);
+    });
+  }
 }
 
 /**

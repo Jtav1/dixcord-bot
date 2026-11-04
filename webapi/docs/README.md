@@ -178,6 +178,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | PUT | `/api/react-role` | admin | Create/update (body: `{ app, guildId, channelId, title, description?, bindings: [{emoji, roleId, description}] }`); rejects duplicate emoji or duplicate role |
 | DELETE | `/api/react-role` | admin | Soft-delete (body: `{ app, guildId }`); bot removes the live message, then hard-deletes via confirm-delete |
 | POST | `/api/react-role/synced` | bot | Bot reports a successful post/edit (body: `{ app, guildId, messageId, channelId, syncedVersion }`) |
+| POST | `/api/react-role/sync-failed` | bot | Bot reports a failed post/edit for a content version (body: `{ app, guildId, contentVersion, error }`), surfaced to the admin panel via GET's `lastSyncError`/`lastSyncErrorVersion` |
 | POST | `/api/react-role/confirm-delete` | bot | Bot confirms the live message is gone (body: `{ app, guildId }`); hard-deletes the row |
 
 See [admin-backend-api.md](admin-backend-api.md) for full admin route documentation.

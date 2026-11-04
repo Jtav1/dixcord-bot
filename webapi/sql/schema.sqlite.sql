@@ -402,6 +402,8 @@ CREATE TABLE IF NOT EXISTS react_role_messages (
   content_version INTEGER NOT NULL DEFAULT 1,
   synced_version INTEGER NOT NULL DEFAULT 0,
   pending_delete INTEGER NOT NULL DEFAULT 0,
+  last_sync_error TEXT NULL,
+  last_sync_error_version INTEGER NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   UNIQUE (app, guild_id)
