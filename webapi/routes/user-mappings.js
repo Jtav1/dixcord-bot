@@ -232,10 +232,11 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
     res.status(201).json({ ok: true, userMapping: row });
   } catch (err) {
     console.error("POST /api/user-mappings error:", err);
-    const msg = err.code === "ER_DUP_ENTRY" || String(err.message).includes("UNIQUE")
-      ? "Duplicate name"
-      : "Failed to create user mapping";
-    res.status(400).json({ ok: false, error: msg });
+    if (err.code === "ER_DUP_ENTRY" || String(err.message).includes("UNIQUE")) {
+      return res.status(400).json({ ok: false, error: "Duplicate name" });
+    }
+    // Admin-only route; the DB error text is safe to show and makes failures diagnosable.
+    res.status(500).json({ ok: false, error: `Failed to create user mapping: ${err.message}` });
   }
 });
 
