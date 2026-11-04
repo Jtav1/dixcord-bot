@@ -1,3 +1,4 @@
+import { PermissionFlags } from "@fluxerjs/core";
 import { describeApiError } from "../../../api/client.js";
 import { countEmoji, countRepost, uncountRepost } from "../../../api/emojis.js";
 import {
@@ -79,16 +80,26 @@ async function resolveReactingMember(ctx) {
 }
 
 /**
- * `.manageable` is cache-only (needs guild.members.me); fetch it if nothing has yet, same fix
- * applied in utilities/timeoutMember.js for `.moderatable`.
+ * fluxer.js has no `GuildMember.manageable`; check ManageRoles + that the role sits below the bot's top role.
  * @param {import('@fluxerjs/core').GuildMember} member
- * @returns {Promise<boolean>}
+ * @param {string} roleId
+ * @returns {Promise<string|null>} Reason it can't be managed, or null if it can.
  */
-async function isManageable(member) {
-  if (!member.guild.members.me) {
-    await member.guild.members.fetchMe().catch(() => null);
+async function roleBlockReason(member, roleId) {
+  const guild = member.guild;
+  if (!guild.members.me) {
+    await guild.members.fetchMe().catch(() => null);
   }
-  return Boolean(member.manageable);
+  const me = guild.members.me;
+  if (!me) return "bot's own member unavailable";
+  const role = guild.roles.get(roleId);
+  if (!role) return "role not found in guild cache";
+  if (role.managed) return "role is managed (integration/bot role)";
+  if (!me.permissions.has(PermissionFlags.ManageRoles)) return "bot lacks Manage Roles";
+  let top = -1;
+  for (const r of me.roles.cache.values()) top = Math.max(top, r.position);
+  if (role.position >= top) return `role position ${role.position} >= bot's highest ${top}`;
+  return null;
 }
 
 /**
@@ -119,10 +130,9 @@ async function handleRoleReactAdd(ctx, reactRoleMessage) {
   const member = await resolveReactingMember(ctx);
   if (!member) return;
   if (member.roles.has(binding.roleId)) return;
-  if (!(await isManageable(member))) {
-    console.error(
-      `bot: cannot grant react-role ${binding.roleId} to ${member.id}: not manageable (missing permissions or role hierarchy)`,
-    );
+  const grantBlock = await roleBlockReason(member, binding.roleId);
+  if (grantBlock) {
+    console.error(`bot: cannot grant react-role ${binding.roleId} to ${member.id}: ${grantBlock}`);
     return;
   }
   try {
@@ -151,10 +161,9 @@ async function handleRoleReactRemove(ctx, reactRoleMessage) {
   const member = await resolveReactingMember(ctx);
   if (!member) return;
   if (!member.roles.has(binding.roleId)) return;
-  if (!(await isManageable(member))) {
-    console.error(
-      `bot: cannot revoke react-role ${binding.roleId} from ${member.id}: not manageable (missing permissions or role hierarchy)`,
-    );
+  const revokeBlock = await roleBlockReason(member, binding.roleId);
+  if (revokeBlock) {
+    console.error(`bot: cannot revoke react-role ${binding.roleId} from ${member.id}: ${revokeBlock}`);
     return;
   }
   try {
