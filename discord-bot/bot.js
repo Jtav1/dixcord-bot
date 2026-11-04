@@ -203,24 +203,24 @@ client.on(
 );
 
 client.on(Events.Error, async (error) => {
-  incrementCounter("discordClientErrorsTotal");
+  incrementCounter("clientErrorsTotal");
   console.error("Discord Client Error: ", error);
 });
 
 client.on(Events.GuildCreate, async () => {
-  incrementCounter("discordGuildJoinsTotal");
+  incrementCounter("guildJoinsTotal");
 });
 
 client.on(Events.GuildDelete, async () => {
-  incrementCounter("discordGuildLeavesTotal");
+  incrementCounter("guildLeavesTotal");
 });
 
 client.on("rateLimit", async () => {
-  incrementCounter("discordRateLimitHitsTotal");
+  incrementCounter("rateLimitHitsTotal");
 });
 
 client.on("shardError", async (error) => {
-  incrementCounter("discordShardErrorsTotal");
+  incrementCounter("shardErrorsTotal");
   console.error("Discord Shard Error: ", error);
 });
 

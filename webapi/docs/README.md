@@ -73,7 +73,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 |--------|------|------|-------------|
 | GET | `/` | — | API info and endpoint list |
 | GET | `/health` | — | Health check |
-| GET | `/metrics` | `METRICS_TOKEN` bearer | Prometheus exposition format (plain text, not the JSON envelope); 503 if `METRICS_TOKEN` unset. See [`docs/metrics.md`](../../docs/metrics.md) for which gauges are guild-scoped. |
+| GET | `/metrics` | `METRICS_TOKEN` bearer | Prometheus exposition format (plain text, not the JSON envelope); 503 if `METRICS_TOKEN` unset. See [`docs/metrics.md`](../../docs/metrics.md) for which gauges are guild- and/or app-scoped (bot gauges carry both `app` and `guild_id` labels, covering every currently-known bot — discord-bot and fluxer-bot alike). |
 | POST | `/api/auth/login` | public | Admin login; returns JWT |
 | POST | `/api/auth/register` | public | Disabled (403) |
 | GET | `/api/users/me` | ✓ | Current user profile |
