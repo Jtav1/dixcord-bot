@@ -17,6 +17,9 @@ const router = express.Router();
 /** Discord's embed field cap is 25; leave headroom and keep the row editor manageable. */
 const MAX_BINDINGS = 20;
 
+/** Max react-role posts per (app, guild). Mirrored in webadmin's ReactForRoleView. */
+const MAX_MESSAGES_PER_GUILD = 10;
+
 const GUILD_ID_PARAM_ERROR = {
   ok: false,
   error: "Parameter \"guildId\" is required",
@@ -36,7 +39,39 @@ function resolveGuildScope(req) {
 }
 
 /**
- * Validate a PUT body's bindings array. Returns the first validation error found, or null.
+ * Parse the :id path param.
+ * @param {import("express").Request} req
+ * @returns {number|null} Positive integer id, or null if malformed.
+ */
+function parseMessageId(req) {
+  const id = Number(req.params.id);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+/**
+ * Validate and normalize the shared create/update body fields.
+ * @param {import("express").Request} req
+ * @returns {{ ok: true, fields: object } | { ok: false, error: string }}
+ */
+function parseMessageFields(req) {
+  const channelId = String(req.body?.channelId ?? "").trim();
+  const title = String(req.body?.title ?? "").trim();
+  const description = req.body?.description != null ? String(req.body.description).trim() : null;
+  if (!channelId || !title) {
+    return { ok: false, error: "channelId and title are required" };
+  }
+  const bindings = (Array.isArray(req.body?.bindings) ? req.body.bindings : []).map((b) => ({
+    emoji: typeof b?.emoji === "string" ? b.emoji.trim() : b?.emoji,
+    roleId: typeof b?.roleId === "string" ? b.roleId.trim() : b?.roleId,
+    description: typeof b?.description === "string" ? b.description.trim() : b?.description,
+  }));
+  const bindingsError = validateBindings(bindings);
+  if (bindingsError) return { ok: false, error: bindingsError };
+  return { ok: true, fields: { channelId, title, description, bindings } };
+}
+
+/**
+ * Validate a message's bindings array. Returns the first validation error found, or null.
  * @param {unknown} bindings
  * @returns {string|null}
  */
@@ -64,17 +99,48 @@ function validateBindings(bindings) {
 }
 
 /**
+ * @openapi
+ * components:
+ *   schemas:
+ *     ReactRoleMessage:
+ *       type: object
+ *       properties:
+ *         id: { type: integer }
+ *         app: { type: string }
+ *         guildId: { type: string }
+ *         channelId: { type: string }
+ *         messageId: { type: string, nullable: true }
+ *         title: { type: string }
+ *         description: { type: string, nullable: true }
+ *         contentVersion: { type: integer }
+ *         syncedVersion: { type: integer }
+ *         pendingDelete: { type: boolean }
+ *         lastSyncError: { type: string, nullable: true, description: "The bot's last post/edit failure message, if any." }
+ *         lastSyncErrorVersion: { type: integer, nullable: true, description: "The contentVersion lastSyncError applies to; stale once contentVersion has moved past it." }
+ *         bindings:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               id: { type: integer }
+ *               emoji: { type: string }
+ *               roleId: { type: string }
+ *               description: { type: string }
+ *               sortOrder: { type: integer }
+ */
+
+/**
  * GET /api/react-role
- * Returns the one react-for-role message config for a server, or { message: null } if
- * unconfigured. Used by both webadmin (populate the edit form) and the bot (reconciliation read).
+ * Lists a server's react-for-role messages (any number, up to MAX_MESSAGES_PER_GUILD). Used by
+ * webadmin (list view) and the bot (reconciliation read).
  * Query: { app, guildId }
  * Auth: required. A guild-scoped bot account may only read its own guildId.
  * @openapi
  * /api/react-role:
  *   get:
- *     operationId: getReactRoleMessage
+ *     operationId: listReactRoleMessages
  *     tags: [React Role]
- *     summary: Get the react-for-role message config for one server
+ *     summary: List the react-for-role messages for one server
  *     parameters:
  *       - name: app
  *         in: query
@@ -86,39 +152,16 @@ function validateBindings(bindings) {
  *         schema: { type: string }
  *     responses:
  *       '200':
- *         description: The message config (null if this server hasn't configured one yet).
+ *         description: The server's messages, oldest first (empty if none).
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
  *                 ok: { type: boolean, enum: [true] }
- *                 message:
- *                   nullable: true
- *                   type: object
- *                   properties:
- *                     id: { type: integer }
- *                     app: { type: string }
- *                     guildId: { type: string }
- *                     channelId: { type: string }
- *                     messageId: { type: string, nullable: true }
- *                     title: { type: string }
- *                     description: { type: string, nullable: true }
- *                     contentVersion: { type: integer }
- *                     syncedVersion: { type: integer }
- *                     pendingDelete: { type: boolean }
- *                     lastSyncError: { type: string, nullable: true, description: "The bot's last post/edit failure message, if any." }
- *                     lastSyncErrorVersion: { type: integer, nullable: true, description: "The contentVersion lastSyncError applies to; stale once contentVersion has moved past it." }
- *                     bindings:
- *                       type: array
- *                       items:
- *                         type: object
- *                         properties:
- *                           id: { type: integer }
- *                           emoji: { type: string }
- *                           roleId: { type: string }
- *                           description: { type: string }
- *                           sortOrder: { type: integer }
+ *                 messages:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/ReactRoleMessage' }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -132,28 +175,177 @@ router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
   try {
     const scope = resolveGuildScope(req);
     if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
-    const message = await reactRole.getMessageWithBindings(scope.app, scope.guildId);
-    res.json({ ok: true, message });
+    const messages = await reactRole.listMessagesWithBindings(scope.app, scope.guildId);
+    res.json({ ok: true, messages });
   } catch (err) {
     console.error("GET /api/react-role error:", err);
+    res.status(500).json({ ok: false, error: "Failed to list react-for-role messages" });
+  }
+});
+
+/**
+ * GET /api/react-role/:id
+ * Returns one react-for-role message. Polled by webadmin right after a save to see the sync result.
+ * Query: { app, guildId }
+ * Auth: required. A guild-scoped bot account may only read its own guildId.
+ * @openapi
+ * /api/react-role/{id}:
+ *   get:
+ *     operationId: getReactRoleMessage
+ *     tags: [React Role]
+ *     summary: Get one react-for-role message
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
+ *       - name: app
+ *         in: query
+ *         required: true
+ *         schema: { type: string, enum: [discord, fluxer] }
+ *       - name: guildId
+ *         in: query
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       '200':
+ *         description: The message.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 message: { $ref: '#/components/schemas/ReactRoleMessage' }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/:id", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
+  try {
+    const scope = resolveGuildScope(req);
+    if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
+    const id = parseMessageId(req);
+    if (!id) return res.status(400).json({ ok: false, error: "Invalid message id" });
+    const message = await reactRole.getMessageWithBindings(id, scope.app, scope.guildId);
+    if (!message) return res.status(404).json({ ok: false, error: "React-for-role message not found" });
+    res.json({ ok: true, message });
+  } catch (err) {
+    console.error("GET /api/react-role/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to load react-for-role message" });
   }
 });
 
 /**
- * PUT /api/react-role
- * Create or update the one react-for-role message config for a server. Bumps content_version
- * so the bot's reconciliation loop picks up the change; the live Discord/Fluxer message itself
- * is posted/edited asynchronously by the bot, not by this request.
+ * POST /api/react-role
+ * Create a react-for-role message for a server (max MAX_MESSAGES_PER_GUILD). The live
+ * Discord/Fluxer message is posted asynchronously by the bot's reconciliation loop.
  * Body: { app, guildId, channelId, title, description?, bindings: [{emoji, roleId, description}] }
  * Auth: admin required.
  * @openapi
  * /api/react-role:
- *   put:
- *     operationId: putReactRoleMessage
+ *   post:
+ *     operationId: createReactRoleMessage
  *     tags: [React Role]
- *     summary: Create or update the react-for-role message config for a server
- *     description: Requires the admin role. Rejects duplicate emoji or duplicate role entries.
+ *     summary: Create a react-for-role message for a server
+ *     description: Requires the admin role. Rejects duplicate emoji or role entries, and any message beyond the per-server cap of 10.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [app, guildId, channelId, title, bindings]
+ *             properties:
+ *               app: { type: string, enum: [discord, fluxer] }
+ *               guildId: { type: string }
+ *               channelId: { type: string }
+ *               title: { type: string }
+ *               description: { type: string }
+ *               bindings:
+ *                 type: array
+ *                 minItems: 1
+ *                 maxItems: 20
+ *                 items:
+ *                   type: object
+ *                   required: [emoji, roleId, description]
+ *                   properties:
+ *                     emoji: { type: string }
+ *                     roleId: { type: string }
+ *                     description: { type: string }
+ *     responses:
+ *       '201':
+ *         description: Created message.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 message: { $ref: '#/components/schemas/ReactRoleMessage' }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const scope = resolveGuildScope(req);
+    if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
+    const parsed = parseMessageFields(req);
+    if (!parsed.ok) return res.status(400).json({ ok: false, error: parsed.error });
+
+    if ((await reactRole.countMessages(scope.app, scope.guildId)) >= MAX_MESSAGES_PER_GUILD) {
+      return res.status(400).json({
+        ok: false,
+        error: `A server can have at most ${MAX_MESSAGES_PER_GUILD} react-for-role messages`,
+      });
+    }
+
+    const message = await reactRole.createMessage(scope.app, scope.guildId, parsed.fields);
+    await recordAudit(req.user.id, "create", "react_role_messages", message.id, {
+      app: scope.app,
+      guildId: scope.guildId,
+      channelId: parsed.fields.channelId,
+      title: parsed.fields.title,
+      bindingCount: parsed.fields.bindings.length,
+    });
+    res.status(201).json({ ok: true, message });
+  } catch (err) {
+    console.error("POST /api/react-role error:", err);
+    res.status(500).json({ ok: false, error: "Failed to create react-for-role message" });
+  }
+});
+
+/**
+ * PUT /api/react-role/:id
+ * Update a react-for-role message. Bumps content_version so the bot's reconciliation loop picks
+ * up the change; the live message itself is edited asynchronously by the bot.
+ * Body: { app, guildId, channelId, title, description?, bindings: [{emoji, roleId, description}] }
+ * Auth: admin required.
+ * @openapi
+ * /api/react-role/{id}:
+ *   put:
+ *     operationId: updateReactRoleMessage
+ *     tags: [React Role]
+ *     summary: Update a react-for-role message
+ *     description: Requires the admin role. Rejects duplicate emoji or role entries.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
  *     requestBody:
  *       required: true
  *       content:
@@ -180,79 +372,71 @@ router.get("/", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
  *                     description: { type: string }
  *     responses:
  *       '200':
- *         description: Saved message config.
+ *         description: Saved message.
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
  *                 ok: { type: boolean, enum: [true] }
- *                 message: { type: object }
+ *                 message: { $ref: '#/components/schemas/ReactRoleMessage' }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '403':
  *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
  *       '500':
  *         $ref: '#/components/responses/ServerError'
  */
-router.put("/", authenticate, requireAdmin, async (req, res) => {
+router.put("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const scope = resolveGuildScope(req);
     if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
+    const id = parseMessageId(req);
+    if (!id) return res.status(400).json({ ok: false, error: "Invalid message id" });
+    const parsed = parseMessageFields(req);
+    if (!parsed.ok) return res.status(400).json({ ok: false, error: parsed.error });
 
-    const channelId = String(req.body?.channelId ?? "").trim();
-    const title = String(req.body?.title ?? "").trim();
-    const description = req.body?.description != null ? String(req.body.description).trim() : null;
-    if (!channelId || !title) {
-      return res.status(400).json({ ok: false, error: "channelId and title are required" });
-    }
-
-    const bindings = (Array.isArray(req.body?.bindings) ? req.body.bindings : []).map((b) => ({
-      emoji: typeof b?.emoji === "string" ? b.emoji.trim() : b?.emoji,
-      roleId: typeof b?.roleId === "string" ? b.roleId.trim() : b?.roleId,
-      description: typeof b?.description === "string" ? b.description.trim() : b?.description,
-    }));
-    const bindingsError = validateBindings(bindings);
-    if (bindingsError) {
-      return res.status(400).json({ ok: false, error: bindingsError });
-    }
-
-    const message = await reactRole.upsertMessage(scope.app, scope.guildId, {
-      channelId,
-      title,
-      description,
-      bindings,
-    });
-    await recordAudit(req.user.id, "update", "react_role_messages", `${scope.app}/${scope.guildId}`, {
-      channelId,
-      title,
-      bindingCount: bindings.length,
+    const message = await reactRole.updateMessage(id, scope.app, scope.guildId, parsed.fields);
+    if (!message) return res.status(404).json({ ok: false, error: "React-for-role message not found" });
+    await recordAudit(req.user.id, "update", "react_role_messages", id, {
+      app: scope.app,
+      guildId: scope.guildId,
+      channelId: parsed.fields.channelId,
+      title: parsed.fields.title,
+      bindingCount: parsed.fields.bindings.length,
     });
     res.json({ ok: true, message });
   } catch (err) {
-    console.error("PUT /api/react-role error:", err);
+    console.error("PUT /api/react-role/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to save react-for-role message" });
   }
 });
 
 /**
- * DELETE /api/react-role
- * Soft-deletes the react-for-role message: flags it for removal. The bot removes the live
+ * DELETE /api/react-role/:id
+ * Soft-deletes a react-for-role message: flags it for removal. The bot removes the live
  * Discord/Fluxer message on its next reconciliation pass, then confirms via
- * POST /api/react-role/confirm-delete, which is what actually removes this row. Idempotent.
+ * POST /api/react-role/:id/confirm-delete, which is what actually removes the row. Idempotent.
  * Body: { app, guildId }
  * Auth: admin required.
  * @openapi
- * /api/react-role:
+ * /api/react-role/{id}:
  *   delete:
  *     operationId: deleteReactRoleMessage
  *     tags: [React Role]
- *     summary: Delete the react-for-role message for a server
+ *     summary: Delete a react-for-role message
  *     description: >
  *       Requires the admin role. Soft-deletes (flags pending_delete); the bot performs the
  *       actual live-message deletion and hard-deletes the row via confirm-delete.
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
  *     requestBody:
  *       required: true
  *       content:
@@ -265,7 +449,7 @@ router.put("/", authenticate, requireAdmin, async (req, res) => {
  *               guildId: { type: string }
  *     responses:
  *       '200':
- *         description: Deletion requested (or already gone/unconfigured).
+ *         description: Deletion requested (or already gone).
  *         content:
  *           application/json:
  *             schema:
@@ -281,31 +465,41 @@ router.put("/", authenticate, requireAdmin, async (req, res) => {
  *       '500':
  *         $ref: '#/components/responses/ServerError'
  */
-router.delete("/", authenticate, requireAdmin, async (req, res) => {
+router.delete("/:id", authenticate, requireAdmin, async (req, res) => {
   try {
     const scope = resolveGuildScope(req);
     if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
-    await reactRole.markPendingDelete(scope.app, scope.guildId);
-    await recordAudit(req.user.id, "delete", "react_role_messages", `${scope.app}/${scope.guildId}`, {});
+    const id = parseMessageId(req);
+    if (!id) return res.status(400).json({ ok: false, error: "Invalid message id" });
+    await reactRole.markPendingDelete(id, scope.app, scope.guildId);
+    await recordAudit(req.user.id, "delete", "react_role_messages", id, {
+      app: scope.app,
+      guildId: scope.guildId,
+    });
     res.json({ ok: true });
   } catch (err) {
-    console.error("DELETE /api/react-role error:", err);
+    console.error("DELETE /api/react-role/:id error:", err);
     res.status(500).json({ ok: false, error: "Failed to delete react-for-role message" });
   }
 });
 
 /**
- * POST /api/react-role/synced
+ * POST /api/react-role/:id/synced
  * Bot-only: record that the live message has been successfully posted or edited to match
  * contentVersion.
  * Body: { app, guildId, messageId, channelId, syncedVersion }
  * Auth: bot or admin required (guild-scoped bot accounts restricted to their own guildId).
  * @openapi
- * /api/react-role/synced:
+ * /api/react-role/{id}/synced:
  *   post:
  *     operationId: markReactRoleSynced
  *     tags: [React Role]
  *     summary: Record that the bot has synced the live message to the current content version
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
  *     requestBody:
  *       required: true
  *       content:
@@ -340,7 +534,7 @@ router.delete("/", authenticate, requireAdmin, async (req, res) => {
  *         $ref: '#/components/responses/ServerError'
  */
 router.post(
-  "/synced",
+  "/:id/synced",
   authenticate,
   requireBotOrAdmin,
   requireOwnGuildOrAdmin,
@@ -348,6 +542,8 @@ router.post(
     try {
       const scope = resolveGuildScope(req);
       if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
+      const id = parseMessageId(req);
+      if (!id) return res.status(400).json({ ok: false, error: "Invalid message id" });
 
       const messageId = String(req.body?.messageId ?? "").trim();
       const channelId = String(req.body?.channelId ?? "").trim();
@@ -359,7 +555,7 @@ router.post(
         });
       }
 
-      const updated = await reactRole.markSynced(scope.app, scope.guildId, {
+      const updated = await reactRole.markSynced(id, scope.app, scope.guildId, {
         messageId,
         channelId,
         syncedVersion,
@@ -369,24 +565,29 @@ router.post(
       }
       res.json({ ok: true });
     } catch (err) {
-      console.error("POST /api/react-role/synced error:", err);
+      console.error("POST /api/react-role/:id/synced error:", err);
       res.status(500).json({ ok: false, error: "Failed to record react-for-role sync" });
     }
   },
 );
 
 /**
- * POST /api/react-role/sync-failed
+ * POST /api/react-role/:id/sync-failed
  * Bot-only: record that the bot failed to post/edit the live message for a content version, so
  * the admin panel (polling GET right after a save) can surface why it didn't take effect.
  * Body: { app, guildId, contentVersion, error }
  * Auth: bot or admin required (guild-scoped bot accounts restricted to their own guildId).
  * @openapi
- * /api/react-role/sync-failed:
+ * /api/react-role/{id}/sync-failed:
  *   post:
  *     operationId: markReactRoleSyncFailed
  *     tags: [React Role]
  *     summary: Record that the bot failed to post/edit the live message for a content version
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
  *     requestBody:
  *       required: true
  *       content:
@@ -420,7 +621,7 @@ router.post(
  *         $ref: '#/components/responses/ServerError'
  */
 router.post(
-  "/sync-failed",
+  "/:id/sync-failed",
   authenticate,
   requireBotOrAdmin,
   requireOwnGuildOrAdmin,
@@ -428,6 +629,8 @@ router.post(
     try {
       const scope = resolveGuildScope(req);
       if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
+      const id = parseMessageId(req);
+      if (!id) return res.status(400).json({ ok: false, error: "Invalid message id" });
 
       const contentVersion = Number(req.body?.contentVersion);
       const error = String(req.body?.error ?? "").trim().slice(0, 1000);
@@ -438,7 +641,7 @@ router.post(
         });
       }
 
-      const updated = await reactRole.recordSyncFailure(scope.app, scope.guildId, {
+      const updated = await reactRole.recordSyncFailure(id, scope.app, scope.guildId, {
         contentVersion,
         error,
       });
@@ -447,24 +650,29 @@ router.post(
       }
       res.json({ ok: true });
     } catch (err) {
-      console.error("POST /api/react-role/sync-failed error:", err);
+      console.error("POST /api/react-role/:id/sync-failed error:", err);
       res.status(500).json({ ok: false, error: "Failed to record react-for-role sync failure" });
     }
   },
 );
 
 /**
- * POST /api/react-role/confirm-delete
+ * POST /api/react-role/:id/confirm-delete
  * Bot-only: confirm the live message has been removed (or was already gone), hard-deleting the
  * row (and its bindings, via cascade). Idempotent.
  * Body: { app, guildId }
  * Auth: bot or admin required (guild-scoped bot accounts restricted to their own guildId).
  * @openapi
- * /api/react-role/confirm-delete:
+ * /api/react-role/{id}/confirm-delete:
  *   post:
  *     operationId: confirmReactRoleDelete
  *     tags: [React Role]
- *     summary: Confirm the live react-for-role message has been removed
+ *     summary: Confirm a live react-for-role message has been removed
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema: { type: integer }
  *     requestBody:
  *       required: true
  *       content:
@@ -494,7 +702,7 @@ router.post(
  *         $ref: '#/components/responses/ServerError'
  */
 router.post(
-  "/confirm-delete",
+  "/:id/confirm-delete",
   authenticate,
   requireBotOrAdmin,
   requireOwnGuildOrAdmin,
@@ -502,10 +710,12 @@ router.post(
     try {
       const scope = resolveGuildScope(req);
       if (!scope.ok) return res.status(scope.status).json({ ok: false, error: scope.error });
-      await reactRole.hardDeleteMessage(scope.app, scope.guildId);
+      const id = parseMessageId(req);
+      if (!id) return res.status(400).json({ ok: false, error: "Invalid message id" });
+      await reactRole.hardDeleteMessage(id, scope.app, scope.guildId);
       res.json({ ok: true });
     } catch (err) {
-      console.error("POST /api/react-role/confirm-delete error:", err);
+      console.error("POST /api/react-role/:id/confirm-delete error:", err);
       res.status(500).json({ ok: false, error: "Failed to confirm react-for-role deletion" });
     }
   },

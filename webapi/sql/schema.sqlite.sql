@@ -386,7 +386,7 @@ CREATE TABLE IF NOT EXISTS timeout_history (
   timestamp TEXT DEFAULT (datetime('now'))
 );
 
--- React-for-role: the one live reaction-role message per (app, guild_id). content_version is
+-- React-for-role: live reaction-role messages, any number per (app, guild_id). content_version is
 -- bumped on every admin write; synced_version is bumped by the bot after it successfully
 -- posts/edits the live message — the bot reconciles whenever they differ. pending_delete is set
 -- by the admin's delete action and cleared (row removed) once the bot confirms the live message
@@ -406,8 +406,10 @@ CREATE TABLE IF NOT EXISTS react_role_messages (
   last_sync_error_version INTEGER NULL,
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
-  UNIQUE (app, guild_id)
+  UNIQUE (app, message_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_react_role_messages_app_guild ON react_role_messages (app, guild_id);
 
 CREATE TRIGGER IF NOT EXISTS react_role_messages_updated_at
   AFTER UPDATE ON react_role_messages WHEN OLD.updated_at = NEW.updated_at

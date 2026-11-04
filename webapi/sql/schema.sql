@@ -392,7 +392,7 @@ CREATE TABLE IF NOT EXISTS timeout_history (
   CONSTRAINT fk_timeout_history_target FOREIGN KEY (target) REFERENCES chat_member_mapping(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- React-for-role: the one live reaction-role message per (app, guild_id). content_version is
+-- React-for-role: live reaction-role messages, any number per (app, guild_id). content_version is
 -- bumped on every admin write; synced_version is bumped by the bot after it successfully
 -- posts/edits the live message — the bot reconciles whenever they differ. pending_delete is set
 -- by the admin's delete action and cleared (row removed) once the bot confirms the live message
@@ -412,7 +412,8 @@ CREATE TABLE IF NOT EXISTS react_role_messages (
   last_sync_error_version INT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uniq_react_role_messages_app_guild (app, guild_id)
+  UNIQUE KEY uniq_react_role_messages_app_message (app, message_id),
+  KEY idx_react_role_messages_app_guild (app, guild_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- One emoji->role binding per row. Both uniques are a defense-in-depth backstop only — the
