@@ -17,13 +17,13 @@ import "./api/cacheRefresh.js";
 // EventEmitter throws if an "error" event has no listener; without this, a failed
 // login or dropped gateway connection crashes the process instead of just logging.
 client.on(Events.Error, (error) => {
-  incrementCounter("fluxerClientErrorsTotal");
+  incrementCounter("clientErrorsTotal");
   console.error("bot: Fluxer client error:", error);
 });
 
-client.on(Events.GuildCreate, () => incrementCounter("fluxerGuildJoinsTotal"));
-client.on(Events.GuildDelete, () => incrementCounter("fluxerGuildLeavesTotal"));
-client.on(Events.ShardError, () => incrementCounter("fluxerShardErrorsTotal"));
+client.on(Events.GuildCreate, () => incrementCounter("guildJoinsTotal"));
+client.on(Events.GuildDelete, () => incrementCounter("guildLeavesTotal"));
+client.on(Events.ShardError, () => incrementCounter("shardErrorsTotal"));
 
 /**
  * Wrap an event handler so a thrown/rejected execute() is logged instead of crashing the
