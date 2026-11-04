@@ -98,6 +98,10 @@ async function isManageable(member) {
  * @param {object} reactRoleMessage
  */
 async function handleRoleReactAdd(ctx, reactRoleMessage) {
+  // The bot pre-reacts with every bound emoji (see reactRoleSync.js's syncBotReactions) so users
+  // don't have to look each one up — never treat that as a role grant request.
+  if (ctx.userId === ctx.client.user?.id) return;
+
   const binding = reactRoleMessage.bindings.find((b) =>
     emojisMatch(toEmojiObject(ctx.emoji), toComparableEmoji(b.emoji)),
   );
@@ -135,6 +139,10 @@ async function handleRoleReactAdd(ctx, reactRoleMessage) {
  * @param {object} reactRoleMessage
  */
 async function handleRoleReactRemove(ctx, reactRoleMessage) {
+  // Same self-reaction guard as handleRoleReactAdd — e.g. syncBotReactions removing its own
+  // stale reaction for a binding that was just deleted must never touch the bot's own roles.
+  if (ctx.userId === ctx.client.user?.id) return;
+
   const binding = reactRoleMessage.bindings.find((b) =>
     emojisMatch(toEmojiObject(ctx.emoji), toComparableEmoji(b.emoji)),
   );

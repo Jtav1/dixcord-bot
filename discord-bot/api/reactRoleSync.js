@@ -14,6 +14,7 @@ import {
 } from "./reactRole.js";
 import { isReactForRoleEnabled } from "../configStore.js";
 import { guildId } from "../configVars.js";
+import { emojisMatch, toEmojiObject } from "../utilities/emojiCompare.js";
 
 // Short on purpose: an admin save should reach the live message within a couple of seconds, not
 // wait out a long cache-refresh-style interval (see cacheRefresh.js's 30s, a different concern).
@@ -100,6 +101,47 @@ function isUnknownMessageError(err) {
 }
 
 /**
+ * React to the live message with each binding's emoji (so users can tap one without having to
+ * look it up), and remove the bot's own reaction for any emoji no longer bound. Per-reaction
+ * failures are logged and swallowed — a missing reaction is a UX nicety, not worth failing the
+ * whole sync over. These reactions never trigger role logic themselves (reactionHandler.js's
+ * role-react branches ignore the bot's own reactions).
+ * @param {import("discord.js").Message} liveMessage
+ * @param {Array<{emoji:string}>} bindings
+ * @returns {Promise<void>}
+ */
+async function syncBotReactions(liveMessage, bindings) {
+  for (const binding of bindings) {
+    const alreadyReacted = [...liveMessage.reactions.cache.values()].some(
+      (r) => r.me && emojisMatch(toEmojiObject(r.emoji), toComparableEmoji(binding.emoji)),
+    );
+    if (alreadyReacted) continue;
+    try {
+      await liveMessage.react(binding.emoji);
+    } catch (err) {
+      console.error(
+        `bot: failed to add react-role reaction ${binding.emoji} to message ${liveMessage.id}: ${err.message}`,
+      );
+    }
+  }
+
+  for (const reaction of liveMessage.reactions.cache.values()) {
+    if (!reaction.me) continue;
+    const stillBound = bindings.some((b) =>
+      emojisMatch(toEmojiObject(reaction.emoji), toComparableEmoji(b.emoji)),
+    );
+    if (stillBound) continue;
+    try {
+      await reaction.users.remove();
+    } catch (err) {
+      console.error(
+        `bot: failed to remove stale react-role reaction on message ${liveMessage.id}: ${err.message}`,
+      );
+    }
+  }
+}
+
+/**
  * Delete the live message if one is recorded, treating "already gone" as success, then confirm.
  * @param {import("discord.js").Client} client
  * @param {object} message
@@ -144,6 +186,7 @@ async function handlePostOrEdit(client, message) {
     try {
       const liveMessage = await channel.messages.fetch(message.messageId);
       await liveMessage.edit({ embeds: [embed] });
+      await syncBotReactions(liveMessage, message.bindings);
       await markReactRoleSynced({
         messageId: message.messageId,
         channelId: message.channelId,
@@ -157,6 +200,7 @@ async function handlePostOrEdit(client, message) {
   }
 
   const posted = await channel.send({ embeds: [embed] });
+  await syncBotReactions(posted, message.bindings);
   await markReactRoleSynced({
     messageId: posted.id,
     channelId: message.channelId,

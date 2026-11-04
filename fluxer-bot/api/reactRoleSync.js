@@ -16,6 +16,7 @@ import {
 } from "./reactRole.js";
 import { isReactForRoleEnabled } from "../configStore.js";
 import { guildId } from "../configVars.js";
+import { emojisMatch, toEmojiObject } from "../utilities/emojiCompare.js";
 
 // Short on purpose: an admin save should reach the live message within a couple of seconds, not
 // wait out a long cache-refresh-style interval (see api/cacheRefresh.js's 30s, a different
@@ -88,6 +89,63 @@ function buildEmbed(message, guild) {
 }
 
 /**
+ * Resolve a binding's stored raw emoji value into the EmojiInput shape fluxer.js's
+ * `Message#react`/`removeReaction` expect: a plain string for unicode, or `{id, name, animated}`
+ * for a custom emoji (looked up by id in the guild's emoji cache — a bare id string alone isn't
+ * documented as accepted).
+ * @param {string} raw
+ * @param {import("@fluxerjs/core").Guild} guild
+ * @returns {string|{id:string,name:string,animated:boolean}}
+ */
+function toEmojiInput(raw, guild) {
+  if (!isSnowflake(raw)) return raw;
+  const emoji = guild.emojis.get(raw);
+  return emoji ? { id: emoji.id, name: emoji.name, animated: emoji.animated } : raw;
+}
+
+/**
+ * React to the live message with each binding's emoji (so users can tap one without having to
+ * look it up), and remove the bot's own reaction for any emoji no longer bound. Per-reaction
+ * failures are logged and swallowed — a missing reaction is a UX nicety, not worth failing the
+ * whole sync over. These reactions never trigger role logic themselves (reactionHandler.js's
+ * role-react branches ignore the bot's own reactions).
+ * @param {import("@fluxerjs/core").Message} liveMessage
+ * @param {Array<{emoji:string}>} bindings
+ * @param {import("@fluxerjs/core").Guild} guild
+ * @returns {Promise<void>}
+ */
+async function syncBotReactions(liveMessage, bindings, guild) {
+  for (const binding of bindings) {
+    const alreadyReacted = [...liveMessage.reactions.cache.values()].some(
+      (r) => r.me && emojisMatch(toEmojiObject(r.emoji), toComparableEmoji(binding.emoji)),
+    );
+    if (alreadyReacted) continue;
+    try {
+      await liveMessage.react(toEmojiInput(binding.emoji, guild));
+    } catch (err) {
+      console.error(
+        `bot: failed to add react-role reaction ${binding.emoji} to message ${liveMessage.id}: ${err.message}`,
+      );
+    }
+  }
+
+  for (const reaction of liveMessage.reactions.cache.values()) {
+    if (!reaction.me) continue;
+    const stillBound = bindings.some((b) =>
+      emojisMatch(toEmojiObject(reaction.emoji), toComparableEmoji(b.emoji)),
+    );
+    if (stillBound) continue;
+    try {
+      await liveMessage.removeReaction(toEmojiInput(reaction.emoji.id ?? reaction.emoji.name, guild));
+    } catch (err) {
+      console.error(
+        `bot: failed to remove stale react-role reaction on message ${liveMessage.id}: ${err.message}`,
+      );
+    }
+  }
+}
+
+/**
  * @param {unknown} err
  * @returns {boolean} True if this looks like "message not found" (already deleted/gone). The
  *   exact error shape for a missing message isn't confirmed against a live Fluxer instance
@@ -141,6 +199,7 @@ async function handlePostOrEdit(message) {
     try {
       const liveMessage = await channel.messages.fetch(message.messageId);
       await liveMessage.edit({ embeds: [embed] });
+      await syncBotReactions(liveMessage, message.bindings, guild);
       await markReactRoleSynced({
         messageId: message.messageId,
         channelId: message.channelId,
@@ -154,6 +213,7 @@ async function handlePostOrEdit(message) {
   }
 
   const posted = await channel.send({ embeds: [embed] });
+  await syncBotReactions(posted, message.bindings, guild);
   await markReactRoleSynced({
     messageId: posted.id,
     channelId: message.channelId,
