@@ -980,6 +980,59 @@ export async function ensureSchemaMigrations() {
   //           chat_member_mapping(id), some ON DELETE CASCADE, and foreign_keys enforcement
   //           defaults ON in this SQLite build — see git history for the exact statements.
 
+  // Legacy discord_handle/discord_id are relaxed to NULLable (data kept) so INSERTs that only set
+  // name (createUserMapping) don't fail NOT NULL. UNIQUE stays; multiple NULLs are allowed.
+  {
+    const legacyCols = [];
+    for (const col of ["discord_handle", "discord_id"]) {
+      if (
+        (await columnExists(db, "chat_member_mapping", col, isSqlite)) &&
+        (await isColumnNotNull(db, "chat_member_mapping", col, isSqlite))
+      ) {
+        legacyCols.push(col);
+      }
+    }
+    if (legacyCols.length > 0) {
+      if (isSqlite) {
+        // Table rebuild; FKs off so DROP TABLE doesn't cascade into the child tables.
+        await db.query("PRAGMA foreign_keys = OFF");
+        try {
+          await db.query(`
+            CREATE TABLE chat_member_mapping_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL UNIQUE,
+              discord_handle TEXT NULL UNIQUE,
+              discord_id TEXT NULL UNIQUE,
+              handle TEXT NULL,
+              app TEXT NULL,
+              primary_guild_member_id INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL
+            )
+          `);
+          const have = new Set();
+          for (const c of ["id", "name", "discord_handle", "discord_id", "handle", "app", "primary_guild_member_id"]) {
+            if (await columnExists(db, "chat_member_mapping", c, isSqlite)) have.add(c);
+          }
+          const copyCols = [...have].join(", ");
+          await db.query(
+            `INSERT INTO chat_member_mapping_new (${copyCols}) SELECT ${copyCols} FROM chat_member_mapping`,
+          );
+          await db.query("DROP TABLE chat_member_mapping");
+          await db.query("ALTER TABLE chat_member_mapping_new RENAME TO chat_member_mapping");
+        } finally {
+          await db.query("PRAGMA foreign_keys = ON");
+        }
+      } else {
+        for (const col of legacyCols) {
+          await db.query(`ALTER TABLE chat_member_mapping MODIFY COLUMN ${col} VARCHAR(255) NULL`);
+        }
+      }
+      applied.push(`chat_member_mapping: ${legacyCols.join(", ")} made nullable`);
+      console.log(
+        `db: migration applied: chat_member_mapping ${legacyCols.join(", ")} made nullable`,
+      );
+    }
+  }
+
   // pin_history expanded metadata (author, message snapshot, pinners)
   if (await tableExists(db, "pin_history", isSqlite)) {
     const pinHistoryColumns = isSqlite
