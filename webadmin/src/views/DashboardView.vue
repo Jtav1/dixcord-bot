@@ -53,9 +53,9 @@
 
           <v-divider class="my-2" />
 
-          <v-list-item v-if="status.bot">
+          <v-list-item v-if="activeBot">
             <template #prepend>
-              <v-icon :color="status.bot.online ? 'success' : 'warning'">
+              <v-icon :color="activeBot.online ? 'success' : 'warning'">
                 mdi-robot-outline
               </v-icon>
             </template>
@@ -64,37 +64,37 @@
               <v-chip
                 class="ml-2"
                 size="x-small"
-                :color="status.bot.online ? 'success' : 'warning'"
+                :color="activeBot.online ? 'success' : 'warning'"
                 variant="tonal"
               >
-                {{ status.bot.online ? "Online" : "Offline" }}
+                {{ activeBot.online ? "Online" : "Offline" }}
               </v-chip>
             </v-list-item-title>
             <v-list-item-subtitle>
-              Version {{ status.bot.version }} · Guild {{ status.bot.guildId }}
+              Version {{ activeBot.version }} · Guild {{ activeBot.guildId }}
             </v-list-item-subtitle>
             <v-list-item-subtitle class="mt-1">
-              Last seen {{ formatTimestamp(status.bot.lastSeenAt) }}
+              Last seen {{ formatTimestamp(activeBot.lastSeenAt) }}
             </v-list-item-subtitle>
-            <v-list-item-subtitle v-if="status.bot.uptimeSeconds != null" class="mt-1">
-              Up {{ formatDuration(status.bot.uptimeSeconds) }}
+            <v-list-item-subtitle v-if="activeBot.uptimeSeconds != null" class="mt-1">
+              Up {{ formatDuration(activeBot.uptimeSeconds) }}
             </v-list-item-subtitle>
             <v-list-item-subtitle
-              v-if="status.bot.memberCount != null || status.bot.channelCount != null"
+              v-if="activeBot.memberCount != null || activeBot.channelCount != null"
               class="mt-1"
             >
-              <template v-if="status.bot.memberCount != null">
-                {{ formatCount(status.bot.memberCount) }} members
+              <template v-if="activeBot.memberCount != null">
+                {{ formatCount(activeBot.memberCount) }} members
               </template>
-              <template v-if="status.bot.memberCount != null && status.bot.channelCount != null">
+              <template v-if="activeBot.memberCount != null && activeBot.channelCount != null">
                 ·
               </template>
-              <template v-if="status.bot.channelCount != null">
-                {{ formatCount(status.bot.channelCount) }} channels
+              <template v-if="activeBot.channelCount != null">
+                {{ formatCount(activeBot.channelCount) }} channels
               </template>
             </v-list-item-subtitle>
-            <v-list-item-subtitle v-if="status.bot.wsPingMs != null" class="mt-1">
-              Gateway ping {{ status.bot.wsPingMs }}ms
+            <v-list-item-subtitle v-if="activeBot.wsPingMs != null" class="mt-1">
+              Gateway ping {{ activeBot.wsPingMs }}ms
             </v-list-item-subtitle>
           </v-list-item>
 
@@ -268,10 +268,16 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
 import { fetchSystemStatus } from "../lib/systemStatus.js";
 import { fetchStatistics } from "../lib/statistics.js";
 import { fetchTriggerResponseFunctions } from "../lib/triggerResponseFunctions.js";
+import { appForClientKey } from "../nav/clients.js";
+
+const route = useRoute();
+
+/** @typedef {{ app: string, guildId: string, version: string, lastSeenAt: string, online: boolean, readyAt: string|null, uptimeSeconds: number|null, memberCount: number|null, channelCount: number|null, wsPingMs: number|null }} BotStatus */
 
 const statusLoading = ref(true);
 const statusError = ref("");
@@ -282,19 +288,24 @@ const statusError = ref("");
  *   cacheVersion: string,
  *   webapiUptimeSeconds: number,
  *   webapiMemoryRssBytes: number,
- *   bot: {
- *     guildId: string,
- *     version: string,
- *     lastSeenAt: string,
- *     online: boolean,
- *     readyAt: string | null,
- *     uptimeSeconds: number | null,
- *     memberCount: number | null,
- *     channelCount: number | null,
- *     wsPingMs: number | null,
- *   } | null,
+ *   bot: BotStatus | null,
+ *   bots: BotStatus[],
  * } | null>} */
 const status = ref(null);
+
+/**
+ * This dashboard is a non-guild-scoped landing page shared across clients, so it can't scope by
+ * guildId — but it must still show the active client's OWN bot, not whichever bot across every
+ * app/guild sent a heartbeat most recently (webapi's `status.bot` default). Pick the most
+ * recently seen bot for this client's app from the full `bots` list instead.
+ * @returns {string}
+ */
+const activeApp = computed(() => appForClientKey(route.path.split("/")[1]));
+
+/** @returns {BotStatus|null} */
+const activeBot = computed(
+  () => status.value?.bots?.find((bot) => bot.app === activeApp.value) ?? null,
+);
 
 const statsLoading = ref(true);
 const statsError = ref("");

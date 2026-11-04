@@ -175,4 +175,9 @@ export function getTimeoutVoteTripleRoleId() {
   return getConfigValue("timeout_vote_triple_role_id", "");
 }
 
+/** @returns {boolean} Defaults to disabled, unlike isFeatureEnabled's default-on convention. */
+export function isReactForRoleEnabled() {
+  return getConfigValue("react_for_role_enabled", "false") === "true";
+}
+
 await loadConfig();

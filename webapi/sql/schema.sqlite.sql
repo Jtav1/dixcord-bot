@@ -385,3 +385,46 @@ CREATE TABLE IF NOT EXISTS timeout_history (
   duration_seconds INTEGER NOT NULL,
   timestamp TEXT DEFAULT (datetime('now'))
 );
+
+-- React-for-role: the one live reaction-role message per (app, guild_id). content_version is
+-- bumped on every admin write; synced_version is bumped by the bot after it successfully
+-- posts/edits the live message — the bot reconciles whenever they differ. pending_delete is set
+-- by the admin's delete action and cleared (row removed) once the bot confirms the live message
+-- is gone, since only the bot can actually talk to Discord/Fluxer.
+CREATE TABLE IF NOT EXISTS react_role_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  app TEXT NOT NULL,
+  guild_id TEXT NOT NULL,
+  channel_id TEXT NOT NULL,
+  message_id TEXT NULL,
+  title TEXT NOT NULL,
+  description TEXT NULL,
+  content_version INTEGER NOT NULL DEFAULT 1,
+  synced_version INTEGER NOT NULL DEFAULT 0,
+  pending_delete INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  UNIQUE (app, guild_id)
+);
+
+CREATE TRIGGER IF NOT EXISTS react_role_messages_updated_at
+  AFTER UPDATE ON react_role_messages WHEN OLD.updated_at = NEW.updated_at
+  BEGIN
+    UPDATE react_role_messages SET updated_at = datetime('now') WHERE id = NEW.id;
+  END;
+
+-- One emoji->role binding per row. Both uniques are a defense-in-depth backstop only — the
+-- route layer is the authoritative validator and must reject duplicate emoji/role before this
+-- constraint would ever fire (a violation here should never happen in normal operation).
+CREATE TABLE IF NOT EXISTS react_role_bindings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  message_id INTEGER NOT NULL REFERENCES react_role_messages(id) ON DELETE CASCADE,
+  emoji TEXT NOT NULL,
+  role_id TEXT NOT NULL,
+  description TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  UNIQUE (message_id, emoji),
+  UNIQUE (message_id, role_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_react_role_bindings_message ON react_role_bindings (message_id);

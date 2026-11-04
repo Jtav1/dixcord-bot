@@ -10,6 +10,90 @@ import { incrementCounter } from "../../../utilities/metrics.js";
 import { emojisMatch, toEmojiObject } from "../../../utilities/emojiCompare.js";
 import { announceMilestones } from "../../../utilities/milestoneNotifier.js";
 import { timeoutMember } from "../../../utilities/timeoutMember.js";
+import { getCachedReactRoleMessage, toComparableEmoji } from "../../../api/reactRoleSync.js";
+
+/**
+ * Find the live react-for-role message's bindings if this reaction's message is it.
+ * @param {string} messageId
+ * @param {boolean} reactForRoleEnabled
+ * @returns {object|null} The cached message (with bindings), or null if not applicable.
+ */
+function resolveReactRoleMessage(messageId, reactForRoleEnabled) {
+  if (!reactForRoleEnabled) return null;
+  const cached = getCachedReactRoleMessage();
+  if (!cached || cached.messageId !== messageId) return null;
+  return cached;
+}
+
+/**
+ * On add: grant the bound role (no-op if already held), or remove the reaction if its emoji
+ * isn't in the bindings list. Permission/hierarchy failures are logged and swallowed.
+ * @param {import('discord.js').MessageReaction} reaction
+ * @param {import('discord.js').Message} message
+ * @param {import('discord.js').User} user
+ * @param {object} emojiObj
+ * @param {object} reactRoleMessage
+ */
+async function handleRoleReactAdd(reaction, message, user, emojiObj, reactRoleMessage) {
+  const binding = reactRoleMessage.bindings.find((b) =>
+    emojisMatch(emojiObj, toComparableEmoji(b.emoji)),
+  );
+  if (!binding) {
+    try {
+      await reaction.users.remove(user.id);
+    } catch (err) {
+      console.error(
+        `bot: failed to remove unlisted react-role reaction on message ${message.id} from user ${user.id}: ${err.message}`,
+      );
+    }
+    return;
+  }
+
+  const member = await message.guild.members.fetch(user.id).catch(() => null);
+  if (!member) return;
+  if (member.roles.cache.has(binding.roleId)) return;
+  if (!member.manageable) {
+    console.error(
+      `bot: cannot grant react-role ${binding.roleId} to ${member.id}: not manageable (missing permissions or role hierarchy)`,
+    );
+    return;
+  }
+  try {
+    await member.roles.add(binding.roleId);
+  } catch (err) {
+    console.error(`bot: failed to add react-role ${binding.roleId} to ${member.id}: ${err.message}`);
+  }
+}
+
+/**
+ * On remove: revoke the bound role (no-op if already lacking it). Permission/hierarchy failures
+ * are logged and swallowed. Nothing to do for an unlisted emoji (the bot already strips those on add).
+ * @param {import('discord.js').Message} message
+ * @param {import('discord.js').User} user
+ * @param {object} emojiObj
+ * @param {object} reactRoleMessage
+ */
+async function handleRoleReactRemove(message, user, emojiObj, reactRoleMessage) {
+  const binding = reactRoleMessage.bindings.find((b) =>
+    emojisMatch(emojiObj, toComparableEmoji(b.emoji)),
+  );
+  if (!binding) return;
+
+  const member = await message.guild.members.fetch(user.id).catch(() => null);
+  if (!member) return;
+  if (!member.roles.cache.has(binding.roleId)) return;
+  if (!member.manageable) {
+    console.error(
+      `bot: cannot revoke react-role ${binding.roleId} from ${member.id}: not manageable (missing permissions or role hierarchy)`,
+    );
+    return;
+  }
+  try {
+    await member.roles.remove(binding.roleId);
+  } catch (err) {
+    console.error(`bot: failed to remove react-role ${binding.roleId} from ${member.id}: ${err.message}`);
+  }
+}
 
 /**
  * Weight of one user's timeout vote based on their roles: 3x if they hold the triple-vote role,
@@ -78,7 +162,7 @@ async function resolveMessage(reaction) {
  * Handle messageReactionAdd: pin threshold, plus/minus votes, emoji counting, repost counting.
  * @param {MessageReaction} reaction
  * @param {User} user
- * @param {{ client: Client, pinEmoji: object|null, pinThreshold: number, plusEmoji: object|null, minusEmoji: object|null, repostEmoji: object|null, pinSystemEnabled: boolean, plusPlusEnabled: boolean, emojiTrackingEnabled: boolean, repostDetectionEnabled: boolean }} options - the *Emoji options are resolved emoji objects (see configStore.js), not bare strings.
+ * @param {{ client: Client, pinEmoji: object|null, pinThreshold: number, plusEmoji: object|null, minusEmoji: object|null, repostEmoji: object|null, pinSystemEnabled: boolean, plusPlusEnabled: boolean, emojiTrackingEnabled: boolean, repostDetectionEnabled: boolean, reactForRoleEnabled: boolean }} options - the *Emoji options are resolved emoji objects (see configStore.js), not bare strings.
  */
 export async function handleReactionAdd(reaction, user, options) {
   const {
@@ -111,6 +195,14 @@ export async function handleReactionAdd(reaction, user, options) {
   }
   const emojiObj = toEmojiObject(emoji);
   const isSelfReaction = user.id === message.author.id;
+
+  // The react-for-role message is exclusively for role self-assignment — if this reaction is on
+  // it, handle role granting (or strip an unlisted reaction) and skip pin/plus/etc classification.
+  const reactRoleMessage = resolveReactRoleMessage(message.id, options.reactForRoleEnabled);
+  if (reactRoleMessage) {
+    await handleRoleReactAdd(reaction, message, user, emojiObj, reactRoleMessage);
+    return;
+  }
 
   // Re-scans all reactions for pinEmoji, since threshold can be crossed regardless of which reaction fired.
   if (pinSystemEnabled && pinEmoji) {
@@ -258,7 +350,7 @@ export async function handleReactionAdd(reaction, user, options) {
  * Handle messageReactionRemove: uncount repost, reverse plus/minus votes, un-count timeout votes.
  * @param {MessageReaction} reaction
  * @param {User} user
- * @param {{ plusEmoji: object|null, minusEmoji: object|null, repostEmoji: object|null, timeoutVoteEmoji: object|null, plusPlusEnabled: boolean, repostDetectionEnabled: boolean, timeoutVoteEnabled: boolean }} options - the *Emoji options are resolved emoji objects (see configStore.js), not bare strings.
+ * @param {{ plusEmoji: object|null, minusEmoji: object|null, repostEmoji: object|null, timeoutVoteEmoji: object|null, plusPlusEnabled: boolean, repostDetectionEnabled: boolean, timeoutVoteEnabled: boolean, reactForRoleEnabled: boolean }} options - the *Emoji options are resolved emoji objects (see configStore.js), not bare strings.
  */
 export async function handleReactionRemove(reaction, user, options) {
   const {
@@ -284,6 +376,12 @@ export async function handleReactionRemove(reaction, user, options) {
   }
   const emojiObj = toEmojiObject(emoji);
   const isSelfReaction = user.id === message.author.id;
+
+  const reactRoleMessage = resolveReactRoleMessage(message.id, options.reactForRoleEnabled);
+  if (reactRoleMessage) {
+    await handleRoleReactRemove(message, user, emojiObj, reactRoleMessage);
+    return;
+  }
 
   const kind = classifyReactionEmoji(emojiObj, {
     plusEmoji,

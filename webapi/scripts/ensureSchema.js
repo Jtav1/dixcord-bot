@@ -2238,6 +2238,99 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: plusplus_tracking.app column already exists");
   }
 
+  // react_role_messages: the one live reaction-role message per (app, guild_id).
+  if (!(await tableExists(db, "react_role_messages", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE react_role_messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          app TEXT NOT NULL,
+          guild_id TEXT NOT NULL,
+          channel_id TEXT NOT NULL,
+          message_id TEXT NULL,
+          title TEXT NOT NULL,
+          description TEXT NULL,
+          content_version INTEGER NOT NULL DEFAULT 1,
+          synced_version INTEGER NOT NULL DEFAULT 0,
+          pending_delete INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now')),
+          UNIQUE (app, guild_id)
+        )
+      `);
+      await db.query(`
+        CREATE TRIGGER react_role_messages_updated_at
+          AFTER UPDATE ON react_role_messages WHEN OLD.updated_at = NEW.updated_at
+          BEGIN
+            UPDATE react_role_messages SET updated_at = datetime('now') WHERE id = NEW.id;
+          END
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE react_role_messages (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          app VARCHAR(20) NOT NULL,
+          guild_id VARCHAR(64) NOT NULL,
+          channel_id VARCHAR(64) NOT NULL,
+          message_id VARCHAR(64) NULL,
+          title VARCHAR(256) NOT NULL,
+          description VARCHAR(2048) NULL,
+          content_version INT NOT NULL DEFAULT 1,
+          synced_version INT NOT NULL DEFAULT 0,
+          pending_delete TINYINT(1) NOT NULL DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY uniq_react_role_messages_app_guild (app, guild_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    }
+    applied.push("react_role_messages table");
+    console.log("db: migration applied: created react_role_messages table");
+  } else {
+    console.log("db: schema ok: react_role_messages table already exists");
+  }
+
+  // react_role_bindings: emoji->role rows for a react_role_messages message. Unique constraints
+  // are defense-in-depth only — the route layer is the authoritative duplicate-emoji/role check.
+  if (!(await tableExists(db, "react_role_bindings", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE react_role_bindings (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          message_id INTEGER NOT NULL REFERENCES react_role_messages(id) ON DELETE CASCADE,
+          emoji TEXT NOT NULL,
+          role_id TEXT NOT NULL,
+          description TEXT NOT NULL,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          UNIQUE (message_id, emoji),
+          UNIQUE (message_id, role_id)
+        )
+      `);
+      await db.query(
+        "CREATE INDEX idx_react_role_bindings_message ON react_role_bindings (message_id)",
+      );
+    } else {
+      await db.query(`
+        CREATE TABLE react_role_bindings (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          message_id INT NOT NULL,
+          emoji VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+          role_id VARCHAR(64) NOT NULL,
+          description VARCHAR(512) NOT NULL,
+          sort_order INT NOT NULL DEFAULT 0,
+          CONSTRAINT fk_react_role_bindings_message FOREIGN KEY (message_id) REFERENCES react_role_messages(id) ON DELETE CASCADE,
+          UNIQUE KEY uniq_react_role_bindings_emoji (message_id, emoji),
+          UNIQUE KEY uniq_react_role_bindings_role (message_id, role_id),
+          KEY idx_react_role_bindings_message (message_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    }
+    applied.push("react_role_bindings table");
+    console.log("db: migration applied: created react_role_bindings table");
+  } else {
+    console.log("db: schema ok: react_role_bindings table already exists");
+  }
+
   if (applied.length === 0) {
     console.log("db: schema valid; no migrations applied");
   } else {

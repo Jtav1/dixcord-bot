@@ -10,6 +10,7 @@ import { apiFetch, apiFetchJson } from "./http.js";
  *   webapiUptimeSeconds: number,
  *   webapiMemoryRssBytes: number,
  *   bot: {
+ *     app: string,
  *     guildId: string,
  *     version: string,
  *     lastSeenAt: string,
@@ -20,6 +21,7 @@ import { apiFetch, apiFetchJson } from "./http.js";
  *     channelCount: number | null,
  *     wsPingMs: number | null,
  *   } | null,
+ *   bots: Array<{ app: string, guildId: string, version: string, lastSeenAt: string, online: boolean, readyAt: string|null, uptimeSeconds: number|null, memberCount: number|null, channelCount: number|null, wsPingMs: number|null }>,
  * }>}
  */
 export async function fetchSystemStatus() {

@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "dixcord-bot webapi",
-    "version": "3.1.0",
+    "version": "4.0.2",
     "description": "Internal REST API backing the dixcord-bot Discord bot, webview, and webadmin services. Every route requires a service-account JWT (admin, bot, or webview) except login and health."
   },
   "servers": [
@@ -84,6 +84,10 @@
     {
       "name": "Statistics",
       "description": "Aggregate usage counts"
+    },
+    {
+      "name": "React Role",
+      "description": "Reaction-based role self-assignment message"
     }
   ],
   "components": {
@@ -218,7 +222,7 @@
       },
       "EmojiFrequency": {
         "type": "object",
-        "description": "A resolved guild_emojis row — the shape every webapi response uses for an emoji or sticker, in place of a bare emoid. If the emoid has no matching guild_emojis row (deleted), only emoid is populated and the rest are null.",
+        "description": "A resolved guild_emojis row — the shape every webapi response uses for an emoji or sticker, in place of a bare emoid. Keyed on (app, id); `frequency`/`byApp` are the combined total across every app sharing this emoji's name (narrow via the request's `app` filter, where supported). No matching row → only emoid/app populated.",
         "properties": {
           "emoid": {
             "type": "string",
@@ -236,7 +240,22 @@
           "frequency": {
             "type": "integer",
             "nullable": true,
-            "description": "Global usage count for this emoid."
+            "description": "Usage count for this emoji's name, summed across every app (or just one app if the request's `app` filter narrowed it)."
+          },
+          "byApp": {
+            "type": "array",
+            "description": "Per-app breakdown behind `frequency`.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "app": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "integer"
+                }
+              }
+            }
           },
           "animated": {
             "type": "integer",
@@ -260,7 +279,7 @@
       },
       "ConfigEmojiValue": {
         "type": "object",
-        "description": "Resolved value of an \"emoji\"-typed config entry (pin_emoji, plusplus_emoji, minusminus_emoji, repost_emoji). If the stored value matches a synced guild_emojis row, this is that row (app is the real app name). If it's freeform text an admin typed by hand that was never synced, app/emoid are null and `emoji` holds the raw text — comparisons should fall back to matching that string (see emojisMatch).",
+        "description": "Resolved value of an \"emoji\"-typed config entry (pin_emoji, plusplus_emoji, minusminus_emoji, repost_emoji); frequency/byApp are the combined cross-app total for its display name. If it's freeform text never synced, app/emoid are null and `emoji` holds the raw text — comparisons fall back to matching that string (see emojisMatch).",
         "properties": {
           "emoid": {
             "type": "string",
@@ -277,6 +296,20 @@
           "frequency": {
             "type": "integer",
             "nullable": true
+          },
+          "byApp": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "app": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "integer"
+                }
+              }
+            }
           },
           "animated": {
             "type": "integer",
@@ -962,6 +995,99 @@
                       "enum": [
                         true
                       ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/user-mappings/{id}/primary-alias": {
+      "post": {
+        "operationId": "setUserMappingPrimaryAlias",
+        "tags": [
+          "User Mappings"
+        ],
+        "summary": "Set a user mapping's primary alias",
+        "description": "Requires the admin role. guildMemberId must already be linked to this mapping via member_aliases (link it first with POST /api/guild-members/{guildMemberId}/link).\n",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "guildMemberId"
+                ],
+                "properties": {
+                  "guildMemberId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated user mapping.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "userMapping": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "type": "string"
+                        },
+                        "app": {
+                          "type": "string"
+                        },
+                        "primaryGuildMemberId": {
+                          "type": "integer"
+                        }
+                      }
                     }
                   }
                 }
@@ -3959,6 +4085,19 @@
                             "type": "string",
                             "format": "date-time",
                             "nullable": true
+                          },
+                          "deliveryKind": {
+                            "type": "string",
+                            "enum": [
+                              "home",
+                              "foreign"
+                            ],
+                            "description": "scope=bot, due=true only. \"home\": this app owns the row, deliver to chat_channel_id and PUT status=sent. \"foreign\": another app owns it, but the requester has a linked account on this app too — deliver as a DM to targetPlatformUserId, then POST /:id/delivered."
+                          },
+                          "targetPlatformUserId": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "scope=bot, due=true only. Set when deliveryKind=\"foreign\" — the platform user id to DM on this app."
                           }
                         }
                       }
@@ -4721,6 +4860,538 @@
         }
       }
     },
+    "/api/scheduled-messages/{id}/delivered": {
+      "post": {
+        "operationId": "markScheduledMessageDeliveredCrossApp",
+        "tags": [
+          "Scheduled Messages"
+        ],
+        "summary": "Record a cross-app delivery of a scheduled message (bot only)",
+        "description": "`app` must be a different app than the one that owns the row, and the requester (the row's user_id) must have a member_aliases link on `app` — otherwise this 403s. Idempotent: calling twice for the same (id, app) is a no-op. Does not touch the row's own `status`/`sent_at`, which only the owning app's own mark-sent call affects.\n",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "fluxer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delivery recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "description": "Bot role required, or the requester has no linked account on `app`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Scheduled message not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/react-role": {
+      "get": {
+        "operationId": "getReactRoleMessage",
+        "tags": [
+          "React Role"
+        ],
+        "summary": "Get the react-for-role message config for one server",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "discord",
+                "fluxer"
+              ]
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The message config (null if this server hasn't configured one yet).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "message": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "app": {
+                          "type": "string"
+                        },
+                        "guildId": {
+                          "type": "string"
+                        },
+                        "channelId": {
+                          "type": "string"
+                        },
+                        "messageId": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "contentVersion": {
+                          "type": "integer"
+                        },
+                        "syncedVersion": {
+                          "type": "integer"
+                        },
+                        "pendingDelete": {
+                          "type": "boolean"
+                        },
+                        "bindings": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "emoji": {
+                                "type": "string"
+                              },
+                              "roleId": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string"
+                              },
+                              "sortOrder": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putReactRoleMessage",
+        "tags": [
+          "React Role"
+        ],
+        "summary": "Create or update the react-for-role message config for a server",
+        "description": "Requires the admin role. Rejects duplicate emoji or duplicate role entries.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "channelId",
+                  "title",
+                  "bindings"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord",
+                      "fluxer"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "channelId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "bindings": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "emoji",
+                        "roleId",
+                        "description"
+                      ],
+                      "properties": {
+                        "emoji": {
+                          "type": "string"
+                        },
+                        "roleId": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Saved message config.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "message": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteReactRoleMessage",
+        "tags": [
+          "React Role"
+        ],
+        "summary": "Delete the react-for-role message for a server",
+        "description": "Requires the admin role. Soft-deletes (flags pending_delete); the bot performs the actual live-message deletion and hard-deletes the row via confirm-delete.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord",
+                      "fluxer"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deletion requested (or already gone/unconfigured).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/react-role/synced": {
+      "post": {
+        "operationId": "markReactRoleSynced",
+        "tags": [
+          "React Role"
+        ],
+        "summary": "Record that the bot has synced the live message to the current content version",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "messageId",
+                  "channelId",
+                  "syncedVersion"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord",
+                      "fluxer"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "channelId": {
+                    "type": "string"
+                  },
+                  "syncedVersion": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/react-role/confirm-delete": {
+      "post": {
+        "operationId": "confirmReactRoleDelete",
+        "tags": [
+          "React Role"
+        ],
+        "summary": "Confirm the live react-for-role message has been removed",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord",
+                      "fluxer"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Confirmed (or already gone).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/pin-quips": {
       "get": {
         "operationId": "listPinQuips",
@@ -5099,6 +5770,15 @@
             }
           },
           {
+            "name": "app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Scope to one chat app's pins (e.g. discord, fluxer). Omit to list every app's pins (current/legacy behavior)."
+          },
+          {
             "name": "guildId",
             "in": "query",
             "required": false,
@@ -5129,6 +5809,10 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "app": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "msgid": {
                             "type": "string"
@@ -5225,6 +5909,15 @@
             }
           },
           {
+            "name": "app",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Scope to one chat app's unhydrated pins — lets a bot's hydration loop skip other platforms' rows. Omit to list every app's (current/legacy behavior)."
+          },
+          {
             "name": "guildId",
             "in": "query",
             "required": false,
@@ -5255,6 +5948,10 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "app": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "msgid": {
                             "type": "string"
@@ -5359,6 +6056,10 @@
                       "properties": {
                         "id": {
                           "type": "integer"
+                        },
+                        "app": {
+                          "type": "string",
+                          "nullable": true
                         },
                         "msgid": {
                           "type": "string"
@@ -5524,6 +6225,10 @@
                       "properties": {
                         "id": {
                           "type": "integer"
+                        },
+                        "app": {
+                          "type": "string",
+                          "nullable": true
                         },
                         "msgid": {
                           "type": "string"
@@ -6650,104 +7355,6 @@
         }
       }
     },
-    "/api/message-processing/emoji-frequency-sync": {
-      "post": {
-        "operationId": "syncEmojiFrequency",
-        "tags": [
-          "Message Processing"
-        ],
-        "summary": "Sync guild_emojis frequency/rows from emoji_frequency for one guild",
-        "description": "Deletes guild_emojis rows whose guild_id belongs to a different guild (app matches, but guild_id doesn't), then for every emoji_frequency row belonging to (app, guildId) — emoji and sticker alike, per emoji_frequency.type (NULL = emoji) — copies its frequency into the matching guild_emojis row (keyed on id), inserting one if it doesn't exist yet using only what emoji_frequency has (name falls back to the id). dryRun:true previews the same counts (deleted/inserted/updated) without writing anything.\n",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "app",
-                  "guildId"
-                ],
-                "properties": {
-                  "app": {
-                    "type": "string",
-                    "enum": [
-                      "discord",
-                      "fluxer"
-                    ]
-                  },
-                  "guildId": {
-                    "type": "string"
-                  },
-                  "dryRun": {
-                    "type": "boolean",
-                    "default": false
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Sync complete (or previewed, if dryRun).",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "dryRun": {
-                      "type": "boolean"
-                    },
-                    "deleted": {
-                      "type": "integer",
-                      "description": "guild_emojis rows removed (misattributed to another guild)."
-                    },
-                    "inserted": {
-                      "type": "integer",
-                      "description": "guild_emojis rows newly created from emoji_frequency."
-                    },
-                    "updated": {
-                      "type": "integer",
-                      "description": "Existing guild_emojis rows whose frequency was copied over."
-                    },
-                    "synced": {
-                      "type": "integer",
-                      "description": "inserted + updated."
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Missing/invalid app or guildId.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/ForbiddenBotOrAdmin"
-          },
-          "500": {
-            "$ref": "#/components/responses/ServerError"
-          }
-        }
-      }
-    },
     "/api/message-processing/sticker-import": {
       "post": {
         "operationId": "importStickers",
@@ -6846,6 +7453,7 @@
           "Message Processing"
         ],
         "summary": "Check whether a message is already logged as pinned",
+        "description": "Scoped to app + messageId: message ids are only unique within their own platform, so app disambiguates a messageId that could otherwise collide across platforms.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -6853,12 +7461,20 @@
               "schema": {
                 "type": "object",
                 "required": [
+                  "app",
                   "messageId"
                 ],
                 "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord",
+                      "fluxer"
+                    ]
+                  },
                   "messageId": {
                     "type": "string",
-                    "description": "Discord message snowflake."
+                    "description": "Platform message snowflake."
                   }
                 }
               }
@@ -6877,6 +7493,16 @@
                       "type": "boolean"
                     }
                   }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "app missing/unsupported.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -8085,6 +8711,10 @@
                   "guildId": {
                     "type": "string",
                     "description": "Scope to one guild/community. Omit to mix every guild's emoji into one pool (current/legacy behavior)."
+                  },
+                  "app": {
+                    "type": "string",
+                    "description": "Scope to one app's own usage only (listed rows and displayed totals alike). Omit for the combined cross-app total per emoji."
                   }
                 }
               }
@@ -8130,6 +8760,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -8272,6 +8905,10 @@
                   "guildId": {
                     "type": "string",
                     "description": "Scope to one guild/community. Omit to mix every guild's stickers into one pool (current/legacy behavior)."
+                  },
+                  "app": {
+                    "type": "string",
+                    "description": "Scope to one app's own usage only (listed rows and displayed totals alike). Omit for the combined cross-app total per sticker."
                   }
                 }
               }
@@ -8317,6 +8954,9 @@
                 }
               }
             }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
@@ -9321,11 +9961,92 @@
                     },
                     "imported": {
                       "type": "integer",
-                      "description": "Every row upserted."
+                      "description": "Every row upserted (inserted + updated)."
+                    },
+                    "inserted": {
+                      "type": "integer",
+                      "description": "Subset of imported that were brand-new rows, not updates to an existing (app, guildId, platformUserId)."
                     },
                     "skipped": {
                       "type": "integer",
                       "description": "Entries dropped because they had no platformUserId at all (malformed input)."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-members/register-self": {
+      "post": {
+        "operationId": "registerBotSelf",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "Register the calling bot's own account into guild_members/member_aliases",
+        "description": "Normal roster sync (POST /api/guild-members/sync) excludes bot accounts entirely — this is the only path that creates a guild_members row for a bot's own platform account. Every client (discord-bot, fluxer-bot, ...) calls this once at its own startup with its own platform user id; all of them alias to the single shared chat_member_mapping identity named after BOT_USERNAME, created on first use. Idempotent — safe to call on every restart.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "platformUserId"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "discord"
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "platformUserId": {
+                    "type": "string"
+                  },
+                  "handle": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Registered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "chatMemberMappingId": {
+                      "type": "integer",
+                      "description": "The shared bot identity's chat_member_mapping.id."
                     }
                   }
                 }
@@ -10072,7 +10793,7 @@
           "Guild Members"
         ],
         "summary": "Request an account link (link-accounts command)",
-        "description": "Sets pending_link on every guild_members row for targetUserId outside the requester's server, pointing at the requester's guild_members row.\n",
+        "description": "Creates a pending_account_links row keyed on a fresh one-time token, replacing any earlier pending request from the same requester. The token must be handed to confirm-link (as its own command/message, out of band) on the account to link to.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -10082,8 +10803,7 @@
                 "required": [
                   "app",
                   "guildId",
-                  "requesterUserId",
-                  "targetUserId"
+                  "requesterUserId"
                 ],
                 "properties": {
                   "app": {
@@ -10094,9 +10814,6 @@
                     "type": "string"
                   },
                   "requesterUserId": {
-                    "type": "string"
-                  },
-                  "targetUserId": {
                     "type": "string"
                   }
                 }
@@ -10118,8 +10835,8 @@
                         true
                       ]
                     },
-                    "flagged": {
-                      "type": "integer"
+                    "token": {
+                      "type": "string"
                     }
                   }
                 }
@@ -10148,7 +10865,7 @@
           "Guild Members"
         ],
         "summary": "Confirm a pending account link (confirm-link command)",
-        "description": "Fails without changes if the confirmer has no pending request, zero or multiple chat_member_mapping identities, or the requester's row is already linked.\n",
+        "description": "Fails without changes for an unknown/expired token, a self-link attempt, or if the confirmer is already linked to an identity.\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -10158,7 +10875,8 @@
                 "required": [
                   "app",
                   "guildId",
-                  "userId"
+                  "userId",
+                  "token"
                 ],
                 "properties": {
                   "app": {
@@ -10169,6 +10887,9 @@
                     "type": "string"
                   },
                   "userId": {
+                    "type": "string"
+                  },
+                  "token": {
                     "type": "string"
                   }
                 }
@@ -10299,6 +11020,11 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "app": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Platform that cast the vote. Not filtered by the `app` query param — see summary."
                           },
                           "type": {
                             "type": "string"
@@ -10432,6 +11158,11 @@
                         "properties": {
                           "id": {
                             "type": "integer"
+                          },
+                          "app": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Platform the accusation was recorded on. Not filtered by the `app` query param — see summary."
                           },
                           "msgid": {
                             "type": "string"

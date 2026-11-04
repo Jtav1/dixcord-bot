@@ -43,6 +43,7 @@ const definition = {
     { name: "Events", description: "Raw plusplus/repost/sticker event log" },
     { name: "Audit Log", description: "Admin action audit trail" },
     { name: "Statistics", description: "Aggregate usage counts" },
+    { name: "React Role", description: "Reaction-based role self-assignment message" },
   ],
   components: {
     securitySchemes: {

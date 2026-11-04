@@ -70,6 +70,7 @@ import { useRoute, useRouter } from "vue-router";
 import ConfigSettingsForm from "../components/ConfigSettingsForm.vue";
 import { fetchConfigEntries } from "../lib/config.js";
 import { fetchGuildSnapshot } from "../lib/guild.js";
+import { appForClientKey } from "../nav/clients.js";
 import { invalidateConfigCache } from "../lib/systemStatus.js";
 import { testFortune, testLinkFixer } from "../lib/botResponses.js";
 import { useSnackbar } from "../composables/useSnackbar.js";
@@ -121,7 +122,8 @@ async function loadConfig() {
   loading.value = true;
   error.value = "";
   try {
-    const snapshot = await fetchGuildSnapshot("discord", guildScope);
+    const [, clientKey] = route.path.split("/");
+    const snapshot = await fetchGuildSnapshot(appForClientKey(clientKey), guildScope);
     currentApp.value = snapshot.guild.app;
     currentGuildId.value = snapshot.guild.guildId;
     channels.value = snapshot.channels;

@@ -26,6 +26,8 @@ import { timeoutMember } from "../../../utilities/timeoutMember.js";
 import { findPinReaction } from "../../connection/utilities/pinHistoryHydration.js";
 import { doplus, dominus } from "./plusplus.js";
 import { getRandomPinQuip, messagePinner } from "./messagePinner.js";
+import { isReactForRoleEnabled } from "../../../configStore.js";
+import { getCachedReactRoleMessage, toComparableEmoji } from "../../../api/reactRoleSync.js";
 
 /**
  * Core reaction-handling logic, shared by the single-reaction and batched-add event wiring.
@@ -48,7 +50,110 @@ export function buildReactionOptions() {
     emojiTrackingEnabled: isEmojiTrackingEnabled(),
     repostDetectionEnabled: isRepostDetectionEnabled(),
     timeoutVoteEnabled: isTimeoutVoteEnabled(),
+    reactForRoleEnabled: isReactForRoleEnabled(),
   };
+}
+
+/**
+ * Find the live react-for-role message's bindings if this reaction's message is it.
+ * @param {string} messageId
+ * @param {boolean} reactForRoleEnabled
+ * @returns {object|null} The cached message (with bindings), or null if not applicable.
+ */
+function resolveReactRoleMessage(messageId, reactForRoleEnabled) {
+  if (!reactForRoleEnabled) return null;
+  const cached = getCachedReactRoleMessage();
+  if (!cached || cached.messageId !== messageId) return null;
+  return cached;
+}
+
+/**
+ * Resolve the reacting/removing member, preferring the gateway-provided member over a fetch.
+ * @param {ReactionCtx} ctx
+ * @returns {Promise<import('@fluxerjs/core').GuildMember|null>}
+ */
+async function resolveReactingMember(ctx) {
+  if (ctx.member) return ctx.member;
+  const guild = ctx.guildId ? await ctx.client.guilds.resolve(ctx.guildId).catch(() => null) : null;
+  return guild ? await guild.members.resolve(ctx.userId).catch(() => null) : null;
+}
+
+/**
+ * `.manageable` is cache-only (needs guild.members.me); fetch it if nothing has yet, same fix
+ * applied in utilities/timeoutMember.js for `.moderatable`.
+ * @param {import('@fluxerjs/core').GuildMember} member
+ * @returns {Promise<boolean>}
+ */
+async function isManageable(member) {
+  if (!member.guild.members.me) {
+    await member.guild.members.fetchMe().catch(() => null);
+  }
+  return Boolean(member.manageable);
+}
+
+/**
+ * On add: grant the bound role (no-op if already held), or remove the reaction if its emoji
+ * isn't in the bindings list. Permission/hierarchy failures are logged and swallowed.
+ * @param {ReactionCtx} ctx
+ * @param {object} reactRoleMessage
+ */
+async function handleRoleReactAdd(ctx, reactRoleMessage) {
+  const binding = reactRoleMessage.bindings.find((b) =>
+    emojisMatch(toEmojiObject(ctx.emoji), toComparableEmoji(b.emoji)),
+  );
+  if (!binding) {
+    try {
+      await ctx.message.removeReaction(ctx.emoji, ctx.userId);
+    } catch (err) {
+      console.error(
+        `bot: failed to remove unlisted react-role reaction on message ${ctx.message.id} from user ${ctx.userId}: ${err.message}`,
+      );
+    }
+    return;
+  }
+
+  const member = await resolveReactingMember(ctx);
+  if (!member) return;
+  if (member.roles.has(binding.roleId)) return;
+  if (!(await isManageable(member))) {
+    console.error(
+      `bot: cannot grant react-role ${binding.roleId} to ${member.id}: not manageable (missing permissions or role hierarchy)`,
+    );
+    return;
+  }
+  try {
+    await member.roles.add(binding.roleId);
+  } catch (err) {
+    console.error(`bot: failed to add react-role ${binding.roleId} to ${member.id}: ${err.message}`);
+  }
+}
+
+/**
+ * On remove: revoke the bound role (no-op if already lacking it). Permission/hierarchy failures
+ * are logged and swallowed. Nothing to do for an unlisted emoji (the bot already strips those on add).
+ * @param {ReactionCtx} ctx
+ * @param {object} reactRoleMessage
+ */
+async function handleRoleReactRemove(ctx, reactRoleMessage) {
+  const binding = reactRoleMessage.bindings.find((b) =>
+    emojisMatch(toEmojiObject(ctx.emoji), toComparableEmoji(b.emoji)),
+  );
+  if (!binding) return;
+
+  const member = await resolveReactingMember(ctx);
+  if (!member) return;
+  if (!member.roles.has(binding.roleId)) return;
+  if (!(await isManageable(member))) {
+    console.error(
+      `bot: cannot revoke react-role ${binding.roleId} from ${member.id}: not manageable (missing permissions or role hierarchy)`,
+    );
+    return;
+  }
+  try {
+    await member.roles.remove(binding.roleId);
+  } catch (err) {
+    console.error(`bot: failed to remove react-role ${binding.roleId} from ${member.id}: ${err.message}`);
+  }
 }
 
 /**
@@ -179,6 +284,14 @@ export async function handleReactionAdd(ctx, options) {
 
   const isSelfReaction = ctx.userId === ctx.message.author.id;
 
+  // The react-for-role message is exclusively for role self-assignment — if this reaction is on
+  // it, handle role granting (or strip an unlisted reaction) and skip pin/plus/etc classification.
+  const reactRoleMessage = resolveReactRoleMessage(ctx.message.id, options.reactForRoleEnabled);
+  if (reactRoleMessage) {
+    await handleRoleReactAdd(ctx, reactRoleMessage);
+    return;
+  }
+
   await handlePinCheck(ctx, options);
 
   const kind = classifyReactionEmoji(ctx.emoji, options);
@@ -248,6 +361,12 @@ export async function handleReactionRemove(ctx, options) {
   incrementCounter("reactionsProcessedTotal");
 
   const isSelfReaction = ctx.userId === ctx.message.author.id;
+
+  const reactRoleMessage = resolveReactRoleMessage(ctx.message.id, options.reactForRoleEnabled);
+  if (reactRoleMessage) {
+    await handleRoleReactRemove(ctx, reactRoleMessage);
+    return;
+  }
 
   // pinEmoji intentionally omitted: a pin can't be reversed by removing a reaction.
   const kind = classifyReactionEmoji(ctx.emoji, { ...options, pinEmoji: null });
