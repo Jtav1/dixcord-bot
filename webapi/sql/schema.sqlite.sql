@@ -308,6 +308,8 @@ CREATE TABLE IF NOT EXISTS guild_members (
   roles TEXT NULL,
   joined_at TEXT NULL,
   synced_at TEXT DEFAULT (datetime('now')),
+  color_role_name TEXT NULL,
+  color_hex TEXT NULL,
   UNIQUE (app, guild_id, platform_user_id)
 );
 

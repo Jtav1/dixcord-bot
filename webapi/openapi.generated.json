@@ -11114,6 +11114,232 @@
         }
       }
     },
+    "/api/guild-members/color-role": {
+      "get": {
+        "operationId": "getColorRole",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "Get a member's color role record",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "fluxer"
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "platformUserId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The record, or null if the member has no color role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "colorRole": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "example": "dixbot-a1b2c"
+                        },
+                        "hex": {
+                          "type": "string",
+                          "example": "FF8800"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "put": {
+        "operationId": "setColorRole",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "Record a member's color role (color-me command)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "platformUserId",
+                  "name",
+                  "hex"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "fluxer"
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "platformUserId": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Role name, dixbot- plus 5 lowercase alphanumerics.",
+                    "example": "dixbot-a1b2c"
+                  },
+                  "hex": {
+                    "type": "string",
+                    "description": "6 uppercase hex digits, no leading #.",
+                    "example": "FF8800"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "clearColorRole",
+        "tags": [
+          "Guild Members"
+        ],
+        "summary": "Clear a member's color role record",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "platformUserId"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "fluxer"
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "platformUserId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cleared (or nothing to clear).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/guild-members/link-request": {
       "post": {
         "operationId": "requestAccountLink",

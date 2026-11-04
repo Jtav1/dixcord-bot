@@ -312,6 +312,8 @@ CREATE TABLE IF NOT EXISTS guild_members (
   roles TEXT NULL,
   joined_at DATETIME NULL,
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  color_role_name VARCHAR(32) NULL,
+  color_hex CHAR(6) NULL,
   UNIQUE KEY uniq_guild_members_app_guild_platform (app, guild_id, platform_user_id),
   KEY idx_guild_members_app_guild (app, guild_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

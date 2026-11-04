@@ -166,3 +166,45 @@ export function confirmAccountLink(userId, token) {
     token,
   });
 }
+
+/**
+ * A member's bot-created color role record (!color-me). GET /api/guild-members/color-role.
+ * @param {string} platformUserId
+ * @returns {Promise<{ name: string, hex: string }|null>}
+ */
+export async function getColorRole(platformUserId) {
+  const { data } = await api.get("/api/guild-members/color-role", {
+    params: { app: "fluxer", guildId, platformUserId },
+  });
+  if (!data?.ok) throw new Error(data?.error || "Failed to load color role");
+  return data.colorRole ?? null;
+}
+
+/**
+ * Record a member's color role. PUT /api/guild-members/color-role.
+ * @param {string} platformUserId
+ * @param {{ name: string, hex: string }} colorRole
+ * @returns {Promise<void>}
+ */
+export async function setColorRole(platformUserId, { name, hex }) {
+  const { data } = await api.put("/api/guild-members/color-role", {
+    app: "fluxer",
+    guildId,
+    platformUserId,
+    name,
+    hex,
+  });
+  if (!data?.ok) throw new Error(data?.error || "Failed to save color role");
+}
+
+/**
+ * Clear a member's color role record. DELETE /api/guild-members/color-role. Idempotent.
+ * @param {string} platformUserId
+ * @returns {Promise<void>}
+ */
+export async function clearColorRole(platformUserId) {
+  const { data } = await api.del("/api/guild-members/color-role", {
+    data: { app: "fluxer", guildId, platformUserId },
+  });
+  if (!data?.ok) throw new Error(data?.error || "Failed to clear color role");
+}

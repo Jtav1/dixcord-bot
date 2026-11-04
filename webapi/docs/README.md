@@ -167,6 +167,9 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/guild-members/register-self` | ✓ | Register the calling bot client's own platform account into guild_members, aliased to the shared bot identity (body: `{ app, guildId, platformUserId, handle? }`); normal sync excludes bot accounts, this is the only path that creates one |
 | POST | `/api/guild-members/link-request` | bot/admin | User-initiated: generate a one-time link token for the requester, snapshotting their existing identity if they have one (body: `{ app, guildId, requesterUserId }`) |
 | POST | `/api/guild-members/link-confirm` | bot/admin | Confirm a pending link by token: confirmer's row becomes an alias of the requester's identity, creating one if the requester didn't have one yet (body: `{ app, guildId, userId, token }`) |
+| GET | `/api/guild-members/color-role?app=&guildId=&platformUserId=` | bot/admin | A member's bot-created color role (`colorRole: { name, hex }` or `null`) for the fluxer `!color-me` command |
+| PUT | `/api/guild-members/color-role` | bot/admin | Record a member's color role (body: `{ app, guildId, platformUserId, name, hex }`; name `dixbot-` + 5 lowercase alphanumerics, hex 6 uppercase digits); creates a minimal row if the member isn't synced yet; roster sync never overwrites it |
+| DELETE | `/api/guild-members/color-role` | bot/admin | Clear a member's color role record (body: `{ app, guildId, platformUserId }`); idempotent |
 | GET | `/api/events/plusplus` | ✓ | Raw plusplus events |
 | GET | `/api/events/reposts` | ✓ | Raw repost events |
 | GET | `/api/audit-log` | admin | Audit log |
