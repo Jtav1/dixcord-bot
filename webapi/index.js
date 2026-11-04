@@ -32,6 +32,7 @@ import statisticsRoutes from "./routes/statistics.js";
 import guildRoutes from "./routes/guild.js";
 import guildMembersRoutes from "./routes/guild-members.js";
 import serviceAccountsRoutes from "./routes/service-accounts.js";
+import reactRoleRoutes from "./routes/react-role.js";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -475,6 +476,16 @@ app.get("/", publicLimiter, (req, res) => {
           "Other plusplus/emoji/repost routes",
         ],
       },
+      reactRole: {
+        authRequired: true,
+        routes: [
+          "GET /api/react-role?app=&guildId=",
+          "PUT /api/react-role (admin)",
+          "DELETE /api/react-role (admin)",
+          "POST /api/react-role/synced (bot)",
+          "POST /api/react-role/confirm-delete (bot)",
+        ],
+      },
     },
     auth: "Use header: Authorization: Bearer <token>",
   });
@@ -612,6 +623,7 @@ app.use("/api/statistics", statisticsRoutes);
 app.use("/api/guild", guildRoutes);
 app.use("/api/guild-members", guildMembersRoutes);
 app.use("/api/service-accounts", serviceAccountsRoutes);
+app.use("/api/react-role", reactRoleRoutes);
 
 app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 

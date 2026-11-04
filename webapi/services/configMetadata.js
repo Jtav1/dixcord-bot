@@ -173,6 +173,13 @@ export const CONFIG_METADATA = Object.freeze({
     requiresBotRestart: false,
     defaultValue: envDefault("timeout_vote_triple_role_id", ""),
   },
+  react_for_role_enabled: {
+    description:
+      "Enable React-For-Role: reaction-based role self-assignment and message sync (see /api/react-role)",
+    type: "boolean",
+    requiresBotRestart: false,
+    defaultValue: envDefault("react_for_role_enabled", "false"),
+  },
 });
 
 const CONFIG_KEY_ORDER = Object.keys(CONFIG_METADATA);

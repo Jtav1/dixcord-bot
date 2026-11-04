@@ -25,11 +25,13 @@ import {
   isEmojiTrackingEnabled,
   isRepostDetectionEnabled,
   isTimeoutVoteEnabled,
+  isReactForRoleEnabled,
 } from "./configStore.js";
 import { startCacheVersionPoller } from "./api/cacheRefresh.js";
 import { startHeartbeat } from "./api/system.js";
 import { startGuildInfoSync } from "./api/guildInfo.js";
 import { registerBotSelf, startGuildMembersSync } from "./api/guildMembers.js";
+import { startReactRoleSync } from "./api/reactRoleSync.js";
 import { startMessageScheduler } from "./scheduler/messageScheduler.js";
 import {
   handleReactionAdd,
@@ -154,6 +156,7 @@ client.once(Events.ClientReady, async (readyClient) => {
   startHeartbeat(readyClient, readyClient.readyAt);
   startGuildInfoSync(readyClient);
   startGuildMembersSync(readyClient);
+  startReactRoleSync(readyClient);
   await registerBotSelf(readyClient).catch((err) => {
     console.error("bot: failed to register bot's own account:", err);
   });
@@ -182,6 +185,7 @@ client.on(
         emojiTrackingEnabled: isEmojiTrackingEnabled(),
         repostDetectionEnabled: isRepostDetectionEnabled(),
         timeoutVoteEnabled: isTimeoutVoteEnabled(),
+        reactForRoleEnabled: isReactForRoleEnabled(),
       });
     }
   }),
@@ -198,6 +202,7 @@ client.on(
       plusPlusEnabled: isPlusPlusEnabled(),
       repostDetectionEnabled: isRepostDetectionEnabled(),
       timeoutVoteEnabled: isTimeoutVoteEnabled(),
+      reactForRoleEnabled: isReactForRoleEnabled(),
     });
   }),
 );

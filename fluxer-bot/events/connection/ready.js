@@ -8,6 +8,7 @@ import { startCacheVersionPoller } from "../../api/cacheRefresh.js";
 import { startMessageScheduler } from "../../scheduler/messageScheduler.js";
 import { startHeartbeat } from "../../api/system.js";
 import { startGuildInfoSync } from "../../api/guildInfo.js";
+import { startReactRoleSync } from "../../api/reactRoleSync.js";
 import { importEmojiList } from "../../api/emojis.js";
 import { importStickerList } from "../../api/stickers.js";
 import { hydratePinHistory } from "./utilities/pinHistoryHydration.js";
@@ -80,6 +81,7 @@ const execute = async () => {
       startMessageScheduler();
       startHeartbeat(client.readyAt);
       startGuildInfoSync();
+      startReactRoleSync();
       await registerBotSelf().catch((err) => {
         console.error("bot: failed to register bot's own account:", err);
       });

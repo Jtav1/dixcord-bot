@@ -14,6 +14,7 @@ import ActivityView from "../views/ActivityView.vue";
 import MilestonesView from "../views/MilestonesView.vue";
 import PinArchiveAdminView from "../views/PinArchiveAdminView.vue";
 import AuditLogView from "../views/AuditLogView.vue";
+import ReactForRoleView from "../views/ReactForRoleView.vue";
 
 /** Feature key -> component, filled in as each phase's view is built. */
 const FEATURE_COMPONENTS = {
@@ -30,6 +31,7 @@ const FEATURE_COMPONENTS = {
   milestones: MilestonesView,
   "pin-archive": PinArchiveAdminView,
   "audit-log": AuditLogView,
+  "react-for-role": ReactForRoleView,
 };
 
 const firstClient = CLIENTS[0];
