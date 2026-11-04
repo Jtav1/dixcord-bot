@@ -1,13 +1,13 @@
 /**
- * React-for-role reconciliation: polls webapi for this guild's desired message state and makes
+ * React-for-role reconciliation: polls webapi for this guild's desired message states and makes
  * the live Discord message match it (post, edit in place, or delete), then reports success back.
- * Also caches the last-fetched message/bindings for reactionHandler.js to consult without its
- * own webapi round-trip per reaction.
+ * Also caches the last-fetched messages/bindings (by live message id) for reactionHandler.js to
+ * consult without its own webapi round-trip per reaction.
  */
 
 import { EmbedBuilder } from "discord.js";
 import {
-  getReactRoleMessage,
+  listReactRoleMessages,
   markReactRoleSynced,
   reportReactRoleSyncFailed,
   confirmReactRoleDelete,
@@ -24,18 +24,19 @@ const SYNC_INTERVAL_MS = 3_000;
 /** Discord's "Unknown Message" API error code. */
 const UNKNOWN_MESSAGE_CODE = 10008;
 
-/** @type {object|null} Last-fetched message+bindings (API shape), for reactionHandler.js. */
-let cachedMessage = null;
+/** @type {Map<string, object>} Last-fetched messages+bindings (API shape) by live message id, for reactionHandler.js. */
+let cachedMessages = new Map();
+
+/**
+ * @param {string} messageId Live platform message id.
+ * @returns {object|null} The cached react-for-role message for it (null if it isn't one).
+ */
+export function getCachedReactRoleMessage(messageId) {
+  return cachedMessages.get(messageId) ?? null;
+}
 
 /** @type {import("discord.js").Client|null} */
 let syncClient = null;
-
-/**
- * @returns {object|null} The cached react-for-role message (null if unconfigured or not yet polled).
- */
-export function getCachedReactRoleMessage() {
-  return cachedMessage;
-}
 
 /**
  * Convert a binding's stored raw emoji value into an object comparable via emojiCompare.js's
@@ -160,7 +161,7 @@ async function handleDelete(client, message) {
       }
     }
   }
-  await confirmReactRoleDelete();
+  await confirmReactRoleDelete(message.id);
 }
 
 /**
@@ -171,7 +172,7 @@ async function handleDelete(client, message) {
  * here by falling through to a fresh post, not thrown.
  * @param {import("discord.js").Client} client
  * @param {object} message
- * @returns {Promise<void>}
+ * @returns {Promise<string>} The live message's id (new if it had to be reposted).
  */
 async function handlePostOrEdit(client, message) {
   const guild = client.guilds.cache.get(guildId);
@@ -187,12 +188,12 @@ async function handlePostOrEdit(client, message) {
       const liveMessage = await channel.messages.fetch(message.messageId);
       await liveMessage.edit({ embeds: [embed] });
       await syncBotReactions(liveMessage, message.bindings);
-      await markReactRoleSynced({
+      await markReactRoleSynced(message.id, {
         messageId: message.messageId,
         channelId: message.channelId,
         syncedVersion: message.contentVersion,
       });
-      return;
+      return message.messageId;
     } catch (err) {
       if (!isUnknownMessageError(err)) throw err;
       // Live message was manually deleted — fall through to repost fresh.
@@ -201,26 +202,24 @@ async function handlePostOrEdit(client, message) {
 
   const posted = await channel.send({ embeds: [embed] });
   await syncBotReactions(posted, message.bindings);
-  await markReactRoleSynced({
+  await markReactRoleSynced(message.id, {
     messageId: posted.id,
     channelId: message.channelId,
     syncedVersion: message.contentVersion,
   });
+  return posted.id;
 }
 
 /**
- * One reconciliation pass: refresh the cache, then act on pending delete or an out-of-sync edit.
- * pending_delete is checked before the enabled flag, so a delete already in flight completes
- * even if the feature gets disabled mid-flight. A post/edit failure is reported to webapi (so
- * the admin panel can surface it) rather than left to fail silently until the next tick retries.
+ * Reconcile one message: act on pending delete or an out-of-sync edit. pending_delete is checked
+ * before the enabled flag, so a delete already in flight completes even if the feature gets
+ * disabled mid-flight. A post/edit failure is reported to webapi (so the admin panel can surface
+ * it) rather than left to fail silently until the next tick retries.
  * @param {import("discord.js").Client} client
+ * @param {object} message
  * @returns {Promise<void>}
  */
-async function tick(client) {
-  const message = await getReactRoleMessage();
-  cachedMessage = message;
-  if (!message) return;
-
+async function reconcileMessage(client, message) {
   if (message.pendingDelete) {
     await handleDelete(client, message);
     return;
@@ -229,15 +228,39 @@ async function tick(client) {
   if (message.contentVersion === message.syncedVersion) return;
 
   try {
-    await handlePostOrEdit(client, message);
+    const liveId = await handlePostOrEdit(client, message);
+    // Serve reactions on a fresh post/edit right away rather than waiting for the next tick.
+    if (message.messageId && message.messageId !== liveId) cachedMessages.delete(message.messageId);
+    cachedMessages.set(liveId, { ...message, messageId: liveId, syncedVersion: message.contentVersion });
   } catch (err) {
-    console.error("bot: react-role post/edit failed:", err);
-    await reportReactRoleSyncFailed({
+    console.error(`bot: react-role post/edit failed (message ${message.id}):`, err);
+    await reportReactRoleSyncFailed(message.id, {
       contentVersion: message.contentVersion,
       error: err?.message || String(err),
     }).catch((reportErr) => {
       console.error("bot: failed to report react-role sync failure:", reportErr);
     });
+  }
+}
+
+/**
+ * One reconciliation pass: refresh the cache, then reconcile each message independently so one
+ * failing post can't block the others.
+ * @param {import("discord.js").Client} client
+ * @returns {Promise<void>}
+ */
+async function tick(client) {
+  const messages = await listReactRoleMessages();
+  cachedMessages = new Map(
+    messages.filter((m) => m.messageId).map((m) => [m.messageId, m]),
+  );
+
+  for (const message of messages) {
+    try {
+      await reconcileMessage(client, message);
+    } catch (err) {
+      console.error(`bot: react-role sync error (message ${message.id}):`, err);
+    }
   }
 }
 
@@ -248,11 +271,16 @@ async function tick(client) {
  */
 export function startReactRoleSync(client) {
   syncClient = client;
+  let running = false;
   const run = async () => {
+    if (running) return; // a multi-message pass can outlast the interval
+    running = true;
     try {
       await tick(syncClient);
     } catch (err) {
       console.error("bot: react-role sync error:", err);
+    } finally {
+      running = false;
     }
   };
   run();

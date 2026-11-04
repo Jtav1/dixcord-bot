@@ -20,9 +20,7 @@ import { getCachedReactRoleMessage, toComparableEmoji } from "../../../api/react
  */
 function resolveReactRoleMessage(messageId, reactForRoleEnabled) {
   if (!reactForRoleEnabled) return null;
-  const cached = getCachedReactRoleMessage();
-  if (!cached || cached.messageId !== messageId) return null;
-  return cached;
+  return getCachedReactRoleMessage(messageId);
 }
 
 /**

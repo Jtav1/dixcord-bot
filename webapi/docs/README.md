@@ -174,12 +174,14 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/service-accounts?role=&guildId=` | admin | List service accounts |
 | POST | `/api/service-accounts` | admin | Create a bot/webview account (body: `{ email, password, name, role, guildId? }`) |
 | DELETE | `/api/service-accounts/:id` | admin | Delete a bot/webview account |
-| GET | `/api/react-role?app=&guildId=` | ✓ | React-for-role message config for one server (`message: null` if unconfigured) |
-| PUT | `/api/react-role` | admin | Create/update (body: `{ app, guildId, channelId, title, description?, bindings: [{emoji, roleId, description}] }`); rejects duplicate emoji or duplicate role |
-| DELETE | `/api/react-role` | admin | Soft-delete (body: `{ app, guildId }`); bot removes the live message, then hard-deletes via confirm-delete |
-| POST | `/api/react-role/synced` | bot | Bot reports a successful post/edit (body: `{ app, guildId, messageId, channelId, syncedVersion }`) |
-| POST | `/api/react-role/sync-failed` | bot | Bot reports a failed post/edit for a content version (body: `{ app, guildId, contentVersion, error }`), surfaced to the admin panel via GET's `lastSyncError`/`lastSyncErrorVersion` |
-| POST | `/api/react-role/confirm-delete` | bot | Bot confirms the live message is gone (body: `{ app, guildId }`); hard-deletes the row |
+| GET | `/api/react-role?app=&guildId=` | ✓ | List the server's react-for-role messages (`messages: [...]`, up to 10 per server) |
+| GET | `/api/react-role/:id?app=&guildId=` | ✓ | One message (404 if not in that server) |
+| POST | `/api/react-role` | admin | Create (body: `{ app, guildId, channelId, title, description?, bindings: [{emoji, roleId, description}] }`); rejects duplicate emoji or duplicate role, and the 11th message for a server |
+| PUT | `/api/react-role/:id` | admin | Update (same body); bumps `contentVersion` so the bot re-syncs |
+| DELETE | `/api/react-role/:id` | admin | Soft-delete (body: `{ app, guildId }`); bot removes the live message, then hard-deletes via confirm-delete |
+| POST | `/api/react-role/:id/synced` | bot | Bot reports a successful post/edit (body: `{ app, guildId, messageId, channelId, syncedVersion }`) |
+| POST | `/api/react-role/:id/sync-failed` | bot | Bot reports a failed post/edit for a content version (body: `{ app, guildId, contentVersion, error }`), surfaced to the admin panel via GET's `lastSyncError`/`lastSyncErrorVersion` |
+| POST | `/api/react-role/:id/confirm-delete` | bot | Bot confirms the live message is gone (body: `{ app, guildId }`); hard-deletes the row |
 
 See [admin-backend-api.md](admin-backend-api.md) for full admin route documentation.
 

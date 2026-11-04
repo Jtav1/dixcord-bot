@@ -2238,7 +2238,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: plusplus_tracking.app column already exists");
   }
 
-  // react_role_messages: the one live reaction-role message per (app, guild_id).
+  // react_role_messages: live reaction-role messages, any number per (app, guild_id).
   if (!(await tableExists(db, "react_role_messages", isSqlite))) {
     if (isSqlite) {
       await db.query(`
@@ -2257,9 +2257,12 @@ export async function ensureSchemaMigrations() {
           last_sync_error_version INTEGER NULL,
           created_at TEXT DEFAULT (datetime('now')),
           updated_at TEXT DEFAULT (datetime('now')),
-          UNIQUE (app, guild_id)
+          UNIQUE (app, message_id)
         )
       `);
+      await db.query(
+        "CREATE INDEX idx_react_role_messages_app_guild ON react_role_messages (app, guild_id)",
+      );
       await db.query(`
         CREATE TRIGGER react_role_messages_updated_at
           AFTER UPDATE ON react_role_messages WHEN OLD.updated_at = NEW.updated_at
@@ -2284,7 +2287,8 @@ export async function ensureSchemaMigrations() {
           last_sync_error_version INT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          UNIQUE KEY uniq_react_role_messages_app_guild (app, guild_id)
+          UNIQUE KEY uniq_react_role_messages_app_message (app, message_id),
+          KEY idx_react_role_messages_app_guild (app, guild_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
       `);
     }
@@ -2315,6 +2319,86 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: added react_role_messages.last_sync_error(_version) columns");
   } else {
     console.log("db: schema ok: react_role_messages.last_sync_error column already exists");
+  }
+
+  // react_role_messages: allow several posts per (app, guild_id). Replaces the old singleton
+  // UNIQUE (app, guild_id) with UNIQUE (app, message_id) plus a plain (app, guild_id) lookup index.
+  if (await tableExists(db, "react_role_messages", isSqlite)) {
+    if (isSqlite) {
+      const [ddlRows] = await db.query(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'react_role_messages'",
+      );
+      if (/UNIQUE\s*\(\s*app\s*,\s*guild_id\s*\)/i.test(ddlRows?.[0]?.sql ?? "")) {
+        // Inline constraint, so rebuild; FKs off so DROP TABLE doesn't cascade into bindings.
+        await db.query("PRAGMA foreign_keys = OFF");
+        try {
+          await db.query(`
+            CREATE TABLE react_role_messages_new (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              app TEXT NOT NULL,
+              guild_id TEXT NOT NULL,
+              channel_id TEXT NOT NULL,
+              message_id TEXT NULL,
+              title TEXT NOT NULL,
+              description TEXT NULL,
+              content_version INTEGER NOT NULL DEFAULT 1,
+              synced_version INTEGER NOT NULL DEFAULT 0,
+              pending_delete INTEGER NOT NULL DEFAULT 0,
+              last_sync_error TEXT NULL,
+              last_sync_error_version INTEGER NULL,
+              created_at TEXT DEFAULT (datetime('now')),
+              updated_at TEXT DEFAULT (datetime('now')),
+              UNIQUE (app, message_id)
+            )
+          `);
+          await db.query(`
+            INSERT INTO react_role_messages_new
+              (id, app, guild_id, channel_id, message_id, title, description, content_version,
+               synced_version, pending_delete, last_sync_error, last_sync_error_version, created_at, updated_at)
+            SELECT id, app, guild_id, channel_id, message_id, title, description, content_version,
+                   synced_version, pending_delete, last_sync_error, last_sync_error_version, created_at, updated_at
+            FROM react_role_messages
+          `);
+          await db.query("DROP TABLE react_role_messages");
+          await db.query("ALTER TABLE react_role_messages_new RENAME TO react_role_messages");
+          await db.query(`
+            CREATE TRIGGER react_role_messages_updated_at
+              AFTER UPDATE ON react_role_messages WHEN OLD.updated_at = NEW.updated_at
+              BEGIN
+                UPDATE react_role_messages SET updated_at = datetime('now') WHERE id = NEW.id;
+              END
+          `);
+        } finally {
+          await db.query("PRAGMA foreign_keys = ON");
+        }
+        applied.push("react_role_messages: multiple posts per guild");
+        console.log("db: migration applied: react_role_messages now allows multiple posts per guild");
+      }
+      if (!(await indexExists(db, "react_role_messages", "idx_react_role_messages_app_guild", isSqlite))) {
+        await db.query(
+          "CREATE INDEX idx_react_role_messages_app_guild ON react_role_messages (app, guild_id)",
+        );
+      }
+    } else {
+      if (await indexExists(db, "react_role_messages", "uniq_react_role_messages_app_guild", isSqlite)) {
+        // Add the lookup index before dropping the old unique so (app, guild_id) stays indexed.
+        if (!(await indexExists(db, "react_role_messages", "idx_react_role_messages_app_guild", isSqlite))) {
+          await db.query(
+            "ALTER TABLE react_role_messages ADD KEY idx_react_role_messages_app_guild (app, guild_id)",
+          );
+        }
+        await db.query(
+          "ALTER TABLE react_role_messages DROP INDEX uniq_react_role_messages_app_guild",
+        );
+        applied.push("react_role_messages: multiple posts per guild");
+        console.log("db: migration applied: react_role_messages now allows multiple posts per guild");
+      }
+      if (!(await indexExists(db, "react_role_messages", "uniq_react_role_messages_app_message", isSqlite))) {
+        await db.query(
+          "ALTER TABLE react_role_messages ADD UNIQUE KEY uniq_react_role_messages_app_message (app, message_id)",
+        );
+      }
+    }
   }
 
   // react_role_bindings: emoji->role rows for a react_role_messages message. Unique constraints

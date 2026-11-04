@@ -330,6 +330,76 @@
             ]
           }
         }
+      },
+      "ReactRoleMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "app": {
+            "type": "string"
+          },
+          "guildId": {
+            "type": "string"
+          },
+          "channelId": {
+            "type": "string"
+          },
+          "messageId": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "contentVersion": {
+            "type": "integer"
+          },
+          "syncedVersion": {
+            "type": "integer"
+          },
+          "pendingDelete": {
+            "type": "boolean"
+          },
+          "lastSyncError": {
+            "type": "string",
+            "nullable": true,
+            "description": "The bot's last post/edit failure message, if any."
+          },
+          "lastSyncErrorVersion": {
+            "type": "integer",
+            "nullable": true,
+            "description": "The contentVersion lastSyncError applies to; stale once contentVersion has moved past it."
+          },
+          "bindings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "emoji": {
+                  "type": "string"
+                },
+                "roleId": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "sortOrder": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "responses": {
@@ -4950,11 +5020,11 @@
     },
     "/api/react-role": {
       "get": {
-        "operationId": "getReactRoleMessage",
+        "operationId": "listReactRoleMessages",
         "tags": [
           "React Role"
         ],
-        "summary": "Get the react-for-role message config for one server",
+        "summary": "List the react-for-role messages for one server",
         "parameters": [
           {
             "name": "app",
@@ -4979,7 +5049,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The message config (null if this server hasn't configured one yet).",
+            "description": "The server's messages, oldest first (empty if none).",
             "content": {
               "application/json": {
                 "schema": {
@@ -4991,75 +5061,10 @@
                         true
                       ]
                     },
-                    "message": {
-                      "nullable": true,
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "integer"
-                        },
-                        "app": {
-                          "type": "string"
-                        },
-                        "guildId": {
-                          "type": "string"
-                        },
-                        "channelId": {
-                          "type": "string"
-                        },
-                        "messageId": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "title": {
-                          "type": "string"
-                        },
-                        "description": {
-                          "type": "string",
-                          "nullable": true
-                        },
-                        "contentVersion": {
-                          "type": "integer"
-                        },
-                        "syncedVersion": {
-                          "type": "integer"
-                        },
-                        "pendingDelete": {
-                          "type": "boolean"
-                        },
-                        "lastSyncError": {
-                          "type": "string",
-                          "nullable": true,
-                          "description": "The bot's last post/edit failure message, if any."
-                        },
-                        "lastSyncErrorVersion": {
-                          "type": "integer",
-                          "nullable": true,
-                          "description": "The contentVersion lastSyncError applies to; stale once contentVersion has moved past it."
-                        },
-                        "bindings": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "id": {
-                                "type": "integer"
-                              },
-                              "emoji": {
-                                "type": "string"
-                              },
-                              "roleId": {
-                                "type": "string"
-                              },
-                              "description": {
-                                "type": "string"
-                              },
-                              "sortOrder": {
-                                "type": "integer"
-                              }
-                            }
-                          }
-                        }
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ReactRoleMessage"
                       }
                     }
                   }
@@ -5081,13 +5086,205 @@
           }
         }
       },
-      "put": {
-        "operationId": "putReactRoleMessage",
+      "post": {
+        "operationId": "createReactRoleMessage",
         "tags": [
           "React Role"
         ],
-        "summary": "Create or update the react-for-role message config for a server",
-        "description": "Requires the admin role. Rejects duplicate emoji or duplicate role entries.",
+        "summary": "Create a react-for-role message for a server",
+        "description": "Requires the admin role. Rejects duplicate emoji or role entries, and any message beyond the per-server cap of 10.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "channelId",
+                  "title",
+                  "bindings"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord",
+                      "fluxer"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "channelId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "bindings": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "emoji",
+                        "roleId",
+                        "description"
+                      ],
+                      "properties": {
+                        "emoji": {
+                          "type": "string"
+                        },
+                        "roleId": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "message": {
+                      "$ref": "#/components/schemas/ReactRoleMessage"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/react-role/{id}": {
+      "get": {
+        "operationId": "getReactRoleMessage",
+        "tags": [
+          "React Role"
+        ],
+        "summary": "Get one react-for-role message",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "discord",
+                "fluxer"
+              ]
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "message": {
+                      "$ref": "#/components/schemas/ReactRoleMessage"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateReactRoleMessage",
+        "tags": [
+          "React Role"
+        ],
+        "summary": "Update a react-for-role message",
+        "description": "Requires the admin role. Rejects duplicate emoji or role entries.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -5152,7 +5349,7 @@
         },
         "responses": {
           "200": {
-            "description": "Saved message config.",
+            "description": "Saved message.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5165,7 +5362,7 @@
                       ]
                     },
                     "message": {
-                      "type": "object"
+                      "$ref": "#/components/schemas/ReactRoleMessage"
                     }
                   }
                 }
@@ -5181,6 +5378,9 @@
           "403": {
             "$ref": "#/components/responses/ForbiddenRole"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "500": {
             "$ref": "#/components/responses/ServerError"
           }
@@ -5191,8 +5391,18 @@
         "tags": [
           "React Role"
         ],
-        "summary": "Delete the react-for-role message for a server",
+        "summary": "Delete a react-for-role message",
         "description": "Requires the admin role. Soft-deletes (flags pending_delete); the bot performs the actual live-message deletion and hard-deletes the row via confirm-delete.\n",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -5221,7 +5431,7 @@
         },
         "responses": {
           "200": {
-            "description": "Deletion requested (or already gone/unconfigured).",
+            "description": "Deletion requested (or already gone).",
             "content": {
               "application/json": {
                 "schema": {
@@ -5253,13 +5463,23 @@
         }
       }
     },
-    "/api/react-role/synced": {
+    "/api/react-role/{id}/synced": {
       "post": {
         "operationId": "markReactRoleSynced",
         "tags": [
           "React Role"
         ],
         "summary": "Record that the bot has synced the live message to the current content version",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -5335,13 +5555,23 @@
         }
       }
     },
-    "/api/react-role/sync-failed": {
+    "/api/react-role/{id}/sync-failed": {
       "post": {
         "operationId": "markReactRoleSyncFailed",
         "tags": [
           "React Role"
         ],
         "summary": "Record that the bot failed to post/edit the live message for a content version",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -5413,13 +5643,23 @@
         }
       }
     },
-    "/api/react-role/confirm-delete": {
+    "/api/react-role/{id}/confirm-delete": {
       "post": {
         "operationId": "confirmReactRoleDelete",
         "tags": [
           "React Role"
         ],
-        "summary": "Confirm the live react-for-role message has been removed",
+        "summary": "Confirm a live react-for-role message has been removed",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
