@@ -197,7 +197,7 @@ Each trigger has a `selection_mode` that controls how `GET /api/trigger-response
 |------|----------|
 | `random` | Uniform random pick among all responses for the trigger. |
 | `ordered` | Round-robin: walks responses in `response_order` (then id), advancing state each hit so the next call returns the next response and wraps around. |
-| `weighted` | Weighted random: each response has a `weight` (0–100). A roll decides whether to pick from the highest-weight tier or from lower-weight responses, then one candidate is chosen at random from that subset. |
+| `weighted` | Each response's `weight` (0–100) is a literal percentage chance. Responses with null/0 weight share the leftover (100 − sum of weights) evenly. If weights sum to ≥ 100 they are normalized and unweighted responses are never picked. |
 
 Any response, in any selection_mode, may also carry a `response_function`. When the response chosen by `GET /api/trigger-responses/random` has one, the API returns that function key alongside the response text, and the bot runs the matching handler instead of replying directly.
 
