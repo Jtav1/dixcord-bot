@@ -212,10 +212,10 @@ async function getRandomResponseByRandomSelection(triggerId) {
 }
 
 /**
- * Weighted selection: pick a response with probability proportional to its weight
- * (weight / sum of all weights for the trigger). Falls back to a uniform pick if every
- * response has weight 0. A chosen response may carry response_function (a named function
- * key); the caller is responsible for dispatching to it instead of replying directly when present.
+ * Weighted selection: explicit weights are literal percentages; the leftover (100 - sum) is
+ * split evenly among unweighted (null/0) responses. If weights sum to >= 100, they are normalized
+ * relative to each other and unweighted responses get nothing. All-zero falls back to uniform.
+ * A chosen response may carry response_function; the caller dispatches to it when present.
  * @param {number} triggerId
  * @returns {Promise<{ id: number, response_string: string, response_function: string|null, response_function_id: number|null }|null>}
  */
@@ -234,18 +234,20 @@ async function getWeightedResponseForTrigger(triggerId) {
     weight: clampWeight(row.weight),
   }));
   const totalWeight = normalized.reduce((sum, r) => sum + r.weight, 0);
+  const unweighted = normalized.filter((r) => r.weight <= 0);
+  const leftover = Math.max(0, 100 - totalWeight);
+  // Effective share per response: explicit weight, or an even split of the leftover.
+  const shares =
+    totalWeight <= 0
+      ? normalized.map(() => 1)
+      : normalized.map((r) =>
+          r.weight > 0 ? r.weight : leftover / unweighted.length,
+        );
+  const shareSum = shares.reduce((a, b) => a + b, 0);
 
-  let chosen;
-  if (totalWeight <= 0) {
-    chosen = normalized[Math.floor(Math.random() * normalized.length)];
-  } else {
-    let roll = Math.random() * totalWeight;
-    chosen = normalized.find((r) => {
-      roll -= r.weight;
-      return roll < 0;
-    });
-    if (!chosen) chosen = normalized[normalized.length - 1];
-  }
+  let roll = Math.random() * shareSum;
+  let chosen = normalized.find((_, i) => (roll -= shares[i]) < 0);
+  if (!chosen) chosen = normalized[normalized.length - 1];
   if (!chosen) return null;
   const newTriggerFrequency = await incrementSelectionFrequencies(
     triggerId,
