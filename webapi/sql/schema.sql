@@ -12,15 +12,11 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- handle/app/primary_guild_member_id snapshot the alias an admin has designated as this
--- identity's primary account (see webadmin "Edit Mapping" and services/guildMembers.js
--- setPrimaryAlias) — kept in sync when that alias is unlinked or moved elsewhere.
+-- Canonical cross-app identity. No display fields of its own — a mapping's name/handle is
+-- resolved live via member_aliases.default_alias -> guild_members.handle (see
+-- services/userMappings.js, services/chatMemberMapping.js).
 CREATE TABLE IF NOT EXISTS chat_member_mapping (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL UNIQUE,
-  handle VARCHAR(255) NULL,
-  app VARCHAR(20) NULL,
-  primary_guild_member_id INT NULL
+  id INT AUTO_INCREMENT PRIMARY KEY
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
@@ -321,13 +317,18 @@ CREATE TABLE IF NOT EXISTS guild_members (
 -- Links one chat_member_mapping identity to many guild_members rows (one-to-many). A
 -- guild_member row is "unlinked" until an admin creates this row (see GET
 -- /api/guild-members/unlinked) — sync never creates or touches this table.
+-- default_alias: exactly one row per chat_member_mapping_id is kept TRUE (the most recently
+-- linked alias), enforced in services/guildMembers.js — not a DB constraint. It's the source of
+-- a mapping's display name/handle (see services/userMappings.js).
 CREATE TABLE IF NOT EXISTS member_aliases (
   id INT AUTO_INCREMENT PRIMARY KEY,
   chat_member_mapping_id INT NOT NULL,
   guild_member_id INT NOT NULL,
+  default_alias TINYINT(1) NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_member_aliases_guild_member (guild_member_id),
   KEY idx_member_aliases_chat_member (chat_member_mapping_id),
+  KEY idx_member_aliases_default (chat_member_mapping_id, default_alias),
   CONSTRAINT fk_member_aliases_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   CONSTRAINT fk_member_aliases_guild_member FOREIGN KEY (guild_member_id) REFERENCES guild_members(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -343,11 +344,6 @@ CREATE TABLE IF NOT EXISTS pending_account_links (
   KEY idx_pending_account_links_app_user (app, app_user_id),
   CONSTRAINT fk_pending_account_links_chat_member FOREIGN KEY (chat_member_mapping_id) REFERENCES chat_member_mapping(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Added here (not inline above) because chat_member_mapping is declared before guild_members.
-ALTER TABLE chat_member_mapping
-  ADD CONSTRAINT fk_chat_member_mapping_primary_guild_member
-    FOREIGN KEY (primary_guild_member_id) REFERENCES guild_members(id) ON DELETE SET NULL;
 
 -- Admin-defined usage-stat thresholds. `type` is the fine-grained metric key (see
 -- webapi/services/milestoneTypes.js), `item` scopes it to one entity (null = global), `object`

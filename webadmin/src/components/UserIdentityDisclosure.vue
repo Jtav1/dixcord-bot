@@ -3,7 +3,7 @@
     <template #activator="{ props: menuProps }">
       <v-chip v-bind="menuProps" size="small" variant="tonal" class="identity-chip">
         <v-icon start size="14">mdi-account-outline</v-icon>
-        {{ mapping ? `#${mapping.id} ${mapping.name}` : `#${platformUserId}` }}
+        {{ mapping ? `#${mapping.id} ${mapping.handle}` : `#${platformUserId}` }}
       </v-chip>
     </template>
 
@@ -14,8 +14,8 @@
           <span>{{ mapping.id }}</span>
         </div>
         <div class="identity-row mb-2">
-          <span class="identity-label">Name</span>
-          <span>{{ mapping.name }}</span>
+          <span class="identity-label">Handle</span>
+          <span>{{ mapping.handle }}</span>
         </div>
 
         <v-divider class="mb-2" />
@@ -67,7 +67,7 @@ import { computed, ref, watch } from "vue";
 import { fetchAliasesForMapping } from "../lib/guildMembers.js";
 
 const props = defineProps({
-  /** Full chat_member_mapping row ({id,name}), or null if unresolved. */
+  /** guild_members row with its linked chat_member_mapping id ({id,handle,...}), or null if unresolved. */
   mapping: { type: Object, default: null },
   /** Fallback identifier (and lookup key) when mapping is null. */
   platformUserId: { type: String, required: true },

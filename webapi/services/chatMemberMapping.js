@@ -67,6 +67,16 @@ export async function getChatMemberMappingIdByDiscordId(discordId) {
   return getChatMemberMappingIdByPlatformUserId(discordId, "discord");
 }
 
+/**
+ * Create a bare chat_member_mapping row with no columns but id — its display identity is
+ * resolved later via member_aliases.default_alias once an alias is linked.
+ * @returns {Promise<number>}
+ */
+export async function createBareChatMemberMappingId() {
+  const [result] = await db.query("INSERT INTO chat_member_mapping (id) VALUES (NULL)", []);
+  return Number(result?.insertId ?? result?.lastInsertRowid);
+}
+
 export const UNKNOWN_CHAT_MEMBER_ERROR =
   "Unknown user; not in chat_member_mapping for this app.";
 

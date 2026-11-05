@@ -12,7 +12,7 @@
 
     <v-text-field
       v-model="search"
-      label="Search name"
+      label="Search handle"
       density="comfortable"
       variant="outlined"
       prepend-inner-icon="mdi-magnify"
@@ -37,78 +37,65 @@
       </template>
       <template #cell-handle="{ item }">
         <span v-if="item.handle" class="text-medium-emphasis">{{ item.handle }}</span>
-      </template>
-      <template #cell-discordHandle="{ item }">
-        <span v-if="item.discordHandle" class="text-medium-emphasis">{{ item.discordHandle }}</span>
+        <span v-else class="text-caption text-medium-emphasis">(no aliases)</span>
       </template>
       <template #actions="{ item }">
         <v-btn icon="mdi-account-multiple" size="small" variant="text" @click="openAliases(item)" />
-        <v-btn icon="mdi-pencil" size="small" variant="text" @click="openEdit(item)" />
         <v-btn icon="mdi-delete" size="small" variant="text" color="error" @click="confirmDelete(item)" />
       </template>
       <template #expanded="{ item }">
-        <MappingAliasesPanel :mapping-id="item.id" :primary-guild-member-id="item.primaryGuildMemberId" />
+        <MappingAliasesPanel :mapping-id="item.id" :default-guild-member-id="item.defaultGuildMemberId" />
       </template>
     </PaginatedTable>
 
     <MemberAliasesDialog v-model="aliasesDialogOpen" :mapping="aliasesTarget" />
 
-    <v-dialog v-model="dialogOpen" max-width="560">
+    <v-dialog v-model="createDialogOpen" max-width="560">
       <v-card class="glass-card">
-        <v-card-title class="text-h6">{{ editing ? "Edit Mapping" : "New Mapping" }}</v-card-title>
+        <v-card-title class="text-h6">New Mapping</v-card-title>
         <v-card-text>
-          <v-text-field v-model="form.name" label="Display name" class="mb-4" />
-
-          <template v-if="editing">
-            <div class="text-caption text-medium-emphasis mb-2">chat_member_mapping record</div>
-            <v-table density="compact" class="mapping-info-table mb-4">
-              <tbody>
-                <tr>
-                  <td class="text-medium-emphasis">id</td>
-                  <td>{{ editing.id }}</td>
-                </tr>
-                <tr>
-                  <td class="text-medium-emphasis">handle</td>
-                  <td>{{ editing.handle || "—" }}</td>
-                </tr>
-                <tr>
-                  <td class="text-medium-emphasis">app</td>
-                  <td>{{ editing.app || "—" }}</td>
-                </tr>
-                <tr>
-                  <td class="text-medium-emphasis">primaryGuildMemberId</td>
-                  <td>{{ editing.primaryGuildMemberId ?? "—" }}</td>
-                </tr>
-                <tr v-if="editing.discordHandle">
-                  <td class="text-medium-emphasis">discordHandle (legacy)</td>
-                  <td>{{ editing.discordHandle }}</td>
-                </tr>
-              </tbody>
-            </v-table>
-
-            <div class="text-caption text-medium-emphasis mb-2">
-              Linked apps — view only; use "Manage Aliases" to link, unlink, or set the primary alias.
-            </div>
-            <div class="d-flex flex-wrap ga-2">
-              <v-chip v-for="alias in editAliases" :key="alias.id" size="small">
-                {{ alias.app }}: {{ alias.handle || alias.nickname || alias.platformUserId }}
-                <span v-if="alias.id === editing.primaryGuildMemberId" class="font-weight-bold ml-1">
-                  (primary)
-                </span>
-              </v-chip>
-              <span
-                v-if="!editAliasesLoading && !editAliases.length"
-                class="text-caption text-medium-emphasis"
-              >
-                No linked guild members yet.
-              </span>
-            </div>
-          </template>
+          <p class="text-body-2 text-medium-emphasis mb-4">
+            Pick an unlinked guild member to seed the new identity — it becomes the mapping's
+            first (and default) alias.
+          </p>
+          <v-text-field
+            v-model="candidateSearch"
+            label="Search handle or nickname"
+            density="comfortable"
+            variant="outlined"
+            prepend-inner-icon="mdi-magnify"
+            clearable
+            class="mb-2"
+            @update:model-value="onCandidateSearchInput"
+          />
+          <v-skeleton-loader v-if="loadingCandidates" type="list-item-two-line@2" />
+          <v-list v-else-if="candidates.length" density="comfortable" class="glass-card">
+            <v-list-item v-for="candidate in candidates" :key="candidate.id">
+              <v-list-item-title>
+                {{ candidate.handle || candidate.nickname || candidate.platformUserId }}
+              </v-list-item-title>
+              <v-list-item-subtitle>
+                {{ candidate.app }} · {{ candidate.guildId }} · {{ candidate.platformUserId }}
+              </v-list-item-subtitle>
+              <template #append>
+                <v-btn
+                  icon="mdi-plus"
+                  size="small"
+                  variant="text"
+                  color="primary"
+                  :loading="creatingId === candidate.id"
+                  @click="onCreate(candidate)"
+                />
+              </template>
+            </v-list-item>
+          </v-list>
+          <p v-else class="text-body-2 text-medium-emphasis">
+            {{ candidateSearch ? "No unlinked members match." : "No unlinked members." }}
+          </p>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="dialogOpen = false">Cancel</v-btn>
-          <v-btn color="primary" variant="flat" :loading="saving" @click="onSave">Save</v-btn>
+          <v-btn variant="text" @click="createDialogOpen = false">Close</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -125,36 +112,29 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import PaginatedTable from "../components/PaginatedTable.vue";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
 import MemberAliasesDialog from "../components/MemberAliasesDialog.vue";
 import MappingAliasesPanel from "../components/MappingAliasesPanel.vue";
 import { usePaginatedResource } from "../composables/usePaginatedResource.js";
 import { useSnackbar } from "../composables/useSnackbar.js";
-import {
-  createUserMapping,
-  deleteUserMapping,
-  fetchUserMappings,
-  updateUserMapping,
-} from "../lib/userMappings.js";
-import { fetchAliasesForMapping } from "../lib/guildMembers.js";
+import { createUserMapping, deleteUserMapping, fetchUserMappings } from "../lib/userMappings.js";
+import { fetchUnlinkedGuildMembers } from "../lib/guildMembers.js";
 
 const { notify } = useSnackbar();
 
 const headers = [
   { title: "ID", key: "id" },
-  { title: "Name", key: "name" },
   { title: "App", key: "app" },
   { title: "Handle", key: "handle" },
-  { title: "Discord Handle", key: "discordHandle" },
 ];
 
 const aliasesDialogOpen = ref(false);
 const aliasesTarget = ref(null);
 
 /**
- * @param {{id:number,name:string,discordHandle?:string}} item
+ * @param {{id:number,handle:string|null,app:string|null,defaultGuildMemberId:number|null}} item
  * @returns {void}
  */
 function openAliases(item) {
@@ -169,6 +149,10 @@ const { items, loading, error, page, totalPages, load } = usePaginatedResource(
   ({ limit, offset }) => fetchUserMappings({ limit, offset, search: search.value.trim() }),
 );
 
+watch(aliasesDialogOpen, (open) => {
+  if (!open) load(page.value);
+});
+
 /**
  * @returns {void}
  */
@@ -177,81 +161,67 @@ function onSearchInput() {
   searchDebounce = setTimeout(() => load(1), 300);
 }
 
-const dialogOpen = ref(false);
-const saving = ref(false);
-const editing = ref(null);
-const form = reactive({ name: "" });
-
-const editAliases = ref([]);
-const editAliasesLoading = ref(false);
+const createDialogOpen = ref(false);
+const candidateSearch = ref("");
+const candidates = ref([]);
+const loadingCandidates = ref(false);
+const creatingId = ref(null);
+let candidateSearchDebounce = null;
 
 /**
- * @param {number} mappingId
  * @returns {Promise<void>}
  */
-async function loadEditAliases(mappingId) {
-  editAliasesLoading.value = true;
+async function loadCandidates() {
+  loadingCandidates.value = true;
   try {
-    editAliases.value = await fetchAliasesForMapping(mappingId);
+    candidates.value = await fetchUnlinkedGuildMembers({ search: candidateSearch.value.trim() });
   } catch (err) {
-    notify(err instanceof Error ? err.message : "Failed to load linked apps", { color: "error" });
+    notify(err instanceof Error ? err.message : "Failed to load unlinked members", { color: "error" });
   } finally {
-    editAliasesLoading.value = false;
+    loadingCandidates.value = false;
+  }
+}
+
+/**
+ * @returns {void}
+ */
+function onCandidateSearchInput() {
+  if (candidateSearchDebounce) clearTimeout(candidateSearchDebounce);
+  candidateSearchDebounce = setTimeout(loadCandidates, 300);
+}
+
+/**
+ * @returns {void}
+ */
+function openCreate() {
+  candidateSearch.value = "";
+  candidates.value = [];
+  createDialogOpen.value = true;
+  loadCandidates();
+}
+
+/**
+ * @param {{id:number}} candidate
+ * @returns {Promise<void>}
+ */
+async function onCreate(candidate) {
+  creatingId.value = candidate.id;
+  try {
+    const mapping = await createUserMapping({ guildMemberId: candidate.id });
+    notify("Mapping created");
+    createDialogOpen.value = false;
+    await load(page.value);
+    openAliases(mapping);
+  } catch (err) {
+    notify(err instanceof Error ? err.message : "Failed to create mapping", { color: "error" });
+  } finally {
+    creatingId.value = null;
   }
 }
 
 const confirmOpen = ref(false);
 const deleting = ref(false);
 const pendingDelete = ref(null);
-
-/**
- * @returns {void}
- */
-function openCreate() {
-  editing.value = null;
-  form.name = "";
-  dialogOpen.value = true;
-}
-
-/**
- * @param {{id:number,name:string}} item
- * @returns {void}
- */
-function openEdit(item) {
-  editing.value = item;
-  form.name = item.name;
-  dialogOpen.value = true;
-
-  editAliases.value = [];
-  loadEditAliases(item.id);
-}
-
-/**
- * @returns {Promise<void>}
- */
-async function onSave() {
-  if (!form.name.trim()) {
-    notify("Name is required", { color: "error" });
-    return;
-  }
-  saving.value = true;
-  try {
-    const fields = { name: form.name.trim() };
-    if (editing.value) {
-      await updateUserMapping(editing.value.id, fields);
-      notify("Mapping updated");
-    } else {
-      await createUserMapping(fields);
-      notify("Mapping created");
-    }
-    dialogOpen.value = false;
-    await load(page.value);
-  } catch (err) {
-    notify(err instanceof Error ? err.message : "Failed to save mapping", { color: "error" });
-  } finally {
-    saving.value = false;
-  }
-}
 
 /**
  * @param {{id:number}} item
@@ -281,9 +251,3 @@ async function onDelete() {
 
 onMounted(() => load(1));
 </script>
-
-<style scoped>
-.mapping-info-table {
-  background: transparent !important;
-}
-</style>

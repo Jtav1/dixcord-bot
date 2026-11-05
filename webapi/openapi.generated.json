@@ -703,7 +703,7 @@
             "name": "search",
             "in": "query",
             "required": false,
-            "description": "Case-insensitive substring match against name.",
+            "description": "Case-insensitive substring match against the mapping's default alias handle.",
             "schema": {
               "type": "string"
             }
@@ -731,12 +731,19 @@
                           "id": {
                             "type": "integer"
                           },
-                          "name": {
-                            "type": "string"
-                          },
-                          "discordHandle": {
+                          "handle": {
                             "type": "string",
-                            "description": "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row."
+                            "nullable": true,
+                            "description": "Resolved from this mapping's default alias (member_aliases.default_alias) -> guild_members.handle. Null if the mapping has no aliases yet."
+                          },
+                          "app": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The default alias's app."
+                          },
+                          "defaultGuildMemberId": {
+                            "type": "integer",
+                            "nullable": true
                           }
                         }
                       }
@@ -772,7 +779,7 @@
           "User Mappings"
         ],
         "summary": "Create a user mapping",
-        "description": "Requires the admin role. Creates a bare identity (id + name) with no guild_members aliases linked yet — linking is a separate, future admin action.\n",
+        "description": "Requires the admin role. Creates a new identity and immediately links it to the given guild_member (must not already be linked to any mapping).\n",
         "requestBody": {
           "required": true,
           "content": {
@@ -780,20 +787,11 @@
               "schema": {
                 "type": "object",
                 "required": [
-                  "app",
-                  "name"
+                  "guildMemberId"
                 ],
                 "properties": {
-                  "app": {
-                    "type": "string",
-                    "enum": [
-                      "discord",
-                      "fluxer"
-                    ],
-                    "description": "Chat app, validated but otherwise unused. Currently \"discord\" and \"fluxer\" are supported."
-                  },
-                  "name": {
-                    "type": "string"
+                  "guildMemberId": {
+                    "type": "integer"
                   }
                 }
               }
@@ -820,12 +818,17 @@
                         "id": {
                           "type": "integer"
                         },
-                        "name": {
-                          "type": "string"
-                        },
-                        "discordHandle": {
+                        "handle": {
                           "type": "string",
-                          "description": "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row."
+                          "nullable": true
+                        },
+                        "app": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "defaultGuildMemberId": {
+                          "type": "integer",
+                          "nullable": true
                         }
                       }
                     }
@@ -842,6 +845,9 @@
           },
           "403": {
             "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"
@@ -899,12 +905,19 @@
                         "id": {
                           "type": "integer"
                         },
-                        "name": {
-                          "type": "string"
-                        },
-                        "discordHandle": {
+                        "handle": {
                           "type": "string",
-                          "description": "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row."
+                          "nullable": true,
+                          "description": "Resolved from this mapping's default alias (member_aliases.default_alias) -> guild_members.handle. Null if the mapping has no aliases yet."
+                        },
+                        "app": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "The default alias's app."
+                        },
+                        "defaultGuildMemberId": {
+                          "type": "integer",
+                          "nullable": true
                         }
                       }
                     }
@@ -918,101 +931,6 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
-          },
-          "500": {
-            "$ref": "#/components/responses/ServerError"
-          }
-        }
-      },
-      "put": {
-        "operationId": "updateUserMapping",
-        "tags": [
-          "User Mappings"
-        ],
-        "summary": "Update a user mapping",
-        "description": "Requires the admin role.",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "app",
-                  "name"
-                ],
-                "properties": {
-                  "app": {
-                    "type": "string",
-                    "enum": [
-                      "discord",
-                      "fluxer"
-                    ],
-                    "description": "Chat app, validated but otherwise unused. Currently \"discord\" and \"fluxer\" are supported."
-                  },
-                  "name": {
-                    "type": "string"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Updated user mapping.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "ok": {
-                      "type": "boolean",
-                      "enum": [
-                        true
-                      ]
-                    },
-                    "userMapping": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "integer"
-                        },
-                        "name": {
-                          "type": "string"
-                        },
-                        "discordHandle": {
-                          "type": "string",
-                          "description": "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row."
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "403": {
-            "$ref": "#/components/responses/ForbiddenRole"
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -1095,7 +1013,7 @@
         "tags": [
           "User Mappings"
         ],
-        "summary": "Set a user mapping's primary alias",
+        "summary": "Set a user mapping's default alias",
         "description": "Requires the admin role. guildMemberId must already be linked to this mapping via member_aliases (link it first with POST /api/guild-members/{guildMemberId}/link).\n",
         "parameters": [
           {
@@ -1145,17 +1063,17 @@
                         "id": {
                           "type": "integer"
                         },
-                        "name": {
-                          "type": "string"
-                        },
                         "handle": {
-                          "type": "string"
+                          "type": "string",
+                          "nullable": true
                         },
                         "app": {
-                          "type": "string"
+                          "type": "string",
+                          "nullable": true
                         },
-                        "primaryGuildMemberId": {
-                          "type": "integer"
+                        "defaultGuildMemberId": {
+                          "type": "integer",
+                          "nullable": true
                         }
                       }
                     }
@@ -2650,9 +2568,6 @@
                         "properties": {
                           "id": {
                             "type": "integer"
-                          },
-                          "name": {
-                            "type": "string"
                           },
                           "handle": {
                             "type": "string",
@@ -10593,7 +10508,7 @@
           "Guild Members"
         ],
         "summary": "List every guild_members row, linked or not, for the manual-link picker",
-        "description": "Unlike GET /api/guild-members/unlinked, this includes rows already linked to an identity (with that identity's id/name), so an admin can see and deliberately move one to a different chat_member_mapping — linking again just moves it, since member_aliases.guild_member_id is unique.\n",
+        "description": "Unlike GET /api/guild-members/unlinked, this includes rows already linked to an identity (with that identity's id), so an admin can see and deliberately move one to a different chat_member_mapping — linking again just moves it, since member_aliases.guild_member_id is unique.\n",
         "parameters": [
           {
             "name": "app",
@@ -10680,10 +10595,6 @@
                             "nullable": true,
                             "description": "chat_member_mapping.id this row is currently linked to",
                             "or null if unlinked.": null
-                          },
-                          "linkedMappingName": {
-                            "type": "string",
-                            "nullable": true
                           }
                         }
                       }
@@ -11062,10 +10973,6 @@
                             "nullable": true,
                             "description": "chat_member_mapping.id",
                             "or null if unlinked": null
-                          },
-                          "name": {
-                            "type": "string",
-                            "nullable": true
                           },
                           "handle": {
                             "type": "string",

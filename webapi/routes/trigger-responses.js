@@ -1072,7 +1072,6 @@ router.get("/functions", authenticate, async (req, res) => {
  *                     type: object
  *                     properties:
  *                       id: { type: integer }
- *                       name: { type: string }
  *                       handle: { type: string, nullable: true }
  *                       nickname: { type: string, nullable: true }
  *                       platformUserId: { type: string, nullable: true }

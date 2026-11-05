@@ -5,7 +5,7 @@
 
 import crypto from "node:crypto";
 import db from "../config/db.js";
-import { getChatMemberAppConfig } from "./chatMemberMapping.js";
+import { createBareChatMemberMappingId, getChatMemberAppConfig } from "./chatMemberMapping.js";
 import { attachRoleObjects } from "./guildInfo.js";
 import { utcIsoToSqlDatetime } from "./scheduledMessages.js";
 
@@ -167,38 +167,13 @@ export async function clearColorRole(app, guildId, platformUserId) {
 }
 
 /**
- * Resolve (creating if needed) the one chat_member_mapping identity representing the shared
- * bot service account, named after BOT_USERNAME. Every bot client's own platform account aliases
- * to this single identity, regardless of app — so every client calls this with the same `name`
- * at its own startup. The insert is a no-op-on-conflict upsert (not check-then-insert) because
- * those startups race: two clients booting together (e.g. docker-compose bringing discord-bot
- * and fluxer-bot up at once) can both see "no row yet" and both attempt the INSERT, and the
- * loser would hit chat_member_mapping's UNIQUE(name) constraint and throw.
- * @returns {Promise<number>}
- * @private
- */
-async function ensureBotChatMemberMappingId() {
-  const name = String(process.env.BOT_USERNAME ?? "").trim() || "bot";
-  if (isSqlite) {
-    await db.query(
-      "INSERT INTO chat_member_mapping (name) VALUES (?) ON CONFLICT(name) DO NOTHING",
-      [name],
-    );
-  } else {
-    await db.query(
-      "INSERT INTO chat_member_mapping (name) VALUES (?) ON DUPLICATE KEY UPDATE name = name",
-      [name],
-    );
-  }
-  const [rows] = await db.query("SELECT id FROM chat_member_mapping WHERE name = ?", [name]);
-  return Number(rows[0].id);
-}
-
-/**
  * Register one bot client's own platform account as a guild_members row for (app, guildId),
- * aliased to the shared bot identity (see ensureBotChatMemberMappingId). Normal roster sync
- * (upsertGuildMembers) excludes bot accounts entirely — this is the only path that creates a
- * guild_members row for one. Called by each client at its own startup, idempotent.
+ * aliased to its own chat_member_mapping identity (not shared across apps — each app's bot
+ * account gets its own identity). Normal roster sync (upsertGuildMembers) excludes bot accounts
+ * entirely — this is the only path that creates a guild_members row for one. Called by each
+ * client at its own startup, idempotent: the guild_member row is stable across reboots
+ * (upsertOneGuildMember upserts on (app, guild_id, platform_user_id)), so once that row already
+ * has an alias from a previous boot, this reuses it rather than creating a new identity.
  * @param {{ app: string, guildId: string, platformUserId: string, handle?: string|null }} params
  * @returns {Promise<{ ok: true, chatMemberMappingId: number } | { ok: false, error: string }>}
  */
@@ -217,30 +192,34 @@ export async function registerBotSelf({ app, guildId, platformUserId, handle }) 
   );
   const guildMemberId = Number(rows?.[0]?.id);
 
-  const chatMemberMappingId = await ensureBotChatMemberMappingId();
+  const [aliasRows] = await db.query(
+    "SELECT chat_member_mapping_id AS id FROM member_aliases WHERE guild_member_id = ?",
+    [guildMemberId],
+  );
+  const chatMemberMappingId =
+    aliasRows?.[0]?.id != null ? Number(aliasRows[0].id) : await createBareChatMemberMappingId();
   await linkGuildMemberAlias(guildMemberId, chatMemberMappingId);
 
   return { ok: true, chatMemberMappingId };
 }
 
 /**
- * List one server's members, left-joined through member_aliases for display name.
- * Unlinked members (no member_aliases row yet) appear with id/name null.
+ * List one server's members, left-joined through member_aliases for linked-identity id.
+ * Unlinked members (no member_aliases row yet) appear with id null.
  * @param {string} app
  * @param {string} guildId
- * @returns {Promise<Array<{ id: number|null, name: string|null, handle: string|null, platformUserId: string, nickname: string|null, roles: object[], joinedAt: string|null, syncedAt: string }> | null>} null if app unsupported. `roles` entries are full guild_roles rows (see attachRoleObjects), not bare ids.
+ * @returns {Promise<Array<{ id: number|null, handle: string|null, platformUserId: string, nickname: string|null, roles: object[], joinedAt: string|null, syncedAt: string }> | null>} null if app unsupported. `roles` entries are full guild_roles rows (see attachRoleObjects), not bare ids.
  */
 export async function listGuildMembers(app, guildId) {
   const appConfig = getChatMemberAppConfig(app);
   if (!appConfig) return null;
 
   const [rows] = await db.query(
-    `SELECT ma.chat_member_mapping_id AS id, cmm.name AS name,
+    `SELECT ma.chat_member_mapping_id AS id,
             gm.handle AS handle, gm.platform_user_id AS platformUserId,
             gm.nickname AS nickname, gm.roles AS roles, gm.joined_at AS joinedAt, gm.synced_at AS syncedAt
      FROM guild_members gm
      LEFT JOIN member_aliases ma ON ma.guild_member_id = gm.id
-     LEFT JOIN chat_member_mapping cmm ON cmm.id = ma.chat_member_mapping_id
      WHERE gm.app = ? AND gm.guild_id = ?`,
     [app, guildId],
   );
@@ -253,19 +232,18 @@ export async function listGuildMembers(app, guildId) {
  * most-recently-synced row per id wins). Backs cross-guild identity lookups that don't
  * care which specific guild a member was last seen in (e.g. admin-panel display chips).
  * @param {string} app
- * @returns {Promise<Array<{ id: number|null, name: string|null, handle: string|null, platformUserId: string, nickname: string|null, roles: object[], joinedAt: string|null, syncedAt: string }> | null>} null if app unsupported. `roles` entries are full guild_roles rows (see attachRoleObjects), not bare ids.
+ * @returns {Promise<Array<{ id: number|null, handle: string|null, platformUserId: string, nickname: string|null, roles: object[], joinedAt: string|null, syncedAt: string }> | null>} null if app unsupported. `roles` entries are full guild_roles rows (see attachRoleObjects), not bare ids.
  */
 export async function listAllGuildMembers(app) {
   const appConfig = getChatMemberAppConfig(app);
   if (!appConfig) return null;
 
   const [rows] = await db.query(
-    `SELECT ma.chat_member_mapping_id AS id, cmm.name AS name,
+    `SELECT ma.chat_member_mapping_id AS id,
             gm.handle AS handle, gm.platform_user_id AS platformUserId,
             gm.nickname AS nickname, gm.roles AS roles, gm.joined_at AS joinedAt, gm.synced_at AS syncedAt
      FROM guild_members gm
      LEFT JOIN member_aliases ma ON ma.guild_member_id = gm.id
-     LEFT JOIN chat_member_mapping cmm ON cmm.id = ma.chat_member_mapping_id
      WHERE gm.app = ?
        AND gm.synced_at = (
          SELECT MAX(gm2.synced_at) FROM guild_members gm2
@@ -314,9 +292,9 @@ export async function listUnlinkedGuildMembers({ app, guildId, search } = {}) {
 /**
  * List every guild_members row (every guild, linked or not) for the admin manual-link picker —
  * unlike listUnlinkedGuildMembers, this includes already-linked rows (with their current
- * mapping id/name) so an admin can see and deliberately move one to a different identity.
+ * mapping id) so an admin can see and deliberately move one to a different identity.
  * @param {{ app?: string, guildId?: string, search?: string }} [filters] `search` matches handle or nickname (substring, case-insensitive).
- * @returns {Promise<Array<{ id: number, app: string, guildId: string, platformUserId: string, handle: string|null, nickname: string|null, roles: object[], joinedAt: string|null, syncedAt: string, linkedMappingId: number|null, linkedMappingName: string|null }>>} `roles` entries are full guild_roles rows.
+ * @returns {Promise<Array<{ id: number, app: string, guildId: string, platformUserId: string, handle: string|null, nickname: string|null, roles: object[], joinedAt: string|null, syncedAt: string, linkedMappingId: number|null }>>} `roles` entries are full guild_roles rows.
  */
 export async function listAllGuildMemberRows({ app, guildId, search } = {}) {
   const conditions = [];
@@ -338,10 +316,9 @@ export async function listAllGuildMemberRows({ app, guildId, search } = {}) {
   const [rows] = await db.query(
     `SELECT gm.id AS id, gm.app AS app, gm.guild_id AS guildId, gm.platform_user_id AS platformUserId,
             gm.handle AS handle, gm.nickname AS nickname, gm.roles AS roles, gm.joined_at AS joinedAt, gm.synced_at AS syncedAt,
-            ma.chat_member_mapping_id AS linkedMappingId, cmm.name AS linkedMappingName
+            ma.chat_member_mapping_id AS linkedMappingId
      FROM guild_members gm
      LEFT JOIN member_aliases ma ON ma.guild_member_id = gm.id
-     LEFT JOIN chat_member_mapping cmm ON cmm.id = ma.chat_member_mapping_id
      ${where}
      ORDER BY gm.synced_at DESC`,
     params,
@@ -353,13 +330,14 @@ export async function listAllGuildMemberRows({ app, guildId, search } = {}) {
 /**
  * List guild_members rows currently linked (via member_aliases) to a chat_member_mapping identity.
  * @param {number} chatMemberMappingId
- * @returns {Promise<Array<{ id: number, app: string, guildId: string, guildName: string|null, platformUserId: string, handle: string|null, nickname: string|null, roles: object[], joinedAt: string|null, syncedAt: string }>>} `roles` entries are full guild_roles rows.
+ * @returns {Promise<Array<{ id: number, app: string, guildId: string, guildName: string|null, platformUserId: string, handle: string|null, nickname: string|null, roles: object[], joinedAt: string|null, syncedAt: string, defaultAlias: boolean }>>} `roles` entries are full guild_roles rows.
  */
 export async function listAliasesForMapping(chatMemberMappingId) {
   const [rows] = await db.query(
     `SELECT gm.id AS id, gm.app AS app, gm.guild_id AS guildId, gi.name AS guildName,
             gm.platform_user_id AS platformUserId, gm.handle AS handle, gm.nickname AS nickname,
-            gm.roles AS roles, gm.joined_at AS joinedAt, gm.synced_at AS syncedAt
+            gm.roles AS roles, gm.joined_at AS joinedAt, gm.synced_at AS syncedAt,
+            ma.default_alias AS defaultAlias
      FROM member_aliases ma
      JOIN guild_members gm ON gm.id = ma.guild_member_id
      LEFT JOIN guild_info gi ON gi.app = gm.app AND gi.guild_id = gm.guild_id
@@ -367,7 +345,11 @@ export async function listAliasesForMapping(chatMemberMappingId) {
      ORDER BY gm.synced_at DESC`,
     [chatMemberMappingId],
   );
-  const parsed = (rows ?? []).map((row) => ({ ...row, roles: row.roles ? JSON.parse(row.roles) : [] }));
+  const parsed = (rows ?? []).map((row) => ({
+    ...row,
+    roles: row.roles ? JSON.parse(row.roles) : [],
+    defaultAlias: !!row.defaultAlias,
+  }));
   return attachRoleObjects(parsed);
 }
 
@@ -381,78 +363,107 @@ export async function guildMemberExists(guildMemberId) {
 }
 
 /**
+ * Promote the newest (highest id) alias of a mapping to default_alias, if it has aliases but no
+ * current default. No-op if the mapping already has a default (or has no aliases at all).
+ * @param {number} chatMemberMappingId
+ * @returns {Promise<void>}
+ */
+async function promoteNewestAliasToDefault(chatMemberMappingId) {
+  const [existing] = await db.query(
+    "SELECT id FROM member_aliases WHERE chat_member_mapping_id = ? AND default_alias = 1",
+    [chatMemberMappingId],
+  );
+  if (existing?.length) return;
+  const [rows] = await db.query(
+    "SELECT id FROM member_aliases WHERE chat_member_mapping_id = ? ORDER BY id DESC LIMIT 1",
+    [chatMemberMappingId],
+  );
+  if (rows?.[0]) {
+    await db.query("UPDATE member_aliases SET default_alias = 1 WHERE id = ?", [rows[0].id]);
+  }
+}
+
+/**
  * Link (or re-link, since guild_member_id is unique in member_aliases) a guild_member row to a
- * chat_member_mapping identity as one of its aliases.
+ * chat_member_mapping identity as one of its aliases — always becoming that mapping's new
+ * default_alias. If this was a re-link away from a different mapping, that mapping's default is
+ * repaired (promoted from its next-newest remaining alias) if it just lost its default.
  * @param {number} guildMemberId
  * @param {number} chatMemberMappingId
  * @returns {Promise<void>}
  */
 export async function linkGuildMemberAlias(guildMemberId, chatMemberMappingId) {
+  const [existingRows] = await db.query(
+    "SELECT chat_member_mapping_id AS mappingId FROM member_aliases WHERE guild_member_id = ?",
+    [guildMemberId],
+  );
+  const previousMappingId = existingRows?.[0]?.mappingId ?? null;
+
   if (isSqlite) {
     await db.query(
-      `INSERT INTO member_aliases (chat_member_mapping_id, guild_member_id) VALUES (?, ?)
-       ON CONFLICT(guild_member_id) DO UPDATE SET chat_member_mapping_id = excluded.chat_member_mapping_id`,
+      `INSERT INTO member_aliases (chat_member_mapping_id, guild_member_id, default_alias) VALUES (?, ?, 1)
+       ON CONFLICT(guild_member_id) DO UPDATE SET chat_member_mapping_id = excluded.chat_member_mapping_id, default_alias = 1`,
       [chatMemberMappingId, guildMemberId],
     );
   } else {
     await db.query(
-      `INSERT INTO member_aliases (chat_member_mapping_id, guild_member_id) VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE chat_member_mapping_id = VALUES(chat_member_mapping_id)`,
+      `INSERT INTO member_aliases (chat_member_mapping_id, guild_member_id, default_alias) VALUES (?, ?, 1)
+       ON DUPLICATE KEY UPDATE chat_member_mapping_id = VALUES(chat_member_mapping_id), default_alias = 1`,
       [chatMemberMappingId, guildMemberId],
     );
   }
-  // If this guild_member was the primary alias of a *different* identity, it no longer belongs
-  // there — clear that identity's stale primary snapshot.
-  await clearStalePrimaryAlias(guildMemberId, chatMemberMappingId);
+  await db.query(
+    "UPDATE member_aliases SET default_alias = 0 WHERE chat_member_mapping_id = ? AND guild_member_id <> ?",
+    [chatMemberMappingId, guildMemberId],
+  );
+  if (previousMappingId != null && previousMappingId !== chatMemberMappingId) {
+    await promoteNewestAliasToDefault(previousMappingId);
+  }
 }
 
 /**
- * Unlink a guild_member from whichever identity it's currently aliased to.
+ * Unlink a guild_member from whichever identity it's currently aliased to. If it was that
+ * mapping's default alias, the next-newest remaining alias (if any) is promoted to default.
  * @param {number} guildMemberId
  * @returns {Promise<boolean>} true if a link existed and was removed.
  */
 export async function unlinkGuildMemberAlias(guildMemberId) {
+  const [existingRows] = await db.query(
+    "SELECT chat_member_mapping_id AS mappingId FROM member_aliases WHERE guild_member_id = ?",
+    [guildMemberId],
+  );
+  const mappingId = existingRows?.[0]?.mappingId ?? null;
   const [result] = await db.query(
     "DELETE FROM member_aliases WHERE guild_member_id = ?",
     [guildMemberId],
   );
-  await clearStalePrimaryAlias(guildMemberId);
+  if (mappingId != null) await promoteNewestAliasToDefault(mappingId);
   return (result?.affectedRows ?? result?.changes ?? 0) > 0;
 }
 
 /**
- * Clear chat_member_mapping.handle/app/primary_guild_member_id on any identity whose primary
- * alias is this guild_member, except (optionally) the identity it's being linked to right now.
+ * Is this guild_member already aliased to some identity?
  * @param {number} guildMemberId
- * @param {number} [exceptChatMemberMappingId]
- * @returns {Promise<void>}
+ * @returns {Promise<boolean>}
  */
-async function clearStalePrimaryAlias(guildMemberId, exceptChatMemberMappingId) {
-  if (exceptChatMemberMappingId != null) {
-    await db.query(
-      `UPDATE chat_member_mapping SET handle = NULL, app = NULL, primary_guild_member_id = NULL
-       WHERE primary_guild_member_id = ? AND id <> ?`,
-      [guildMemberId, exceptChatMemberMappingId],
-    );
-  } else {
-    await db.query(
-      `UPDATE chat_member_mapping SET handle = NULL, app = NULL, primary_guild_member_id = NULL
-       WHERE primary_guild_member_id = ?`,
-      [guildMemberId],
-    );
-  }
+export async function isGuildMemberLinked(guildMemberId) {
+  const [rows] = await db.query(
+    "SELECT 1 AS x FROM member_aliases WHERE guild_member_id = ?",
+    [guildMemberId],
+  );
+  return Array.isArray(rows) && rows.length > 0;
 }
 
 /**
- * Designate one of a chat_member_mapping identity's already-linked aliases as its primary
- * account, snapshotting that alias's app/handle onto the identity itself.
+ * Designate one of a chat_member_mapping identity's already-linked aliases as its default
+ * (admin override of the normal "newest alias wins" rule).
  * @param {number} chatMemberMappingId
  * @param {number} guildMemberId
- * @returns {Promise<{ handle: string|null, app: string }|null>} null if guildMemberId isn't an alias of this identity.
+ * @returns {Promise<{ handle: string|null, app: string, defaultGuildMemberId: number }|null>} null if guildMemberId isn't an alias of this identity.
  */
 export async function setPrimaryAlias(chatMemberMappingId, guildMemberId) {
   const [rows] = await db.query(
-    `SELECT gm.app AS app, gm.handle AS handle, gm.nickname AS nickname
+    `SELECT ma.id AS aliasId, gm.app AS app, gm.handle AS handle, gm.nickname AS nickname
      FROM member_aliases ma
      JOIN guild_members gm ON gm.id = ma.guild_member_id
      WHERE ma.guild_member_id = ? AND ma.chat_member_mapping_id = ?`,
@@ -461,12 +472,9 @@ export async function setPrimaryAlias(chatMemberMappingId, guildMemberId) {
   if (!rows || rows.length === 0) return null;
 
   const alias = rows[0];
-  const handle = alias.handle || alias.nickname || null;
-  await db.query(
-    "UPDATE chat_member_mapping SET handle = ?, app = ?, primary_guild_member_id = ? WHERE id = ?",
-    [handle, alias.app, guildMemberId, chatMemberMappingId],
-  );
-  return { handle, app: alias.app };
+  await db.query("UPDATE member_aliases SET default_alias = 0 WHERE chat_member_mapping_id = ?", [chatMemberMappingId]);
+  await db.query("UPDATE member_aliases SET default_alias = 1 WHERE id = ?", [alias.aliasId]);
+  return { handle: alias.handle || alias.nickname || null, app: alias.app, defaultGuildMemberId: guildMemberId };
 }
 
 /**
@@ -486,34 +494,6 @@ export async function listServersForUser(chatMemberMappingId) {
   );
   const parsed = (rows ?? []).map((row) => ({ ...row, roles: row.roles ? JSON.parse(row.roles) : [] }));
   return attachRoleObjects(parsed);
-}
-
-/**
- * Does `name` already exist in chat_member_mapping?
- * @param {string} name
- * @returns {Promise<boolean>}
- * @private
- */
-async function chatMemberMappingNameExists(name) {
-  const [rows] = await db.query("SELECT id FROM chat_member_mapping WHERE name = ?", [name]);
-  return Array.isArray(rows) && rows.length > 0;
-}
-
-/**
- * Create a chat_member_mapping identity for a self-service link with no existing identity to
- * attach to. Seeds the name from the requester's handle, disambiguating on collision.
- * @param {string|null} seedName
- * @returns {Promise<number>} the new chat_member_mapping.id
- * @private
- */
-async function createChatMemberMappingForSelfServiceLink(seedName) {
-  const base = String(seedName ?? "").trim() || "linked-user";
-  let name = base;
-  for (let suffix = 1; await chatMemberMappingNameExists(name); suffix += 1) {
-    name = `${base}-${suffix}`;
-  }
-  const [result] = await db.query("INSERT INTO chat_member_mapping (name) VALUES (?)", [name]);
-  return Number(result?.insertId ?? result?.lastInsertRowid);
 }
 
 /**
@@ -604,11 +584,8 @@ export async function confirmAccountLink({ app, guildId, userId, token }) {
 
     let chatMemberMappingId = pending.chat_member_mapping_id;
     if (chatMemberMappingId == null) {
-      chatMemberMappingId = await createChatMemberMappingForSelfServiceLink(
-        requester.handle ?? requester.nickname ?? pending.app_user_id,
-      );
+      chatMemberMappingId = await createBareChatMemberMappingId();
       await linkGuildMemberAlias(requester.id, chatMemberMappingId);
-      await setPrimaryAlias(chatMemberMappingId, requester.id);
     }
 
     await linkGuildMemberAlias(confirmer.id, chatMemberMappingId);

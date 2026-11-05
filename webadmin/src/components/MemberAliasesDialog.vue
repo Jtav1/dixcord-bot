@@ -2,9 +2,8 @@
   <v-dialog v-model="internalOpen" max-width="720">
     <v-card class="glass-card">
       <v-card-title class="text-h6">
-        Manage Aliases — #{{ mapping?.id }} {{ mapping?.name }}
+        Manage Aliases — #{{ mapping?.id }} {{ mapping?.handle || "" }}
       </v-card-title>
-      <v-card-subtitle v-if="mapping?.discordHandle">{{ mapping.discordHandle }}</v-card-subtitle>
 
       <v-card-text>
         <v-alert v-if="error" type="error" variant="tonal" class="mb-4" :text="error" />
@@ -16,8 +15,8 @@
             <v-list-item v-for="alias in aliases" :key="alias.id">
               <v-list-item-title>
                 {{ alias.handle || alias.nickname || alias.platformUserId }}
-                <v-chip v-if="alias.id === mapping?.primaryGuildMemberId" size="x-small" color="primary" variant="tonal" class="ml-1">
-                  primary
+                <v-chip v-if="alias.id === mapping?.defaultGuildMemberId" size="x-small" color="primary" variant="tonal" class="ml-1">
+                  default
                 </v-chip>
               </v-list-item-title>
               <v-list-item-subtitle>
@@ -39,7 +38,7 @@
           <v-select
             v-model="selectedPrimaryId"
             :items="primaryAliasItems"
-            label="Primary account"
+            label="Default account"
             density="comfortable"
             variant="outlined"
             hide-details
@@ -169,11 +168,14 @@ async function onSetPrimary(guildMemberId) {
     const updated = await setPrimaryAlias(props.mapping.id, guildMemberId);
     props.mapping.handle = updated.handle;
     props.mapping.app = updated.app;
-    props.mapping.primaryGuildMemberId = updated.primaryGuildMemberId;
-    notify("Primary account set");
+    props.mapping.defaultGuildMemberId = updated.defaultGuildMemberId;
+    aliases.value.forEach((a) => {
+      a.defaultAlias = a.id === updated.defaultGuildMemberId;
+    });
+    notify("Default account set");
   } catch (err) {
-    selectedPrimaryId.value = props.mapping.primaryGuildMemberId ?? null;
-    notify(err instanceof Error ? err.message : "Failed to set primary account", { color: "error" });
+    selectedPrimaryId.value = props.mapping.defaultGuildMemberId ?? null;
+    notify(err instanceof Error ? err.message : "Failed to set default account", { color: "error" });
   } finally {
     settingPrimary.value = false;
   }
@@ -211,6 +213,13 @@ async function onLink(candidate) {
     await linkGuildMemberAlias(candidate.id, props.mapping.id);
     notify("Member linked");
     await Promise.all([loadAliases(), loadCandidates()]);
+    // Newly linked aliases always become the mapping's new default.
+    if (props.mapping) {
+      props.mapping.handle = candidate.handle || candidate.nickname || null;
+      props.mapping.app = candidate.app ?? null;
+      props.mapping.defaultGuildMemberId = candidate.id;
+      selectedPrimaryId.value = candidate.id;
+    }
   } catch (err) {
     notify(err instanceof Error ? err.message : "Failed to link member", { color: "error" });
   } finally {
@@ -226,14 +235,17 @@ async function onUnlink(alias) {
   unlinkingId.value = alias.id;
   try {
     await unlinkGuildMemberAlias(alias.id);
-    if (props.mapping && alias.id === props.mapping.primaryGuildMemberId) {
-      props.mapping.handle = undefined;
-      props.mapping.app = undefined;
-      props.mapping.primaryGuildMemberId = undefined;
-      selectedPrimaryId.value = null;
-    }
     notify("Member unlinked");
     await Promise.all([loadAliases(), loadCandidates()]);
+    // The backend auto-promotes the next-newest remaining alias to default when the current
+    // default is unlinked — reflect whatever it landed on (or null if none remain).
+    if (props.mapping) {
+      const newDefault = aliases.value.find((a) => a.defaultAlias) ?? null;
+      props.mapping.handle = newDefault?.handle || newDefault?.nickname || null;
+      props.mapping.app = newDefault?.app ?? null;
+      props.mapping.defaultGuildMemberId = newDefault?.id ?? null;
+      selectedPrimaryId.value = newDefault?.id ?? null;
+    }
   } catch (err) {
     notify(err instanceof Error ? err.message : "Failed to unlink member", { color: "error" });
   } finally {
@@ -246,7 +258,7 @@ watch(
   (open) => {
     if (!open) return;
     search.value = "";
-    selectedPrimaryId.value = props.mapping?.primaryGuildMemberId ?? null;
+    selectedPrimaryId.value = props.mapping?.defaultGuildMemberId ?? null;
     loadAliases();
     loadCandidates();
   },

@@ -25,6 +25,17 @@ export function representativePlatformIdSubquery(mappingIdExpr) {
 }
 
 /**
+ * Correlated subquery resolving a chat_member_mapping id's display handle via its default alias
+ * (member_aliases.default_alias) -> guild_members.handle. Replaces the old
+ * chat_member_mapping.name column.
+ * @param {string} mappingIdExpr - SQL expression for the chat_member_mapping.id to resolve
+ * @returns {string}
+ */
+export function representativeHandleSubquery(mappingIdExpr) {
+  return `(SELECT gm.handle FROM guild_members gm JOIN member_aliases ma ON ma.guild_member_id = gm.id WHERE ma.chat_member_mapping_id = ${mappingIdExpr} AND ma.default_alias = 1 LIMIT 1)`;
+}
+
+/**
  * Normalize limit from API request (number or string). Clamps to [1, max].
  * @param {number|string} value
  * @param {number} [defaultN=5]
@@ -381,12 +392,13 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid, cm.name, SUM(uet.frequency) AS total
+    `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid,
+            ${representativeHandleSubquery("cm.id")} AS name, SUM(uet.frequency) AS total
      FROM member_emoji_tracking uet
      INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
      INNER JOIN guild_emojis ge ON uet.app = ge.app AND uet.emoid = ge.id
      WHERE ${isEmojiType}
-     GROUP BY cm.id, cm.name
+     GROUP BY cm.id
      ORDER BY total DESC
      LIMIT ? OFFSET ?`,
     [n, off],
@@ -441,12 +453,13 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid, cm.name, SUM(uet.frequency) AS total
+    `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid,
+            ${representativeHandleSubquery("cm.id")} AS name, SUM(uet.frequency) AS total
      FROM member_emoji_tracking uet
      INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
      INNER JOIN guild_emojis ge ON uet.app = ge.app AND uet.emoid = ge.id
      WHERE ${isStickerType}
-     GROUP BY cm.id, cm.name
+     GROUP BY cm.id
      ORDER BY total DESC
      LIMIT ? OFFSET ?`,
     [n, off],
