@@ -18,15 +18,11 @@ CREATE TRIGGER IF NOT EXISTS users_updated_at
     UPDATE users SET updated_at = datetime('now') WHERE id = NEW.id;
   END;
 
--- handle/app/primary_guild_member_id snapshot the alias an admin has designated as this
--- identity's primary account (see webadmin "Edit Mapping" and services/guildMembers.js
--- setPrimaryAlias) — kept in sync when that alias is unlinked or moved elsewhere.
+-- Canonical cross-app identity. No display fields of its own — a mapping's name/handle is
+-- resolved live via member_aliases.default_alias -> guild_members.handle (see
+-- services/userMappings.js, services/chatMemberMapping.js).
 CREATE TABLE IF NOT EXISTS chat_member_mapping (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name TEXT NOT NULL UNIQUE,
-  handle TEXT NULL,
-  app TEXT NULL,
-  primary_guild_member_id INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL
+  id INTEGER PRIMARY KEY AUTOINCREMENT
 );
 
 -- Bot response tables (shared with dixcord-bot when using same DB)
@@ -318,14 +314,19 @@ CREATE INDEX IF NOT EXISTS idx_guild_members_app_guild ON guild_members (app, gu
 -- Links one chat_member_mapping identity to many guild_members rows (one-to-many). A
 -- guild_member row is "unlinked" until an admin creates this row (see GET
 -- /api/guild-members/unlinked) — sync never creates or touches this table.
+-- default_alias: exactly one row per chat_member_mapping_id is kept 1 (the most recently
+-- linked alias), enforced in services/guildMembers.js — not a DB constraint. It's the source of
+-- a mapping's display name/handle (see services/userMappings.js).
 CREATE TABLE IF NOT EXISTS member_aliases (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   chat_member_mapping_id INTEGER NOT NULL REFERENCES chat_member_mapping(id) ON DELETE CASCADE,
   guild_member_id INTEGER NOT NULL UNIQUE REFERENCES guild_members(id) ON DELETE CASCADE,
+  default_alias INTEGER NOT NULL DEFAULT 0,
   created_at TEXT DEFAULT (datetime('now'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_member_aliases_chat_member ON member_aliases (chat_member_mapping_id);
+CREATE INDEX IF NOT EXISTS idx_member_aliases_default ON member_aliases (chat_member_mapping_id, default_alias);
 
 -- Self-service account-link handshake (link-accounts / confirm-link); deleted on confirm.
 CREATE TABLE IF NOT EXISTS pending_account_links (

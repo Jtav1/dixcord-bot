@@ -899,6 +899,63 @@ export async function ensureSchemaMigrations() {
     }
   }
 
+  // member_aliases.default_alias: exactly one row per chat_member_mapping_id is kept 1 (the most
+  // recently linked alias) — see services/guildMembers.js linkGuildMemberAlias/
+  // unlinkGuildMemberAlias. It's the source of a mapping's display name/handle
+  // (services/userMappings.js), replacing the old chat_member_mapping.name/handle/app/
+  // primary_guild_member_id columns dropped below.
+  if (
+    (await tableExists(db, "member_aliases", isSqlite)) &&
+    !(await columnExists(db, "member_aliases", "default_alias", isSqlite))
+  ) {
+    await db.query(
+      isSqlite
+        ? "ALTER TABLE member_aliases ADD COLUMN default_alias INTEGER NOT NULL DEFAULT 0"
+        : "ALTER TABLE member_aliases ADD COLUMN default_alias TINYINT(1) NOT NULL DEFAULT 0",
+    );
+    applied.push("member_aliases.default_alias column");
+    console.log("db: migration applied: added member_aliases.default_alias column");
+  }
+  if (
+    (await tableExists(db, "member_aliases", isSqlite)) &&
+    !(await indexExists(db, "member_aliases", "idx_member_aliases_default", isSqlite))
+  ) {
+    await db.query(
+      "CREATE INDEX idx_member_aliases_default ON member_aliases (chat_member_mapping_id, default_alias)",
+    );
+    applied.push("member_aliases idx_member_aliases_default index");
+    console.log("db: migration applied: added idx_member_aliases_default index");
+  }
+
+  // Reconcile default_alias: any chat_member_mapping_id with aliases but no default gets the
+  // newest (highest id) one promoted. Idempotent (only acts where no default exists yet), so this
+  // is safe and cheap every boot — catches rows the discord_id backfill above just inserted
+  // (default_alias=0 by column default) as well as any other gap. The inner SELECT is wrapped in
+  // a derived table so MySQL doesn't reject it for referencing the UPDATE's own target table.
+  if (await tableExists(db, "member_aliases", isSqlite)) {
+    const [result] = await db.query(`
+      UPDATE member_aliases
+      SET default_alias = 1
+      WHERE id IN (
+        SELECT id FROM (
+          SELECT MAX(id) AS id FROM member_aliases ma
+          WHERE NOT EXISTS (
+            SELECT 1 FROM member_aliases ma2
+            WHERE ma2.chat_member_mapping_id = ma.chat_member_mapping_id AND ma2.default_alias = 1
+          )
+          GROUP BY ma.chat_member_mapping_id
+        ) AS promote
+      )
+    `);
+    const promotedCount = result?.affectedRows ?? result?.changes ?? 0;
+    if (promotedCount > 0) {
+      applied.push(`member_aliases default_alias backfill (${promotedCount} row(s) promoted)`);
+      console.log(`db: migration applied: promoted ${promotedCount} member_aliases.default_alias row(s)`);
+    } else {
+      console.log("db: schema ok: member_aliases.default_alias backfill has no gaps to fill");
+    }
+  }
+
   // Drop guild_members.chat_member_mapping_id: superseded by member_aliases.
   if (await columnExists(db, "guild_members", "chat_member_mapping_id", isSqlite)) {
     if (isSqlite) {
@@ -921,136 +978,52 @@ export async function ensureSchemaMigrations() {
     console.log("db: migration applied: dropped guild_members.chat_member_mapping_id");
   }
 
-  // chat_member_mapping.handle/app/primary_guild_member_id: snapshot of the alias an admin has
-  // designated as this identity's primary account (webadmin "Edit Mapping"). Added after
-  // guild_members/member_aliases above since primary_guild_member_id references guild_members.
+  // chat_member_mapping no longer has display columns of its own — name/handle/app/
+  // primary_guild_member_id, and the long-deferred legacy discord_handle/discord_id, are all
+  // dropped here. A mapping's display identity now resolves live via
+  // member_aliases.default_alias -> guild_members.handle (see services/userMappings.js). This is
+  // safe to run unconditionally every boot: the guild_members.handle and member_aliases backfills
+  // above (which were the reason discord_handle/discord_id were kept around) already ran earlier
+  // in this same function, ahead of this point, on every boot including this one.
   if (await tableExists(db, "chat_member_mapping", isSqlite)) {
-    if (!(await columnExists(db, "chat_member_mapping", "handle", isSqlite))) {
-      await db.query(
-        isSqlite
-          ? "ALTER TABLE chat_member_mapping ADD COLUMN handle TEXT NULL"
-          : "ALTER TABLE chat_member_mapping ADD COLUMN handle VARCHAR(255) NULL",
-      );
-      applied.push("chat_member_mapping.handle column");
-      console.log("db: migration applied: added chat_member_mapping.handle column");
-    } else {
-      console.log("db: schema ok: chat_member_mapping.handle column already exists");
+    const dropCols = [];
+    for (const col of ["name", "handle", "app", "primary_guild_member_id", "discord_handle", "discord_id"]) {
+      if (await columnExists(db, "chat_member_mapping", col, isSqlite)) dropCols.push(col);
     }
-
-    if (!(await columnExists(db, "chat_member_mapping", "app", isSqlite))) {
-      await db.query(
-        isSqlite
-          ? "ALTER TABLE chat_member_mapping ADD COLUMN app TEXT NULL"
-          : "ALTER TABLE chat_member_mapping ADD COLUMN app VARCHAR(20) NULL",
-      );
-      applied.push("chat_member_mapping.app column");
-      console.log("db: migration applied: added chat_member_mapping.app column");
-    } else {
-      console.log("db: schema ok: chat_member_mapping.app column already exists");
-    }
-
-    if (!(await columnExists(db, "chat_member_mapping", "primary_guild_member_id", isSqlite))) {
-      await db.query(
-        isSqlite
-          ? "ALTER TABLE chat_member_mapping ADD COLUMN primary_guild_member_id INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL"
-          : "ALTER TABLE chat_member_mapping ADD COLUMN primary_guild_member_id INT NULL",
-      );
-      applied.push("chat_member_mapping.primary_guild_member_id column");
-      console.log("db: migration applied: added chat_member_mapping.primary_guild_member_id column");
-    } else {
-      console.log("db: schema ok: chat_member_mapping.primary_guild_member_id column already exists");
-    }
-
-    if (
-      !isSqlite &&
-      !(await constraintExists(
-        db,
-        "chat_member_mapping",
-        "fk_chat_member_mapping_primary_guild_member",
-        isSqlite,
-      ))
-    ) {
-      await db.query(
-        "ALTER TABLE chat_member_mapping ADD CONSTRAINT fk_chat_member_mapping_primary_guild_member FOREIGN KEY (primary_guild_member_id) REFERENCES guild_members(id) ON DELETE SET NULL",
-      );
-      applied.push("chat_member_mapping.primary_guild_member_id foreign key");
-      console.log("db: migration applied: added chat_member_mapping.primary_guild_member_id foreign key");
-    }
-  }
-
-  // chat_member_mapping.discord_handle/discord_id are DELIBERATELY NOT auto-dropped here.
-  // Production has existing chat_member_mapping rows but guild_members is net new — this
-  // migration always runs before the bot ever gets a chance to sync (see the member_aliases
-  // backfill above), so guild_members may still be empty or only partially populated on the very
-  // boot these columns would otherwise be dropped on. Since they're the only remaining source
-  // for the member_aliases backfill above, dropping them automatically on some unpredictable
-  // boot risks permanently losing the ability to link anyone who hasn't synced into
-  // guild_members yet. Once production is confirmed to have backfilled member_aliases as
-  // expected (e.g. checking its row count against guild_members), drop these columns via a
-  // separate, explicit, manually-triggered migration step — do not re-add this as an automatic
-  // step without re-solving the ordering problem described above.
-  //
-  // That future step, when ready, is exactly what used to run here:
-  //   MySQL:  ALTER TABLE chat_member_mapping DROP COLUMN discord_handle;
-  //           ALTER TABLE chat_member_mapping DROP COLUMN discord_id;
-  //   SQLite: rebuild the table without those columns (both are UNIQUE, so SQLite's
-  //           DROP COLUMN can't remove them directly) — wrap in
-  //           PRAGMA foreign_keys = OFF / ON, since several tables (member_aliases,
-  //           plusplus_tracking, member_emoji_tracking, member_repost_tracking,
-  //           trigger_response_user_history, scheduled_messages, pin_history) FK-reference
-  //           chat_member_mapping(id), some ON DELETE CASCADE, and foreign_keys enforcement
-  //           defaults ON in this SQLite build — see git history for the exact statements.
-
-  // Legacy discord_handle/discord_id are relaxed to NULLable (data kept) so INSERTs that only set
-  // name (createUserMapping) don't fail NOT NULL. UNIQUE stays; multiple NULLs are allowed.
-  {
-    const legacyCols = [];
-    for (const col of ["discord_handle", "discord_id"]) {
-      if (
-        (await columnExists(db, "chat_member_mapping", col, isSqlite)) &&
-        (await isColumnNotNull(db, "chat_member_mapping", col, isSqlite))
-      ) {
-        legacyCols.push(col);
-      }
-    }
-    if (legacyCols.length > 0) {
+    if (dropCols.length > 0) {
       if (isSqlite) {
-        // Table rebuild; FKs off so DROP TABLE doesn't cascade into the child tables.
+        // name/discord_handle/discord_id are UNIQUE; SQLite's DROP COLUMN can't remove a UNIQUE
+        // column directly — rebuild the table keeping only id. FKs off so DROP TABLE doesn't
+        // cascade into child tables (member_aliases, plusplus_tracking, etc. all reference
+        // chat_member_mapping(id), several ON DELETE CASCADE).
         await db.query("PRAGMA foreign_keys = OFF");
         try {
-          await db.query(`
-            CREATE TABLE chat_member_mapping_new (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              name TEXT NOT NULL UNIQUE,
-              discord_handle TEXT NULL UNIQUE,
-              discord_id TEXT NULL UNIQUE,
-              handle TEXT NULL,
-              app TEXT NULL,
-              primary_guild_member_id INTEGER NULL REFERENCES guild_members(id) ON DELETE SET NULL
-            )
-          `);
-          const have = new Set();
-          for (const c of ["id", "name", "discord_handle", "discord_id", "handle", "app", "primary_guild_member_id"]) {
-            if (await columnExists(db, "chat_member_mapping", c, isSqlite)) have.add(c);
-          }
-          const copyCols = [...have].join(", ");
-          await db.query(
-            `INSERT INTO chat_member_mapping_new (${copyCols}) SELECT ${copyCols} FROM chat_member_mapping`,
-          );
+          await db.query("CREATE TABLE chat_member_mapping_new (id INTEGER PRIMARY KEY AUTOINCREMENT)");
+          await db.query("INSERT INTO chat_member_mapping_new (id) SELECT id FROM chat_member_mapping");
           await db.query("DROP TABLE chat_member_mapping");
           await db.query("ALTER TABLE chat_member_mapping_new RENAME TO chat_member_mapping");
         } finally {
           await db.query("PRAGMA foreign_keys = ON");
         }
       } else {
-        for (const col of legacyCols) {
-          await db.query(`ALTER TABLE chat_member_mapping MODIFY COLUMN ${col} VARCHAR(255) NULL`);
+        if (
+          await constraintExists(
+            db,
+            "chat_member_mapping",
+            "fk_chat_member_mapping_primary_guild_member",
+            isSqlite,
+          )
+        ) {
+          await db.query(
+            "ALTER TABLE chat_member_mapping DROP FOREIGN KEY fk_chat_member_mapping_primary_guild_member",
+          );
         }
+        await db.query(
+          `ALTER TABLE chat_member_mapping ${dropCols.map((c) => `DROP COLUMN ${c}`).join(", ")}`,
+        );
       }
-      applied.push(`chat_member_mapping: ${legacyCols.join(", ")} made nullable`);
-      console.log(
-        `db: migration applied: chat_member_mapping ${legacyCols.join(", ")} made nullable`,
-      );
+      applied.push(`chat_member_mapping: dropped ${dropCols.join(", ")}`);
+      console.log(`db: migration applied: chat_member_mapping dropped ${dropCols.join(", ")}`);
     }
   }
 

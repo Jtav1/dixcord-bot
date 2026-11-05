@@ -101,7 +101,6 @@ Unlike `POST /api/guild-members/sync`, this is the one path that creates a `guil
   "members": [
     {
       "id": 1,
-      "name": "Justin flavored sauce",
       "handle": "normal_justin",
       "platformUserId": "100000000000000006",
       "nickname": "JT",
@@ -121,7 +120,6 @@ Unlike `POST /api/guild-members/sync`, this is the one path that creates a `guil
     },
     {
       "id": null,
-      "name": null,
       "handle": null,
       "platformUserId": "999999999999999999",
       "nickname": "Ghost",
@@ -174,7 +172,7 @@ Admin-only. Read-only list of `guild_members` rows with no `member_aliases` row 
 
 ## GET /api/guild-members/all?app=discord&search=jt
 
-Admin-only. Every `guild_members` row, linked or not — the manual-link picker's data source. Unlike `GET /api/guild-members/unlinked`, already-linked rows are included (with `linkedMappingId`/`linkedMappingName`), so an admin can see and deliberately move a row to a different identity; linking again just moves it, since `member_aliases.guild_member_id` is unique.
+Admin-only. Every `guild_members` row, linked or not — the manual-link picker's data source. Unlike `GET /api/guild-members/unlinked`, already-linked rows are included (with `linkedMappingId`), so an admin can see and deliberately move a row to a different identity; linking again just moves it, since `member_aliases.guild_member_id` is unique.
 
 **200 OK**
 
@@ -192,8 +190,7 @@ Admin-only. Every `guild_members` row, linked or not — the manual-link picker'
       "roles": [],
       "joinedAt": "2024-01-01 00:00:00",
       "syncedAt": "2026-09-12 07:20:48",
-      "linkedMappingId": 1,
-      "linkedMappingName": "Justin flavored sauce"
+      "linkedMappingId": 1
     },
     {
       "id": 42,
@@ -205,8 +202,7 @@ Admin-only. Every `guild_members` row, linked or not — the manual-link picker'
       "roles": [],
       "joinedAt": null,
       "syncedAt": "2026-09-12 07:20:48",
-      "linkedMappingId": null,
-      "linkedMappingName": null
+      "linkedMappingId": null
     }
   ]
 }
@@ -244,7 +240,8 @@ Admin-only. Every `guild_members` row currently linked (via `member_aliases`) to
         }
       ],
       "joinedAt": "2024-01-01 00:00:00",
-      "syncedAt": "2026-09-12 07:20:48"
+      "syncedAt": "2026-09-12 07:20:48",
+      "defaultAlias": true
     }
   ]
 }

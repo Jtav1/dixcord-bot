@@ -52,7 +52,6 @@
           <td class="text-body-2">
             <UserIdentityChip
               :mapping-id="user.id"
-              :name="user.name"
               :nickname="user.nickname"
               :handle="user.handle"
             />
@@ -87,17 +86,16 @@ defineEmits(["select-user"]);
 const search = ref("");
 
 /**
- * Users filtered by the search box, matching name, nickname, or handle case-insensitively.
- * @returns {Array<{ id: number, name: string, handle: string|null, nickname: string|null }>}
+ * Users filtered by the search box, matching nickname or handle case-insensitively.
+ * @returns {Array<{ id: number, handle: string|null, nickname: string|null }>}
  */
 const filteredUsers = computed(() => {
   const term = search.value?.trim().toLowerCase();
   if (!term) return props.users;
   return props.users.filter((user) => {
-    const name = String(user.name ?? "").toLowerCase();
     const nickname = String(user.nickname ?? "").toLowerCase();
     const handle = String(user.handle ?? "").toLowerCase();
-    return name.includes(term) || nickname.includes(term) || handle.includes(term);
+    return nickname.includes(term) || handle.includes(term);
   });
 });
 </script>

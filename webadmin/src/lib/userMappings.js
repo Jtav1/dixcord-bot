@@ -1,9 +1,10 @@
 import { apiFetch, apiFetchJson } from "./http.js";
 
 /**
- * Paginated, searchable list of user mappings (bare canonical identity: id + name).
+ * Paginated, searchable list of user mappings (bare canonical identity: id, plus handle/app
+ * resolved from each mapping's default alias).
  * @param {{ limit?: number, offset?: number, search?: string }} [options]
- * @returns {Promise<{ items: Array<{id:number,name:string}>, total: number }>}
+ * @returns {Promise<{ items: Array<{id:number,handle:string|null,app:string|null,defaultGuildMemberId:number|null}>, total: number }>}
  */
 export async function fetchUserMappings({ limit = 25, offset = 0, search = "" } = {}) {
   const params = new URLSearchParams({ app: "discord", limit: String(limit), offset: String(offset) });
@@ -13,7 +14,9 @@ export async function fetchUserMappings({ limit = 25, offset = 0, search = "" } 
 }
 
 /**
- * @param {{ name: string }} fields
+ * Create a user mapping by linking it to an unlinked guild_member, which becomes its sole
+ * (default) alias.
+ * @param {{ guildMemberId: number }} fields
  * @returns {Promise<object>}
  */
 export async function createUserMapping(fields) {
@@ -27,22 +30,7 @@ export async function createUserMapping(fields) {
 }
 
 /**
- * @param {number} id
- * @param {{ name?: string }} fields
- * @returns {Promise<object>}
- */
-export async function updateUserMapping(id, fields) {
-  const data = await apiFetchJson(
-    "PUT",
-    `/user-mappings/${id}?app=discord`,
-    fields,
-    "Update user mapping",
-  );
-  return data.userMapping;
-}
-
-/**
- * Designate one of a mapping's already-linked aliases as its primary account.
+ * Designate one of a mapping's already-linked aliases as its default alias.
  * @param {number} id
  * @param {number} guildMemberId
  * @returns {Promise<object>}

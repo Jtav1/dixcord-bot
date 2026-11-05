@@ -126,15 +126,15 @@ export function formatPinTimestamp(timestamp) {
 }
 
 /**
- * Build a lookup map from chat_member_mapping internal id to display name.
- * @param {Array<{ id: number, name: string }>} userMappings User mapping rows.
+ * Build a lookup map from chat_member_mapping internal id to display handle.
+ * @param {Array<{ id: number, handle: string|null }>} userMappings User mapping rows.
  * @returns {Map<number, string>}
  */
 export function buildMappingIdNameMap(userMappings) {
   const map = new Map();
   for (const row of userMappings) {
-    if (row?.id != null && row?.name != null) {
-      map.set(Number(row.id), String(row.name));
+    if (row?.id != null && row?.handle != null) {
+      map.set(Number(row.id), String(row.handle));
     }
   }
   return map;

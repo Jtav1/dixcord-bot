@@ -46,8 +46,8 @@ Routes added for admin panel backend preparation. **Write** routes require admin
 |--------|------|------|-------------|
 | GET | `/api/user-mappings?app=discord&limit=&offset=&search=` | admin, bot, or webview | Paginated list |
 | GET | `/api/user-mappings/:id?app=discord` | admin or bot | Get one |
-| POST | `/api/user-mappings` | admin | Create `{ app, name, handle, platformUserId }` |
-| PUT | `/api/user-mappings/:id` | admin | Update |
+| POST | `/api/user-mappings` | admin | Create by linking an unlinked guild_member: `{ guildMemberId }` |
+| POST | `/api/user-mappings/:id/primary-alias` | admin | Override the mapping's default alias: `{ guildMemberId }` |
 | DELETE | `/api/user-mappings/:id?app=discord` | admin | Delete |
 
 ## Config (extended)

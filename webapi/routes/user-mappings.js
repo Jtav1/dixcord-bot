@@ -5,9 +5,8 @@ import {
   deleteUserMapping,
   getUserMappingById,
   listUserMappings,
-  updateUserMapping,
 } from "../services/userMappings.js";
-import { setPrimaryAlias } from "../services/guildMembers.js";
+import { guildMemberExists, isGuildMemberLinked, setPrimaryAlias } from "../services/guildMembers.js";
 import {
   CHAT_APP_PARAM_ERROR,
   resolveChatAppFromRequest,
@@ -46,7 +45,7 @@ const router = express.Router();
  *       - name: search
  *         in: query
  *         required: false
- *         description: Case-insensitive substring match against name.
+ *         description: Case-insensitive substring match against the mapping's default alias handle.
  *         schema: { type: string }
  *     responses:
  *       '200':
@@ -63,8 +62,9 @@ const router = express.Router();
  *                     type: object
  *                     properties:
  *                       id: { type: integer }
- *                       name: { type: string }
- *                       discordHandle: { type: string, description: "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row." }
+ *                       handle: { type: string, nullable: true, description: "Resolved from this mapping's default alias (member_aliases.default_alias) -> guild_members.handle. Null if the mapping has no aliases yet." }
+ *                       app: { type: string, nullable: true, description: "The default alias's app." }
+ *                       defaultGuildMemberId: { type: integer, nullable: true }
  *                 total: { type: integer }
  *                 limit: { type: integer }
  *                 offset: { type: integer }
@@ -126,8 +126,9 @@ router.get("/", authenticate, async (req, res) => {
  *                   type: object
  *                   properties:
  *                     id: { type: integer }
- *                     name: { type: string }
- *                     discordHandle: { type: string, description: "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row." }
+ *                     handle: { type: string, nullable: true, description: "Resolved from this mapping's default alias (member_aliases.default_alias) -> guild_members.handle. Null if the mapping has no aliases yet." }
+ *                     app: { type: string, nullable: true, description: "The default alias's app." }
+ *                     defaultGuildMemberId: { type: integer, nullable: true }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -160,8 +161,9 @@ router.get("/:id", authenticate, async (req, res) => {
 
 /**
  * POST /api/user-mappings
- * Create a user mapping.
- * Body: { app, name }
+ * Create a user mapping by linking it to an unlinked guild_member in one atomic action — that
+ * guild_member becomes the mapping's sole (and therefore default) alias.
+ * Body: { guildMemberId }
  * Auth: admin required.
  * @openapi
  * /api/user-mappings:
@@ -170,21 +172,17 @@ router.get("/:id", authenticate, async (req, res) => {
  *     tags: [User Mappings]
  *     summary: Create a user mapping
  *     description: >
- *       Requires the admin role. Creates a bare identity (id + name) with no guild_members
- *       aliases linked yet — linking is a separate, future admin action.
+ *       Requires the admin role. Creates a new identity and immediately links it to the given
+ *       guild_member (must not already be linked to any mapping).
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [app, name]
+ *             required: [guildMemberId]
  *             properties:
- *               app:
- *                 type: string
- *                 enum: [discord, fluxer]
- *                 description: Chat app, validated but otherwise unused. Currently "discord" and "fluxer" are supported.
- *               name: { type: string }
+ *               guildMemberId: { type: integer }
  *     responses:
  *       '201':
  *         description: Created user mapping.
@@ -198,93 +196,9 @@ router.get("/:id", authenticate, async (req, res) => {
  *                   type: object
  *                   properties:
  *                     id: { type: integer }
- *                     name: { type: string }
- *                     discordHandle: { type: string, description: "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row." }
- *       '400':
- *         $ref: '#/components/responses/BadRequest'
- *       '401':
- *         $ref: '#/components/responses/Unauthorized'
- *       '403':
- *         $ref: '#/components/responses/ForbiddenRole'
- *       '500':
- *         $ref: '#/components/responses/ServerError'
- */
-router.post("/", authenticate, requireAdmin, async (req, res) => {
-  try {
-    const app = resolveChatAppFromRequest(req);
-    if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
-
-    const name = String(req.body?.name ?? "").trim();
-    if (!name) {
-      return res.status(400).json({
-        ok: false,
-        error: "name is required",
-      });
-    }
-
-    const id = await createUserMapping({ name });
-    if (id == null) {
-      return res.status(500).json({ ok: false, error: "Failed to create user mapping" });
-    }
-
-    const row = await getUserMappingById(id);
-    await recordAudit(req.user.id, "create", "chat_member_mapping", id, { name });
-    res.status(201).json({ ok: true, userMapping: row });
-  } catch (err) {
-    console.error("POST /api/user-mappings error:", err);
-    if (err.code === "ER_DUP_ENTRY" || String(err.message).includes("UNIQUE")) {
-      return res.status(400).json({ ok: false, error: "Duplicate name" });
-    }
-    // Admin-only route; the DB error text is safe to show and makes failures diagnosable.
-    res.status(500).json({ ok: false, error: `Failed to create user mapping: ${err.message}` });
-  }
-});
-
-/**
- * PUT /api/user-mappings/:id
- * Update a user mapping.
- * Body: { app, name }
- * Auth: admin required.
- * @openapi
- * /api/user-mappings/{id}:
- *   put:
- *     operationId: updateUserMapping
- *     tags: [User Mappings]
- *     summary: Update a user mapping
- *     description: Requires the admin role.
- *     parameters:
- *       - name: id
- *         in: path
- *         required: true
- *         schema: { type: integer }
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [app, name]
- *             properties:
- *               app:
- *                 type: string
- *                 enum: [discord, fluxer]
- *                 description: Chat app, validated but otherwise unused. Currently "discord" and "fluxer" are supported.
- *               name: { type: string }
- *     responses:
- *       '200':
- *         description: Updated user mapping.
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 ok: { type: boolean, enum: [true] }
- *                 userMapping:
- *                   type: object
- *                   properties:
- *                     id: { type: integer }
- *                     name: { type: string }
- *                     discordHandle: { type: string, description: "Legacy column, present only if chat_member_mapping.discord_handle exists and is non-null for this row." }
+ *                     handle: { type: string, nullable: true }
+ *                     app: { type: string, nullable: true }
+ *                     defaultGuildMemberId: { type: integer, nullable: true }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':
@@ -296,42 +210,36 @@ router.post("/", authenticate, requireAdmin, async (req, res) => {
  *       '500':
  *         $ref: '#/components/responses/ServerError'
  */
-router.put("/:id", authenticate, requireAdmin, async (req, res) => {
+router.post("/", authenticate, requireAdmin, async (req, res) => {
   try {
     const app = resolveChatAppFromRequest(req);
     if (!app) return res.status(400).json(CHAT_APP_PARAM_ERROR);
 
-    const id = parseInt(req.params.id, 10);
-    if (Number.isNaN(id)) {
-      return res.status(400).json({ ok: false, error: "Invalid id" });
+    const guildMemberId = parseInt(req.body?.guildMemberId, 10);
+    if (Number.isNaN(guildMemberId)) {
+      return res.status(400).json({ ok: false, error: "guildMemberId is required" });
+    }
+    if (!(await guildMemberExists(guildMemberId))) {
+      return res.status(404).json({ ok: false, error: "Guild member not found" });
+    }
+    if (await isGuildMemberLinked(guildMemberId)) {
+      return res.status(400).json({ ok: false, error: "Guild member is already linked to a mapping" });
     }
 
-    const updated = await updateUserMapping(id, { name: req.body?.name });
-
-    if (!updated) {
-      const existing = await getUserMappingById(id);
-      if (!existing) {
-        return res.status(404).json({ ok: false, error: "User mapping not found" });
-      }
-      return res.status(400).json({
-        ok: false,
-        error: "Provide name to update",
-      });
-    }
-
+    const id = await createUserMapping({ guildMemberId });
     const row = await getUserMappingById(id);
-    await recordAudit(req.user.id, "update", "chat_member_mapping", id, {});
-    res.json({ ok: true, userMapping: row });
+    await recordAudit(req.user.id, "create", "chat_member_mapping", id, { guildMemberId });
+    res.status(201).json({ ok: true, userMapping: row });
   } catch (err) {
-    console.error("PUT /api/user-mappings/:id error:", err);
-    res.status(500).json({ ok: false, error: "Failed to update user mapping" });
+    console.error("POST /api/user-mappings error:", err);
+    res.status(500).json({ ok: false, error: "Failed to create user mapping" });
   }
 });
 
 /**
  * POST /api/user-mappings/:id/primary-alias
- * Designate one of this mapping's already-linked guild_members aliases as its primary account,
- * snapshotting that alias's app/handle onto chat_member_mapping itself.
+ * Designate one of this mapping's already-linked guild_members aliases as its default alias
+ * (member_aliases.default_alias), overriding the normal "newest alias wins" rule.
  * Body: { guildMemberId }
  * Auth: admin required.
  * @openapi
@@ -339,7 +247,7 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
  *   post:
  *     operationId: setUserMappingPrimaryAlias
  *     tags: [User Mappings]
- *     summary: Set a user mapping's primary alias
+ *     summary: Set a user mapping's default alias
  *     description: >
  *       Requires the admin role. guildMemberId must already be linked to this mapping via
  *       member_aliases (link it first with POST /api/guild-members/{guildMemberId}/link).
@@ -370,10 +278,9 @@ router.put("/:id", authenticate, requireAdmin, async (req, res) => {
  *                   type: object
  *                   properties:
  *                     id: { type: integer }
- *                     name: { type: string }
- *                     handle: { type: string }
- *                     app: { type: string }
- *                     primaryGuildMemberId: { type: integer }
+ *                     handle: { type: string, nullable: true }
+ *                     app: { type: string, nullable: true }
+ *                     defaultGuildMemberId: { type: integer, nullable: true }
  *       '400':
  *         $ref: '#/components/responses/BadRequest'
  *       '401':

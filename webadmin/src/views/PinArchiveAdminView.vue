@@ -146,7 +146,7 @@ onMounted(async () => {
   await load(1);
   try {
     const { items: users } = await fetchUserMappings({ limit: 200 });
-    nameMap.value = new Map(users.map((u) => [u.id, u.name]));
+    nameMap.value = new Map(users.map((u) => [u.id, u.handle]));
   } catch (err) {
     console.warn("Failed to load user mappings for pin archive:", err);
   }

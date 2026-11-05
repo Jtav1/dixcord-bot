@@ -312,7 +312,7 @@ router.get("/unlinked", authenticate, requireAdmin, async (req, res) => {
  *     summary: List every guild_members row, linked or not, for the manual-link picker
  *     description: >
  *       Unlike GET /api/guild-members/unlinked, this includes rows already linked to an
- *       identity (with that identity's id/name), so an admin can see and deliberately move
+ *       identity (with that identity's id), so an admin can see and deliberately move
  *       one to a different chat_member_mapping — linking again just moves it, since
  *       member_aliases.guild_member_id is unique.
  *     parameters:
@@ -353,7 +353,6 @@ router.get("/unlinked", authenticate, requireAdmin, async (req, res) => {
  *                       joinedAt: { type: string, nullable: true }
  *                       syncedAt: { type: string }
  *                       linkedMappingId: { type: integer, nullable: true, description: chat_member_mapping.id this row is currently linked to, or null if unlinked. }
- *                       linkedMappingName: { type: string, nullable: true }
  *       '401':
  *         $ref: '#/components/responses/Unauthorized'
  *       '403':
@@ -684,7 +683,6 @@ router.delete("/:guildMemberId/link", authenticate, requireAdmin, async (req, re
  *                     type: object
  *                     properties:
  *                       id: { type: integer, nullable: true, description: chat_member_mapping.id, or null if unlinked }
- *                       name: { type: string, nullable: true }
  *                       handle: { type: string, nullable: true }
  *                       platformUserId: { type: string }
  *                       nickname: { type: string, nullable: true }

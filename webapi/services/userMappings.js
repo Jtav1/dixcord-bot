@@ -1,39 +1,36 @@
 /**
- * CRUD for chat_member_mapping rows (bare canonical identity: id + name only).
- * Linking a mapping to its guild_members aliases is a separate, future admin action.
+ * CRUD for chat_member_mapping rows (bare canonical identity: just an id). A mapping's display
+ * identity (handle/app) is resolved live via its default alias (member_aliases.default_alias ->
+ * guild_members), not stored on chat_member_mapping itself.
  */
 
 import db from "../config/db.js";
+import { createBareChatMemberMappingId } from "./chatMemberMapping.js";
+import { linkGuildMemberAlias } from "./guildMembers.js";
+
+const JOIN_DEFAULT_ALIAS = `
+  FROM chat_member_mapping cmm
+  LEFT JOIN member_aliases ma ON ma.chat_member_mapping_id = cmm.id AND ma.default_alias = 1
+  LEFT JOIN guild_members gm ON gm.id = ma.guild_member_id
+`;
 
 /**
- * Serialize a mapping row for API responses. `discordHandle` is included only when the
- * (legacy, not-auto-dropped) chat_member_mapping.discord_handle column exists and is non-null
- * for this row — SELECT * naturally omits the property when the column doesn't exist.
- * `handle`/`app`/`primaryGuildMemberId` snapshot the alias an admin has designated as this
- * identity's primary account (see services/guildMembers.js setPrimaryAlias).
+ * Serialize a joined mapping row for API responses.
  * @param {Record<string, unknown>} row
- * @returns {{ id: number, name: string, discordHandle?: string, handle?: string, app?: string, primaryGuildMemberId?: number }}
+ * @returns {{ id: number, handle: string|null, app: string|null, defaultGuildMemberId: number|null }}
  */
 export function serializeUserMappingRow(row) {
-  const result = { id: Number(row.id), name: String(row.name) };
-  if (row.discord_handle != null) {
-    result.discordHandle = String(row.discord_handle);
-  }
-  if (row.handle != null) {
-    result.handle = String(row.handle);
-  }
-  if (row.app != null) {
-    result.app = String(row.app);
-  }
-  if (row.primary_guild_member_id != null) {
-    result.primaryGuildMemberId = Number(row.primary_guild_member_id);
-  }
-  return result;
+  return {
+    id: Number(row.id),
+    handle: row.handle != null ? String(row.handle) : row.nickname != null ? String(row.nickname) : null,
+    app: row.app != null ? String(row.app) : null,
+    defaultGuildMemberId: row.defaultGuildMemberId != null ? Number(row.defaultGuildMemberId) : null,
+  };
 }
 
 /**
  * List user mappings with pagination.
- * @param {{ limit?: number, offset?: number, search?: string }} opts
+ * @param {{ limit?: number, offset?: number, search?: string }} opts `search` matches the default alias's handle (substring, case-insensitive).
  * @returns {Promise<{ rows: Array<ReturnType<typeof serializeUserMappingRow>>, total: number }>}
  */
 export async function listUserMappings(opts = {}) {
@@ -41,19 +38,20 @@ export async function listUserMappings(opts = {}) {
   const offset = Math.max(0, opts.offset ?? 0);
   const search = opts.search?.trim();
 
-  let countSql = "SELECT COUNT(*) AS total FROM chat_member_mapping";
-  let listSql = "SELECT * FROM chat_member_mapping";
+  let countSql = `SELECT COUNT(*) AS total ${JOIN_DEFAULT_ALIAS}`;
+  let listSql = `SELECT cmm.id AS id, gm.handle AS handle, gm.nickname AS nickname, gm.app AS app,
+                        ma.guild_member_id AS defaultGuildMemberId ${JOIN_DEFAULT_ALIAS}`;
   const params = [];
 
   if (search) {
-    const where = " WHERE name LIKE ?";
+    const where = " WHERE gm.handle LIKE ?";
     const pattern = `%${search}%`;
     countSql += where;
     listSql += where;
     params.push(pattern);
   }
 
-  listSql += " ORDER BY id ASC LIMIT ? OFFSET ?";
+  listSql += " ORDER BY cmm.id ASC LIMIT ? OFFSET ?";
 
   const [countRows] = await db.query(countSql, params);
   const total = Number(countRows?.[0]?.total ?? 0);
@@ -70,7 +68,10 @@ export async function listUserMappings(opts = {}) {
  */
 export async function getUserMappingById(id) {
   const [rows] = await db.query(
-    "SELECT * FROM chat_member_mapping WHERE id = ?",
+    `SELECT cmm.id AS id, gm.handle AS handle, gm.nickname AS nickname, gm.app AS app,
+            ma.guild_member_id AS defaultGuildMemberId
+     ${JOIN_DEFAULT_ALIAS}
+     WHERE cmm.id = ?`,
     [id],
   );
   if (!rows || rows.length === 0) return null;
@@ -78,29 +79,15 @@ export async function getUserMappingById(id) {
 }
 
 /**
- * @param {{ name: string }} payload
- * @returns {Promise<number|null>}
+ * Create a chat_member_mapping identity and immediately link it to an unlinked guild_member,
+ * which becomes its sole (and therefore default) alias.
+ * @param {{ guildMemberId: number }} payload
+ * @returns {Promise<number>} the new chat_member_mapping.id
  */
-export async function createUserMapping(payload) {
-  const [result] = await db.query(
-    "INSERT INTO chat_member_mapping (name) VALUES (?)",
-    [payload.name.trim()],
-  );
-  return result?.insertId ?? result?.lastInsertRowid ?? null;
-}
-
-/**
- * @param {number} id
- * @param {{ name?: string }} updates
- * @returns {Promise<boolean>}
- */
-export async function updateUserMapping(id, updates) {
-  if (updates.name === undefined) return false;
-  const [result] = await db.query(
-    "UPDATE chat_member_mapping SET name = ? WHERE id = ?",
-    [String(updates.name).trim(), id],
-  );
-  return (result?.affectedRows ?? result?.changes ?? 0) > 0;
+export async function createUserMapping({ guildMemberId }) {
+  const id = await createBareChatMemberMappingId();
+  await linkGuildMemberAlias(guildMemberId, id);
+  return id;
 }
 
 /**
