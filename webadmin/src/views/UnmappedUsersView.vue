@@ -52,7 +52,7 @@ import MemberAliasesDialog from "../components/MemberAliasesDialog.vue";
 import { usePaginatedResource } from "../composables/usePaginatedResource.js";
 import { useSnackbar } from "../composables/useSnackbar.js";
 import { fetchUnlinkedGuildMembers, linkGuildMemberAlias } from "../lib/guildMembers.js";
-import { createUserMapping, setPrimaryAlias } from "../lib/userMappings.js";
+import { createUserMapping, fetchUserMappings, setPrimaryAlias } from "../lib/userMappings.js";
 
 const { notify } = useSnackbar();
 
@@ -95,7 +95,8 @@ const resolvingId = ref(null);
 /**
  * Create a chat_member_mapping for this guild_member (named after its handle/nickname), link
  * it, set it as that mapping's primary alias, then open Manage Aliases so the admin can keep
- * going (link other-app aliases, rename, etc).
+ * going (link other-app aliases, rename, etc). chat_member_mapping.name is globally unique, so
+ * if another identity already owns that name, link to the existing mapping instead of failing.
  * @param {{id:number,app:string,handle:string|null,nickname:string|null,platformUserId:string}} item
  * @returns {Promise<void>}
  */
@@ -103,7 +104,14 @@ async function onResolve(item) {
   resolvingId.value = item.id;
   try {
     const name = item.handle || item.nickname || item.platformUserId;
-    const mapping = await createUserMapping({ name });
+    const mapping = await createUserMapping({ name }).catch(async (err) => {
+      if (!(err instanceof Error) || err.message !== "Duplicate name") throw err;
+      const { items: matches } = await fetchUserMappings({ search: name, limit: 50 });
+      const existing = matches.find((m) => m.name.toLowerCase() === name.toLowerCase());
+      if (!existing) throw err;
+      notify(`A mapping named "${name}" already exists — linking to it instead.`, { color: "info" });
+      return existing;
+    });
     await linkGuildMemberAlias(item.id, mapping.id);
     aliasesTarget.value = await setPrimaryAlias(mapping.id, item.id);
     aliasesDialogOpen.value = true;
