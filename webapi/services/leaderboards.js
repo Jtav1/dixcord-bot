@@ -7,32 +7,48 @@
  */
 
 import db from "../config/db.js";
+import { isSqliteDb } from "../scripts/schemaUtils.js";
 import {
   getChatMemberMappingIdByPlatformUserId,
   isChatMemberAppSupported,
 } from "./chatMemberMapping.js";
 
 /**
- * Correlated subquery picking one representative guild_members.platform_user_id for a
- * chat_member_mapping id — the most-recently-synced linked alias. A chat_member_mapping can
- * have multiple aliases (multiple guilds); this picks one for display purposes. Portable
- * across MySQL/SQLite (no window functions).
- * @param {string} mappingIdExpr - SQL expression for the chat_member_mapping.id to resolve
+ * SQL fragment restricting a representative-alias subquery to one app, or "" when the caller
+ * is app-agnostic. `app` must already be validated (isChatMemberAppSupported) by the caller —
+ * re-checked here too so an unvalidated value is ignored rather than interpolated.
+ * @param {string} [app]
  * @returns {string}
  */
-export function representativePlatformIdSubquery(mappingIdExpr) {
-  return `(SELECT gm.platform_user_id FROM guild_members gm JOIN member_aliases ma ON ma.guild_member_id = gm.id WHERE ma.chat_member_mapping_id = ${mappingIdExpr} ORDER BY gm.synced_at DESC LIMIT 1)`;
+function appScopeClause(app) {
+  return app && isChatMemberAppSupported(app) ? ` AND gm.app = '${app}'` : "";
 }
 
 /**
- * Correlated subquery resolving a chat_member_mapping id's display handle via its default alias
- * (member_aliases.default_alias) -> guild_members.handle. Replaces the old
- * chat_member_mapping.name column.
+ * Correlated subquery picking one representative guild_members.platform_user_id for a
+ * chat_member_mapping id — the most-recently-synced linked alias. A chat_member_mapping can
+ * have multiple aliases (multiple guilds, or even multiple apps); pass `app` to scope the pick
+ * to that app's aliases only, so a Discord-scoped query never surfaces a Fluxer snowflake (or
+ * vice versa). Portable across MySQL/SQLite (no window functions).
  * @param {string} mappingIdExpr - SQL expression for the chat_member_mapping.id to resolve
+ * @param {string} [app] - restrict to this app's aliases (e.g. "discord")
  * @returns {string}
  */
-export function representativeHandleSubquery(mappingIdExpr) {
-  return `(SELECT gm.handle FROM guild_members gm JOIN member_aliases ma ON ma.guild_member_id = gm.id WHERE ma.chat_member_mapping_id = ${mappingIdExpr} AND ma.default_alias = 1 LIMIT 1)`;
+export function representativePlatformIdSubquery(mappingIdExpr, app) {
+  return `(SELECT gm.platform_user_id FROM guild_members gm JOIN member_aliases ma ON ma.guild_member_id = gm.id WHERE ma.chat_member_mapping_id = ${mappingIdExpr}${appScopeClause(app)} ORDER BY gm.synced_at DESC LIMIT 1)`;
+}
+
+/**
+ * Correlated subquery resolving a chat_member_mapping id's display handle, preferring its
+ * default alias (member_aliases.default_alias) and otherwise the most-recently-synced one.
+ * Pass `app` to scope to that app's aliases only (see representativePlatformIdSubquery) — the
+ * mapping's single global default_alias can belong to a different app than the caller's.
+ * @param {string} mappingIdExpr - SQL expression for the chat_member_mapping.id to resolve
+ * @param {string} [app] - restrict to this app's aliases (e.g. "discord")
+ * @returns {string}
+ */
+export function representativeHandleSubquery(mappingIdExpr, app) {
+  return `(SELECT gm.handle FROM guild_members gm JOIN member_aliases ma ON ma.guild_member_id = gm.id WHERE ma.chat_member_mapping_id = ${mappingIdExpr}${appScopeClause(app)} ORDER BY ma.default_alias DESC, gm.synced_at DESC LIMIT 1)`;
 }
 
 /**
@@ -93,7 +109,7 @@ function buildPlusplusTimeClause(range = {}) {
 async function aggregatePlusPlusLeaderboard(app, range = {}) {
   if (!isChatMemberAppSupported(app)) return [];
   const { clause, params } = buildPlusplusTimeClause(range);
-  const representativeId = representativePlatformIdSubquery("CAST(pt.string AS INTEGER)");
+  const representativeId = representativePlatformIdSubquery("CAST(pt.string AS INTEGER)", app);
 
   let [results] = await db.query(
     `SELECT
@@ -193,7 +209,7 @@ export async function getPlusPlusVoteHistoryByRowId(rowId, type = "word", app) {
   }
 
   const [rows] = await db.query(
-    `SELECT pt.id, pt.value, pt.timestamp, ${representativePlatformIdSubquery("pt.voter")} AS voter_platform_id
+    `SELECT pt.id, pt.value, pt.timestamp, ${representativePlatformIdSubquery("pt.voter", app)} AS voter_platform_id
      FROM plusplus_tracking pt
      WHERE pt.type = ? AND ${stringMatchClause}
      ORDER BY pt.timestamp ASC, pt.id ASC`,
@@ -244,7 +260,7 @@ export async function getPlusPlusTopVoters(limit, app) {
   if (!isChatMemberAppSupported(app)) return [];
   const n = parseLimit(limit, 3, 50);
   const [rows] = await db.query(
-    `SELECT ${representativePlatformIdSubquery("cm.id")} AS voter, COUNT(*) AS total
+    `SELECT ${representativePlatformIdSubquery("cm.id", app)} AS voter, COUNT(*) AS total
      FROM plusplus_tracking p
      INNER JOIN chat_member_mapping cm ON p.voter = cm.id
      GROUP BY cm.id
@@ -259,6 +275,16 @@ export async function getPlusPlusTopVoters(limit, app) {
 
 const EMOJI_TYPE_WHERE = "(type = 'emoji' OR type IS NULL)";
 const STICKER_TYPE_WHERE = "type = 'sticker'";
+
+/**
+ * guild_emojis.name grouping/matching expression, forced case-sensitive. MySQL's table default
+ * collation (utf8mb4_general_ci) is case-insensitive, so plain `name` in GROUP BY/IN silently
+ * merges distinct, differently-cased custom emojis (e.g. "approve" and "Approve" are different
+ * Discord emoji ids) — their combined frequency then ranks the group, while re-matching by exact
+ * string in JS only recovers one casing's rows, undercounting the displayed total. SQLite's TEXT
+ * columns are already byte-comparison (case-sensitive) by default, so only MySQL needs `BINARY`.
+ */
+const NAME_COL = isSqliteDb() ? "name" : "BINARY name";
 
 /**
  * Shared ranking behind listEmojiFrequency/listStickerFrequency: combines by `name`, not by raw
@@ -290,7 +316,7 @@ async function listFrequencyByName(typeWhere, limit, offset, guildId, appFilter)
   const baseWhere = baseConditions.join(" AND ");
 
   const [countRows] = await db.query(
-    `SELECT COUNT(*) AS total FROM (SELECT name FROM guild_emojis WHERE ${baseWhere} GROUP BY name) t`,
+    `SELECT COUNT(*) AS total FROM (SELECT name FROM guild_emojis WHERE ${baseWhere} GROUP BY ${NAME_COL}) t`,
     baseParams,
   );
   const total = Number(countRows?.[0]?.total ?? 0);
@@ -298,8 +324,8 @@ async function listFrequencyByName(typeWhere, limit, offset, guildId, appFilter)
   const [nameRows] = await db.query(
     `SELECT name FROM guild_emojis
      WHERE ${baseWhere}
-     GROUP BY name
-     ORDER BY SUM(frequency) DESC, name ASC
+     GROUP BY ${NAME_COL}
+     ORDER BY SUM(frequency) DESC, ${NAME_COL} ASC
      LIMIT ? OFFSET ?`,
     [...baseParams, n, off],
   );
@@ -307,8 +333,10 @@ async function listFrequencyByName(typeWhere, limit, offset, guildId, appFilter)
   if (names.length === 0) return { rows: [], total };
 
   // One query for this page's names: builds both byApp and the representative display row.
+  // Matches names case-sensitively (NAME_COL) so this detail fetch recovers exactly the rows
+  // that contributed to the nameRows group's ranking above — never a case-folded subset.
   const namePlaceholders = names.map(() => "?").join(", ");
-  const detailWhere = [...baseConditions, `name IN (${namePlaceholders})`].join(" AND ");
+  const detailWhere = [...baseConditions, `${NAME_COL} IN (${namePlaceholders})`].join(" AND ");
   const [detailRows] = await db.query(
     `SELECT name, id, app, animated, type, frequency FROM guild_emojis WHERE ${detailWhere}`,
     [...baseParams, ...names],
@@ -392,8 +420,8 @@ export async function listEmojiUsersByTotalUsage(limit, offset = 0, app) {
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid,
-            ${representativeHandleSubquery("cm.id")} AS name, SUM(uet.frequency) AS total
+    `SELECT ${representativePlatformIdSubquery("cm.id", app)} AS userid,
+            ${representativeHandleSubquery("cm.id", app)} AS name, SUM(uet.frequency) AS total
      FROM member_emoji_tracking uet
      INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
      INNER JOIN guild_emojis ge ON uet.app = ge.app AND uet.emoid = ge.id
@@ -453,8 +481,8 @@ export async function listStickerUsersByTotalUsage(limit, offset = 0, app) {
   const total = Number(countRows?.[0]?.total ?? 0);
 
   const [rows] = await db.query(
-    `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid,
-            ${representativeHandleSubquery("cm.id")} AS name, SUM(uet.frequency) AS total
+    `SELECT ${representativePlatformIdSubquery("cm.id", app)} AS userid,
+            ${representativeHandleSubquery("cm.id", app)} AS name, SUM(uet.frequency) AS total
      FROM member_emoji_tracking uet
      INNER JOIN chat_member_mapping cm ON uet.userid = cm.id
      INNER JOIN guild_emojis ge ON uet.app = ge.app AND uet.emoid = ge.id
@@ -500,7 +528,7 @@ export async function getTopReposters(limit, app, range = {}) {
   const where = parts.length ? ` WHERE ${parts.join(" AND ")}` : "";
   params.push(n);
   const [rows] = await db.query(
-    `SELECT ${representativePlatformIdSubquery("cm.id")} AS userid, COUNT(*) AS count
+    `SELECT ${representativePlatformIdSubquery("cm.id", app)} AS userid, COUNT(*) AS count
      FROM member_repost_tracking r
      INNER JOIN chat_member_mapping cm ON r.userid = cm.id
      ${where}
