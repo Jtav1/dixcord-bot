@@ -4,6 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
+import multer from "multer";
 import { apiReference } from "@scalar/express-api-reference";
 import db from "./config/db.js";
 import { ensureSchemaMigrations } from "./scripts/ensureSchema.js";
@@ -417,6 +418,11 @@ app.get("/", publicLimiter, (req, res) => {
           "PUT /api/guild-emojis/:internalId (body: { name?, imagePath? }) (bot/admin)",
           "DELETE /api/guild-emojis/:internalId (bot/admin)",
         ],
+        adminRoutes: [
+          "GET /api/guild-emojis/search?app=&type=&animated=&name=&limit=&offset=",
+          "GET /api/guild-emojis/:internalId/image",
+          "POST /api/guild-emojis/:internalId/image (multipart, field \"image\")",
+        ],
       },
       serviceAccounts: {
         authRequired: true,
@@ -653,6 +659,10 @@ app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 app.use((err, req, res, next) => {
   if (err?.type === "entity.too.large") {
     return res.status(413).json({ ok: false, error: "Request body too large" });
+  }
+  if (err instanceof multer.MulterError) {
+    const status = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+    return res.status(status).json({ ok: false, error: err.message });
   }
   console.error(err);
   res.status(500).json({ ok: false, error: "Internal server error" });

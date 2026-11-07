@@ -16,6 +16,23 @@ export function getEmojiFilesRoot() {
 }
 
 /**
+ * The relative path (and required mimetype) webview's lookup expects for a row's image — the
+ * same naming rule the sync downloader uses (discord-bot/fluxer-bot's `emojiFiles.js`).
+ * Stickers are always `.png`: webview's own sticker URL builder (`stickerLeaderboard.js`) only
+ * ever requests `.png` regardless of format, so that's what matching it requires.
+ * @param {{ type: "emoji"|"sticker"|null, name: string, animated: boolean }} row
+ * @returns {{ relativePath: string, mimetype: "image/png"|"image/gif" }}
+ */
+export function canonicalImagePath({ type, name, animated }) {
+  if (type === "sticker") {
+    return { relativePath: `Stickers/${name}.png`, mimetype: "image/png" };
+  }
+  return animated
+    ? { relativePath: `Emojis/${name}.gif`, mimetype: "image/gif" }
+    : { relativePath: `Emojis/${name}.png`, mimetype: "image/png" };
+}
+
+/**
  * Best-effort delete each given `guild_emojis.image_path`, but only if no row still references
  * it — the same filename can be shared across rows (webview's lookup is name-keyed, so two
  * differently-guilded emoji with the same name point at one file). Never throws; logs failures.

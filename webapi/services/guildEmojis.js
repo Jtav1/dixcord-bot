@@ -98,6 +98,50 @@ export async function listByGuild(app, guildId, { type, limit, offset = 0 } = {}
 }
 
 /**
+ * Cross-guild, filtered, paginated browse of the whole catalog — for the webadmin catalog
+ * browser (unlike listByGuild, no guildId is required or even accepted).
+ * @param {{ app?: string, type?: "emoji"|"sticker", animated?: boolean, name?: string, limit?: number, offset?: number }} [opts]
+ * @returns {Promise<{ rows: Record<string, unknown>[], total: number }>}
+ */
+export async function searchGuildEmojis({ app, type, animated, name, limit, offset = 0 } = {}) {
+  const n = parseLimit(limit, 24, 100);
+  const off = Math.max(0, parseInt(offset, 10) || 0);
+
+  const conditions = [];
+  const params = [];
+  if (app) {
+    conditions.push("app = ?");
+    params.push(app);
+  }
+  if (type) {
+    conditions.push("type = ?");
+    params.push(type);
+  }
+  if (animated != null) {
+    conditions.push("animated = ?");
+    params.push(animated ? 1 : 0);
+  }
+  if (name) {
+    conditions.push("name LIKE ?");
+    params.push(`%${name}%`);
+  }
+  const where = conditions.length > 0 ? conditions.join(" AND ") : "1=1";
+
+  const [countRows] = await db.query(
+    `SELECT COUNT(*) AS total FROM guild_emojis WHERE ${where}`,
+    params,
+  );
+  const total = Number(countRows?.[0]?.total ?? 0);
+
+  const [rows] = await db.query(
+    `SELECT * FROM guild_emojis WHERE ${where} ORDER BY name ASC LIMIT ? OFFSET ?`,
+    [...params, n, off],
+  );
+
+  return { rows: (Array.isArray(rows) ? rows : []).map(toApiShape), total };
+}
+
+/**
  * Update only the mutable fields (`name`, `imagePath`) of one row. `id`/`app`/`guildId`/
  * `frequency` stay sync/usage-owned and are never touched here.
  * @param {string} whereClause - SQL condition, e.g. "internal_id = ?"

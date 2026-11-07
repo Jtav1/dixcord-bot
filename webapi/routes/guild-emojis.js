@@ -1,17 +1,23 @@
+import fs from "node:fs";
+import path from "node:path";
 import express from "express";
-import { authenticate, isAdminRole, requireBotOrAdmin, requireOwnGuildOrAdmin } from "../middleware/auth.js";
+import multer from "multer";
+import { authenticate, isAdminRole, requireAdmin, requireBotOrAdmin, requireOwnGuildOrAdmin } from "../middleware/auth.js";
 import { getChatMemberAppConfig } from "../services/chatMemberMapping.js";
-import { deleteOrphanedImageFiles } from "../services/emojiFiles.js";
+import { canonicalImagePath, deleteOrphanedImageFiles, getEmojiFilesRoot } from "../services/emojiFiles.js";
 import {
   deleteRow,
   getByAppGuildName,
   getByAppId,
   getByInternalId,
   listByGuild,
+  searchGuildEmojis,
   updateRow,
 } from "../services/guildEmojis.js";
 import { parseLimit } from "../services/leaderboards.js";
 import { recordAudit } from "../services/auditLog.js";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const router = express.Router();
 
@@ -146,6 +152,78 @@ router.get("/by-guild", authenticate, requireBotOrAdmin, requireOwnGuildOrAdmin,
   } catch (err) {
     console.error("GET /api/guild-emojis/by-guild error:", err);
     res.status(500).json({ ok: false, error: "Failed to list guild emojis" });
+  }
+});
+
+/**
+ * GET /api/guild-emojis/search
+ * Cross-guild, filtered, paginated browse of the whole catalog (webadmin's catalog browser).
+ * Query: { app?, type?, animated?, name?, limit?, offset? }
+ * Auth: admin only — a pure browsing feature, no bot ever needs it.
+ * @openapi
+ * /api/guild-emojis/search:
+ *   get:
+ *     operationId: searchGuildEmojis
+ *     tags: [Guild Emojis]
+ *     summary: Search the emoji/sticker catalog across every guild
+ *     description: Requires the admin role.
+ *     parameters:
+ *       - { name: app, in: query, schema: { type: string, example: discord } }
+ *       - { name: type, in: query, schema: { type: string, enum: [emoji, sticker] } }
+ *       - { name: animated, in: query, schema: { type: boolean } }
+ *       - { name: name, in: query, schema: { type: string }, description: "Case-insensitive substring match." }
+ *       - { name: limit, in: query, schema: { type: integer, default: 24, maximum: 100 } }
+ *       - { name: offset, in: query, schema: { type: integer, default: 0 } }
+ *     responses:
+ *       '200':
+ *         description: Paginated catalog rows.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 guildEmojis:
+ *                   type: array
+ *                   items: { $ref: '#/components/schemas/GuildEmoji' }
+ *                 total: { type: integer }
+ *                 limit: { type: integer }
+ *                 offset: { type: integer }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/search", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const app = req.query.app ? String(req.query.app).trim() : undefined;
+    if (app && !getChatMemberAppConfig(app)) {
+      return res.status(400).json({ ok: false, error: "Unsupported app" });
+    }
+    const type = req.query.type;
+    if (type !== undefined && type !== "emoji" && type !== "sticker") {
+      return res.status(400).json({ ok: false, error: "type must be emoji or sticker" });
+    }
+    let animated;
+    if (req.query.animated !== undefined) {
+      if (req.query.animated !== "true" && req.query.animated !== "false") {
+        return res.status(400).json({ ok: false, error: "animated must be true or false" });
+      }
+      animated = req.query.animated === "true";
+    }
+    const name = req.query.name ? String(req.query.name).trim() : undefined;
+
+    const limit = parseLimit(req.query.limit, 24, 100);
+    const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+    const { rows, total } = await searchGuildEmojis({ app, type, animated, name, limit, offset });
+    res.json({ ok: true, guildEmojis: rows, total, limit, offset });
+  } catch (err) {
+    console.error("GET /api/guild-emojis/search error:", err);
+    res.status(500).json({ ok: false, error: "Failed to search guild emojis" });
   }
 });
 
@@ -628,6 +706,129 @@ router.delete("/:internalId", authenticate, requireBotOrAdmin, async (req, res) 
   } catch (err) {
     console.error("DELETE /api/guild-emojis/:internalId error:", err);
     res.status(500).json({ ok: false, error: "Failed to delete guild emoji" });
+  }
+});
+
+/**
+ * GET /api/guild-emojis/:internalId/image
+ * Stream the row's current image file.
+ * Auth: admin only.
+ * @openapi
+ * /api/guild-emojis/{internalId}/image:
+ *   get:
+ *     operationId: getGuildEmojiImage
+ *     tags: [Guild Emojis]
+ *     summary: Get a catalog row's image file
+ *     description: Requires the admin role.
+ *     parameters:
+ *       - { name: internalId, in: path, required: true, schema: { type: integer } }
+ *     responses:
+ *       '200':
+ *         description: The image file (image/png or image/gif).
+ *         content:
+ *           image/png: { schema: { type: string, format: binary } }
+ *           image/gif: { schema: { type: string, format: binary } }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.get("/:internalId/image", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const internalId = parseInt(req.params.internalId, 10);
+    if (Number.isNaN(internalId)) return res.status(400).json({ ok: false, error: "Invalid internalId" });
+    const row = await getByInternalId(internalId);
+    if (!row || !row.imagePath) return res.status(404).json({ ok: false, error: "No image for this guild emoji" });
+
+    const fullPath = path.join(getEmojiFilesRoot(), row.imagePath);
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ ok: false, error: "Image file is missing on disk" });
+    }
+    res.sendFile(fullPath);
+  } catch (err) {
+    console.error("GET /api/guild-emojis/:internalId/image error:", err);
+    res.status(500).json({ ok: false, error: "Failed to get guild emoji image" });
+  }
+});
+
+/**
+ * POST /api/guild-emojis/:internalId/image
+ * Replace (or add) the row's image. The target filename is always the canonical one webview's
+ * own name-based lookup expects (`Emojis/<name>.<gif|png>` or `Stickers/<name>.png`) — unlike
+ * the sync downloader, this explicit admin action is allowed to overwrite an existing file.
+ * Body: multipart/form-data, field "image" (image/png or image/gif, matching the row's expected type).
+ * Auth: admin only.
+ * @openapi
+ * /api/guild-emojis/{internalId}/image:
+ *   post:
+ *     operationId: uploadGuildEmojiImage
+ *     tags: [Guild Emojis]
+ *     summary: Replace or add a catalog row's image
+ *     description: Requires the admin role.
+ *     parameters:
+ *       - { name: internalId, in: path, required: true, schema: { type: integer } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [image]
+ *             properties:
+ *               image: { type: string, format: binary }
+ *     responses:
+ *       '200':
+ *         description: Updated.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 imagePath: { type: string }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '404':
+ *         $ref: '#/components/responses/NotFound'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/:internalId/image", authenticate, requireAdmin, upload.single("image"), async (req, res) => {
+  try {
+    const internalId = parseInt(req.params.internalId, 10);
+    if (Number.isNaN(internalId)) return res.status(400).json({ ok: false, error: "Invalid internalId" });
+    const row = await getByInternalId(internalId);
+    if (!row) return res.status(404).json({ ok: false, error: "Guild emoji not found" });
+    if (!req.file) return res.status(400).json({ ok: false, error: "image file is required" });
+
+    const { relativePath, mimetype } = canonicalImagePath(row);
+    if (req.file.mimetype !== mimetype) {
+      return res.status(400).json({
+        ok: false,
+        error: `This ${row.type ?? "emoji"}${row.type === "sticker" ? "" : row.animated ? " (animated)" : ""} expects ${mimetype}, got ${req.file.mimetype}`,
+      });
+    }
+
+    const fullPath = path.join(getEmojiFilesRoot(), relativePath);
+    await fs.promises.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.promises.writeFile(fullPath, req.file.buffer);
+
+    await updateRow("internal_id = ?", [internalId], { imagePath: relativePath });
+    await recordAudit(req.user.id, "upload_guild_emoji_image", "guild_emojis", internalId, { imagePath: relativePath });
+    res.json({ ok: true, imagePath: relativePath });
+  } catch (err) {
+    console.error("POST /api/guild-emojis/:internalId/image error:", err);
+    res.status(500).json({ ok: false, error: "Failed to upload guild emoji image" });
   }
 });
 

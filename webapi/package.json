@@ -27,6 +27,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@prometheus-io/client": "^0.16.1",
     "@scalar/express-api-reference": "^0.10.19",
     "bcryptjs": "^3.0.3",
     "chrono-node": "^2.10.1",
@@ -36,8 +37,8 @@
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.5.0",
     "mysql2": "^3.24.4",
-    "@prometheus-io/client": "^0.16.1",
     "swagger-jsdoc": "^6.3.0"
   },
   "devDependencies": {
