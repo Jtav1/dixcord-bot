@@ -338,7 +338,7 @@ async function listFrequencyByName(typeWhere, limit, offset, guildId, appFilter)
   const namePlaceholders = names.map(() => "?").join(", ");
   const detailWhere = [...baseConditions, `${NAME_COL} IN (${namePlaceholders})`].join(" AND ");
   const [detailRows] = await db.query(
-    `SELECT name, id, app, animated, type, frequency FROM guild_emojis WHERE ${detailWhere}`,
+    `SELECT name, id, app, animated, type, image_path, frequency FROM guild_emojis WHERE ${detailWhere}`,
     [...baseParams, ...names],
   );
 
@@ -365,6 +365,7 @@ async function listFrequencyByName(typeWhere, limit, offset, guildId, appFilter)
         byApp,
         animated: representative?.animated ?? null,
         type: representative?.type ?? null,
+        imagePath: representative?.image_path ?? null,
       },
     };
   });

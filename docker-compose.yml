@@ -15,8 +15,10 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - PIN_FILES_DIR=/data/pin-files
+      - EMOJI_FILES_DIR=/data/emoji-files
     volumes:
       - ./discord-bot/files:/data/pin-files
+      - ./webview/files:/data/emoji-files
     healthcheck:
       test:
         [
@@ -81,11 +83,14 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3002
+      - EMOJI_FILES_DIR=/app/files
     depends_on:
       webapi:
         condition: service_healthy
     volumes:
-      - ./webview/files:/app/files:ro
+      # Not :ro anymore - discord-bot/fluxer-bot/webapi now write downloaded emoji/sticker
+      # images into this same host directory; webview itself still only reads from it.
+      - ./webview/files:/app/files
     healthcheck:
       test:
         [
@@ -111,8 +116,10 @@ services:
       - ./discord-bot/.env
     environment:
       - PIN_FILES_DIR=/data/pin-files
+      - EMOJI_FILES_DIR=/data/emoji-files
     volumes:
       - ./discord-bot/files:/data/pin-files
+      - ./webview/files:/data/emoji-files
     # When using MySQL, uncomment below and the mysql service:
     # depends_on:
     #   mysql:
@@ -134,6 +141,10 @@ services:
         condition: service_healthy
     env_file:
       - ./fluxer-bot/.env
+    environment:
+      - EMOJI_FILES_DIR=/data/emoji-files
+    volumes:
+      - ./webview/files:/data/emoji-files
     restart: unless-stopped
 
   # MySQL (optional). Uncomment this service and the depends_on/env blocks above to use it.

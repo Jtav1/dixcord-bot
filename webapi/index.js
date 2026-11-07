@@ -31,6 +31,7 @@ import auditLogRoutes from "./routes/audit-log.js";
 import statisticsRoutes from "./routes/statistics.js";
 import guildRoutes from "./routes/guild.js";
 import guildMembersRoutes from "./routes/guild-members.js";
+import guildEmojisRoutes from "./routes/guild-emojis.js";
 import serviceAccountsRoutes from "./routes/service-accounts.js";
 import reactRoleRoutes from "./routes/react-role.js";
 
@@ -402,6 +403,21 @@ app.get("/", publicLimiter, (req, res) => {
         ],
         adminRoutes: ["GET /api/guild-members/unlinked?app=&guildId="],
       },
+      guildEmojis: {
+        authRequired: true,
+        routes: [
+          "GET /api/guild-emojis/by-guild?app=&guildId=&type=&limit=&offset= (bot/admin)",
+          "GET /api/guild-emojis/by-name?app=&guildId=&name= (bot/admin)",
+          "PUT /api/guild-emojis/by-name (body: { app, guildId, name, name?, imagePath? }) (bot/admin)",
+          "DELETE /api/guild-emojis/by-name (body: { app, guildId, name }) (bot/admin)",
+          "GET /api/guild-emojis?app=&id= (bot/admin)",
+          "PUT /api/guild-emojis (body: { app, id, name?, imagePath? }) (bot/admin)",
+          "DELETE /api/guild-emojis (body: { app, id }) (bot/admin)",
+          "GET /api/guild-emojis/:internalId (bot/admin)",
+          "PUT /api/guild-emojis/:internalId (body: { name?, imagePath? }) (bot/admin)",
+          "DELETE /api/guild-emojis/:internalId (bot/admin)",
+        ],
+      },
       serviceAccounts: {
         authRequired: true,
         adminRoutes: [
@@ -628,6 +644,7 @@ app.use("/api/audit-log", auditLogRoutes);
 app.use("/api/statistics", statisticsRoutes);
 app.use("/api/guild", guildRoutes);
 app.use("/api/guild-members", guildMembersRoutes);
+app.use("/api/guild-emojis", guildEmojisRoutes);
 app.use("/api/service-accounts", serviceAccountsRoutes);
 app.use("/api/react-role", reactRoleRoutes);
 

@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
 -- Keyed on (app, id), not id alone — an id isn't unique across apps (see emojiFrequency.js for
 -- how cross-app totals are computed, grouped by name).
 CREATE TABLE IF NOT EXISTS guild_emojis (
+  -- Non-PK AUTO_INCREMENT paired with a UNIQUE KEY (InnoDB allows this as long as it's the
+  -- leading column of some key); a CRUD-friendly surrogate id alongside the real (app, id) key.
+  internal_id INT AUTO_INCREMENT,
   id VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL, -- exact-match identity (custom snowflake or unicode emoji char); a linguistic _ci collation treats many distinct emoji as equal
   app VARCHAR(20) NOT NULL,
   guild_id VARCHAR(64) NULL,
@@ -58,9 +61,11 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   managed TINYINT(1) NULL,
   requires_colons TINYINT(1) NULL,
   roles TEXT NULL,
+  image_path VARCHAR(500) NULL,       -- relative path under the shared emoji files root (see discord-bot/api/utilities/emojiFiles.js)
   frequency INT NOT NULL DEFAULT 0,   -- usage counter, incremented directly (see ensureAndIncrementEmoji)
   synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (app, id),
+  UNIQUE KEY uniq_guild_emojis_internal_id (internal_id),
   KEY idx_guild_emojis_guild (app, guild_id),
   KEY idx_guild_emojis_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

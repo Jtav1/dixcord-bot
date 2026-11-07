@@ -23,6 +23,7 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 - **System** – Health, status, cache version / invalidate, bot heartbeat.
 - **Guild** – App/guild-scoped snapshot of platform-client guild metadata, channels, roles, and the emoji/sticker catalog; pushed periodically by a platform client (discord-bot today), read by admin panel/webview.
 - **Guild members** – App/guild-scoped server membership (Discord handle, nickname, roles held, joined-at), keyed on the platform's own user id. Sync only ever upserts `guild_members` — it never creates or removes rows and never touches `chat_member_mapping`/`member_aliases`; linking a member to a canonical identity is a separate action — an admin (see `GET /api/guild-members/unlinked`) or the members themselves via `link-request`/`link-confirm` (the `link-accounts` / `confirm-link` bot commands). Includes a reverse lookup ("every server this user belongs to") for future cross-server delivery features.
+- **Guild emojis** – CRUD over the `guild_emojis` catalog by internal id, `(app, id)`, or `(app, guildId, name)`; one catalog row per guild. The emoji/sticker import sync (Message processing, above) also downloads each item's image into the shared emoji files volume (`EMOJI_FILES_DIR`, same directory webview serves from) and records its path, but that path is only ever surfaced on the webview-facing leaderboard routes — never via `/api/guild`, `/api/events/stickers`, or config-value resolution.
 - **Service accounts** – Admin-only provisioning of extra `bot`/`webview` accounts, optionally bound to one `guildId`; a guild-bound bot account can only call guild-scoped routes for its own guild (`admin` and unrestricted accounts are never scope-limited).
 - **Statistics** – Aggregate counts across tracking tables (used by web-view).
 - **Scheduled messages** – Create/list/update/delete reminders for bot delivery; admin scope for moderation.
@@ -172,6 +173,16 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | GET | `/api/guild-members/color-role?app=&guildId=&platformUserId=` | bot/admin | A member's bot-created color role (`colorRole: { name, hex }` or `null`) for the fluxer `!color-me` command |
 | PUT | `/api/guild-members/color-role` | bot/admin | Record a member's color role (body: `{ app, guildId, platformUserId, name, hex }`; name `dixbot-` + 5 lowercase alphanumerics, hex 6 uppercase digits); creates a minimal row if the member isn't synced yet; roster sync never overwrites it |
 | DELETE | `/api/guild-members/color-role` | bot/admin | Clear a member's color role record (body: `{ app, guildId, platformUserId }`); idempotent |
+| GET | `/api/guild-emojis/by-guild?app=&guildId=&type=&limit=&offset=` | bot/admin | Paginated list of one guild's emoji/sticker catalog rows |
+| GET | `/api/guild-emojis/by-name?app=&guildId=&name=` | bot/admin | One catalog row by `(app, guildId, name)` |
+| PUT | `/api/guild-emojis/by-name` | bot/admin | Update `name`/`imagePath` of the row at `(app, guildId, name)` (body: `{ app, guildId, name, name?, imagePath? }`) |
+| DELETE | `/api/guild-emojis/by-name` | bot/admin | Hard-delete the row at `(app, guildId, name)`, regardless of usage frequency |
+| GET | `/api/guild-emojis?app=&id=` | bot/admin | One catalog row by `(app, id)` |
+| PUT | `/api/guild-emojis` | bot/admin | Update `name`/`imagePath` of the row at `(app, id)` (body: `{ app, id, name?, imagePath? }`) |
+| DELETE | `/api/guild-emojis` | bot/admin | Hard-delete the row at `(app, id)`, regardless of usage frequency |
+| GET | `/api/guild-emojis/:internalId` | bot/admin | One catalog row by its surrogate internal id |
+| PUT | `/api/guild-emojis/:internalId` | bot/admin | Update `name`/`imagePath` of the row at this internal id (body: `{ name?, imagePath? }`) |
+| DELETE | `/api/guild-emojis/:internalId` | bot/admin | Hard-delete the row at this internal id, regardless of usage frequency |
 | GET | `/api/events/plusplus` | ✓ | Raw plusplus events |
 | GET | `/api/events/reposts` | ✓ | Raw repost events |
 | GET | `/api/audit-log` | admin | Audit log |
@@ -224,6 +235,7 @@ Example JSON responses for each API route category:
 | **Admin backend** | [admin-backend-api.md](admin-backend-api.md) | New admin-panel backend routes |
 | **Guild** | [guild-response-examples.md](guild-response-examples.md) | Guild metadata, channels, roles, emoji/sticker catalog |
 | **Guild Members** | [guild-members-response-examples.md](guild-members-response-examples.md) | Per-server membership sync/list, reverse user→servers lookup |
+| **Guild Emojis** | [guild-emojis-response-examples.md](guild-emojis-response-examples.md) | Read/update/delete catalog rows by internal id, (app, id), or (app, guildId, name) |
 
 ## Request examples (cURL)
 

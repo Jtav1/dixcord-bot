@@ -10,6 +10,7 @@ import {
   requireChatMemberMappingId,
   UNKNOWN_CHAT_MEMBER_ERROR,
 } from "./chatMemberMapping.js";
+import { deleteOrphanedImageFiles } from "./emojiFiles.js";
 import { emojisMatch, resolveConfigEmojiValue } from "./emojiFrequency.js";
 import { getGuildConfigValue } from "./guildConfig.js";
 import { normalizePinLogPayload } from "./pinHistory.js";
@@ -665,7 +666,7 @@ export async function pruneIdsNotIn(table, where, params, keepIds) {
  * then deletes rows no longer live with no usage history (frequency > 0 rows always survive). If
  * the incoming name equals the id, the existing name is kept instead (Discord has been observed
  * to briefly report a name as its own id). Discards the sync if guildId is unknown.
- * @param {Array<{id?: string, name?: string, animated?: boolean, available?: boolean|null, managed?: boolean|null, requiresColons?: boolean|null, roles?: string[]}>} items
+ * @param {Array<{id?: string, name?: string, animated?: boolean, available?: boolean|null, managed?: boolean|null, requiresColons?: boolean|null, roles?: string[], imagePath?: string|null}>} items
  * @param {"emoji"|"sticker"} assetKind
  * @param {string} app
  * @param {string} guildId
@@ -716,12 +717,13 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
       e.managed == null ? null : e.managed ? 1 : 0,
       e.requiresColons == null ? null : e.requiresColons ? 1 : 0,
       Array.isArray(e.roles) && e.roles.length > 0 ? JSON.stringify(e.roles) : null,
+      e.imagePath ?? null,
     ];
 
     if (isSqlite) {
       await db.query(
-        `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles, image_path)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(app, id) DO UPDATE SET
            guild_id = excluded.guild_id,
            type = excluded.type,
@@ -731,13 +733,14 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
            managed = excluded.managed,
            requires_colons = excluded.requires_colons,
            roles = excluded.roles,
+           image_path = COALESCE(excluded.image_path, guild_emojis.image_path),
            synced_at = CURRENT_TIMESTAMP`,
         params,
       );
     } else {
       await db.query(
-        `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `INSERT INTO guild_emojis (id, app, guild_id, type, name, animated, available, managed, requires_colons, roles, image_path)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
            app = VALUES(app),
            guild_id = VALUES(guild_id),
@@ -748,6 +751,7 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
            managed = VALUES(managed),
            requires_colons = VALUES(requires_colons),
            roles = VALUES(roles),
+           image_path = COALESCE(VALUES(image_path), image_path),
            synced_at = CURRENT_TIMESTAMP`,
         params,
       );
@@ -759,18 +763,29 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
 
   // Remove no-longer-live rows with no usage history; frequency > 0 rows are kept regardless.
   const keepIds = explicitLiveIds ? explicitLiveIds.map((v) => String(v)) : liveIds;
+  const pruneWhere = "app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)";
+  const pruneParams = [app, gid, assetKind];
+
+  // Capture image_path of rows about to go stale, so we can clean up orphaned files afterward —
+  // a row surviving on frequency alone keeps its image untouched; this only ever removes files
+  // for rows that are actually about to be deleted below.
+  const [staleCandidates] = await db.query(
+    `SELECT id, image_path FROM guild_emojis WHERE ${pruneWhere}`,
+    pruneParams,
+  );
+  const keepSet = new Set(keepIds.map(String));
+  const candidateImagePaths = (staleCandidates ?? [])
+    .filter((r) => !keepSet.has(String(r.id)))
+    .map((r) => r.image_path);
+
   if (keepIds.length > 0) {
-    await pruneIdsNotIn(
-      "guild_emojis",
-      "app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)",
-      [app, gid, assetKind],
-      keepIds,
-    );
+    await pruneIdsNotIn("guild_emojis", pruneWhere, pruneParams, keepIds);
   } else {
-    await db.query(
-      "DELETE FROM guild_emojis WHERE app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)",
-      [app, gid, assetKind],
-    );
+    await db.query(`DELETE FROM guild_emojis WHERE ${pruneWhere}`, pruneParams);
+  }
+
+  if (candidateImagePaths.length > 0) {
+    await deleteOrphanedImageFiles(candidateImagePaths);
   }
 
   return { ok: true, imported };

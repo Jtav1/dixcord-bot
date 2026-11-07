@@ -1,13 +1,19 @@
 import * as api from "./client.js";
+import { downloadEmojiImage, mapWithConcurrency } from "./utilities/emojiFiles.js";
 import { guildId } from "../configVars.js";
 
 /**
  * Sync server emoji list with the web API. Fully replaces this guild's guild_emojis catalog.
+ * Downloads each emoji's image into the shared emoji files volume first, so the import payload
+ * can carry its resolved relative path.
  * POST /api/message-processing/emoji-import
  * @param {Array<import('@fluxerjs/core').GuildEmoji>} emojiList - e.g. from guild.fetchEmojis()
  */
 export const importEmojiList = async (emojiList) => {
-  const emojis = emojiList.map((e) => ({
+  const imagePaths = await mapWithConcurrency(emojiList, 10, (e) =>
+    downloadEmojiImage({ name: String(e.name), animated: Boolean(e.animated), url: e.url }),
+  );
+  const emojis = emojiList.map((e, i) => ({
     id: String(e.id),
     name: String(e.name),
     animated: Boolean(e.animated),
@@ -16,6 +22,7 @@ export const importEmojiList = async (emojiList) => {
     requiresColons: null,
     roles: [],
     type: "emoji",
+    imagePath: imagePaths[i],
   }));
   const path = "/api/message-processing/emoji-import";
   await api.postInChunks(path, { app: "fluxer", guildId, prune: false }, "emojis", emojis);
