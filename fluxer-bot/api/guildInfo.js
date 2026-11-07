@@ -61,10 +61,17 @@ export async function syncGuildInfo() {
     console.log("bot: guild not in cache yet; skipping guild-info sync");
     return;
   }
-  await api.post("/api/guild/sync", {
-    app: "fluxer",
-    guildId,
-    ...snapshot,
+  const path = "/api/guild/sync";
+  const base = { app: "fluxer", guildId, guild: snapshot.guild, prune: false };
+  await api.postInChunks(path, { ...base, roles: [] }, "channels", snapshot.channels);
+  await api.postInChunks(path, { ...base, channels: [] }, "roles", snapshot.roles);
+  await api.post(path, {
+    ...base,
+    channels: [],
+    roles: [],
+    prune: true,
+    channelIds: snapshot.channels.map((c) => c.id),
+    roleIds: snapshot.roles.map((r) => r.id),
   });
 }
 

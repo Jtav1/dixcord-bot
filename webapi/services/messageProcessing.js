@@ -635,6 +635,28 @@ export async function countRepost(payload) {
   return { ok: false };
 }
 
+/**
+ * Delete rows matching `where` whose id isn't in keepIds. Selects existing ids and deletes the
+ * diff in chunks, so a big keep-list can't exceed the DB's bound-parameter limit.
+ * @param {string} table
+ * @param {string} where - condition on the rows eligible for deletion
+ * @param {Array} params - bound values for `where`
+ * @param {string[]} keepIds
+ * @returns {Promise<void>}
+ */
+export async function pruneIdsNotIn(table, where, params, keepIds) {
+  const keep = new Set(keepIds.map(String));
+  const [rows] = await db.query(`SELECT id FROM ${table} WHERE ${where}`, params);
+  const stale = (rows ?? []).map((r) => String(r.id)).filter((id) => !keep.has(id));
+  for (let i = 0; i < stale.length; i += 500) {
+    const part = stale.slice(i, i + 500);
+    await db.query(
+      `DELETE FROM ${table} WHERE ${where} AND id IN (${part.map(() => "?").join(", ")})`,
+      [...params, ...part],
+    );
+  }
+}
+
 // --- Guild emoji / sticker catalog + usage counter (guild_emojis; type = 'emoji' | 'sticker' | NULL) ---
 
 /**
@@ -647,9 +669,13 @@ export async function countRepost(payload) {
  * @param {"emoji"|"sticker"} assetKind
  * @param {string} app
  * @param {string} guildId
+ * @param {{ prune?: boolean, liveIds?: string[]|null }} [opts] chunked sync: prune=false upserts only;
+ *   a final prune=true call passes the full live id list (default: ids in this call)
  * @returns {Promise<{ ok: boolean, imported?: number }>} imported = catalog rows upserted this sync
  */
-export async function importGuildAssetFrequencyList(items, assetKind, app, guildId) {
+export async function importGuildAssetFrequencyList(items, assetKind, app, guildId, opts = {}) {
+  const { prune = true, liveIds: explicitLiveIds = null } = opts;
+  if (explicitLiveIds != null && !Array.isArray(explicitLiveIds)) return { ok: false };
   if (!Array.isArray(items)) return { ok: false };
   if (assetKind !== "emoji" && assetKind !== "sticker") return { ok: false };
   if (!isChatMemberAppSupported(app)) return { ok: false };
@@ -729,14 +755,16 @@ export async function importGuildAssetFrequencyList(items, assetKind, app, guild
     imported++;
   }
 
+  if (!prune) return { ok: true, imported };
+
   // Remove no-longer-live rows with no usage history; frequency > 0 rows are kept regardless.
-  if (liveIds.length > 0) {
-    const placeholders = liveIds.map(() => "?").join(", ");
-    await db.query(
-      `DELETE FROM guild_emojis
-       WHERE app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)
-         AND id NOT IN (${placeholders})`,
-      [app, gid, assetKind, ...liveIds],
+  const keepIds = explicitLiveIds ? explicitLiveIds.map((v) => String(v)) : liveIds;
+  if (keepIds.length > 0) {
+    await pruneIdsNotIn(
+      "guild_emojis",
+      "app = ? AND guild_id = ? AND type = ? AND (frequency IS NULL OR frequency <= 0)",
+      [app, gid, assetKind],
+      keepIds,
     );
   } else {
     await db.query(

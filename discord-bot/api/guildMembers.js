@@ -56,11 +56,7 @@ export async function syncGuildMembers(client) {
     return;
   }
   const members = await buildMemberList(guild);
-  await api.post("/api/guild-members/sync", {
-    app: "discord",
-    guildId,
-    members,
-  });
+  await api.postInChunks("/api/guild-members/sync", { app: "discord", guildId }, "members", members);
 }
 
 /**

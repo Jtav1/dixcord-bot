@@ -108,6 +108,39 @@ export function post(path, body, options = {}) {
 }
 
 /**
+ * POST a big list in size-capped chunks (webapi body limit is 100kb). Each request is
+ * `{ ...base, [key]: chunk }`; always sends at least one. Numeric response fields are summed.
+ * @param {string} path
+ * @param {object} base - fields repeated in every request
+ * @param {string} key - body field holding the list
+ * @param {Array} items
+ * @param {{ maxBytes?: number }} [opts] - maxBytes caps the serialized body
+ * @returns {Promise<Record<string, number>>} summed numeric fields (e.g. inserted, imported)
+ */
+export async function postInChunks(path, base, key, items, { maxBytes = 80_000 } = {}) {
+  const budget = maxBytes - JSON.stringify(base).length;
+  const chunks = [[]];
+  let size = 0;
+  for (const item of items) {
+    const len = JSON.stringify(item).length + 1;
+    if (size + len > budget && chunks.at(-1).length > 0) {
+      chunks.push([]);
+      size = 0;
+    }
+    chunks.at(-1).push(item);
+    size += len;
+  }
+  const totals = {};
+  for (const chunk of chunks) {
+    const { data } = await post(path, { ...base, [key]: chunk });
+    for (const [k, v] of Object.entries(data ?? {})) {
+      if (typeof v === "number") totals[k] = (totals[k] ?? 0) + v;
+    }
+  }
+  return totals;
+}
+
+/**
  * PUT request.
  * @param {string} path
  * @param {object} [body] - JSON body

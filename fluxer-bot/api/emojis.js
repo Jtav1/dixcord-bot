@@ -17,7 +17,9 @@ export const importEmojiList = async (emojiList) => {
     roles: [],
     type: "emoji",
   }));
-  await api.post("/api/message-processing/emoji-import", { app: "fluxer", guildId, emojis });
+  const path = "/api/message-processing/emoji-import";
+  await api.postInChunks(path, { app: "fluxer", guildId, prune: false }, "emojis", emojis);
+  await api.post(path, { app: "fluxer", guildId, emojis: [], prune: true, liveIds: emojis.map((e) => e.id) });
   console.log("bot: emoji import via webapi complete");
 };
 

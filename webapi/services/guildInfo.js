@@ -9,6 +9,9 @@ import db from "../config/db.js";
 import { isChatMemberAppSupported } from "./chatMemberMapping.js";
 import { utcIsoToSqlDatetime } from "./scheduledMessages.js";
 import { seedDefaultConfigForGuild } from "./guildConfig.js";
+import { pruneIdsNotIn } from "./messageProcessing.js";
+
+const isSqlite = (process.env.DB_TYPE || "mysql").toLowerCase() === "sqlite";
 
 /**
  * @param {unknown} value
@@ -129,10 +132,12 @@ export async function attachChannelObjects(rows, { app: fallbackApp } = {}) {
 /**
  * Upsert a full guild snapshot: guild_info row, and a full replace of that guild's
  * guild_channels/guild_roles rows.
- * @param {{ app: string, guildId: string, guild: Record<string, unknown>, channels: Array<Record<string, unknown>>, roles: Array<Record<string, unknown>> }} payload
+ * Chunked sync: send prune=false per chunk, then a final prune=true with channelIds/roleIds (full
+ * live id lists); without them, prune keeps only the ids in this call.
+ * @param {{ app: string, guildId: string, guild: Record<string, unknown>, channels: Array<Record<string, unknown>>, roles: Array<Record<string, unknown>>, prune?: boolean, channelIds?: string[]|null, roleIds?: string[]|null }} payload
  * @returns {Promise<{ ok: true } | { ok: false, error: string }>}
  */
-export async function upsertGuildSnapshot({ app, guildId, guild, channels, roles }) {
+export async function upsertGuildSnapshot({ app, guildId, guild, channels, roles, prune = true, channelIds = null, roleIds = null }) {
   if (!isChatMemberAppSupported(app)) {
     return {
       ok: false,
@@ -149,6 +154,13 @@ export async function upsertGuildSnapshot({ app, guildId, guild, channels, roles
   }
   if (!Array.isArray(roles)) {
     return { ok: false, error: "roles must be an array" };
+  }
+
+  if (channelIds != null && !Array.isArray(channelIds)) {
+    return { ok: false, error: "channelIds must be an array" };
+  }
+  if (roleIds != null && !Array.isArray(roleIds)) {
+    return { ok: false, error: "roleIds must be an array" };
   }
 
   const fields = [
@@ -187,41 +199,62 @@ export async function upsertGuildSnapshot({ app, guildId, guild, channels, roles
     await seedDefaultConfigForGuild(app, gid);
   }
 
-  await db.query("DELETE FROM guild_channels WHERE app = ? AND guild_id = ?", [app, gid]);
+  const upsertSql = (table, cols, updateCols) => {
+    const names = cols.join(", ");
+    const marks = cols.map(() => "?").join(", ");
+    return isSqlite
+      ? `INSERT INTO ${table} (${names}) VALUES (${marks})
+         ON CONFLICT(app, id) DO UPDATE SET ${updateCols.map((c) => `${c} = excluded.${c}`).join(", ")}, synced_at = CURRENT_TIMESTAMP`
+      : `INSERT INTO ${table} (${names}) VALUES (${marks})
+         ON DUPLICATE KEY UPDATE ${updateCols.map((c) => `${c} = VALUES(${c})`).join(", ")}, synced_at = CURRENT_TIMESTAMP`;
+  };
+  const channelSql = upsertSql(
+    "guild_channels",
+    ["app", "id", "guild_id", "name", "type", "position", "parent_id"],
+    ["guild_id", "name", "type", "position", "parent_id"],
+  );
+  const roleSql = upsertSql(
+    "guild_roles",
+    ["app", "id", "guild_id", "name", "color", "position", "mentionable", "hoisted"],
+    ["guild_id", "name", "color", "position", "mentionable", "hoisted"],
+  );
+
+  const seenChannelIds = [];
   for (const channel of channels) {
     const id = String(channel?.id ?? "").trim();
     if (!id) continue;
-    await db.query(
-      "INSERT INTO guild_channels (app, id, guild_id, name, type, position, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [
-        app,
-        id,
-        gid,
-        String(channel.name ?? ""),
-        channel.type != null ? String(channel.type) : null,
-        toFiniteNumberOrNull(channel.position),
-        channel.parentId ?? null,
-      ],
-    );
+    seenChannelIds.push(id);
+    await db.query(channelSql, [
+      app,
+      id,
+      gid,
+      String(channel.name ?? ""),
+      channel.type != null ? String(channel.type) : null,
+      toFiniteNumberOrNull(channel.position),
+      channel.parentId ?? null,
+    ]);
   }
 
-  await db.query("DELETE FROM guild_roles WHERE app = ? AND guild_id = ?", [app, gid]);
+  const seenRoleIds = [];
   for (const role of roles) {
     const id = String(role?.id ?? "").trim();
     if (!id) continue;
-    await db.query(
-      "INSERT INTO guild_roles (app, id, guild_id, name, color, position, mentionable, hoisted) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [
-        app,
-        id,
-        gid,
-        String(role.name ?? ""),
-        role.color ?? null,
-        toFiniteNumberOrNull(role.position),
-        role.mentionable ? 1 : 0,
-        role.hoisted ? 1 : 0,
-      ],
-    );
+    seenRoleIds.push(id);
+    await db.query(roleSql, [
+      app,
+      id,
+      gid,
+      String(role.name ?? ""),
+      role.color ?? null,
+      toFiniteNumberOrNull(role.position),
+      role.mentionable ? 1 : 0,
+      role.hoisted ? 1 : 0,
+    ]);
+  }
+
+  if (prune) {
+    await pruneIdsNotIn("guild_channels", "app = ? AND guild_id = ?", [app, gid], channelIds ?? seenChannelIds);
+    await pruneIdsNotIn("guild_roles", "app = ? AND guild_id = ?", [app, gid], roleIds ?? seenRoleIds);
   }
 
   return { ok: true };

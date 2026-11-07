@@ -84,7 +84,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/message-processing/emoji-count` | ✓ | Record emoji usage / +/- reply |
 | POST | `/api/message-processing/plusminus` | ✓ | Record plus/minus (message or reaction) |
 | POST | `/api/message-processing/count-repost` | ✓ | Record or withdraw repost accusation |
-| POST | `/api/message-processing/emoji-import` | ✓ | Sync server emoji list (body: `{ app, emojis }`) |
+| POST | `/api/message-processing/emoji-import` | ✓ | Sync server emoji list (body: `{ app, guildId, emojis, prune?, liveIds? }`; chunk with `prune:false`, then a final `prune:true` + `liveIds`; `sticker-import` is the same) |
 | POST | `/api/message-processing/sticker-import` | ✓ | Sync server sticker list (body: `{ app, stickers }`) |
 | POST | `/api/message-processing/pin-check` | ✓ | Check if message already pinned (body: `{ messageId }`) |
 | POST | `/api/message-processing/pin-log` | ✓ | Log message as pinned (body: `{ messageId }`) |
@@ -156,7 +156,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | POST | `/api/system/heartbeat` | ✓ | Bot heartbeat (body: `{ app, guildId, version }`) |
 | GET | `/api/guild?app=&guildId=` | ✓ | Synced guild metadata, channels, roles, emoji/sticker catalog |
 | GET | `/api/guild/all` | admin | Every guild that has ever synced, for a guild-picker UI |
-| POST | `/api/guild/sync` | ✓ | Push a full guild snapshot (body: `{ app, guildId, guild, channels, roles }`); auto-seeds default config for brand-new servers |
+| POST | `/api/guild/sync` | ✓ | Push a full guild snapshot (body: `{ app, guildId, guild, channels, roles, prune?, channelIds?, roleIds? }`; chunk with `prune:false`, then a final `prune:true` + ids); auto-seeds default config for brand-new servers |
 | GET | `/api/guild-members?app=&guildId=` | ✓ | List one server's members (guildId optional: omit for all-guilds dedup lookup); unlinked members have null id/name |
 | GET | `/api/guild-members/user/:chatMemberMappingId` | ✓ | Every server a given internal user id belongs to |
 | GET | `/api/guild-members/unlinked?app=&guildId=&search=` | admin | Membership rows with no member_aliases link yet |
