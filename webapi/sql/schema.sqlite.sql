@@ -53,6 +53,9 @@ CREATE TABLE IF NOT EXISTS plusplus_tracking (
 -- Keyed on (app, id), not id alone — an id isn't unique across apps (see emojiFrequency.js for
 -- how cross-app totals are computed, grouped by name).
 CREATE TABLE IF NOT EXISTS guild_emojis (
+  -- Plain INTEGER backfilled from rowid, not AUTOINCREMENT: not a FK target, so monotonic
+  -- after-delete semantics aren't needed, and this stays a trivial ALTER on existing tables.
+  internal_id INTEGER,
   id TEXT NOT NULL,
   app TEXT NOT NULL,
   guild_id TEXT NULL,
@@ -63,11 +66,15 @@ CREATE TABLE IF NOT EXISTS guild_emojis (
   managed INTEGER NULL,
   requires_colons INTEGER NULL,
   roles TEXT NULL,
+  image_path TEXT NULL,               -- relative path under the shared emoji files root (see discord-bot/api/utilities/emojiFiles.js)
   frequency INTEGER NOT NULL DEFAULT 0,  -- usage counter, incremented directly (see ensureAndIncrementEmoji)
   synced_at TEXT DEFAULT (datetime('now')),
   PRIMARY KEY (app, id)
 );
 
+-- uniq_guild_emojis_internal_id is created by ensureSchema.js instead of here: this file's
+-- CREATE INDEX statements run unconditionally even when CREATE TABLE above was a no-op (table
+-- already existed pre-internal_id), which would error on a column the old table lacks.
 CREATE INDEX IF NOT EXISTS idx_guild_emojis_guild ON guild_emojis (app, guild_id);
 CREATE INDEX IF NOT EXISTS idx_guild_emojis_name ON guild_emojis (name);
 

@@ -61,3 +61,16 @@ export async function apiFetchJson(method, path, body, context) {
     context,
   );
 }
+
+/**
+ * apiFetch with a multipart/form-data request body — no Content-Type header, so the browser
+ * sets the correct multipart boundary itself.
+ * @param {string} method HTTP method.
+ * @param {string} path Path under API_BASE.
+ * @param {FormData} formData
+ * @param {string} [context] Label for error messages.
+ * @returns {Promise<any>} Parsed response body.
+ */
+export async function apiFetchForm(method, path, formData, context) {
+  return apiFetch(path, { method, body: formData }, context);
+}

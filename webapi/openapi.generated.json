@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "dixcord-bot webapi",
-    "version": "4.0.4",
+    "version": "4.1.0",
     "description": "Internal REST API backing the dixcord-bot Discord bot, webview, and webadmin services. Every route requires a service-account JWT (admin, bot, or webview) except login and health."
   },
   "servers": [
@@ -88,6 +88,10 @@
     {
       "name": "React Role",
       "description": "Reaction-based role self-assignment message"
+    },
+    {
+      "name": "Guild Emojis",
+      "description": "Emoji/sticker catalog CRUD by internal id, (app, id), or (app, guildId, name)"
     }
   ],
   "components": {
@@ -274,6 +278,78 @@
               "sticker",
               null
             ]
+          },
+          "imagePath": {
+            "type": "string",
+            "nullable": true,
+            "description": "Relative path under the shared emoji files root. Present only on the webview emoji/sticker list routes (leaderboards/emoji, leaderboards/sticker, and their per-user variants) — omitted elsewhere."
+          }
+        }
+      },
+      "GuildEmoji": {
+        "type": "object",
+        "description": "A full guild_emojis catalog row, as returned by the Guild Emojis CRUD endpoints. Distinct from EmojiFrequency, which is the display-only shape leaderboard routes use.",
+        "properties": {
+          "internalId": {
+            "type": "integer",
+            "description": "Surrogate key for CRUD-by-id lookups."
+          },
+          "id": {
+            "type": "string",
+            "description": "Discord/Fluxer snowflake, or the literal unicode character for a built-in emoji."
+          },
+          "app": {
+            "type": "string"
+          },
+          "guildId": {
+            "type": "string",
+            "nullable": true
+          },
+          "type": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "emoji",
+              "sticker",
+              null
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "animated": {
+            "type": "boolean"
+          },
+          "available": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "managed": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "requiresColons": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "imagePath": {
+            "type": "string",
+            "nullable": true,
+            "description": "Relative path under the shared emoji files root."
+          },
+          "frequency": {
+            "type": "integer",
+            "description": "Usage counter; owned by the sync/usage pipeline, not mutable via this CRUD."
+          },
+          "syncedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -7516,6 +7592,18 @@
                   "guildId": {
                     "type": "string"
                   },
+                  "prune": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "false = partial chunk, upsert only (chunked sync)"
+                  },
+                  "liveIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Full live id list used by the final prune call; default is the ids in this body"
+                  },
                   "emojis": {
                     "type": "array",
                     "items": {
@@ -7547,6 +7635,11 @@
                           "items": {
                             "type": "string"
                           }
+                        },
+                        "imagePath": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Relative path under the shared emoji files root, set by the bot's downloader; omit/null if the download was skipped or failed."
                         }
                       }
                     }
@@ -7572,7 +7665,7 @@
                     },
                     "imported": {
                       "type": "integer",
-                      "description": "New rows added; existing emoji ids are skipped."
+                      "description": "Rows upserted in this call."
                     }
                   }
                 }
@@ -7628,6 +7721,18 @@
                   "guildId": {
                     "type": "string"
                   },
+                  "prune": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "false = partial chunk, upsert only (chunked sync)"
+                  },
+                  "liveIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Full live id list used by the final prune call; default is the ids in this body"
+                  },
                   "stickers": {
                     "type": "array",
                     "items": {
@@ -7638,6 +7743,11 @@
                         },
                         "name": {
                           "type": "string"
+                        },
+                        "imagePath": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Relative path under the shared emoji files root, set by the bot's downloader; omit/null if skipped (e.g. Lottie) or failed."
                         }
                       }
                     }
@@ -10081,6 +10191,25 @@
                     "items": {
                       "type": "object"
                     }
+                  },
+                  "prune": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "false = partial chunk, upsert only (chunked sync)"
+                  },
+                  "channelIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Full live channel ids for the final prune call"
+                  },
+                  "roleIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Full live role ids for the final prune call"
                   }
                 }
               }
@@ -11392,6 +11521,948 @@
           },
           "403": {
             "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-emojis/by-guild": {
+      "get": {
+        "operationId": "listGuildEmojisByGuild",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "List a guild's emoji/sticker catalog rows",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "discord"
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "emoji",
+                "sticker"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated catalog rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "guildEmojis": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GuildEmoji"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-emojis/search": {
+      "get": {
+        "operationId": "searchGuildEmojis",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Search the emoji/sticker catalog across every guild",
+        "description": "Requires the admin role.",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "example": "discord"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "emoji",
+                "sticker"
+              ]
+            }
+          },
+          {
+            "name": "animated",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Case-insensitive substring match."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 24,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated catalog rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "guildEmojis": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GuildEmoji"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "offset": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-emojis/by-name": {
+      "get": {
+        "operationId": "getGuildEmojiByName",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Get a catalog row by (app, guildId, name)",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "discord"
+            }
+          },
+          {
+            "name": "guildId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The row.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "guildEmoji": {
+                      "$ref": "#/components/schemas/GuildEmoji"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateGuildEmojiByName",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Update a catalog row looked up by (app, guildId, name)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "name"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "discord"
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "Current name, used to locate the row."
+                  },
+                  "imagePath": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteGuildEmojiByName",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Delete a catalog row looked up by (app, guildId, name)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "guildId",
+                  "name"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "discord"
+                  },
+                  "guildId": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-emojis": {
+      "get": {
+        "operationId": "getGuildEmojiByAppId",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Get a catalog row by (app, id)",
+        "parameters": [
+          {
+            "name": "app",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "discord"
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The row.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "guildEmoji": {
+                      "$ref": "#/components/schemas/GuildEmoji"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateGuildEmojiByAppId",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Update a catalog row looked up by (app, id)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "id"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "discord"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "imagePath": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteGuildEmojiByAppId",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Delete a catalog row looked up by (app, id)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "app",
+                  "id"
+                ],
+                "properties": {
+                  "app": {
+                    "type": "string",
+                    "example": "discord"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-emojis/{internalId}": {
+      "get": {
+        "operationId": "getGuildEmojiByInternalId",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Get a catalog row by internal id",
+        "parameters": [
+          {
+            "name": "internalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The row.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "guildEmoji": {
+                      "$ref": "#/components/schemas/GuildEmoji"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateGuildEmojiByInternalId",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Update a catalog row by internal id",
+        "parameters": [
+          {
+            "name": "internalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "imagePath": {
+                    "type": "string",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteGuildEmojiByInternalId",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Delete a catalog row by internal id",
+        "parameters": [
+          {
+            "name": "internalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-emojis/{internalId}/image": {
+      "get": {
+        "operationId": "getGuildEmojiImage",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Get a catalog row's image file",
+        "description": "Requires the admin role.",
+        "parameters": [
+          {
+            "name": "internalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image file (image/png or image/gif).",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "operationId": "uploadGuildEmojiImage",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Replace or add a catalog row's image",
+        "description": "Requires the admin role.",
+        "parameters": [
+          {
+            "name": "internalId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "image"
+                ],
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "imagePath": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "500": {
             "$ref": "#/components/responses/ServerError"

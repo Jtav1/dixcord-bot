@@ -22,6 +22,7 @@ export const GLOBAL_FEATURES = [
   { key: "milestones", label: "Milestones", icon: "mdi-flag-checkered" },
   { key: "pin-archive", label: "Pin Archive", icon: "mdi-pin-outline" },
   { key: "audit-log", label: "Audit Log", icon: "mdi-clipboard-text-clock-outline" },
+  { key: "guild-emojis", label: "Emoji/Sticker Catalog", icon: "mdi-emoticon-outline" },
 ];
 
 /** @type {{ key: string, label: string, icon: string }[]} */

@@ -17,7 +17,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = parseInt(process.env.PORT || "3002", 10);
 const WEBAPI_URL = process.env.WEBAPI_URL || "http://localhost:3000";
 const distDir = path.join(__dirname, "dist");
-const filesDir = path.join(__dirname, "files");
+const filesDir = process.env.EMOJI_FILES_DIR
+  ? path.resolve(process.env.EMOJI_FILES_DIR)
+  : path.join(__dirname, "files");
 const filesStatic = express.static(filesDir);
 
 try {

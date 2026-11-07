@@ -365,7 +365,7 @@ router.post("/count-repost", authenticate, async (req, res) => {
  * Replaces this guild's guild_emojis catalog rows (type='emoji'), keeping rows with usage
  * history (frequency > 0) even if no longer live on Discord; guild_emojis.frequency itself is
  * untouched. Gracefully no-ops (imported:0) if guildId isn't a known guild.
- * Body: { app: "discord", guildId: string, emojis: Array<{ id: string, name: string, animated?: boolean, available?: boolean, managed?: boolean, requiresColons?: boolean, roles?: string[] }> }
+ * Body: { app: "discord", guildId: string, emojis: Array<{ id: string, name: string, animated?: boolean, available?: boolean, managed?: boolean, requiresColons?: boolean, roles?: string[], imagePath?: string|null }> }
  * Response: { ok: true, imported: number }
  * Auth: required.
  * @openapi
@@ -403,6 +403,7 @@ router.post("/count-repost", authenticate, async (req, res) => {
  *                     managed: { type: boolean, nullable: true }
  *                     requiresColons: { type: boolean, nullable: true }
  *                     roles: { type: array, items: { type: string } }
+ *                     imagePath: { type: string, nullable: true, description: "Relative path under the shared emoji files root, set by the bot's downloader; omit/null if the download was skipped or failed." }
  *     responses:
  *       '200':
  *         description: Emoji catalog synced.
@@ -458,7 +459,7 @@ router.post("/emoji-import", authenticate, async (req, res) => {
  * Replaces this guild's guild_emojis catalog rows (type='sticker'), keeping rows with usage
  * history (frequency > 0) even if no longer live on Discord; guild_emojis.frequency itself is
  * untouched. Gracefully no-ops (imported:0) if guildId isn't a known guild.
- * Body: { app: "discord", guildId: string, stickers: Array<{ id: string, name: string }> }
+ * Body: { app: "discord", guildId: string, stickers: Array<{ id: string, name: string, imagePath?: string|null }> }
  * Response: { ok: true, imported: number }
  * Auth: required.
  * @openapi
@@ -491,6 +492,7 @@ router.post("/emoji-import", authenticate, async (req, res) => {
  *                   properties:
  *                     id: { type: string }
  *                     name: { type: string }
+ *                     imagePath: { type: string, nullable: true, description: "Relative path under the shared emoji files root, set by the bot's downloader; omit/null if skipped (e.g. Lottie) or failed." }
  *     responses:
  *       '200':
  *         description: Sticker catalog synced.

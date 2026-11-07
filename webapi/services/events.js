@@ -176,7 +176,9 @@ export async function getEmojiStatsForUser(userId, app, limit) {
     emoid: String(row.emoid),
     frequency: Number(row.frequency),
   }));
-  return attachEmojiObjects(parsed);
+  // includeImagePath: true - this backs GET /api/leaderboards/emoji/user/:userId, a webview
+  // emoji-list route; see emojiFrequency.js's attachEmojiObjects for why this is opt-in.
+  return attachEmojiObjects(parsed, { includeImagePath: true });
 }
 
 const STICKER_FREQUENCY_WHERE = "ge.type = 'sticker'";
@@ -214,7 +216,9 @@ export async function getStickerStatsForUser(userId, app, limit) {
     emoid: String(row.emoid),
     frequency: Number(row.frequency),
   }));
-  return attachEmojiObjects(parsed);
+  // includeImagePath: true - this backs GET /api/leaderboards/sticker/user/:userId, a webview
+  // sticker-list route; see emojiFrequency.js's attachEmojiObjects for why this is opt-in.
+  return attachEmojiObjects(parsed, { includeImagePath: true });
 }
 
 /**

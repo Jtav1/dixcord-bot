@@ -1,8 +1,11 @@
 import * as api from "./client.js";
+import { downloadEmojiImage, mapWithConcurrency } from "./utilities/emojiFiles.js";
 import { guildId } from "../configVars.js";
 
 /**
  * Sync server emoji list with the web API. Fully replaces this guild's guild_emojis catalog.
+ * Downloads each emoji's image into the shared emoji files volume first, so the import payload
+ * can carry its resolved relative path.
  * POST /api/message-processing/emoji-import
  * @param {Iterable<import('discord.js').GuildEmoji>} emojiObjectList - e.g. guild.emojis (Collection)
  */
@@ -10,7 +13,14 @@ export const importEmojiList = async (emojiObjectList) => {
   const list = Array.isArray(emojiObjectList)
     ? emojiObjectList
     : Array.from(emojiObjectList.values?.() ?? emojiObjectList);
-  const emojis = list.map((e) => ({
+  const imagePaths = await mapWithConcurrency(list, 10, (e) =>
+    downloadEmojiImage({
+      name: String(e.name),
+      animated: Boolean(e.animated),
+      url: e.imageURL({ extension: e.animated ? "gif" : "png" }),
+    }),
+  );
+  const emojis = list.map((e, i) => ({
     id: String(e.id),
     name: String(e.name),
     animated: Boolean(e.animated),
@@ -19,6 +29,7 @@ export const importEmojiList = async (emojiObjectList) => {
     requiresColons: e.requiresColons ?? null,
     roles: e.roles?.cache ? [...e.roles.cache.keys()] : [],
     type: "emoji",
+    imagePath: imagePaths[i],
   }));
   const path = "/api/message-processing/emoji-import";
   await api.postInChunks(path, { app: "discord", guildId, prune: false }, "emojis", emojis);

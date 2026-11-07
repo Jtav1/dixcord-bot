@@ -4,6 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import bcrypt from "bcryptjs";
+import multer from "multer";
 import { apiReference } from "@scalar/express-api-reference";
 import db from "./config/db.js";
 import { ensureSchemaMigrations } from "./scripts/ensureSchema.js";
@@ -31,6 +32,7 @@ import auditLogRoutes from "./routes/audit-log.js";
 import statisticsRoutes from "./routes/statistics.js";
 import guildRoutes from "./routes/guild.js";
 import guildMembersRoutes from "./routes/guild-members.js";
+import guildEmojisRoutes from "./routes/guild-emojis.js";
 import serviceAccountsRoutes from "./routes/service-accounts.js";
 import reactRoleRoutes from "./routes/react-role.js";
 
@@ -402,6 +404,26 @@ app.get("/", publicLimiter, (req, res) => {
         ],
         adminRoutes: ["GET /api/guild-members/unlinked?app=&guildId="],
       },
+      guildEmojis: {
+        authRequired: true,
+        routes: [
+          "GET /api/guild-emojis/by-guild?app=&guildId=&type=&limit=&offset= (bot/admin)",
+          "GET /api/guild-emojis/by-name?app=&guildId=&name= (bot/admin)",
+          "PUT /api/guild-emojis/by-name (body: { app, guildId, name, name?, imagePath? }) (bot/admin)",
+          "DELETE /api/guild-emojis/by-name (body: { app, guildId, name }) (bot/admin)",
+          "GET /api/guild-emojis?app=&id= (bot/admin)",
+          "PUT /api/guild-emojis (body: { app, id, name?, imagePath? }) (bot/admin)",
+          "DELETE /api/guild-emojis (body: { app, id }) (bot/admin)",
+          "GET /api/guild-emojis/:internalId (bot/admin)",
+          "PUT /api/guild-emojis/:internalId (body: { name?, imagePath? }) (bot/admin)",
+          "DELETE /api/guild-emojis/:internalId (bot/admin)",
+        ],
+        adminRoutes: [
+          "GET /api/guild-emojis/search?app=&type=&animated=&name=&limit=&offset=",
+          "GET /api/guild-emojis/:internalId/image",
+          "POST /api/guild-emojis/:internalId/image (multipart, field \"image\")",
+        ],
+      },
       serviceAccounts: {
         authRequired: true,
         adminRoutes: [
@@ -628,6 +650,7 @@ app.use("/api/audit-log", auditLogRoutes);
 app.use("/api/statistics", statisticsRoutes);
 app.use("/api/guild", guildRoutes);
 app.use("/api/guild-members", guildMembersRoutes);
+app.use("/api/guild-emojis", guildEmojisRoutes);
 app.use("/api/service-accounts", serviceAccountsRoutes);
 app.use("/api/react-role", reactRoleRoutes);
 
@@ -636,6 +659,10 @@ app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 app.use((err, req, res, next) => {
   if (err?.type === "entity.too.large") {
     return res.status(413).json({ ok: false, error: "Request body too large" });
+  }
+  if (err instanceof multer.MulterError) {
+    const status = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+    return res.status(status).json({ ok: false, error: err.message });
   }
   console.error(err);
   res.status(500).json({ ok: false, error: "Internal server error" });

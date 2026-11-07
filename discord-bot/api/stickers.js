@@ -1,18 +1,25 @@
 import * as api from "./client.js";
+import { downloadStickerImage, mapWithConcurrency } from "./utilities/emojiFiles.js";
 import { guildId } from "../configVars.js";
 
 /**
  * Sync server sticker list with the web API. Fully replaces this guild's sticker catalog.
+ * Downloads each sticker's image into the shared emoji files volume first (skipping Lottie
+ * stickers, which have no raster image), so the import payload can carry its resolved path.
  * POST /api/message-processing/sticker-import
- * @param {Iterable<{ id: string, name: string }>} stickerObjectList - e.g. guild.stickers (Collection)
+ * @param {Iterable<import('discord.js').Sticker>} stickerObjectList - e.g. guild.stickers (Collection)
  */
 export const importStickerList = async (stickerObjectList) => {
   const list = Array.isArray(stickerObjectList)
     ? stickerObjectList
     : Array.from(stickerObjectList.values?.() ?? stickerObjectList);
-  const stickers = list.map((s) => ({
+  const imagePaths = await mapWithConcurrency(list, 10, (s) =>
+    downloadStickerImage({ name: String(s.name), format: s.format, url: s.url }),
+  );
+  const stickers = list.map((s, i) => ({
     id: String(s.id),
     name: String(s.name),
+    imagePath: imagePaths[i],
   }));
   const path = "/api/message-processing/sticker-import";
   await api.postInChunks(path, { app: "discord", guildId, prune: false }, "stickers", stickers);

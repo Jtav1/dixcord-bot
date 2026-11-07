@@ -44,6 +44,7 @@ const definition = {
     { name: "Audit Log", description: "Admin action audit trail" },
     { name: "Statistics", description: "Aggregate usage counts" },
     { name: "React Role", description: "Reaction-based role self-assignment message" },
+    { name: "Guild Emojis", description: "Emoji/sticker catalog CRUD by internal id, (app, id), or (app, guildId, name)" },
   ],
   components: {
     securitySchemes: {
@@ -142,6 +143,33 @@ const definition = {
           },
           animated: { type: "integer", nullable: true, enum: [0, 1, null] },
           type: { type: "string", nullable: true, enum: ["emoji", "sticker", null] },
+          imagePath: {
+            type: "string",
+            nullable: true,
+            description: "Relative path under the shared emoji files root. Present only on the webview emoji/sticker list routes (leaderboards/emoji, leaderboards/sticker, and their per-user variants) — omitted elsewhere.",
+          },
+        },
+      },
+      GuildEmoji: {
+        type: "object",
+        description:
+          "A full guild_emojis catalog row, as returned by the Guild Emojis CRUD endpoints. " +
+          "Distinct from EmojiFrequency, which is the display-only shape leaderboard routes use.",
+        properties: {
+          internalId: { type: "integer", description: "Surrogate key for CRUD-by-id lookups." },
+          id: { type: "string", description: "Discord/Fluxer snowflake, or the literal unicode character for a built-in emoji." },
+          app: { type: "string" },
+          guildId: { type: "string", nullable: true },
+          type: { type: "string", nullable: true, enum: ["emoji", "sticker", null] },
+          name: { type: "string" },
+          animated: { type: "boolean" },
+          available: { type: "boolean", nullable: true },
+          managed: { type: "boolean", nullable: true },
+          requiresColons: { type: "boolean", nullable: true },
+          roles: { type: "array", items: { type: "string" } },
+          imagePath: { type: "string", nullable: true, description: "Relative path under the shared emoji files root." },
+          frequency: { type: "integer", description: "Usage counter; owned by the sync/usage pipeline, not mutable via this CRUD." },
+          syncedAt: { type: "string", format: "date-time" },
         },
       },
       ConfigEmojiValue: {

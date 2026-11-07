@@ -1977,6 +1977,70 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: guild_emojis already keyed on (app, id)");
   }
 
+  // guild_emojis.image_path: relative path (under the shared emoji/sticker files root) to the
+  // downloaded image for this row, set by discord-bot/fluxer-bot's emoji/sticker sync. NULL until
+  // a sync downloads an image (or for unicode/Lottie rows, which have none).
+  if (await tableExists(db, "guild_emojis", isSqlite)) {
+    if (!(await columnExists(db, "guild_emojis", "image_path", isSqlite))) {
+      await db.query(
+        isSqlite
+          ? "ALTER TABLE guild_emojis ADD COLUMN image_path TEXT NULL"
+          : "ALTER TABLE guild_emojis ADD COLUMN image_path VARCHAR(500) NULL",
+      );
+      applied.push("guild_emojis.image_path column");
+      console.log("db: migration applied: added guild_emojis.image_path column");
+    } else {
+      console.log("db: schema ok: guild_emojis.image_path column already exists");
+    }
+  }
+
+  // guild_emojis.internal_id: auto-increment surrogate key for CRUD-by-id lookups (the real key
+  // is (app, id), which isn't convenient to type/pass around). Backfilled for all existing rows.
+  // MySQL needs a non-PK AUTO_INCREMENT paired with a UNIQUE KEY (InnoDB allows this as long as
+  // it's the leading column of some key). SQLite: plain INTEGER + UNIQUE INDEX, backfilled from
+  // rowid — true AUTOINCREMENT semantics aren't needed since this isn't a FK target yet.
+  if (await tableExists(db, "guild_emojis", isSqlite)) {
+    if (!(await columnExists(db, "guild_emojis", "internal_id", isSqlite))) {
+      if (isSqlite) {
+        await db.query("ALTER TABLE guild_emojis ADD COLUMN internal_id INTEGER");
+        await db.query("UPDATE guild_emojis SET internal_id = rowid WHERE internal_id IS NULL");
+      } else {
+        await db.query("ALTER TABLE guild_emojis ADD COLUMN internal_id INT NULL");
+        // Backfill deterministically via a ranked self-join (no window-function dependency).
+        await db.query("SET @rownum := 0");
+        await db.query(`
+          UPDATE guild_emojis
+          JOIN (
+            SELECT app, id, (@rownum := @rownum + 1) AS rn
+            FROM guild_emojis
+            ORDER BY synced_at, app, id
+          ) ranked ON guild_emojis.app = ranked.app AND guild_emojis.id = ranked.id
+          SET guild_emojis.internal_id = ranked.rn
+        `);
+        // Unique key must exist before the column can be made AUTO_INCREMENT.
+        await db.query(
+          "ALTER TABLE guild_emojis ADD UNIQUE KEY uniq_guild_emojis_internal_id (internal_id)",
+        );
+        await db.query(
+          "ALTER TABLE guild_emojis MODIFY COLUMN internal_id INT NOT NULL AUTO_INCREMENT",
+        );
+      }
+      applied.push("guild_emojis.internal_id column (backfilled)");
+      console.log("db: migration applied: added guild_emojis.internal_id column, backfilled existing rows");
+    } else {
+      console.log("db: schema ok: guild_emojis.internal_id column already exists");
+    }
+    // Fresh installs (schema.sqlite.sql's CREATE TABLE) get the column but not this index — see
+    // the comment in schema.sqlite.sql. MySQL's unique key is added above or inline by
+    // schema.sql's CREATE TABLE, so this branch is SQLite-only.
+    if (isSqlite && !(await indexExists(db, "guild_emojis", "uniq_guild_emojis_internal_id", isSqlite))) {
+      await db.query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uniq_guild_emojis_internal_id ON guild_emojis (internal_id)",
+      );
+      console.log("db: migration applied: created uniq_guild_emojis_internal_id index");
+    }
+  }
+
   // member_emoji_tracking: add app, scope unique_user_emoji to (userid, app, emoid) — same
   // reasoning as guild_emojis above. Existing rows are attributed to 'discord'.
   if (
