@@ -634,6 +634,9 @@ app.use("/api/react-role", reactRoleRoutes);
 app.use((req, res) => res.status(404).json({ ok: false, error: "Not found" }));
 
 app.use((err, req, res, next) => {
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ ok: false, error: "Request body too large" });
+  }
   console.error(err);
   res.status(500).json({ ok: false, error: "Internal server error" });
 });

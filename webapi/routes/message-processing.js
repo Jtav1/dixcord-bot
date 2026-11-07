@@ -389,6 +389,8 @@ router.post("/count-repost", authenticate, async (req, res) => {
  *             properties:
  *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string }
+ *               prune: { type: boolean, default: true, description: "false = partial chunk, upsert only (chunked sync)" }
+ *               liveIds: { type: array, items: { type: string }, description: "Full live id list used by the final prune call; default is the ids in this body" }
  *               emojis:
  *                 type: array
  *                 items:
@@ -410,7 +412,7 @@ router.post("/count-repost", authenticate, async (req, res) => {
  *               type: object
  *               properties:
  *                 ok: { type: boolean, enum: [true] }
- *                 imported: { type: integer, description: "New rows added; existing emoji ids are skipped." }
+ *                 imported: { type: integer, description: "Rows upserted in this call." }
  *       '400':
  *         description: Missing/invalid app, or emojis is not an array.
  *         content:
@@ -427,8 +429,17 @@ router.post("/emoji-import", authenticate, async (req, res) => {
     if (!resolveChatAppFromRequest(req)) {
       return res.status(400).json(CHAT_APP_PARAM_ERROR);
     }
-    const { app, guildId, emojis } = req.body ?? {};
-    const result = await importGuildAssetFrequencyList(emojis, "emoji", app, guildId);
+    const { app, guildId, emojis, prune, liveIds } = req.body ?? {};
+    if (prune !== undefined && typeof prune !== "boolean") {
+      return res.status(400).json({ ok: false, error: "prune must be a boolean" });
+    }
+    if (liveIds !== undefined && !Array.isArray(liveIds)) {
+      return res.status(400).json({ ok: false, error: "liveIds must be an array" });
+    }
+    const result = await importGuildAssetFrequencyList(emojis, "emoji", app, guildId, {
+      prune: prune ?? true,
+      liveIds: liveIds ?? null,
+    });
     if (!result.ok) {
       return res
         .status(400)
@@ -471,6 +482,8 @@ router.post("/emoji-import", authenticate, async (req, res) => {
  *             properties:
  *               app: { type: string, enum: [discord, fluxer] }
  *               guildId: { type: string }
+ *               prune: { type: boolean, default: true, description: "false = partial chunk, upsert only (chunked sync)" }
+ *               liveIds: { type: array, items: { type: string }, description: "Full live id list used by the final prune call; default is the ids in this body" }
  *               stickers:
  *                 type: array
  *                 items:
@@ -504,8 +517,17 @@ router.post("/sticker-import", authenticate, async (req, res) => {
     if (!resolveChatAppFromRequest(req)) {
       return res.status(400).json(CHAT_APP_PARAM_ERROR);
     }
-    const { app, guildId, stickers } = req.body ?? {};
-    const result = await importGuildAssetFrequencyList(stickers, "sticker", app, guildId);
+    const { app, guildId, stickers, prune, liveIds } = req.body ?? {};
+    if (prune !== undefined && typeof prune !== "boolean") {
+      return res.status(400).json({ ok: false, error: "prune must be a boolean" });
+    }
+    if (liveIds !== undefined && !Array.isArray(liveIds)) {
+      return res.status(400).json({ ok: false, error: "liveIds must be an array" });
+    }
+    const result = await importGuildAssetFrequencyList(stickers, "sticker", app, guildId, {
+      prune: prune ?? true,
+      liveIds: liveIds ?? null,
+    });
     if (!result.ok) {
       return res
         .status(400)

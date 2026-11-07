@@ -20,7 +20,9 @@ export const importEmojiList = async (emojiObjectList) => {
     roles: e.roles?.cache ? [...e.roles.cache.keys()] : [],
     type: "emoji",
   }));
-  await api.post("/api/message-processing/emoji-import", { app: "discord", guildId, emojis });
+  const path = "/api/message-processing/emoji-import";
+  await api.postInChunks(path, { app: "discord", guildId, prune: false }, "emojis", emojis);
+  await api.post(path, { app: "discord", guildId, emojis: [], prune: true, liveIds: emojis.map((e) => e.id) });
   console.log("bot: emoji import via webapi complete");
 };
 

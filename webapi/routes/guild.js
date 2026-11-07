@@ -137,6 +137,9 @@ router.get("/all", authenticate, requireAdmin, async (req, res) => {
  *               guild: { type: object }
  *               channels: { type: array, items: { type: object } }
  *               roles: { type: array, items: { type: object } }
+ *               prune: { type: boolean, default: true, description: "false = partial chunk, upsert only (chunked sync)" }
+ *               channelIds: { type: array, items: { type: string }, description: "Full live channel ids for the final prune call" }
+ *               roleIds: { type: array, items: { type: string }, description: "Full live role ids for the final prune call" }
  *     responses:
  *       '200':
  *         description: Snapshot stored.
@@ -157,8 +160,16 @@ router.get("/all", authenticate, requireAdmin, async (req, res) => {
  */
 router.post("/sync", authenticate, requireOwnGuildOrAdmin, async (req, res) => {
   try {
-    const { app, guildId, guild, channels, roles } = req.body ?? {};
-    const result = await upsertGuildSnapshot({ app, guildId, guild, channels, roles });
+    const { app, guildId, guild, channels, roles, prune, channelIds, roleIds } = req.body ?? {};
+    if (prune !== undefined && typeof prune !== "boolean") {
+      return res.status(400).json({ ok: false, error: "prune must be a boolean" });
+    }
+    const result = await upsertGuildSnapshot({
+      app, guildId, guild, channels, roles,
+      prune: prune ?? true,
+      channelIds: channelIds ?? null,
+      roleIds: roleIds ?? null,
+    });
     if (!result.ok) {
       return res.status(400).json({ ok: false, error: result.error });
     }

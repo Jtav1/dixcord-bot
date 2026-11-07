@@ -14,7 +14,9 @@ export const importStickerList = async (stickerObjectList) => {
     id: String(s.id),
     name: String(s.name),
   }));
-  await api.post("/api/message-processing/sticker-import", { app: "discord", guildId, stickers });
+  const path = "/api/message-processing/sticker-import";
+  await api.postInChunks(path, { app: "discord", guildId, prune: false }, "stickers", stickers);
+  await api.post(path, { app: "discord", guildId, stickers: [], prune: true, liveIds: stickers.map((s) => s.id) });
   console.log("bot: sticker import via webapi complete");
 };
 

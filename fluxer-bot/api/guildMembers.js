@@ -8,7 +8,6 @@ import { client } from "../fluxerClient.js";
 
 const GUILD_MEMBERS_SYNC_INTERVAL_MS = 5 * 60 * 1000;
 const FETCH_PAGE_SIZE = 1000; // fluxer max per page
-const POST_BATCH_SIZE = 200; // keeps each sync body under webapi's 100kb json limit
 
 let syncInProgress = false;
 
@@ -54,15 +53,12 @@ export async function syncGuildMembers() {
   const guild = await client.guilds.resolve(guildId);
   const members = (await fetchAllMembers(guild)).map(toSyncMember);
 
-  let inserted = 0;
-  for (let i = 0; i < members.length; i += POST_BATCH_SIZE) {
-    const { data } = await api.post("/api/guild-members/sync", {
-      app: "fluxer",
-      guildId,
-      members: members.slice(i, i + POST_BATCH_SIZE),
-    });
-    inserted += data?.inserted ?? 0;
-  }
+  const { inserted = 0 } = await api.postInChunks(
+    "/api/guild-members/sync",
+    { app: "fluxer", guildId },
+    "members",
+    members,
+  );
 
   if (inserted > 0) {
     console.log(`bot: synced ${inserted} new guild member(s)`);
