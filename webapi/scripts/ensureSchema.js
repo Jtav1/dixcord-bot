@@ -2553,6 +2553,41 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: react_role_bindings table already exists");
   }
 
+  // Scraped Facebook Marketplace listing cache (see services/facebookMarketplace.js).
+  if (!(await tableExists(db, "facebook_marketplace_cache", isSqlite))) {
+    if (isSqlite) {
+      await db.query(`
+        CREATE TABLE facebook_marketplace_cache (
+          listing_id TEXT PRIMARY KEY,
+          canonical_url TEXT NOT NULL,
+          title TEXT NULL,
+          price TEXT NULL,
+          location TEXT NULL,
+          description TEXT NULL,
+          image_url TEXT NULL,
+          scraped_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+    } else {
+      await db.query(`
+        CREATE TABLE facebook_marketplace_cache (
+          listing_id VARCHAR(64) PRIMARY KEY,
+          canonical_url VARCHAR(500) NOT NULL,
+          title VARCHAR(255) NULL,
+          price VARCHAR(100) NULL,
+          location VARCHAR(255) NULL,
+          description TEXT NULL,
+          image_url VARCHAR(1000) NULL,
+          scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `);
+    }
+    applied.push("facebook_marketplace_cache table");
+    console.log("db: migration applied: created facebook_marketplace_cache table");
+  } else {
+    console.log("db: schema ok: facebook_marketplace_cache table already exists");
+  }
+
   if (applied.length === 0) {
     console.log("db: schema valid; no migrations applied");
   } else {

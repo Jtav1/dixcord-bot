@@ -10,6 +10,7 @@ const counters = {
   messagesProcessedTotal: 0,
   triggerResponsesMatchedTotal: 0,
   linkFixerTriggeredTotal: 0,
+  facebookMarketplacePreviewsTotal: 0,
   remindersCreatedTotal: 0,
   reminderParseFailuresTotal: 0,
   eightBallResponsesTotal: 0,
