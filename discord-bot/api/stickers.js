@@ -13,6 +13,7 @@ export const importStickerList = async (stickerObjectList) => {
   const list = Array.isArray(stickerObjectList)
     ? stickerObjectList
     : Array.from(stickerObjectList.values?.() ?? stickerObjectList);
+  console.log(`bot: sticker image/filepath sync starting (${list.length} stickers)`);
   const imagePaths = await mapWithConcurrency(list, 10, (s) =>
     downloadStickerImage({ name: String(s.name), format: s.format, url: s.url }),
   );
@@ -24,7 +25,7 @@ export const importStickerList = async (stickerObjectList) => {
   const path = "/api/message-processing/sticker-import";
   await api.postInChunks(path, { app: "discord", guildId, prune: false }, "stickers", stickers);
   await api.post(path, { app: "discord", guildId, stickers: [], prune: true, liveIds: stickers.map((s) => s.id) });
-  console.log("bot: sticker import via webapi complete");
+  console.log(`bot: sticker image/filepath sync complete (${imagePaths.filter(Boolean).length}/${list.length} images resolved)`);
 };
 
 /**

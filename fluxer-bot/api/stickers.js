@@ -10,6 +10,7 @@ import { guildId } from "../configVars.js";
  * @param {Array<import('@fluxerjs/core').GuildSticker>} stickerList - e.g. from guild.fetchStickers()
  */
 export const importStickerList = async (stickerList) => {
+  console.log(`bot: sticker image/filepath sync starting (${stickerList.length} stickers)`);
   const imagePaths = await mapWithConcurrency(stickerList, 10, (s) =>
     downloadStickerImage({ name: String(s.name), animated: Boolean(s.animated), url: s.url }),
   );
@@ -21,7 +22,7 @@ export const importStickerList = async (stickerList) => {
   const path = "/api/message-processing/sticker-import";
   await api.postInChunks(path, { app: "fluxer", guildId, prune: false }, "stickers", stickers);
   await api.post(path, { app: "fluxer", guildId, stickers: [], prune: true, liveIds: stickers.map((s) => s.id) });
-  console.log("bot: sticker import via webapi complete");
+  console.log(`bot: sticker image/filepath sync complete (${imagePaths.filter(Boolean).length}/${stickerList.length} images resolved)`);
 };
 
 /**

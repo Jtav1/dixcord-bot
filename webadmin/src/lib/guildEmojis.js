@@ -45,11 +45,24 @@ export async function deleteGuildEmoji(internalId) {
 /**
  * URL for a catalog row's current image (404s if it has none) — used directly as a `<v-img>`
  * src; the webadmin proxy attaches auth server-side, so no manual fetch/blob handling is needed.
+ * Only for single-item lookups (the detail popup) — the catalog grid uses
+ * fetchGuildEmojiImages instead, to avoid one request per card.
  * @param {number} internalId
  * @returns {string}
  */
 export function guildEmojiImageUrl(internalId) {
   return `${API_BASE}/guild-emojis/${internalId}/image`;
+}
+
+/**
+ * Batch-fetch images for a page of catalog rows in one request (capped at 100 ids server-side).
+ * @param {number[]} internalIds
+ * @returns {Promise<Record<number, string|null>>} data URIs keyed by internalId
+ */
+export async function fetchGuildEmojiImages(internalIds) {
+  if (internalIds.length === 0) return {};
+  const data = await apiFetchJson("POST", "/guild-emojis/images", { internalIds }, "Guild emoji images");
+  return data.images;
 }
 
 /**

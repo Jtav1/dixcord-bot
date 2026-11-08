@@ -13,6 +13,7 @@ export const importEmojiList = async (emojiObjectList) => {
   const list = Array.isArray(emojiObjectList)
     ? emojiObjectList
     : Array.from(emojiObjectList.values?.() ?? emojiObjectList);
+  console.log(`bot: emoji image/filepath sync starting (${list.length} emoji)`);
   const imagePaths = await mapWithConcurrency(list, 10, (e) =>
     downloadEmojiImage({
       name: String(e.name),
@@ -34,7 +35,7 @@ export const importEmojiList = async (emojiObjectList) => {
   const path = "/api/message-processing/emoji-import";
   await api.postInChunks(path, { app: "discord", guildId, prune: false }, "emojis", emojis);
   await api.post(path, { app: "discord", guildId, emojis: [], prune: true, liveIds: emojis.map((e) => e.id) });
-  console.log("bot: emoji import via webapi complete");
+  console.log(`bot: emoji image/filepath sync complete (${imagePaths.filter(Boolean).length}/${list.length} images resolved)`);
 };
 
 /**

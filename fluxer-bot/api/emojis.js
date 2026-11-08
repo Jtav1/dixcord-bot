@@ -10,6 +10,7 @@ import { guildId } from "../configVars.js";
  * @param {Array<import('@fluxerjs/core').GuildEmoji>} emojiList - e.g. from guild.fetchEmojis()
  */
 export const importEmojiList = async (emojiList) => {
+  console.log(`bot: emoji image/filepath sync starting (${emojiList.length} emoji)`);
   const imagePaths = await mapWithConcurrency(emojiList, 10, (e) =>
     downloadEmojiImage({ name: String(e.name), animated: Boolean(e.animated), url: e.url }),
   );
@@ -27,7 +28,7 @@ export const importEmojiList = async (emojiList) => {
   const path = "/api/message-processing/emoji-import";
   await api.postInChunks(path, { app: "fluxer", guildId, prune: false }, "emojis", emojis);
   await api.post(path, { app: "fluxer", guildId, emojis: [], prune: true, liveIds: emojis.map((e) => e.id) });
-  console.log("bot: emoji import via webapi complete");
+  console.log(`bot: emoji image/filepath sync complete (${imagePaths.filter(Boolean).length}/${emojiList.length} images resolved)`);
 };
 
 /**

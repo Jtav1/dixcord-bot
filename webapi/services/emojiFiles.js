@@ -32,6 +32,25 @@ export function canonicalImagePath({ type, name, animated }) {
     : { relativePath: `Emojis/${name}.png`, mimetype: "image/png" };
 }
 
+const MIME_BY_EXTENSION = { ".png": "image/png", ".gif": "image/gif" };
+
+/**
+ * Read one image file and return it as a data URI, or null if it's missing/unreadable.
+ * @param {string|null|undefined} imagePath - relative to getEmojiFilesRoot()
+ * @returns {Promise<string|null>}
+ */
+export async function readImageAsDataUri(imagePath) {
+  if (!imagePath) return null;
+  const mimetype = MIME_BY_EXTENSION[path.extname(imagePath).toLowerCase()];
+  if (!mimetype) return null;
+  try {
+    const buffer = await fs.readFile(path.join(getEmojiFilesRoot(), imagePath));
+    return `data:${mimetype};base64,${buffer.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Best-effort delete each given `guild_emojis.image_path`, but only if no row still references
  * it — the same filename can be shared across rows (webview's lookup is name-keyed, so two

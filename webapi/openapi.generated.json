@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "dixcord-bot webapi",
-    "version": "4.1.0",
+    "version": "4.1.4",
     "description": "Internal REST API backing the dixcord-bot Discord bot, webview, and webadmin services. Every route requires a service-account JWT (admin, bot, or webview) except login and health."
   },
   "servers": [
@@ -11720,6 +11720,76 @@
                     },
                     "offset": {
                       "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/guild-emojis/images": {
+      "post": {
+        "operationId": "getGuildEmojiImages",
+        "tags": [
+          "Guild Emojis"
+        ],
+        "summary": "Batch-fetch catalog row images as data URIs",
+        "description": "Requires the admin role. Capped at 100 ids per call.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "internalIds"
+                ],
+                "properties": {
+                  "internalIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Data URIs keyed by internalId (null if missing/no image).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "images": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "nullable": true
+                      }
                     }
                   }
                 }

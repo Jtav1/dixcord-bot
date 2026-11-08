@@ -4,7 +4,10 @@
  */
 
 import db from "../config/db.js";
+import { readImageAsDataUri } from "./emojiFiles.js";
 import { parseLimit } from "./leaderboards.js";
+
+const MAX_BATCH_IMAGE_IDS = 100;
 
 /**
  * Map a raw guild_emojis row to the camelCase API shape.
@@ -139,6 +142,30 @@ export async function searchGuildEmojis({ app, type, animated, name, limit, offs
   );
 
   return { rows: (Array.isArray(rows) ? rows : []).map(toApiShape), total };
+}
+
+/**
+ * Batch-read images for a page of catalog rows as data URIs, one query instead of one HTTP
+ * request per card — what the webadmin catalog browser calls once per page load.
+ * @param {number[]} internalIds - capped at MAX_BATCH_IMAGE_IDS
+ * @returns {Promise<Record<number, string|null>>} keyed by internalId; missing/no-image ids map to null
+ */
+export async function getImageDataUris(internalIds) {
+  const ids = internalIds.slice(0, MAX_BATCH_IMAGE_IDS);
+  const result = {};
+  for (const id of ids) result[id] = null;
+  if (ids.length === 0) return result;
+
+  const [rows] = await db.query(
+    `SELECT internal_id, image_path FROM guild_emojis WHERE internal_id IN (${ids.map(() => "?").join(", ")})`,
+    ids,
+  );
+  await Promise.all(
+    (rows ?? []).map(async (row) => {
+      result[row.internal_id] = await readImageAsDataUri(row.image_path);
+    }),
+  );
+  return result;
 }
 
 /**

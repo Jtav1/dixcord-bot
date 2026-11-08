@@ -10,6 +10,7 @@ import {
   getByAppGuildName,
   getByAppId,
   getByInternalId,
+  getImageDataUris,
   listByGuild,
   searchGuildEmojis,
   updateRow,
@@ -224,6 +225,61 @@ router.get("/search", authenticate, requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("GET /api/guild-emojis/search error:", err);
     res.status(500).json({ ok: false, error: "Failed to search guild emojis" });
+  }
+});
+
+/**
+ * POST /api/guild-emojis/images
+ * Batch-read images for a page of catalog rows as data URIs — one request per page instead of
+ * one per card, to avoid rate-limiting the catalog browser.
+ * Body: { internalIds: number[] }
+ * Auth: admin only.
+ * @openapi
+ * /api/guild-emojis/images:
+ *   post:
+ *     operationId: getGuildEmojiImages
+ *     tags: [Guild Emojis]
+ *     summary: Batch-fetch catalog row images as data URIs
+ *     description: Requires the admin role. Capped at 100 ids per call.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [internalIds]
+ *             properties:
+ *               internalIds: { type: array, items: { type: integer } }
+ *     responses:
+ *       '200':
+ *         description: Data URIs keyed by internalId (null if missing/no image).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok: { type: boolean, enum: [true] }
+ *                 images: { type: object, additionalProperties: { type: string, nullable: true } }
+ *       '400':
+ *         $ref: '#/components/responses/BadRequest'
+ *       '401':
+ *         $ref: '#/components/responses/Unauthorized'
+ *       '403':
+ *         $ref: '#/components/responses/ForbiddenRole'
+ *       '500':
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post("/images", authenticate, requireAdmin, async (req, res) => {
+  try {
+    const internalIds = req.body?.internalIds;
+    if (!Array.isArray(internalIds) || !internalIds.every((id) => Number.isInteger(id))) {
+      return res.status(400).json({ ok: false, error: "internalIds must be an array of integers" });
+    }
+    const images = await getImageDataUris(internalIds);
+    res.json({ ok: true, images });
+  } catch (err) {
+    console.error("POST /api/guild-emojis/images error:", err);
+    res.status(500).json({ ok: false, error: "Failed to fetch guild emoji images" });
   }
 });
 

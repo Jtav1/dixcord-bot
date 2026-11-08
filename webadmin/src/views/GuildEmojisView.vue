@@ -55,11 +55,8 @@
           <v-card class="glass-card emoji-card" @click="openDetail(item)">
             <div class="d-flex align-center ga-3 pa-3">
               <v-avatar size="40" rounded="lg" class="flex-shrink-0">
-                <v-img :src="guildEmojiImageUrl(item.internalId)" cover>
-                  <template #error>
-                    <v-icon icon="mdi-image-off-outline" size="20" />
-                  </template>
-                </v-img>
+                <v-img v-if="imagesByInternalId[item.internalId]" :src="imagesByInternalId[item.internalId]" cover />
+                <v-icon v-else icon="mdi-image-off-outline" size="20" />
               </v-avatar>
               <div class="flex-grow-1 text-truncate">
                 <div class="text-body-2 font-weight-medium text-truncate">{{ item.name }}</div>
@@ -169,13 +166,14 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import ConfirmDialog from "../components/ConfirmDialog.vue";
 import { usePaginatedResource } from "../composables/usePaginatedResource.js";
 import { useSnackbar } from "../composables/useSnackbar.js";
 import { appLabel } from "../nav/clients.js";
 import {
   deleteGuildEmoji,
+  fetchGuildEmojiImages,
   guildEmojiImageUrl,
   searchGuildEmojis,
   updateGuildEmoji,
@@ -215,6 +213,13 @@ const { items, loading, error, page, totalPages, load } = usePaginatedResource(
     }),
   { pageSize: 24 },
 );
+
+const imagesByInternalId = ref({});
+
+// One batched request per page load, instead of one image request per card.
+watch(items, async (pageItems) => {
+  imagesByInternalId.value = await fetchGuildEmojiImages(pageItems.map((item) => item.internalId));
+});
 
 /**
  * @returns {void}
@@ -296,6 +301,8 @@ async function onFileSelected(event) {
     const imagePath = await uploadGuildEmojiImage(detail.value.internalId, file);
     notify("Image uploaded");
     detail.value = { ...detail.value, imagePath };
+    const refreshed = await fetchGuildEmojiImages([detail.value.internalId]);
+    imagesByInternalId.value = { ...imagesByInternalId.value, ...refreshed };
   } catch (err) {
     notify(err instanceof Error ? err.message : "Failed to upload image", { color: "error" });
   } finally {
