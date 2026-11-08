@@ -1,10 +1,8 @@
 import { EmbedBuilder } from "@fluxerjs/builders";
 
 /**
- * Extract up to `limit` facebook.com Marketplace-shaped URLs from message content — a
- * pre-filter so webapi isn't asked about every unrelated facebook.com link (profile/group/post
- * links). A `/share/` link's true destination is unknown until webapi resolves it, so those are
- * included too; webapi does the authoritative check either way.
+ * Extract up to `limit` facebook.com Marketplace-shaped URLs (pre-filter only — webapi does the
+ * authoritative check, since a `/share/` link's destination is unknown until it resolves it).
  * @param {string} content
  * @param {number} [limit]
  * @returns {string[]}

@@ -53,9 +53,8 @@ export function guildEmojiImageUrl(internalId) {
 }
 
 /**
- * Replace (or add) a catalog row's image. The file must match the mimetype the row's
- * name/type/animated combination expects (image/png, or image/gif for an animated emoji) —
- * webapi rejects a mismatch with a descriptive error.
+ * Replace (or add) a catalog row's image — webapi rejects it if the mimetype doesn't match what
+ * the row's name/type/animated combination expects.
  * @param {number} internalId
  * @param {File} file
  * @returns {Promise<string>} the new imagePath

@@ -1977,9 +1977,7 @@ export async function ensureSchemaMigrations() {
     console.log("db: schema ok: guild_emojis already keyed on (app, id)");
   }
 
-  // guild_emojis.image_path: relative path (under the shared emoji/sticker files root) to the
-  // downloaded image for this row, set by discord-bot/fluxer-bot's emoji/sticker sync. NULL until
-  // a sync downloads an image (or for unicode/Lottie rows, which have none).
+  // guild_emojis.image_path: relative path to the synced image for this row (see emojiFiles.js).
   if (await tableExists(db, "guild_emojis", isSqlite)) {
     if (!(await columnExists(db, "guild_emojis", "image_path", isSqlite))) {
       await db.query(
@@ -1994,11 +1992,8 @@ export async function ensureSchemaMigrations() {
     }
   }
 
-  // guild_emojis.internal_id: auto-increment surrogate key for CRUD-by-id lookups (the real key
-  // is (app, id), which isn't convenient to type/pass around). Backfilled for all existing rows.
-  // MySQL needs a non-PK AUTO_INCREMENT paired with a UNIQUE KEY (InnoDB allows this as long as
-  // it's the leading column of some key). SQLite: plain INTEGER + UNIQUE INDEX, backfilled from
-  // rowid — true AUTOINCREMENT semantics aren't needed since this isn't a FK target yet.
+  // guild_emojis.internal_id: auto-increment surrogate key for CRUD-by-id lookups (the real key,
+  // (app, id), isn't convenient to type/pass around). Backfilled for all existing rows.
   if (await tableExists(db, "guild_emojis", isSqlite)) {
     if (!(await columnExists(db, "guild_emojis", "internal_id", isSqlite))) {
       if (isSqlite) {
@@ -2030,9 +2025,7 @@ export async function ensureSchemaMigrations() {
     } else {
       console.log("db: schema ok: guild_emojis.internal_id column already exists");
     }
-    // Fresh installs (schema.sqlite.sql's CREATE TABLE) get the column but not this index — see
-    // the comment in schema.sqlite.sql. MySQL's unique key is added above or inline by
-    // schema.sql's CREATE TABLE, so this branch is SQLite-only.
+    // SQLite-only: fresh installs get the column but not this index (see schema.sqlite.sql).
     if (isSqlite && !(await indexExists(db, "guild_emojis", "uniq_guild_emojis_internal_id", isSqlite))) {
       await db.query(
         "CREATE UNIQUE INDEX IF NOT EXISTS uniq_guild_emojis_internal_id ON guild_emojis (internal_id)",

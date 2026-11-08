@@ -82,9 +82,8 @@ export async function downloadEmojiImage({ name, animated, url }) {
 }
 
 /**
- * Download a sticker's image into `Stickers/`. Fluxer's GuildSticker (per fluxer.js docs) always
- * exposes a direct CDN `.url` and an `animated` flag, same as its emoji shape — no Lottie-style
- * non-raster format to guard against here.
+ * Download a sticker's image into `Stickers/` — unlike Discord, no Lottie-style non-raster
+ * format to guard against here (GuildSticker's shape mirrors GuildEmoji's, per fluxer.js docs).
  * @param {{ name: string, animated: boolean, url: string }} sticker
  * @returns {Promise<string|null>} relative path (e.g. `"Stickers/wave.gif"`), or null on failure
  */

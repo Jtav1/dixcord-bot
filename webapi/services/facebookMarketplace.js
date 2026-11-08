@@ -1,10 +1,8 @@
 /**
- * Facebook Marketplace link scraping/caching. Facebook renders listing data (title/price/
- * location/description/photo) into the page's own server-rendered Relay JSON blob — not
- * something requiring JS execution — but only when the request carries a full, realistic
- * browser header set; a bare fetch() gets a 400. This is scraping an undocumented, unstable
- * internal shape Facebook can change without notice, so every extraction failure degrades to
- * "not a listing" rather than throwing — a scrape failure must never surface as a chat error.
+ * Facebook Marketplace link scraping/caching. Listing data lives in the page's own
+ * server-rendered JSON (no JS execution needed), but only with a full browser header set — and
+ * it's an undocumented shape Facebook can change anytime, so failures degrade to "not a
+ * listing" rather than throwing.
  */
 
 import db from "../config/db.js";
