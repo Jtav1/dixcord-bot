@@ -35,6 +35,7 @@
           icon="mdi-account-multiple"
           size="small"
           variant="text"
+          aria-label="Create new user mapping (only for a new member joining the community)"
           :loading="resolvingId === item.id"
           @click="onResolve(item)"
         />
