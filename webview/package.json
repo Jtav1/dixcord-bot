@@ -1,6 +1,6 @@
 {
   "name": "dixcord-bot-webview",
-  "version": "4.1.0",
+  "version": "4.1.4",
   "description": "Public view frontend for dixcord-bot",
   "type": "module",
   "scripts": {

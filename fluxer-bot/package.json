@@ -1,6 +1,6 @@
 {
   "name": "fluxer-bot",
-  "version": "v0.1.0",
+  "version": "4.1.4",
   "description": "",
   "main": "bot.js",
   "type": "module",
