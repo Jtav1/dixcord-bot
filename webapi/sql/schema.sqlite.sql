@@ -442,3 +442,18 @@ CREATE TABLE IF NOT EXISTS react_role_bindings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_react_role_bindings_message ON react_role_bindings (message_id);
+
+-- Scraped Facebook Marketplace listing cache, keyed on listing id alone — platform-agnostic
+-- (not scoped to any app/guild), since the same listing id means the same real-world item no
+-- matter who pastes the link. Rows older than FACEBOOK_MARKETPLACE_CACHE_TTL_DAYS are deleted
+-- opportunistically on write (see services/facebookMarketplace.js) rather than via a cron job.
+CREATE TABLE IF NOT EXISTS facebook_marketplace_cache (
+  listing_id TEXT PRIMARY KEY,
+  canonical_url TEXT NOT NULL,
+  title TEXT NULL,
+  price TEXT NULL,
+  location TEXT NULL,
+  description TEXT NULL,
+  image_url TEXT NULL,
+  scraped_at TEXT DEFAULT (datetime('now'))
+);

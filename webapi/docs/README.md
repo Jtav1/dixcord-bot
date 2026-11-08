@@ -9,7 +9,7 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 ## Features overview
 
 - **Auth & users** – Login (JWT); register disabled; profile get/update/delete. Bootstraps service accounts from env (`admin`, `bot`, `webview`).
-- **Bot responses** – Random 8-ball fortunes; social link fixer.
+- **Bot responses** – Random 8-ball fortunes; social link fixer; Facebook Marketplace link resolution (scrapes title/price/location/description/photo for a Marketplace URL, caching results in `facebook_marketplace_cache` for `FACEBOOK_MARKETPLACE_CACHE_TTL_DAYS`).
 - **Message processing** – Emoji/sticker usage, plus/minus scoring, repost tracking, pin check/log, emoji/sticker import.
 - **Config** – Per-`(app, guildId)` key/value bot settings (pin threshold, emoji IDs, channels, feature on/off toggles, etc.); each server a community operates gets its own fully independent set, auto-seeded with defaults when first registered via guild sync.
 - **Link replacements** – CRUD for source_host → target_host rewrite rules.
@@ -57,6 +57,7 @@ App-level setup and layout also live in [`../README.md`](../README.md). Copy [`.
 | `CORS_ORIGINS` | legacy defaults if unset | Comma-separated hostnames or full origins allowed for CORS |
 | `API_RATE_LIMIT_MAX` | `300` | Authenticated API requests per minute per IP |
 | `PIN_FILES_DIR` | `../discord-bot/files` | Shared directory for pin attachment files |
+| `FACEBOOK_MARKETPLACE_CACHE_TTL_DAYS` | `7` | Days to keep a scraped Facebook Marketplace listing cached before it's deleted |
 | `DISCORD_GUILD_ID` | unset | Dev-only: guild to seed `guild_config` for on first boot (see below) |
 | `SEED_CONFIG_<KEY>` | unset | Dev-only: value for `guild_config`'s `<key>` (uppercased) when seeding on first boot |
 
@@ -82,6 +83,7 @@ Every route exposed by the API (auth: use `Authorization: Bearer <token>` unless
 | DELETE | `/api/users/me` | ✓ | Delete account |
 | POST | `/api/bot-responses/fortune` | ✓ | Random 8-ball fortune |
 | POST | `/api/bot-responses/link-fixer` | ✓ | Fix embed-friendly link (body: `{ message, app, guildId }`) |
+| POST | `/api/bot-responses/facebook-marketplace` | ✓ | Resolve a Facebook URL to Marketplace listing details, if it is one (body: `{ url, app, guildId }`); cached, gated by `facebook_marketplace_enabled` |
 | POST | `/api/message-processing/emoji-count` | ✓ | Record emoji usage / +/- reply |
 | POST | `/api/message-processing/plusminus` | ✓ | Record plus/minus (message or reaction) |
 | POST | `/api/message-processing/count-repost` | ✓ | Record or withdraw repost accusation |

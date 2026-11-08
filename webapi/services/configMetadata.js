@@ -186,6 +186,12 @@ export const CONFIG_METADATA = Object.freeze({
     requiresBotRestart: false,
     defaultValue: envDefault("react_for_role_enabled", "false"),
   },
+  facebook_marketplace_enabled: {
+    description: "Enable Facebook Marketplace link preview cards",
+    type: "boolean",
+    requiresBotRestart: false,
+    defaultValue: envDefault("facebook_marketplace_enabled", "false"),
+  },
 });
 
 const CONFIG_KEY_ORDER = Object.keys(CONFIG_METADATA);

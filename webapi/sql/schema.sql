@@ -434,3 +434,18 @@ CREATE TABLE IF NOT EXISTS react_role_bindings (
   UNIQUE KEY uniq_react_role_bindings_role (message_id, role_id),
   KEY idx_react_role_bindings_message (message_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Scraped Facebook Marketplace listing cache, keyed on listing id alone — platform-agnostic
+-- (not scoped to any app/guild), since the same listing id means the same real-world item no
+-- matter who pastes the link. Rows older than FACEBOOK_MARKETPLACE_CACHE_TTL_DAYS are deleted
+-- opportunistically on write (see services/facebookMarketplace.js) rather than via a cron job.
+CREATE TABLE IF NOT EXISTS facebook_marketplace_cache (
+  listing_id VARCHAR(64) PRIMARY KEY,
+  canonical_url VARCHAR(500) NOT NULL,
+  title VARCHAR(255) NULL,
+  price VARCHAR(100) NULL,
+  location VARCHAR(255) NULL,
+  description TEXT NULL,
+  image_url VARCHAR(1000) NULL,
+  scraped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

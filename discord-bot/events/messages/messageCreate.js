@@ -6,6 +6,7 @@ import {
   getLinkFixerResponse,
   getFortuneResponse,
 } from "../../api/responses.js";
+import { getFacebookMarketplacePreview } from "../../api/facebookMarketplace.js";
 import { getRandomResponseForTrigger } from "../../api/triggerResponses.js";
 import { executeResponseFunction } from "../../utilities/triggerResponseFunctions.js";
 import {
@@ -21,6 +22,10 @@ import {
 import { emojiDetector } from "./utilities/emojiDetector.js";
 import { stickerDetector } from "./utilities/stickerDetector.js";
 import { plusMinusMsg } from "./utilities/plusplus.js";
+import {
+  buildFacebookMarketplaceEmbed,
+  extractFacebookMarketplaceUrls,
+} from "./utilities/facebookMarketplaceEmbed.js";
 import { announceMilestones } from "../../utilities/milestoneNotifier.js";
 import {
   isLinkFixerEnabled,
@@ -29,6 +34,7 @@ import {
   isEightBallEnabled,
   isStickerTrackingEnabled,
   isPlusPlusEnabled,
+  isFacebookMarketplaceEnabled,
 } from "../../configStore.js";
 import { incrementCounter } from "../../utilities/metrics.js";
 
@@ -67,6 +73,23 @@ const execute = async (message) => {
           response = twitFixReply;
           incrementCounter("linkFixerTriggeredTotal");
         }
+      }
+    }
+
+    if (isFacebookMarketplaceEnabled()) {
+      const fbUrls = extractFacebookMarketplaceUrls(message.content);
+      const embeds = [];
+      for (const url of fbUrls) {
+        try {
+          const listing = await getFacebookMarketplacePreview(url);
+          if (listing) embeds.push(buildFacebookMarketplaceEmbed(listing));
+        } catch (err) {
+          console.error("bot: Facebook Marketplace lookup failed:", err.message);
+        }
+      }
+      if (embeds.length > 0) {
+        await message.reply({ embeds });
+        incrementCounter("facebookMarketplacePreviewsTotal");
       }
     }
 

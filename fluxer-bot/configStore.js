@@ -180,4 +180,9 @@ export function isReactForRoleEnabled() {
   return getConfigValue("react_for_role_enabled", "false") === "true";
 }
 
+/** @returns {boolean} Defaults to disabled, unlike isFeatureEnabled's default-on convention. */
+export function isFacebookMarketplaceEnabled() {
+  return getConfigValue("facebook_marketplace_enabled", "false") === "true";
+}
+
 await loadConfig();

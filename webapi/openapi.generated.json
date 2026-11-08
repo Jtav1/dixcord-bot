@@ -13675,6 +13675,114 @@
         }
       }
     },
+    "/api/bot-responses/facebook-marketplace": {
+      "post": {
+        "operationId": "getFacebookMarketplacePreview",
+        "tags": [
+          "Bot Responses"
+        ],
+        "summary": "Resolve a Facebook link to Marketplace listing details, if it is one",
+        "description": "Returns isMarketplaceListing:false (not an error) for any facebook.com URL that isn't a Marketplace item, or when facebook_marketplace_enabled is off for this server. 400 only for a URL whose host isn't a recognized Facebook domain (this endpoint fetches the URL server-side, so that's an SSRF guard, not a soft case).\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "url",
+                  "app",
+                  "guildId"
+                ],
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "example": "https://www.facebook.com/marketplace/item/1157528266644960/"
+                  },
+                  "app": {
+                    "type": "string",
+                    "enum": [
+                      "discord",
+                      "fluxer"
+                    ]
+                  },
+                  "guildId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolution result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "isMarketplaceListing": {
+                      "type": "boolean"
+                    },
+                    "listing": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "url": {
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "price": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "location": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "description": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "imageUrl": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenRole"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
     "/api/auth/register": {
       "post": {
         "operationId": "registerUser",
