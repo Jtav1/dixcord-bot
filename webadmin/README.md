@@ -1,6 +1,6 @@
 # Dixcord Admin Panel
 
-Node.js + Vite frontend scaffold for the dixcord-bot admin panel. Uses [webapi](../webapi/) as its only backend in both development and production.
+Node.js + Vite admin panel for dixcord-bot. Uses [webapi](../webapi/) as its only backend in both development and production. See [`../docs/web-frontends.md`](../docs/web-frontends.md) for the current feature/route/component architecture.
 
 All API traffic goes to same-origin `/api`, which is proxied to `WEBAPI_URL` from `.env`. The
 proxy authenticates to webapi server-side as the `ADMIN_USERNAME`/`ADMIN_PASSWORD` service

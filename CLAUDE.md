@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Discord-bot: a self-hostable discord bot. This bot is comprised of a web backend `webapi/` and multiple front-ends; `discord-bot/` is the discord bot client built using discordjs, `fluxer-bot/` is a bot client for [Fluxer](https://github.com/fluxerapp/fluxer) (a self-hostable Discord-alternative) built using fluxer.js, intended to grow toward feature parity with `discord-bot/`, `webview/` is a read-only website for reviewing bot info and stats, and `webadmin/` is an admin-only (and should be locally hosted and inaccessible from the internet really) bot control panel. 
+Discord-bot: a self-hostable discord bot. This bot is comprised of a web backend `webapi/` and multiple front-ends; `discord-bot/` is the discord bot client built using discordjs, `fluxer-bot/` is a bot client for [Fluxer](https://github.com/fluxerapp/fluxer) (a self-hostable Discord-alternative) built using fluxer.js, at near-full feature parity with `discord-bot/` (see [`docs/bot-features.md`](docs/bot-features.md) for the feature-by-feature comparison), `webview/` is a read-only website for reviewing bot info and stats, and `webadmin/` is an admin-only (and should be locally hosted and inaccessible from the internet really) bot control panel — a 15+ feature app today, not a scaffold. See [`docs/webapi-internals.md`](docs/webapi-internals.md) for webapi service-layer patterns and [`docs/web-frontends.md`](docs/web-frontends.md) for webview/webadmin architecture.
 
 ## Git usage restriction
 
@@ -68,7 +68,7 @@ npm run run    # node bot.js
 npm start      # node scripts/start.js (waits for webapi /health, then bot.js)
 ```
 
-Base template only today (login + ready logging) — no feature commands/events yet. Mirrors `discord-bot/`'s structure (dynamic `events/`/`commands/` loaders, `api/client.js` webapi JWT client, `configVars.js`) so ported features stay consistent across both bots.
+At near-full feature parity with `discord-bot/` (17 commands, 14 event files) plus one fluxer-only feature (`color-me`) — see [`docs/bot-features.md`](docs/bot-features.md). No slash commands: fluxer.js has no `ApplicationCommand`/`Interaction` types, so commands are prefix-text (`FLUXER_COMMAND_PREFIX`, default `!`). Mirrors `discord-bot/`'s structure (dynamic `events/`/`commands/` loaders, `api/client.js` webapi JWT client, `configVars.js`) so ported features stay consistent across both bots.
 
 ### webview/ (public read-only site, port 3002 default)
 
@@ -81,7 +81,7 @@ npm run build    # vite build -> dist/
 npm start        # node server.js (serves dist/ + proxies /api to webapi)
 ```
 
-### webadmin/ (admin panel, port 3001 default — currently a minimal scaffold)
+### webadmin/ (admin panel, port 3001 default)
 
 ```bash
 cd webadmin

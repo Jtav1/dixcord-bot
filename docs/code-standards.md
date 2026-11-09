@@ -3,7 +3,7 @@
 Conventions observed across this repository's five Node.js/ESM services:
 
 - **`discord-bot/`** — Discord.js v14 bot; depends on `webapi` for almost all behavior.
-- **`fluxer-bot/`** — fluxer.js bot for [Fluxer](https://github.com/fluxerapp/fluxer); base template only today, growing toward feature parity with `discord-bot/`; same `webapi` dependency once features are ported.
+- **`fluxer-bot/`** — fluxer.js bot for [Fluxer](https://github.com/fluxerapp/fluxer); at near-full feature parity with `discord-bot/`; same `webapi` dependency.
 - **`webapi/`** — Express REST API (MySQL or SQLite), JWT auth; backend for all other services.
 - **`webview/`** — Vue 3 + Vuetify public read-only stats site, with a small Express prod server.
 - **`webadmin/`** — Vue 3 + Vuetify admin panel, with a small Express prod server.
@@ -68,8 +68,8 @@ This document describes what the code **actually does**, not an aspirational sty
 - One deliberate divergence: fluxer.js doesn't pass the client into event handlers (unlike discord.js's `readyClient` arg), so the `Client` singleton lives in its own `fluxerClient.js` and event files import it directly rather than receiving it as a handler argument.
 - `@fluxerjs/core` has no Discord-style gateway intents; don't introduce an intents-equivalent option unless a future fluxer.js version adds one.
 - Self-hosted Fluxer instances need discovery (`Client.fromDiscovery(origin)`) rather than a bare `new Client()` — see `fluxerClient.js` and the `FLUXER_INSTANCE_URL` env var.
-- Feature parity tracking lives in [`fluxer-bot/FEATURE_PARITY.md`](../fluxer-bot/FEATURE_PARITY.md) — check a feature off there (or note why it deviates) as it's ported.
-- No feature commands/events are implemented yet (base template only) — don't infer additional conventions beyond what's listed here until real features land.
+- Feature parity tracking lives in [`fluxer-bot/FEATURE_PARITY.md`](../fluxer-bot/FEATURE_PARITY.md) — check a feature off there (or note why it deviates) as it's ported. See [`bot-features.md`](bot-features.md) for how each ported feature actually works across both bots, including documented deviations.
+- fluxer.js has no slash-command primitive, so all 17 commands are prefix-text (`FLUXER_COMMAND_PREFIX`, default `!`) rather than `ApplicationCommand`/`Interaction`-based.
 
 ## webapi/
 
@@ -111,7 +111,7 @@ This document describes what the code **actually does**, not an aspirational sty
 ## Reference files
 
 - Discord bot shape + JSDoc style: [`discord-bot/events/messages/utilities/messagePinner.js`](../discord-bot/events/messages/utilities/messagePinner.js)
-- Fluxer bot base template + loader shape: [`fluxer-bot/bot.js`](../fluxer-bot/bot.js)
+- Fluxer bot loader shape: [`fluxer-bot/bot.js`](../fluxer-bot/bot.js)
 - Web API route + error/response envelope: [`webapi/routes/trigger-responses.js`](../webapi/routes/trigger-responses.js)
 - Web API service module layout: [`webapi/services/messageProcessing.js`](../webapi/services/messageProcessing.js)
 - Web API auth middleware: [`webapi/middleware/auth.js`](../webapi/middleware/auth.js)

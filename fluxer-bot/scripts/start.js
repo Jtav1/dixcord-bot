@@ -10,7 +10,7 @@ const appDir = path.join(__dirname, "..");
 
 await waitForWebapi();
 
-// No slash-command deploy step yet — commands/ is empty until the first feature is ported.
+// No slash-command deploy step: fluxer.js has no slash-command primitive, commands are prefix-text.
 
 const child = spawn("node", ["bot.js"], {
   cwd: appDir,
